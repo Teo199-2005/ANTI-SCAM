@@ -96,7 +96,7 @@ export default function Footer() {
               About
             </h3>
             <p className="text-sm leading-7 text-white/55">
-              Anti-Scam PH connects guests with verified luxury resorts
+              Anti-Scam PH connects guests with verified resorts
               across the Philippines through a seamless, secure booking experience.
             </p>
             <ul className="mt-6 space-y-3">
