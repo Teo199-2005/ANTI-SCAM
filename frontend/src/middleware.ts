@@ -1,33 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost";
+/**
+ * Production apex domain (no protocol), e.g. anti-scamph.com.
+ * Required for `{tenant}.anti-scamph.com` → `/resorts/{tenant}` routing.
+ * If unset, only `*.localhost` is treated as tenant hosts (local dev).
+ */
+const ROOT_DOMAIN_CONFIG = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase() ?? "";
 
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
 
   // Strip port for comparison
-  const hostname = host.split(":")[0];
+  const hostname = host.split(":")[0].toLowerCase();
 
   const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-  const isRootDomain = hostname === ROOT_DOMAIN || hostname === `www.${ROOT_DOMAIN}`;
-
-  if (isLocalhost || isRootDomain) {
+  if (isLocalhost) {
     return NextResponse.next();
   }
 
-  // Check for a subdomain (e.g. beachparadise.resortstaycation.com)
-  const rootParts = ROOT_DOMAIN.split(".");
-  const hostParts = hostname.split(".");
+  let subdomain: string | null = null;
 
-  if (hostParts.length > rootParts.length) {
-    const subdomain = hostParts[0];
-    const url = request.nextUrl.clone();
-    const originalPath = url.pathname === "/" ? "" : url.pathname;
-    url.pathname = `/resorts/${subdomain}${originalPath}`;
-    return NextResponse.rewrite(url);
+  if (ROOT_DOMAIN_CONFIG) {
+    if (hostname === ROOT_DOMAIN_CONFIG || hostname === `www.${ROOT_DOMAIN_CONFIG}`) {
+      return NextResponse.next();
+    }
+    const suffix = `.${ROOT_DOMAIN_CONFIG}`;
+    if (hostname.endsWith(suffix)) {
+      const sub = hostname.slice(0, -suffix.length);
+      if (sub && !sub.includes(".")) {
+        subdomain = sub;
+      }
+    }
+  } else if (hostname.endsWith(".localhost")) {
+    const sub = hostname.slice(0, -".localhost".length);
+    if (sub && !sub.includes(".")) {
+      subdomain = sub;
+    }
   }
 
-  return NextResponse.next();
+  if (!subdomain) {
+    return NextResponse.next();
+  }
+
+  const url = request.nextUrl.clone();
+  const originalPath = url.pathname === "/" ? "" : url.pathname;
+  url.pathname = `/resorts/${subdomain}${originalPath}`;
+  return NextResponse.rewrite(url);
 }
 
 export const config = {
