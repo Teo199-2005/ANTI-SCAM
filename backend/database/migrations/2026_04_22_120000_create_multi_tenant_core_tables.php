@@ -59,7 +59,13 @@ return new class extends Migration
             $table->date('billing_cycle_end');
             $table->date('next_due_date');
             $table->date('grace_until')->nullable();
-            $table->enum('status', ['active', 'pending_payment', 'grace_period', 'suspended', 'cancelled'])->default('pending_payment');
+            $table->enum('status', [
+                'active',
+                'pending_payment',
+                'grace_period',
+                'suspended',
+                'cancelled'
+            ])->default('pending_payment');
             $table->timestamps();
 
             $table->index(['tenant_id', 'status', 'next_due_date']);
@@ -77,13 +83,27 @@ return new class extends Migration
             $table->unsignedInteger('guest_count')->default(1);
             $table->decimal('reservation_fee', 10, 2)->default(500);
             $table->decimal('total_amount', 12, 2)->default(0);
-            $table->enum('status', ['pending_payment', 'confirmed', 'cancelled', 'expired'])->default('pending_payment');
+            $table->enum('status', [
+                'pending_payment',
+                'confirmed',
+                'cancelled',
+                'expired'
+            ])->default('pending_payment');
             $table->string('xendit_invoice_id')->nullable()->index();
-            $table->enum('xendit_payment_status', ['pending', 'paid', 'failed', 'expired'])->nullable();
+            $table->enum('xendit_payment_status', [
+                'pending',
+                'paid',
+                'failed',
+                'expired'
+            ])->nullable();
             $table->timestamp('reserved_at')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'room_id', 'check_in_date', 'check_out_date']);
+            // ✅ FIXED: short index name (prevents MySQL 64-char limit error)
+            $table->index(
+                ['tenant_id', 'room_id', 'check_in_date', 'check_out_date'],
+                'reservations_room_date_idx'
+            );
         });
 
         Schema::create('booking_locks', function (Blueprint $table): void {
@@ -97,7 +117,10 @@ return new class extends Migration
             $table->enum('status', ['locked', 'released', 'converted'])->default('locked');
             $table->timestamps();
 
-            $table->index(['tenant_id', 'room_id', 'check_in_date', 'check_out_date', 'status'], 'booking_locks_lookup_idx');
+            $table->index(
+                ['tenant_id', 'room_id', 'check_in_date', 'check_out_date', 'status'],
+                'booking_locks_lookup_idx'
+            );
         });
 
         Schema::create('audit_logs', function (Blueprint $table): void {
