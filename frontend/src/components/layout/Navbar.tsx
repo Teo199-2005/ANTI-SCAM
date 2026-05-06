@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Anchor, LogIn, Menu, UserPlus, X } from "lucide-react";
+import { LogIn, Menu, UserPlus, X } from "lucide-react";
 import PageContainer from "./PageContainer";
 import Logo from "./Logo";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,12 +10,10 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
 const navLinks = [
-  { href: "/",        label: "Home"           },
-  { href: "/resorts", label: "Resorts"        },
-  { href: "/about",   label: "About"          },
-  { href: "/blogs",   label: "Blogs"          },
-  { href: "/contact", label: "Contact"        },
-  { href: "/booking", label: "Booking Engine" },
+  { href: "/",        label: "Home"    },
+  { href: "/about",   label: "About"   },
+  { href: "/blogs",   label: "Blogs"   },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default function Navbar() {
@@ -117,15 +115,6 @@ export default function Navbar() {
                   </Link>
                 </>
               )}
-
-              {/* Book Now CTA */}
-              <Link
-                href="/booking"
-                className="cl-btn-primary hidden sm:inline-flex"
-              >
-                <Anchor size={14} />
-                Book Now
-              </Link>
 
               {/* Hamburger */}
               <button
@@ -235,14 +224,6 @@ export default function Navbar() {
                 </Link>
               </>
             )}
-            <Link
-              href="/booking"
-              onClick={() => setDrawerOpen(false)}
-              className="cl-btn-primary flex w-full justify-center"
-            >
-              <Anchor size={14} />
-              Book Now
-            </Link>
           </div>
         </aside>
       </>

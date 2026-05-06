@@ -58,7 +58,7 @@ const slides: Slide[] = [
     headline: "No more\ndouble bookings",
     sub: "Real-time room locking ensures every reservation is unique. When a room is booked, it's off the calendar instantly.",
     cta: "See how it works",
-    ctaHref: "/booking",
+    ctaHref: "/about",
     accent: "from-emerald-400/30 to-teal-500/20",
     blob: "bg-emerald-400",
   },
@@ -68,8 +68,8 @@ const slides: Slide[] = [
     eyebrow: "Seamless Experience",
     headline: "Easy booking,\nfor everyone",
     sub: "Guests reserve in minutes. Owners approve without lifting a finger. The whole flow is automated end-to-end.",
-    cta: "Try the booking engine",
-    ctaHref: "/booking",
+    cta: "Learn more",
+    ctaHref: "/about",
     accent: "from-clCoral/30 to-clCoralDark/20",
     blob: "bg-clCoral",
   },
@@ -186,8 +186,8 @@ export default function HeroSlider() {
           >
             {slide.cta}
           </Link>
-          <Link href="/resorts" className="cl-btn-ghost-dark">
-            Browse Resorts
+          <Link href="/contact" className="cl-btn-ghost-dark">
+            Contact
           </Link>
         </div>
 

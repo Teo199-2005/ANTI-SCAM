@@ -12,12 +12,10 @@ import PageContainer from "./PageContainer";
 import Logo from "./Logo";
 
 const quickLinks = [
-  { href: "/",        label: "Home"           },
-  { href: "/resorts", label: "Browse Resorts" },
-  { href: "/booking", label: "Booking Engine" },
-  { href: "/about",   label: "About Us"       },
-  { href: "/blogs",   label: "Blogs"          },
-  { href: "/contact", label: "Contact"        },
+  { href: "/",        label: "Home"     },
+  { href: "/about",   label: "About Us" },
+  { href: "/blogs",   label: "Blogs"    },
+  { href: "/contact", label: "Contact"  },
 ];
 
 const guestLinks = [
@@ -197,10 +195,10 @@ export default function Footer() {
             </div>
 
             <Link
-              href="/booking"
+              href="/contact"
               className="mt-5 flex w-full items-center justify-center rounded-full bg-gradient-to-r from-clOcean to-clTeal py-2.5 text-sm font-semibold text-white shadow-cl-btn transition hover:from-clOceanHover hover:to-clOcean active:scale-[0.985]"
             >
-              Book a Stay →
+              Contact us →
             </Link>
           </div>
         </div>
