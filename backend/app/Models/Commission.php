@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Commission extends Model
+{
+    protected $fillable = [
+        'marketer_id', 'resort_id', 'period',
+        'gross_bookings', 'commission_rate', 'commission_amount', 'status',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'gross_bookings'    => 'decimal:2',
+            'commission_rate'   => 'float',
+            'commission_amount' => 'decimal:2',
+        ];
+    }
+
+    public function marketer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'marketer_id');
+    }
+
+    public function resort(): BelongsTo
+    {
+        return $this->belongsTo(Resort::class);
+    }
+
+    public function releases(): HasMany
+    {
+        return $this->hasMany(CommissionRelease::class);
+    }
+}

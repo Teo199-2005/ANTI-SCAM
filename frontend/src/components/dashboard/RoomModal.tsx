@@ -1,0 +1,331 @@
+"use client";
+
+import { apiClient } from "@/lib/api/client";
+import { Image as ImageIcon, Loader2, Star, Trash2, Upload, X } from "lucide-react";
+import { useToast } from "@/components/shared/ToastProvider";
+import { useEffect, useRef, useState } from "react";
+
+export type RoomFormValues = {
+  resort_id: number;
+  name: string;
+  code: string;
+  capacity: number;
+  base_price: number;
+  amenities: string[];
+  rules: string;
+  status: "active" | "inactive" | "maintenance";
+};
+
+type RoomImage = {
+  id: number;
+  url: string;
+  is_primary: boolean;
+  original_name: string;
+};
+
+type RoomModalProps = {
+  open: boolean;
+  title: string;
+  initialValues: RoomFormValues;
+  loading: boolean;
+  roomId?: number;
+  onClose: () => void;
+  onSave: (values: RoomFormValues) => Promise<void>;
+};
+
+type Tab = "details" | "images";
+
+export default function RoomModal({ open, title, initialValues, loading, roomId, onClose, onSave }: RoomModalProps) {
+  const [form, setForm] = useState<RoomFormValues>(initialValues);
+  const [visible, setVisible] = useState(false);
+  const [tab, setTab] = useState<Tab>("details");
+  const [images, setImages] = useState<RoomImage[]>([]);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deletingImg, setDeletingImg] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { pushToast } = useToast();
+
+  useEffect(() => {
+    setForm(initialValues);
+    setTab("details");
+  }, [initialValues, open]);
+
+  useEffect(() => {
+    if (open) {
+      const t = window.setTimeout(() => setVisible(true), 10);
+      return () => window.clearTimeout(t);
+    } else {
+      setVisible(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (tab === "images" && roomId) {
+      void loadImages();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, roomId]);
+
+  const loadImages = async () => {
+    if (!roomId) return;
+    setLoadingImages(true);
+    try {
+      const { data } = await apiClient.get<{ success: boolean; data: RoomImage[] }>(`/rooms/${roomId}/images`);
+      setImages(Array.isArray(data.data) ? data.data : []);
+    } catch {
+      setImages([]);
+      pushToast({ title: "Couldn’t load photos", description: "Try reopening the Images tab.", tone: "error" });
+    } finally {
+      setLoadingImages(false);
+    }
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !roomId) return;
+    // enforce 5 images per room client-side
+    const existing = images.length;
+    const incoming = files.length;
+    if (existing + incoming > 5) {
+      pushToast({ title: "Upload failed", description: `You can only have up to 5 images per room. Remove some images first.`, tone: "error" });
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((f) => formData.append("images[]", f));
+      const { data } = await apiClient.post<{ success: boolean; data: RoomImage[] }>(`/rooms/${roomId}/images`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (Array.isArray(data.data)) {
+        setImages((prev) => [...prev, ...data.data]);
+        const n = data.data.length;
+        pushToast({
+          title: n === 1 ? "Photo uploaded" : `${n} photos uploaded`,
+          description: "They appear in the gallery below.",
+          tone: "success",
+        });
+      }
+    } catch {
+      pushToast({ title: "Upload failed", description: "Check file type and size, then try again.", tone: "error" });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async (imgId: number) => {
+    if (!roomId) return;
+    setDeletingImg(imgId);
+    try {
+      await apiClient.delete(`/rooms/${roomId}/images/${imgId}`);
+      setImages((prev) => prev.filter((i) => i.id !== imgId));
+      pushToast({ title: "Photo removed", tone: "success" });
+    } catch {
+      pushToast({ title: "Delete failed", description: "Could not remove this image.", tone: "error" });
+    } finally {
+      setDeletingImg(null);
+    }
+  };
+
+  const handleSetPrimary = async (imgId: number) => {
+    if (!roomId) return;
+    try {
+      await apiClient.post(`/rooms/${roomId}/images/${imgId}/primary`);
+      setImages((prev) => prev.map((i) => ({ ...i, is_primary: i.id === imgId })));
+      pushToast({ title: "Cover photo updated", description: "This image is now the primary listing photo.", tone: "success" });
+    } catch {
+      pushToast({ title: "Could not set primary", description: "Try again in a moment.", tone: "error" });
+    }
+  };
+
+  if (!open) return null;
+
+  const updateField = <K extends keyof RoomFormValues>(key: K, value: RoomFormValues[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <div
+      role="presentation"
+      className={`fixed inset-0 z-[80] flex items-end justify-center p-0 transition-all duration-200 md:items-center md:p-4 ${visible ? "bg-zinc-900/40 backdrop-blur-sm" : "bg-transparent"}`}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={`flex max-h-[min(88dvh,900px)] w-full max-w-2xl flex-col overflow-hidden border border-white/45 bg-white/90 shadow-float backdrop-blur-xl backdrop-saturate-150 transition-all duration-200 max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl max-md:border-x-0 max-md:border-b-0 md:max-h-[min(90vh,800px)] md:rounded-2xl md:border ${visible ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-4 opacity-0 md:translate-y-0 md:scale-95"}`}
+      >
+        {/* Modal header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-200/80 px-6 py-4 max-md:pt-[max(1rem,env(safe-area-inset-top))]">
+          <h3 className="min-w-0 font-dash text-xl text-navy">{title}</h3>
+          <button
+            type="button"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-white/50 bg-white/60 text-zinc-500 transition hover:bg-white hover:text-navy md:h-9 md:w-9 md:min-h-0 md:min-w-0"
+            onClick={onClose}
+            aria-label="Close room modal"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Tab bar — only show when editing (roomId exists) */}
+        {roomId ? (
+          <div className="flex shrink-0 overflow-x-auto overflow-y-hidden border-b border-zinc-200/80 px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-min whitespace-nowrap">
+            {(["details", "images"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`shrink-0 px-4 py-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+                  tab === t
+                    ? "border-skyBlue text-skyBlue"
+                    : "border-transparent text-zinc-500 hover:text-navy"
+                }`}
+              >
+                {t === "images" ? <span className="inline-flex items-center gap-1.5"><ImageIcon size={13} />Photos</span> : "Details"}
+              </button>
+            ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Details tab */}
+        {tab === "details" && (
+          <form
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void onSave(form);
+            }}
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <input className="dash-input" placeholder="Room name" value={form.name}
+                onChange={(e) => updateField("name", e.target.value)} required />
+              <input className="dash-input" placeholder="Room code" value={form.code}
+                onChange={(e) => updateField("code", e.target.value)} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <input className="dash-input" type="number" min={1} max={50} placeholder="Capacity" value={form.capacity}
+                onChange={(e) => updateField("capacity", Number(e.target.value))} required />
+              <input className="dash-input" type="number" min={0} step="0.01" placeholder="Base price" value={form.base_price}
+                onChange={(e) => updateField("base_price", Number(e.target.value))} required />
+            </div>
+            <input className="dash-input" placeholder="Amenities (comma separated)" value={form.amenities.join(", ")}
+              onChange={(e) => updateField("amenities", e.target.value.split(",").map((i) => i.trim()).filter(Boolean))} />
+            <textarea className="dash-input h-24 resize-none" placeholder="Rules and regulations" value={form.rules}
+              onChange={(e) => updateField("rules", e.target.value)} />
+            <select className="dash-input" value={form.status}
+              onChange={(e) => updateField("status", e.target.value as RoomFormValues["status"])}>
+              <option value="active">active</option>
+              <option value="inactive">inactive</option>
+              <option value="maintenance">maintenance</option>
+            </select>
+            <div className="flex flex-col-reverse gap-2 pt-2 max-md:w-full md:flex-row md:flex-wrap md:justify-end [&_button]:max-md:w-full">
+              <button type="button" onClick={onClose} className="dash-btn-sm px-4 py-2">Cancel</button>
+              <button type="submit" disabled={loading} className="dash-btn-primary disabled:opacity-50">
+                {loading ? "Saving…" : "Save room"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Images tab */}
+        {tab === "images" && roomId && (
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            {/* Upload area */}
+            <div
+              className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-softBorder bg-softGray py-8 transition hover:border-skyBlue hover:bg-metalFace"
+              onClick={() => fileRef.current?.click()}
+            >
+              {uploading ? (
+                <span className="inline-flex items-center gap-2 text-sm text-zinc-500">
+                  <Loader2 size={16} className="animate-spin" /> Uploading…
+                </span>
+              ) : (
+                <>
+                  <Upload size={22} className="text-zinc-400 mb-2" />
+                  <p className="text-sm font-medium text-zinc-600">Click to upload photos</p>
+                  <p className="text-xs text-zinc-400 mt-1">JPG, PNG, WebP · max 4 MB each · up to 5 files</p>
+                </>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="hidden"
+                onChange={handleUpload}
+              />
+            </div>
+
+            {/* Image grid */}
+            {loadingImages ? (
+              <div className="grid grid-cols-3 gap-3">
+                {[1,2,3].map(i=><div key={i} className="aspect-video animate-pulse rounded-xl bg-softGray"/>)}
+              </div>
+            ) : images.length === 0 ? (
+              <p className="text-center text-sm text-zinc-500 py-4">No photos yet. Upload some above.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {images.map((img) => (
+                  <div key={img.id} className="group relative aspect-video overflow-hidden rounded-xl bg-softGray">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt={img.original_name} className="h-full w-full object-cover" />
+                    {img.is_primary && (
+                      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/90 px-2 py-0.5 text-[10px] font-bold text-white">
+                        <Star size={8} fill="white" /> Primary
+                      </span>
+                    )}
+                    <div className="absolute inset-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      {!img.is_primary && (
+                        <button
+                          type="button"
+                          onClick={() => void handleSetPrimary(img.id)}
+                          className="rounded-lg bg-amber-400/90 p-1.5 text-white hover:bg-amber-500"
+                          title="Set as primary"
+                        >
+                          <Star size={12} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={deletingImg === img.id}
+                        onClick={() => void handleDelete(img.id)}
+                        className="ml-auto rounded-lg bg-rose-500/90 p-1.5 text-white hover:bg-rose-600 disabled:opacity-50"
+                        title="Delete image"
+                      >
+                        {deletingImg === img.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 max-md:w-full [&_button]:max-md:w-full">
+              <button type="button" onClick={onClose} className="dash-btn-sm px-4 py-2">Close</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

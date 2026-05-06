@@ -1,0 +1,85 @@
+/**
+ * Generic BFF proxy — forwards all /api/backend/* requests to the Laravel backend,
+ * injecting the httpOnly session token as Authorization: Bearer.
+ *
+ * This keeps the auth token exclusively server-side (httpOnly cookie) while allowing
+ * the React SPA to make authenticated requests without ever touching the token directly.
+ */
+import { NextRequest, NextResponse } from "next/server";
+
+const BACKEND = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1").replace(/\/$/, "");
+
+type RouteContext = { params: Promise<{ path: string[] }> };
+
+async function proxy(req: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const { path } = await context.params;
+  const token = req.cookies.get("rs_session")?.value;
+
+  if (!token) {
+    return NextResponse.json({ success: false, message: "Not authenticated." }, { status: 401 });
+  }
+
+  const targetPath = `/${path.join("/")}`;
+  const search = req.nextUrl.searchParams.toString();
+  const targetUrl = `${BACKEND}${targetPath}${search ? `?${search}` : ""}`;
+
+  const isFormData = req.headers.get("content-type")?.includes("multipart/form-data");
+
+  const forwardHeaders: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
+
+  if (!isFormData) {
+    forwardHeaders["Content-Type"] = req.headers.get("content-type") ?? "application/json";
+  }
+
+  let body: BodyInit | null = null;
+  if (!["GET", "HEAD"].includes(req.method)) {
+    body = isFormData ? await req.formData() : await req.text();
+  }
+
+  let backendRes: Response;
+  try {
+    backendRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: forwardHeaders,
+      body: body ?? undefined,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Backend unreachable.";
+    console.error(`[BFF proxy] fetch error → ${targetUrl}:`, msg);
+    return NextResponse.json({ success: false, message: "Backend unreachable. Is the API server running?" }, { status: 502 });
+  }
+
+  const contentType = backendRes.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const data = await backendRes.json();
+    // Log non-200 responses to help debug issues in development
+    if (!backendRes.ok && process.env.NODE_ENV !== "production") {
+      console.warn(`[BFF proxy] ${req.method} ${targetPath} → ${backendRes.status}`, JSON.stringify(data));
+    }
+    return NextResponse.json(data, { status: backendRes.status });
+  }
+
+  // Non-JSON response (e.g. HTML error page from unexpected exceptions)
+  const text = await backendRes.text();
+  if (!backendRes.ok) {
+    console.error(`[BFF proxy] Non-JSON error from backend (${backendRes.status}):`, text.slice(0, 500));
+    return NextResponse.json(
+      { success: false, message: `Server error (${backendRes.status}). Check API logs.` },
+      { status: backendRes.status }
+    );
+  }
+  return new NextResponse(text, {
+    status: backendRes.status,
+    headers: { "Content-Type": contentType },
+  });
+}
+
+export const GET = proxy;
+export const POST = proxy;
+export const PUT = proxy;
+export const PATCH = proxy;
+export const DELETE = proxy;

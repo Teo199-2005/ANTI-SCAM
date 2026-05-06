@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Modules\Resorts\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ResortResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'tenant_id' => $this->tenant_id,
+            'name' => $this->name,
+            'description' => $this->description,
+            'address' => $this->address,
+            'contact_number' => $this->contact_number,
+            'logo_url' => $this->logo_url,
+            'is_publicly_listed' => (bool) $this->is_publicly_listed,
+            'is_vip' => (bool) ($this->is_vip ?? false),
+            'rooms_count' => $this->whenCounted('rooms'),
+            'subscription' => $this->whenLoaded('subscription', function () {
+                return [
+                    'id' => $this->subscription?->id,
+                    'plan' => $this->subscription?->plan,
+                    'base_price' => $this->subscription?->base_price,
+                    'included_rooms' => $this->subscription?->included_rooms,
+                    'extra_room_fee' => $this->subscription?->extra_room_fee,
+                    'active_room_count' => $this->subscription?->active_room_count,
+                    'total_monthly_fee' => $this->subscription?->total_monthly_fee,
+                    'billing_cycle_start' => $this->subscription?->billing_cycle_start?->toDateString(),
+                    'billing_cycle_end' => $this->subscription?->billing_cycle_end?->toDateString(),
+                    'next_due_date' => $this->subscription?->next_due_date?->toDateString(),
+                    'grace_until' => $this->subscription?->grace_until?->toDateString(),
+                    'status' => $this->subscription?->status,
+                ];
+            }),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}

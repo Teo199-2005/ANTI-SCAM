@@ -1,0 +1,30 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const BACKEND = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+
+export async function POST(req: NextRequest) {
+  const token = req.cookies.get("rs_session")?.value;
+
+  // Fire-and-forget: revoke the backend token if we have it
+  if (token) {
+    try {
+      await fetch(`${BACKEND}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+    } catch {
+      // Always clear the cookie regardless of backend availability
+    }
+  }
+
+  const res = NextResponse.json({ success: true });
+  res.cookies.set("rs_session", "", {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+
+  return res;
+}

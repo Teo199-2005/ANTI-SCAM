@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Modules\Audit\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Shared\Traits\ApiResponseTrait;
+use Illuminate\Http\Request;
+
+class AuditLogController extends Controller
+{
+    use ApiResponseTrait;
+
+    public function index(Request $request)
+    {
+        $perPage    = (int) $request->integer('perPage', 25);
+        $action     = $request->string('action')->value();
+        $entityType = $request->string('entityType')->value();
+        $userId     = $request->integer('userId');
+
+        $query = AuditLog::withoutGlobalScopes()
+            ->orderByDesc('created_at');
+
+        if ($action) {
+            $query->where('action', 'like', "%{$action}%");
+        }
+
+        if ($entityType) {
+            $query->where('entity_type', $entityType);
+        }
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        return $this->successResponse($query->paginate($perPage), 'Audit logs fetched');
+    }
+}

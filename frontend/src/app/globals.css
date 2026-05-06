@@ -1,0 +1,846 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #111827;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #F4F4F9;
+  color: var(--foreground);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT LAYER — all custom classes live here so Tailwind
+   utility classes (pl-9, mt-2, etc.) always override them.
+   ═══════════════════════════════════════════════════════════════ */
+@layer components {
+
+/* ── Marketing / Landing — Anti-Scam PH brand palette ────────── */
+.section-padding {
+  @apply px-4 py-14 md:px-8 lg:px-12;
+}
+
+/* Cards — soft warm-white frosted glass with light navy tint */
+.soft-panel {
+  @apply rounded-2xl border border-clSeafoam/50 bg-white/70 shadow-cl-card backdrop-blur-xl backdrop-saturate-150
+         transition-shadow duration-200 hover:shadow-cl-card-hover;
+}
+
+/* Icon pills — brand-tinted */
+.glass-pill-icon {
+  @apply inline-flex rounded-full border border-clSeafoam p-2 text-clOcean shadow-sm
+         bg-gradient-to-br from-clSeafoam to-white backdrop-blur-md;
+}
+.glass-pill-icon-sm {
+  @apply inline-flex rounded-full border border-clSeafoam p-1.5 text-clOcean shadow-sm
+         bg-gradient-to-br from-clSeafoam to-white backdrop-blur-md;
+}
+
+/* CTA call-out band — light canvas gradient */
+.glass-cta-band {
+  @apply rounded-2xl border border-clSeafoam/60 bg-gradient-to-br from-clSeafoam/60 via-white/80 to-clSand/50
+         p-6 text-center shadow-cl-card backdrop-blur-xl backdrop-saturate-150;
+}
+
+/* Tags / badges (marketing) */
+.glass-tag {
+  @apply rounded-full border border-clSeafoam/70 bg-clSeafoam/50 px-3 py-1
+         text-xs font-semibold text-clOcean shadow-sm backdrop-blur-md;
+}
+
+/* Form inputs — brand focus ring */
+.glass-field {
+  @apply w-full rounded-xl border border-clSeafoam bg-white/70 px-4 py-2.5 text-sm text-zinc-900
+         shadow-sm outline-none backdrop-blur-md placeholder:text-zinc-400
+         focus:border-clTeal/70 focus:ring-2 focus:ring-clTeal/25
+         transition-[border-color,box-shadow] duration-150;
+}
+.glass-field-round {
+  @apply rounded-full border border-clSeafoam bg-white/70 px-4 py-2.5 text-sm text-zinc-900
+         shadow-sm outline-none backdrop-blur-md placeholder:text-zinc-400
+         focus:border-clTeal/70 focus:ring-2 focus:ring-clTeal/25
+         transition-[border-color,box-shadow] duration-150;
+}
+
+/* Hero panel — large frosted card on hero images */
+.glass-hero-panel {
+  @apply max-w-3xl rounded-2xl border border-white/50 bg-white/70 p-8
+         shadow-[0_8px_40px_rgba(13,30,66,0.12),0_2px_8px_rgba(13,30,66,0.06)]
+         backdrop-blur-2xl backdrop-saturate-150;
+}
+
+/* Full-bleed hero photo — own compositing layer (helps avoid soft edges from nested transforms) */
+.hero-cover-media {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Inline glass buttons (contact bar, social row) */
+.glass-inline-btn {
+  @apply inline-flex items-center gap-2 rounded-full border border-clSeafoam/60 bg-white/50
+         px-4 py-2 text-sm font-medium text-clOcean shadow-sm backdrop-blur-md transition hover:bg-white/70;
+}
+.glass-social {
+  @apply rounded-full border border-clSeafoam/60 bg-white/50 p-2 text-clOcean
+         shadow-sm backdrop-blur-md transition hover:bg-clSeafoam/60 hover:text-clOcean;
+}
+.glass-social-text {
+  @apply rounded-full border border-clSeafoam/60 bg-white/50 px-3 py-2
+         text-xs font-semibold text-clOcean shadow-sm backdrop-blur-md transition hover:bg-clSeafoam/60;
+}
+
+/* ── Section backgrounds — Anti-Scam PH light canvas ────────── */
+.beige-texture-section {
+  background-color: #E8E8F0;
+}
+.paper-texture-section {
+  background-color: #F4F4F9;
+}
+
+/* ── Marketing primary CTA button (crimson gradient) ─────────── */
+.cl-btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border-0
+         bg-gradient-to-r from-clOcean to-clTeal px-5 py-2.5 text-sm font-semibold text-white
+         shadow-cl-btn transition-[transform,box-shadow,opacity] duration-150
+         hover:from-clOceanHover hover:to-clOcean hover:shadow-[0_4px_18px_rgba(204,27,46,0.40)]
+         active:scale-[0.985]
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clOcean/60 focus-visible:ring-offset-2;
+}
+
+/* ── Marketing outline / ghost button ───────────────────────── */
+.cl-btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-full
+         border border-clOcean/30 bg-white/60 px-5 py-2.5 text-sm font-semibold text-clOcean
+         shadow-sm backdrop-blur-md transition-[transform,background-color,box-shadow] duration-150
+         hover:bg-clSeafoam/60 hover:border-clTeal/50
+         active:scale-[0.985]
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clOcean/50 focus-visible:ring-offset-2;
+}
+
+/* ── Marketing ghost on dark bg (hero sliders, dark sections) ── */
+.cl-btn-ghost-dark {
+  @apply inline-flex items-center justify-center gap-2 rounded-full
+         border border-white/35 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white
+         backdrop-blur-md transition-[transform,background-color] duration-150
+         hover:bg-white/20
+         active:scale-[0.985];
+}
+
+/* ── Marketing stat / trust panel ──────────────────────────── */
+.cl-stat-panel {
+  @apply soft-panel flex flex-col items-center gap-3 p-6 text-center;
+}
+
+/* ── Section heading accent line ──────────────────────────────  */
+.cl-section-eyebrow {
+  @apply mb-3 inline-flex items-center gap-2 rounded-full border border-clSeafoam
+         bg-clSeafoam/60 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-clOcean;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD APP SHELL — Anti-Scam PH brand operational
+     Layer 0 — light canvas wash
+     Layer 1 — sidebar / topbar strips (raised lip + diffuse)
+     Layer 2 — frosted cards (upper specular edge + graded face)
+     Layer 3 — subtle insets
+   ═══════════════════════════════════════════════════════════════ */
+.dash-shell {
+  min-height: 100vh;
+  background-color: #F4F4F9;
+  @apply font-dash text-zinc-800;
+}
+/* Dashboard forbids Playfair — shell forces Jakarta for any stray .font-heading */
+.dash-shell .font-heading {
+  font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* ── Sidebar — brand rail ── */
+.dash-sidebar {
+  @apply border-r border-white/55 bg-gradient-to-b from-softCard via-softCard to-metalFace text-zinc-700 shadow-sidebar;
+}
+
+/* ── Topbar — light strip ── */
+.dash-topbar {
+  @apply border-b border-white/60 bg-gradient-to-b from-white/80 via-softCard to-metalFace text-zinc-800 shadow-topbar backdrop-blur-[2px];
+}
+
+/* ── Cards (prefer <DashCard /> for new code) — tinted face ───── */
+.dash-card {
+  @apply rounded-2xl border border-white/55 bg-gradient-to-b from-softCard via-softCard to-metalFace shadow-metallic-panel;
+}
+.dash-card-hover {
+  @apply transition-[box-shadow,transform] duration-200 motion-reduce:transition-none;
+}
+.dash-card-hover:hover {
+  @apply shadow-metallic-panel-hover -translate-y-px motion-reduce:translate-y-0;
+}
+
+/* ── Inputs ──────────────────────────────────────────────────── */
+.dash-input {
+  @apply w-full rounded-xl border border-softBorderStrong bg-gradient-to-b from-white to-softGray/80 px-4 py-2.5 font-dash text-dash-sm
+         text-zinc-900 outline-none transition
+         placeholder:text-zinc-400 shadow-[inset_0_2px_3px_rgba(15,23,42,0.05)]
+         focus:border-primaryBlue focus:ring-2 focus:ring-primaryBlue/20
+         disabled:cursor-not-allowed disabled:opacity-60;
+}
+.dash-label {
+  @apply mb-1 block font-dash text-dash-xs font-medium text-zinc-600;
+}
+
+/* Filter / search toolbars — stack on small screens; primary CTAs full width */
+.dash-filter-bar {
+  @apply flex flex-col gap-3 max-md:[&_button.dash-btn-primary]:w-full max-md:[&_button.dash-btn-accent]:w-full md:flex-row md:flex-wrap md:items-end;
+}
+.dash-filter-bar > * {
+  @apply min-w-0 max-md:w-full md:max-w-none;
+}
+
+/* ── Buttons — primary fill ONLY on .dash-btn-primary ─────────── */
+.dash-btn-sm {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-softBorderStrong/90
+         bg-gradient-to-b from-white to-softGray/95 px-3 py-1.5 font-dash text-dash-xs font-semibold text-zinc-600
+         shadow-[0_1px_0_rgb(255_255_255/0.9)_inset,0_4px_10px_rgba(23,45,75,0.07)]
+         transition-[transform,box-shadow,background-color,border-color,color,opacity] duration-150
+         hover:border-slate-300 hover:from-softGray hover:to-softGray hover:text-navy hover:shadow-[0_2px_8px_rgba(23,45,75,0.1)]
+         active:scale-[0.985]
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue focus-visible:ring-offset-2;
+}
+.dash-btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border-0
+         bg-primaryBlue px-4 py-2.5 font-dash text-dash-sm font-semibold text-white
+         transition-[transform,background-color,box-shadow,opacity] duration-150 shadow-dash-primary
+         hover:bg-primaryBlueDark
+         hover:shadow-[0_4px_14px_rgba(204,27,46,0.34)]
+         active:scale-[0.985]
+         disabled:opacity-50
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue focus-visible:ring-offset-2;
+}
+.dash-btn-accent {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border-0
+         bg-accentOrange px-4 py-2.5 font-dash text-dash-sm font-semibold text-white
+         transition-[transform,background-color,box-shadow,opacity] duration-150 shadow-dash-accent
+         hover:bg-accentOrangeDark
+         hover:shadow-[0_4px_14px_rgba(245,184,0,0.34)]
+         active:scale-[0.985]
+         disabled:opacity-50
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accentOrange focus-visible:ring-offset-2;
+}
+
+.dash-btn-danger {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-1.5
+         font-dash text-dash-xs font-semibold text-rose-700
+         transition-[background-color,border-color,color,opacity] duration-150
+         hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800
+         disabled:opacity-50
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70 focus-visible:ring-offset-2;
+}
+
+.dash-btn-neutral-strong {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-navy/20 bg-navy px-3 py-1.5
+         font-dash text-dash-xs font-semibold text-white transition-[background-color,border-color,color,opacity] duration-150
+         hover:bg-primaryBlue hover:border-primaryBlue
+         disabled:opacity-50
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40 focus-visible:ring-offset-2;
+}
+
+/* ── Tables ──────────────────────────────────────────────────── */
+.dash-table-wrap {
+  @apply overflow-hidden rounded-2xl border border-white/65 bg-softCard/95 shadow-table-wrap ring-1 ring-black/[0.04];
+}
+.dash-table {
+  @apply w-full min-w-[640px] text-left font-dash text-dash-sm;
+  border-collapse: collapse;
+}
+
+/* Brand header bar */
+.dash-table thead {
+  @apply bg-gradient-to-b from-slateBlue to-navy;
+}
+.dash-table thead tr {
+  @apply bg-transparent;
+}
+/* WCAG AA — bright caps on machined header bar */
+.dash-table th {
+  @apply px-5 py-3.5 text-dash-xs font-bold uppercase tracking-wide text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)];
+  border-bottom: 2px solid rgba(255, 255, 255, 0.16);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+}
+.dash-table th:last-child {
+  border-right: none;
+}
+
+.dash-table td {
+  @apply px-5 py-3.5 text-zinc-700;
+  border-bottom: 1px solid theme("colors.dsBorderCell");
+  border-right: 1px solid theme("colors.dsBorderCellAlt");
+}
+.dash-table td:last-child {
+  border-right: none;
+}
+.dash-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dash-table tbody tr {
+  @apply bg-softCard transition-[background-color,transform,box-shadow] duration-150;
+}
+
+.dash-table tbody tr:nth-child(even) {
+  @apply bg-dsRowMuted;
+}
+
+.dash-table tbody tr:hover {
+  @apply bg-dsRowHover;
+}
+.dash-table tbody tr:hover td:first-child {
+  box-shadow:
+    inset 3px 0 0 theme("colors.slateBlue"),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* ── Table actions column — mobile sticky rail + 44px targets ── */
+.dash-table-actions-inner {
+  @apply flex flex-wrap items-center justify-end gap-2 max-md:flex-col max-md:items-stretch max-md:gap-2.5;
+}
+
+/* Icon-only toolbars: keep one row on small screens */
+.dash-table-actions-inner.dash-table-actions-inner--toolbar {
+  @apply max-md:flex-row max-md:flex-nowrap max-md:items-center max-md:justify-end;
+}
+
+.dash-table-actions-inner > .dash-btn-sm,
+.dash-table-actions-inner > a.dash-btn-sm {
+  @apply max-md:min-h-11 max-md:w-full max-md:justify-center;
+}
+
+.dash-table-actions-inner.dash-table-actions-inner--toolbar > .dash-btn-sm,
+.dash-table-actions-inner.dash-table-actions-inner--toolbar > a.dash-btn-sm {
+  @apply max-md:w-auto;
+}
+
+.dash-table-actions-inner.dash-table-actions-inner--toolbar .dash-action-icon {
+  @apply max-md:shrink-0;
+}
+
+.dash-table-actions-inner > .dash-input {
+  @apply max-md:min-h-11 max-md:w-full;
+}
+
+.dash-action-icon {
+  @apply inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-[transform,background-color,color,box-shadow] duration-150 active:scale-[0.96] md:h-9 md:w-9 md:min-h-0 md:min-w-0;
+}
+
+/* Table action buttons: icon-only look when icon is present */
+.dash-table-actions-cell .dash-btn-sm:has(svg),
+.dash-table-actions-cell a.dash-btn-sm:has(svg) {
+  @apply inline-flex h-9 w-9 min-h-9 min-w-9 items-center justify-center rounded-lg border-softBorder bg-white/90 p-0 text-navy;
+  font-size: 0;
+  line-height: 0;
+}
+.dash-table-actions-cell .dash-btn-sm:has(svg) svg,
+.dash-table-actions-cell a.dash-btn-sm:has(svg) svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.45;
+}
+
+.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label],
+.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label] {
+  position: relative;
+}
+.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]::after,
+.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]::after {
+  content: attr(data-action-label);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  white-space: nowrap;
+  min-width: max-content;
+  z-index: 20;
+  @apply rounded-lg bg-navy px-3 py-1.5 font-dash text-xs font-semibold text-white shadow-[0_8px_20px_rgba(13,30,66,0.30)] transition-all duration-150;
+}
+.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]:hover::after,
+.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]:hover::after,
+.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]:focus-visible::after,
+.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Reuse styled tooltip for standalone icon action buttons */
+.dash-action-icon[data-action-label] {
+  position: relative;
+}
+.dash-action-icon[data-action-label]::after {
+  content: attr(data-action-label);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  white-space: nowrap;
+  min-width: max-content;
+  z-index: 20;
+  @apply rounded-lg bg-navy px-3 py-1.5 font-dash text-xs font-semibold text-white shadow-[0_8px_20px_rgba(13,30,66,0.30)] transition-all duration-150;
+}
+.dash-action-icon[data-action-label]:hover::after,
+.dash-action-icon[data-action-label]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Zebra + hover: action cell matches row (explicit rules; split-pairs = main/detail row pairs) */
+.dash-table tbody tr:hover td.dash-table-actions-cell {
+  @apply bg-dsRowHover;
+}
+
+.dash-shell .dash-table:not(.dash-table--split-pairs) tbody tr:nth-child(odd) td.dash-table-actions-cell {
+  @apply bg-softCard;
+}
+.dash-shell .dash-table:not(.dash-table--split-pairs) tbody tr:nth-child(even) td.dash-table-actions-cell {
+  @apply bg-dsRowMuted;
+}
+
+.dash-shell .dash-table.dash-table--split-pairs tbody tr:nth-child(4n + 1) td.dash-table-actions-cell {
+  @apply bg-softCard;
+}
+.dash-shell .dash-table.dash-table--split-pairs tbody tr:nth-child(4n + 3) td.dash-table-actions-cell {
+  @apply bg-dsRowMuted;
+}
+
+@media (max-width: 767px) {
+  .dash-shell .dash-table th.dash-table-actions-head,
+  .dash-shell .dash-table td.dash-table-actions-cell {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    box-shadow: -8px 0 14px -6px rgba(15, 23, 42, 0.14);
+  }
+
+  .dash-shell .dash-table thead th.dash-table-actions-head {
+    z-index: 3;
+    background-image: linear-gradient(to bottom, theme("colors.slateBlue"), theme("colors.navy"));
+  }
+}
+
+/* ── Typography ──────────────────────────────────────────────── */
+.dash-page-title {
+  @apply font-dash text-dash-3xl font-bold text-navy md:text-dash-4xl;
+}
+.dash-page-sub {
+  @apply mt-1 max-w-2xl font-dash text-dash-base font-normal text-zinc-600;
+}
+.dash-page-header {
+  @apply space-y-1;
+}
+.dash-role-badge {
+  @apply capitalize;
+}
+
+/* ── Hero banner — brand gradients ──────────────────────────── */
+/* Admin / overview: deep navy → primary sweep */
+.dash-hero-banner {
+  @apply rounded-2xl bg-gradient-to-br from-navy via-slateBlue to-primaryBlueDark p-6 text-white shadow-dash-hero ring-1 ring-inset ring-white/15;
+}
+/* Guest / resort CTA: navy → primary crimson */
+.dash-hero-banner-cta {
+  @apply rounded-2xl bg-gradient-to-br from-navy via-primaryBlue to-primaryBlueDark p-6 text-white shadow-dash-hero ring-1 ring-inset ring-white/15;
+}
+/* Staff: toned-down navy sweep */
+.dash-hero-banner-staff {
+  @apply rounded-2xl bg-gradient-to-br from-zinc-600 via-navy to-navy p-6 text-white shadow-dash-hero ring-1 ring-inset ring-white/15;
+}
+
+/* Frosted chips on hero gradients — use these instead of ad-hoc bg-white/10 */
+.dash-hero-glass-panel {
+  @apply rounded-xl bg-white/10 backdrop-blur-sm;
+}
+.dash-hero-glass-avatar {
+  @apply rounded-2xl bg-white/20 text-lg font-bold text-white backdrop-blur-sm;
+}
+.dash-hero-glass-quiet-cta {
+  @apply shrink-0 rounded-xl bg-white/15 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/25;
+}
+
+/* ── Status badges — map to ds semantic tokens ───────────────── */
+.dash-badge {
+  @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 font-dash text-dash-xs font-semibold text-white;
+}
+.dash-badge::before {
+  content: "";
+  @apply inline-block h-3.5 w-3.5 rounded-full text-center text-[10px] font-bold leading-[14px] text-white;
+  background-color: rgba(255, 255, 255, 0.18);
+}
+.dash-badge-emerald {
+  @apply dash-badge bg-dsSuccess;
+}
+.dash-badge-emerald::before {
+  content: "✓";
+}
+.dash-badge-amber {
+  @apply dash-badge bg-dsWarning;
+}
+.dash-badge-amber::before {
+  content: "!";
+}
+.dash-badge-rose {
+  @apply dash-badge bg-dsError;
+}
+.dash-badge-rose::before {
+  content: "×";
+}
+.dash-badge-sky {
+  @apply dash-badge bg-dsInfo;
+}
+.dash-badge-sky::before {
+  content: "i";
+}
+.dash-badge-slate {
+  @apply dash-badge bg-zinc-600;
+}
+.dash-badge-slate::before {
+  content: "•";
+}
+.dash-badge-orange {
+  @apply dash-badge bg-accentOrangeDark;
+}
+.dash-badge-orange::before {
+  content: "!";
+}
+.dash-badge-violet {
+  @apply dash-badge bg-dsData6;
+}
+.dash-badge-violet::before {
+  content: "★";
+}
+.dash-badge-navy {
+  @apply dash-badge bg-navy;
+}
+.dash-badge-navy::before {
+  content: "◆";
+}
+
+/* Badges inside mobile table cards — full text, no single-line clip */
+.dash-mobile-table-card .dash-badge {
+  @apply max-w-full whitespace-normal text-left leading-snug;
+}
+
+/* ── Inset panels ────────────────────────────────────────────── */
+.dash-inset {
+  @apply rounded-xl border border-slate-300/40 bg-gradient-to-b from-softGray to-softGray/90 p-3 font-dash text-dash-sm text-zinc-700 shadow-[inset_0_2px_4px_rgba(15,23,42,0.055)];
+}
+
+/* ── Alert surfaces — semantic wrappers for consistency ───────── */
+.dash-alert-error {
+  @apply rounded-2xl border border-sem-error bg-sem-error-muted p-6 text-center text-sm text-sem-error motion-safe:animate-dash-fade-in;
+}
+.dash-alert-success {
+  @apply rounded-2xl border border-sem-success bg-sem-success-muted p-6 text-center text-sm text-sem-success motion-safe:animate-dash-fade-in;
+}
+
+/* ── Section heading ─────────────────────────────────────────── */
+.dash-section-head {
+  @apply mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-softBorderStrong/80 pb-3;
+}
+.dash-section-title {
+  @apply flex items-center gap-2 font-dash text-base font-semibold text-navy;
+}
+
+/* ── Stat accent borders ─────────────────────────────────────── */
+.stat-accent-blue    { border-left: 4px solid theme("colors.skyBlue"); }
+.stat-accent-emerald { border-left: 4px solid theme("colors.dsSuccess"); }
+.stat-accent-amber   { border-left: 4px solid theme("colors.dsWarning"); }
+.stat-accent-rose    { border-left: 4px solid theme("colors.dsError"); }
+.stat-accent-violet  { border-left: 4px solid theme("colors.dsData6"); }
+.stat-accent-orange  { border-left: 4px solid theme("colors.accentOrange"); }
+
+/* ── Skeleton loader ─────────────────────────────────────────── */
+.dash-shell .dash-skeleton {
+  @apply animate-pulse rounded-xl bg-gradient-to-r from-navy/10 via-metalGlow/80 to-navy/10;
+}
+
+.dash-shell-main {
+  @apply mx-auto w-full max-w-[1440px];
+}
+
+/* ── Progress ring track ─────────────────────────────────────── */
+.soft-progress-track {
+  stroke: theme("colors.softBorder");
+}
+
+/* ── Misc ────────────────────────────────────────────────────── */
+.soft-section-label {
+  @apply mb-1 px-2 font-dash text-dash-xs font-medium text-zinc-600;
+}
+
+} /* end @layer components */
+
+/* ═══════════════════════════════════════════════════════════════
+   APP LOADING SCREEN — single template (marketing + dashboard)
+   All routes use the same classes; change this block once to update everywhere.
+   ═══════════════════════════════════════════════════════════════ */
+
+.app-loading-shell {
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(ellipse 85% 65% at 12% 18%, rgba(26, 56, 148, 0.14), transparent 52%),
+    radial-gradient(ellipse 75% 60% at 88% 82%, rgba(204, 27, 46, 0.11), transparent 50%),
+    radial-gradient(ellipse 55% 45% at 50% 50%, rgba(43, 92, 230, 0.05), transparent 62%);
+}
+
+/* Combined atmosphere: top wash + diagonal corners + brand blue/red pools */
+.app-loading-overlay {
+  background:
+    radial-gradient(ellipse 110% 55% at 50% -28%, rgba(13, 30, 66, 0.1), transparent 52%),
+    radial-gradient(ellipse 70% 50% at 0% 0%, rgba(43, 92, 230, 0.09), transparent 48%),
+    radial-gradient(ellipse 65% 48% at 100% 100%, rgba(204, 27, 46, 0.08), transparent 46%),
+    radial-gradient(circle at 4% 96%, rgba(26, 56, 148, 0.11), transparent 38%),
+    radial-gradient(circle at 96% 6%, rgba(204, 27, 46, 0.09), transparent 36%);
+}
+
+.app-loading-grid-layer {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.app-loading-panel {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 28px 70px -24px rgba(13, 30, 66, 0.14),
+    0 24px 56px -28px rgba(204, 27, 46, 0.1),
+    0 12px 32px -16px rgba(26, 56, 148, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+
+.app-loading-orbit {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  display: grid;
+  place-items: center;
+}
+
+.app-loading-orbit-glow {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(26, 56, 148, 0.18) 0%,
+    rgba(204, 27, 46, 0.1) 42%,
+    transparent 68%
+  );
+  animation: app-loading-glow 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-orbit-glow {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+.app-loading-orbit-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.app-loading-orbit-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Brand blue → crimson arc */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 70deg,
+    theme("colors.slateBlue") 155deg,
+    theme("colors.primaryBlue") 205deg,
+    theme("colors.skyBlue") 250deg,
+    transparent 310deg
+  );
+  animation: app-loading-spin 1.05s cubic-bezier(0.62, 0.12, 0.27, 0.88) infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-orbit-sweep {
+    animation: none;
+    opacity: 0.92;
+  }
+}
+
+.app-loading-orbit-core {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+}
+
+.app-loading-sheen-layer {
+  background: linear-gradient(
+    115deg,
+    transparent 34%,
+    rgba(43, 92, 230, 0.06) 44%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(204, 27, 46, 0.05) 56%,
+    transparent 66%
+  );
+  background-size: 220% 100%;
+  background-position: 0 0;
+}
+
+.dash-toast {
+  @apply border ring-1;
+}
+
+.dash-toast--success {
+  @apply border-emerald-300/70 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/80 text-emerald-950 ring-emerald-200/50 shadow-card;
+}
+
+.dash-toast--error {
+  @apply border-rose-300/70 bg-gradient-to-br from-rose-50 via-white to-rose-50/80 text-rose-950 ring-rose-200/50 shadow-card;
+}
+
+.dash-toast--warning {
+  @apply border-amber-300/70 bg-gradient-to-br from-amber-50 via-white to-amber-50/70 text-amber-950 ring-amber-200/50 shadow-card;
+}
+
+.dash-toast--info {
+  @apply border-sky-300/70 bg-gradient-to-br from-sky-50 via-white to-sky-50/70 text-sky-950 ring-sky-200/50 shadow-card;
+}
+
+@keyframes app-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes app-loading-glow {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes app-loading-sheen {
+  0%,
+  100% {
+    background-position: 130% 0;
+  }
+  50% {
+    background-position: -30% 0;
+  }
+}
+
+@keyframes app-loading-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dash-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dash-soft-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-app-loading-sheen {
+    animation: app-loading-sheen 2.85s ease-in-out infinite;
+  }
+  .animate-app-loading-enter {
+    animation: app-loading-enter 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-dash-fade-in {
+    animation: dash-fade-in 0.24s ease-out both;
+  }
+  .animate-dash-soft-pop {
+    animation: dash-soft-pop 0.22s ease-out both;
+  }
+}
+
+@layer utilities {
+  .text-sem-success { @apply text-dsSuccess; }
+  .text-sem-warning { @apply text-dsWarning; }
+  .text-sem-error { @apply text-dsError; }
+  .text-sem-info { @apply text-dsInfo; }
+
+  .bg-sem-success { @apply bg-dsSuccess; }
+  .bg-sem-warning { @apply bg-dsWarning; }
+  .bg-sem-error { @apply bg-dsError; }
+  .bg-sem-info { @apply bg-dsInfo; }
+
+  .bg-sem-success-muted { background-color: rgba(5, 150, 105, 0.12); }
+  .bg-sem-warning-muted { background-color: rgba(217, 119, 6, 0.12); }
+  .bg-sem-error-muted { background-color: rgba(225, 29, 72, 0.12); }
+  .bg-sem-info-muted { background-color: rgba(2, 132, 199, 0.12); }
+
+  .border-sem-success { @apply border-dsSuccess; }
+  .border-sem-warning { @apply border-dsWarning; }
+  .border-sem-error { @apply border-dsError; }
+  .border-sem-info { @apply border-dsInfo; }
+}
+
+/* Hero slider progress bar */
+@keyframes progress-bar {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.animate-progress-bar {
+  animation-name: progress-bar;
+  animation-fill-mode: forwards;
+}
