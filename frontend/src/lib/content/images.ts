@@ -6,8 +6,8 @@
  */
 export const HERO_BANNER_INTRINSIC = { width: 1942, height: 809, aspect: 1942 / 809 } as const;
 
-/** Visionaries — Charles Andrew Santiago (`CEO.png`), intrinsic **651 × 591** px (~1.10∶1). */
-export const VISIONARY_CEO_INTRINSIC = { width: 651, height: 591 } as const;
+/** Visionaries — Charles Andrew Santiago (`CEO.png`), intrinsic **1254 × 1254** px (1∶1). */
+export const VISIONARY_CEO_INTRINSIC = { width: 1254, height: 1254 } as const;
 
 /** Visionaries — Teofilo Harry Paet (`CTO.png`), intrinsic **527 × 586** px (~0.90∶1). */
 export const VISIONARY_CTO_INTRINSIC = { width: 527, height: 586 } as const;
