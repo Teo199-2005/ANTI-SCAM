@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Legal\PlatformTerms;
 use App\Models\EmailLog;
 use App\Models\Reservation;
 use App\Models\Resort;
@@ -12,24 +13,57 @@ use Throwable;
 
 class EmailNotificationService
 {
-    public function __construct(private readonly BrandedEmailTemplateService $templateService)
+    public function __construct(private readonly BrandedEmailTemplateService $templateService) {}
+
+    /** Send full Terms & Conditions to the user after explicit acceptance (registration or onboarding). */
+    public function sendTermsAccepted(User $user, string $contextLabel): void
     {
+        if (! $user->email) {
+            return;
+        }
+
+        $summary = PlatformTerms::emailSummaryLine($contextLabel);
+        $bodyHtml = '<p style="font-size:14px;line-height:1.55;color:#374151">'
+            .htmlspecialchars($summary, ENT_QUOTES, 'UTF-8')
+            .'</p>'
+            .PlatformTerms::toEmailHtml();
+
+        $this->dispatch(
+            'terms_accepted',
+            $user->email,
+            'Anti-Scam PH — Terms & Conditions confirmation',
+            function () use ($user, $bodyHtml): void {
+                Mail::send([], [], function ($m) use ($user, $bodyHtml): void {
+                    $m->to($user->email, $user->name)
+                        ->subject('Anti-Scam PH — Terms & Conditions confirmation')
+                        ->html($this->templateService->render(
+                            'Terms & Conditions',
+                            $bodyHtml,
+                            'Your copy of the agreement is attached in this email.'
+                        ));
+                });
+            },
+            ['user_id' => $user->id, 'terms_version' => PlatformTerms::version()],
+            $user->tenant_id
+        );
     }
 
     /** Send a booking confirmation email to the guest. */
     public function sendBookingConfirmation(Reservation $reservation): void
     {
         $user = $reservation->client;
-        if (! $user?->email) return;
+        if (! $user?->email) {
+            return;
+        }
 
         $this->dispatch(
             'booking_confirmation',
             $user->email,
-            'Booking Confirmed – ' . $reservation->reference_no,
+            'Booking Confirmed – '.$reservation->reference_no,
             function () use ($reservation, $user): void {
                 Mail::send([], [], function ($m) use ($reservation, $user): void {
                     $m->to($user->email, $user->name)
-                        ->subject('Booking Confirmed – ' . $reservation->reference_no)
+                        ->subject('Booking Confirmed – '.$reservation->reference_no)
                         ->html($this->templateService->render(
                             'Booking confirmed',
                             $this->bookingConfirmationHtml($reservation),
@@ -46,16 +80,18 @@ class EmailNotificationService
     public function sendPaymentReceipt(Reservation $reservation): void
     {
         $user = $reservation->client;
-        if (! $user?->email) return;
+        if (! $user?->email) {
+            return;
+        }
 
         $this->dispatch(
             'payment_receipt',
             $user->email,
-            'Payment Receipt – ' . $reservation->reference_no,
+            'Payment Receipt – '.$reservation->reference_no,
             function () use ($reservation, $user): void {
                 Mail::send([], [], function ($m) use ($reservation, $user): void {
                     $m->to($user->email, $user->name)
-                        ->subject('Payment Receipt – ' . $reservation->reference_no)
+                        ->subject('Payment Receipt – '.$reservation->reference_no)
                         ->html($this->templateService->render(
                             'Payment receipt',
                             $this->paymentReceiptHtml($reservation),
@@ -72,7 +108,9 @@ class EmailNotificationService
     public function sendNewBookingToResort(Reservation $reservation): void
     {
         $resort = $reservation->resort;
-        if (! $resort?->contact_number) return; // use contact email if available
+        if (! $resort?->contact_number) {
+            return;
+        } // use contact email if available
 
         // Resort notification uses a platform admin email or resort owner email
         $resortOwner = User::withoutGlobalScopes()
@@ -80,16 +118,18 @@ class EmailNotificationService
             ->where('role', 'resort_owner')
             ->first();
 
-        if (! $resortOwner?->email) return;
+        if (! $resortOwner?->email) {
+            return;
+        }
 
         $this->dispatch(
             'new_booking_resort',
             $resortOwner->email,
-            'New Booking Received – ' . $reservation->reference_no,
+            'New Booking Received – '.$reservation->reference_no,
             function () use ($reservation, $resortOwner): void {
                 Mail::send([], [], function ($m) use ($reservation, $resortOwner): void {
                     $m->to($resortOwner->email, $resortOwner->name)
-                        ->subject('New Booking – ' . $reservation->reference_no)
+                        ->subject('New Booking – '.$reservation->reference_no)
                         ->html($this->templateService->render(
                             'New booking received',
                             $this->newBookingResortHtml($reservation),
@@ -110,12 +150,14 @@ class EmailNotificationService
             ->where('role', 'resort_owner')
             ->first();
 
-        if (! $owner?->email) return;
+        if (! $owner?->email) {
+            return;
+        }
 
         $this->dispatch(
             'subscription_due',
             $owner->email,
-            'Subscription Payment Due – ' . $subscription->resort?->name,
+            'Subscription Payment Due – '.$subscription->resort?->name,
             function () use ($subscription, $owner): void {
                 Mail::send([], [], function ($m) use ($subscription, $owner): void {
                     $m->to($owner->email, $owner->name)
@@ -140,12 +182,14 @@ class EmailNotificationService
             ->where('role', 'resort_owner')
             ->first();
 
-        if (! $owner?->email) return;
+        if (! $owner?->email) {
+            return;
+        }
 
         $this->dispatch(
             'subscription_renewal_confirmation',
             $owner->email,
-            'Subscription Renewed – ' . $subscription->resort?->name,
+            'Subscription Renewed – '.$subscription->resort?->name,
             function () use ($subscription, $owner): void {
                 Mail::send([], [], function ($m) use ($subscription, $owner): void {
                     $m->to($owner->email, $owner->name)
@@ -170,12 +214,14 @@ class EmailNotificationService
             ->where('role', 'resort_owner')
             ->first();
 
-        if (! $owner?->email) return;
+        if (! $owner?->email) {
+            return;
+        }
 
         $this->dispatch(
             'grace_period_alert',
             $owner->email,
-            'Action Required: Subscription Grace Period – ' . $subscription->resort?->name,
+            'Action Required: Subscription Grace Period – '.$subscription->resort?->name,
             function () use ($subscription, $owner): void {
                 Mail::send([], [], function ($m) use ($subscription, $owner): void {
                     $m->to($owner->email)
@@ -200,12 +246,14 @@ class EmailNotificationService
             ->where('role', 'resort_owner')
             ->first();
 
-        if (! $owner?->email) return;
+        if (! $owner?->email) {
+            return;
+        }
 
         $this->dispatch(
             'resort_suspended',
             $owner->email,
-            'Your resort listing has been suspended – ' . $resort->name,
+            'Your resort listing has been suspended – '.$resort->name,
             function () use ($resort, $owner): void {
                 Mail::send([], [], function ($m) use ($resort, $owner): void {
                     $m->to($owner->email)
@@ -236,11 +284,11 @@ class EmailNotificationService
     ): void {
         $log = EmailLog::create([
             'tenant_id' => $tenantId,
-            'type'      => $type,
-            'to_email'  => $toEmail,
-            'subject'   => $subject,
-            'status'    => 'queued',
-            'metadata'  => $metadata,
+            'type' => $type,
+            'to_email' => $toEmail,
+            'subject' => $subject,
+            'status' => 'queued',
+            'metadata' => $metadata,
         ]);
 
         try {
@@ -260,6 +308,7 @@ class EmailNotificationService
         $fee = number_format($r->reservation_fee, 2);
         $total = number_format($r->total_amount, 2);
         $balance = number_format($r->total_amount - $r->reservation_fee, 2);
+
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
   <h2 style="color:#1E3A5F">Booking Confirmed!</h2>
@@ -279,6 +328,7 @@ HTML;
     private function paymentReceiptHtml(Reservation $r): string
     {
         $fee = number_format($r->reservation_fee, 2);
+
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
   <h2 style="color:#1E3A5F">Payment Receipt</h2>
@@ -306,6 +356,7 @@ HTML;
     {
         $due = $s->next_due_date;
         $amount = number_format($s->total_monthly_fee, 2);
+
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #fde68a;border-radius:12px;background:#fffbeb">
   <h2 style="color:#92400e">Subscription Payment Due</h2>
@@ -319,6 +370,7 @@ HTML;
     {
         $amount = number_format($s->total_monthly_fee, 2);
         $nextDue = $s->next_due_date;
+
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #bbf7d0;border-radius:12px;background:#f0fdf4">
   <h2 style="color:#166534">Subscription Renewed</h2>
@@ -331,6 +383,7 @@ HTML;
     private function gracePeriodHtml(Subscription $s): string
     {
         $grace = $s->grace_until;
+
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #fca5a5;border-radius:12px;background:#fff1f2">
   <h2 style="color:#991b1b">⚠️ Subscription Grace Period Active</h2>

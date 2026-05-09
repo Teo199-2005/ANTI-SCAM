@@ -34,6 +34,7 @@ export const authClient = axios.create({
   baseURL: "/api/auth",
   headers: { Accept: "application/json", "Content-Type": "application/json" },
   timeout: 10_000,
+  withCredentials: true,
 });
 
 // ── Response interceptors ─────────────────────────────────────────────────────

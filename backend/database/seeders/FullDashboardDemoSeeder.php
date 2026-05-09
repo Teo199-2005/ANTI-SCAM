@@ -82,7 +82,7 @@ class FullDashboardDemoSeeder extends Seeder
                 $rooms->push($room);
             }
 
-            $plan = $i % 4 === 0 ? 'vip' : 'standard';
+            $plan = $i % 4 === 0 ? 'vip' : 'basic';
             $includedRooms = $plan === 'vip' ? 6 : 3;
             $basePrice = $plan === 'vip' ? 12999 : 4999;
             $extraRoomFee = $plan === 'vip' ? 650 : 950;

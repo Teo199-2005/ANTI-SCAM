@@ -2,7 +2,7 @@ import { HERO_BANNER_INTRINSIC, images } from "@/lib/content/images";
 import Image from "next/image";
 
 /**
- * Landing hero: single full-width image only. Intrinsics 1774×887 (`poster1.png`) — section uses the same aspect ratio
+ * Landing hero: single full-width image only. Intrinsics 1536×1024 (`coverphoto.png`) — section uses the same aspect ratio
  * so the bitmap is not stretched or letterboxed.
  */
 export default function HeroSection() {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\SubscriptionInvoice;
+use App\Services\MarketerCommissionPayoutService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,13 +15,24 @@ class MarketingDashboardController extends Controller
 {
     use ApiResponseTrait;
 
+    public function __construct(private readonly MarketerCommissionPayoutService $marketerPayouts) {}
+
     public function stats(Request $request)
     {
         $marketerId = $request->user()->id;
 
         $totalCommissions = Commission::where('marketer_id', $marketerId)->sum('commission_amount');
         $pendingCommissions = Commission::where('marketer_id', $marketerId)->where('status', 'pending')->sum('commission_amount');
-        $releasedCommissions = Commission::where('marketer_id', $marketerId)->where('status', 'released')->sum('commission_amount');
+        $pendingRows = Commission::where('marketer_id', $marketerId)->where('status', 'pending')->orderBy('id')->get();
+        $pendingPayoutNetEstimate = $pendingRows->isEmpty()
+            ? 0.0
+            : (float) $this->marketerPayouts->allocateNetByCommission($pendingRows)['net_total'];
+
+        $releasedCommissionsPaidOut = (float) CommissionRelease::query()
+            ->whereHas('commission', fn ($q) => $q->where('marketer_id', $marketerId))
+            ->sum('amount');
+        $releasedCommissionsGross = Commission::where('marketer_id', $marketerId)->where('status', 'released')->sum('commission_amount');
+
         $resortCount = DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count();
 
         $user = $request->user();
@@ -28,17 +40,23 @@ class MarketingDashboardController extends Controller
         $code = $user->referral_code;
         $shareRegister = $code !== null && $code !== '' ? "{$frontend}/register?ref={$code}" : null;
         $subscribeHint = $code !== null && $code !== ''
-            ? "Owners subscribed with code {$code} unlock ₱1,500/mo pricing where referral discounts apply."
+            ? "Resort owners who enter code {$code} at checkout get their first month free (3, 6, or 12-month plans) — after completing their resort profile setup."
             : null;
 
+        $wh = $this->marketerPayouts->withholdingRate();
+
         return $this->successResponse([
-            'totalCommissions'   => (float) $totalCommissions,
+            'totalCommissions' => (float) $totalCommissions,
             'pendingCommissions' => (float) $pendingCommissions,
-            'releasedCommissions' => (float) $releasedCommissions,
-            'assignedResorts'    => $resortCount,
+            'pendingPayoutNetEstimate' => round($pendingPayoutNetEstimate, 2),
+            'releasedCommissions' => round($releasedCommissionsPaidOut, 2),
+            'releasedCommissionsGross' => (float) $releasedCommissionsGross,
+            'payoutWithholdingRate' => $wh,
+            'assignedResorts' => $resortCount,
             'referral_code' => $code,
             'referral_share_register_url' => $shareRegister,
             'referral_subscribe_hint' => $subscribeHint,
+            'commission_payout_schedule' => 'Pending subscription-referral commissions are paid automatically via GCash (Xendit) on the 10th of each month (Asia/Manila), for earnings through the previous calendar month, when automation is enabled and payout details are complete. A platform withholding (taxes and fees) is deducted before each disbursement; see payoutWithholdingRate.',
         ], 'Marketing stats');
     }
 
@@ -58,7 +76,7 @@ class MarketingDashboardController extends Controller
     public function commissions(Request $request)
     {
         $marketerId = $request->user()->id;
-        $perPage    = (int) $request->integer('perPage', 12);
+        $perPage = (int) $request->integer('perPage', 12);
 
         $commissions = Commission::with(['resort:id,name', 'releases'])
             ->where('marketer_id', $marketerId)
@@ -71,7 +89,7 @@ class MarketingDashboardController extends Controller
     public function releaseHistory(Request $request)
     {
         $marketerId = $request->user()->id;
-        $perPage    = (int) $request->integer('perPage', 12);
+        $perPage = (int) $request->integer('perPage', 12);
 
         $releases = CommissionRelease::with(['commission.resort:id,name', 'releasedByUser:id,name'])
             ->whereHas('commission', fn ($q) => $q->where('marketer_id', $marketerId))

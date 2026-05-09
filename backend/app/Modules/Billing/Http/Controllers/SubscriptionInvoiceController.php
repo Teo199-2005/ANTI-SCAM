@@ -8,6 +8,7 @@ use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Modules\Billing\Services\XenditSubscriptionInvoiceService;
 use App\Modules\Billing\Services\XenditSubscriptionWebhookService;
+use App\Services\LandingReadinessService;
 use App\Services\MarketingReferralCodeService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
@@ -140,15 +141,35 @@ class SubscriptionInvoiceController extends Controller
             }
 
             $marketerId = $marketer->id;
+
+            // Gate: resort profile must be complete before the first-month-free promo
+            // can be applied. The promo is not available for 1-month terms.
+            if ($durationMonths <= 1) {
+                return $this->errorResponse(
+                    'The referral first-month-free promo requires a multi-month plan (3, 6, or 12 months).',
+                    ['referral_code' => ['invalid_duration']],
+                    422
+                );
+            }
+
+            $readiness = app(LandingReadinessService::class)->check($resort);
+            if (! $readiness['is_ready']) {
+                return $this->errorResponse(
+                    'Your resort profile is incomplete. Complete your setup before applying a referral code.',
+                    [
+                        'referral_code' => ['profile_incomplete'],
+                        'missing_fields' => $readiness['missing_fields'],
+                    ],
+                    422
+                );
+            }
         }
+        $isFirstMonthFree = $hasReferralCode && $billingScope === 'monthly' && $durationMonths > 1;
         $invoicePlanTag = $billingScope === 'room_addon'
             ? sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths)
-            : sprintf(
-                '%s_m%d_b%d',
-                (string) $subscription->plan,
-                $durationMonths,
-                $hasReferralCode ? 1 : 0
-            );
+            : ($isFirstMonthFree
+                ? sprintf('%s_m%d_fmf', (string) $subscription->plan, $durationMonths)
+                : sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths));
 
         $existingPendingGatewayInvoice = SubscriptionInvoice::query()
             ->where('subscription_id', $subscription->id)
@@ -285,4 +306,3 @@ class SubscriptionInvoiceController extends Controller
         }
     }
 }
-

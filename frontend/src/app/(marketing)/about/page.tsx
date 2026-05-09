@@ -7,6 +7,7 @@ import {
   Flag,
   Gem,
   type LucideProps,
+  Lightbulb,
   ShieldCheck,
   Sparkles,
   Target,
@@ -25,36 +26,34 @@ function SectionDivider({ icon: Icon }: { icon: FC<LucideProps> }) {
   );
 }
 
-const highlights = [
-  "Trusted booking experiences for modern resorts",
-  "Operational clarity for lean hospitality teams",
-  "Guest-first product design from discovery to checkout",
+const platformHighlights = [
+  "Smart reservation systems",
+  "Real-time booking management",
+  "Double-booking prevention",
+  "Dedicated booking websites",
+  "Monthly financial reports",
+  "Verified resort protection",
+  "Automated inquiry handling",
 ];
 
 const pillars = [
   {
     icon: Target,
-    title: "Mission",
+    title: "Our mission",
     description:
-      "Help resorts operate with clarity while giving guests a transparent, stress-free reservation journey.",
-    stripe: "from-clCoral to-clCoralDark",
-    iconStyle: "border-yellow-200 bg-yellow-50 text-amber-700",
+      "To give Philippine resorts a trusted, modern reservation ecosystem through secure booking technology, operational automation, and verified resort protection — helping businesses grow while guests book with confidence nationwide.",
   },
   {
     icon: Flag,
-    title: "Vision",
+    title: "Our vision",
     description:
-      "Become the most trusted booking operating system for premium staycations in the Philippines.",
-    stripe: "from-clTeal to-clTealLight",
-    iconStyle: "border-blue-200 bg-blue-50 text-clTeal",
+      "To lead as the Philippines’ verified resort network and reservation management platform — setting the standard for trusted bookings, professional operations, and scam-free hospitality.",
   },
   {
-    icon: Gem,
-    title: "Values",
+    icon: Lightbulb,
+    title: "Why we built Anti-Scam PH",
     description:
-      "Reliability, guest-first communication, operational accuracy, and long-term platform trust.",
-    stripe: "from-clOcean to-clTeal",
-    iconStyle: "border-clSeafoam bg-clSeafoam/60 text-clOcean",
+      "Fake resort pages, booking scams, reservation conflicts, and manual workflows were costing legitimate operators and guests alike. We built Anti-Scam PH so serious resorts can grow professionally online — and guests can reserve with clearer trust and security.",
   },
 ];
 
@@ -71,29 +70,53 @@ export default function AboutPage() {
         {/* ── About Us ──────────────────────────────────────────────── */}
         <section className="overflow-hidden rounded-3xl border border-clSeafoam/70 bg-gradient-to-br from-white via-clSand/20 to-clSeafoam/30 shadow-cl-card">
           <div className="grid md:grid-cols-[1.6fr_1fr]">
-            {/* Left — brand statement */}
+            {/* Left — brand narrative */}
             <div className="p-7 md:border-r md:border-clSeafoam/50 md:p-10">
-              <span className="cl-section-eyebrow mb-4 inline-flex">Who We Are</span>
+              <span className="cl-section-eyebrow mb-4 inline-flex">About us</span>
               <SectionHeading
-                title="About Us"
-                subtitle="We design serene stays and trustworthy booking experiences for modern travelers."
+                title="Anti-Scam PH"
+                subtitle="Philippine-based resort verification and reservation management — built for trust, automation, and growth."
               />
-              <p className="max-w-2xl text-base leading-8 text-zinc-600">
-                Anti-Scam PH exists to help resorts operate with confidence and give guests a seamless
-                path from discovery to confirmed reservation. Our platform combines elegant design with
-                reliable booking logic tailored for hospitality teams.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-2.5">
-                {highlights.map((highlight) => (
-                  <span
-                    key={highlight}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-clSeafoam bg-clSeafoam/60 px-3.5 py-1.5 text-xs font-semibold text-clOcean shadow-sm"
-                  >
-                    <Sparkles className="h-3 w-3 text-clCoral" />
-                    {highlight}
-                  </span>
-                ))}
+              <div className="max-w-2xl space-y-4 text-base leading-8 text-zinc-600">
+                <p>
+                  <strong className="font-semibold text-zinc-800">Anti-Scam PH</strong> is a
+                  Philippine-based resort verification and reservation management platform operated by{" "}
+                  <strong className="font-semibold text-zinc-800">The Rising 2 Brothers OPC</strong>,
+                  established in 2024.
+                </p>
+                <p>
+                  We help modernize the resort and staycation industry with secure booking, verified
+                  listings, and smart tools for owners nationwide — so legitimate businesses can compete
+                  on service, not on who shouts loudest online.
+                </p>
+                <p>
+                  We know the pain points: fake booking pages, scams, double bookings, endless
+                  inquiries, and spreadsheets that don&apos;t scale. Through verification, automation,
+                  and clear guest communication, we aim for a safer, more organized, and more
+                  professional booking experience across the country.
+                </p>
               </div>
+
+              <p className="mt-8 text-sm font-semibold uppercase tracking-wider text-clOcean">
+                What we help resorts streamline
+              </p>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {platformHighlights.map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-2.5 rounded-xl border border-clSeafoam/70 bg-white/70 px-3 py-2.5 text-sm text-zinc-700 shadow-sm"
+                  >
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-clTeal" aria-hidden />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              <p className="mt-6 text-sm leading-7 text-zinc-600">
+                Our verification approach helps guests spot legitimate resorts and helps owners build
+                credibility. As we grow, we&apos;re working toward a trusted nationwide network of
+                verified properties — and a stronger, more modern Philippine hospitality sector.
+              </p>
             </div>
 
             {/* Right — two info cards */}
@@ -104,12 +127,12 @@ export default function AboutPage() {
                     <ShieldCheck className="h-4 w-4" />
                   </div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-clOcean">
-                    Platform Promise
+                    Verification & trust
                   </p>
                 </div>
                 <p className="text-sm leading-7 text-zinc-600">
-                  Clear pricing, protected availability, and guest-facing transparency built into every
-                  booking flow.
+                  We combine technology with verification signals so guests can book with clearer
+                  confidence — and owners can stand out as verified, professional operators.
                 </p>
               </div>
               <div className="flex flex-col justify-center bg-white/50 p-6 md:p-8">
@@ -118,12 +141,12 @@ export default function AboutPage() {
                     <BadgeCheck className="h-4 w-4 text-primaryBlue" />
                   </div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-clOcean">
-                    Why Teams Choose Us
+                    One platform
                   </p>
                 </div>
                 <p className="text-sm leading-7 text-zinc-600">
-                  Small resort operators get one polished system for listings, reservations, schedules,
-                  and guest trust.
+                  Listings, reservations, availability, payments, and reporting in one place — fewer
+                  tools, fewer mistakes, more time for guests.
                 </p>
               </div>
             </div>
@@ -132,16 +155,16 @@ export default function AboutPage() {
 
         <SectionDivider icon={Target} />
 
-        {/* ── Mission / Vision / Values (minimal) ─────────────────────── */}
+        {/* ── Mission / Vision / Why we built ─────────────────────────── */}
         <section className="overflow-hidden rounded-3xl border border-clSeafoam/60 bg-white shadow-cl-card">
           <div className="p-7 md:p-10">
-            <span className="cl-section-eyebrow mb-4 inline-flex">Principles</span>
+            <span className="cl-section-eyebrow mb-4 inline-flex">Direction</span>
             <SectionHeading
-              title="Mission, Vision & Values"
-              subtitle="The principles behind every product decision, booking flow, and hospitality experience we shape."
+              title="Mission, vision & purpose"
+              subtitle="What drives Anti-Scam PH — and why we keep building for Philippine resorts and their guests."
             />
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="mt-5 grid gap-4 lg:grid-cols-3">
               {pillars.map((pillar) => (
                 <article
                   key={pillar.title}

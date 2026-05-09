@@ -80,7 +80,7 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
         <span className="cl-section-eyebrow">Leadership</span>
       </div>
 
-      <div className="mb-8 mx-auto flex max-w-5xl flex-col items-center gap-4 md:flex-row md:items-start md:justify-between md:gap-8">
+      <div className="mb-8 mx-auto flex max-w-5xl flex-col items-center gap-8 md:flex-row md:items-start md:justify-between md:gap-10 lg:gap-12">
         <div className="text-center md:text-left">
           <h2
             className={`font-heading text-3xl font-semibold md:text-4xl ${
@@ -97,18 +97,41 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
             Meet our leadership team shaping premium digital hospitality.
           </p>
         </div>
-        <div className="inline-flex shrink-0 items-center gap-2.5 rounded-full border border-clSeafoam/70 bg-white px-3 py-2 shadow-sm md:mt-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/rising2brothers.png"
-            alt="The Rising 2 Brothers"
-            width={26}
-            height={26}
-            className="h-6 w-6 shrink-0 rounded-sm object-contain"
-          />
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-            Powered by: The Rising 2 Brothers
-          </span>
+
+        {/* Operator — logo + name sized to pair visually with “The Visionaries” */}
+        <div
+          className={`flex w-full max-w-md shrink-0 flex-col items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-5 md:w-auto md:flex-col md:items-end md:justify-start md:px-6 md:py-5 lg:flex-row lg:items-center ${
+            dark
+              ? "border-white/20 bg-white/10"
+              : "border-clSeafoam/80 bg-white/90"
+          }`}
+        >
+          <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24 md:h-28 md:w-28">
+            <Image
+              src="/rising2brothers.png"
+              alt="The Rising 2 Brothers OPC — company logo"
+              fill
+              className="object-contain"
+              sizes="(max-width: 768px) 5rem, 7rem"
+              priority
+            />
+          </div>
+          <div className="text-center sm:text-left md:text-right lg:text-left">
+            <p
+              className={`text-[11px] font-bold uppercase tracking-[0.2em] ${
+                dark ? "text-white/55" : "text-zinc-500"
+              }`}
+            >
+              Powered by
+            </p>
+            <p
+              className={`mt-1 font-heading text-3xl font-semibold leading-tight md:text-4xl ${
+                dark ? "text-white" : "text-zinc-900"
+              }`}
+            >
+              The Rising 2 Brothers
+            </p>
+          </div>
         </div>
       </div>
 

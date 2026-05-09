@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHydrated } from "@/hooks/useHydrated";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
+import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -67,6 +68,7 @@ export default function RegisterPage() {
         role_intent: "resort_owner",
         password,
         password_confirmation: passwordConfirmation,
+        accept_terms: true,
       });
       router.push("/dashboard");
     } catch (err) {
@@ -287,15 +289,10 @@ export default function RegisterPage() {
               onChange={(e) => setAcceptTerms(e.target.checked)}
             />
             <span>
-              I agree to the{" "}
-              <Link href="/terms" className="font-semibold text-clOcean hover:underline">
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="font-semibold text-clOcean hover:underline">
-                Privacy Policy
-              </Link>
-              .
+              I have read and agree to the{" "}
+              <LegalLinkButton kind="terms">Terms &amp; Conditions</LegalLinkButton> and{" "}
+              <LegalLinkButton kind="privacy">Privacy Policy</LegalLinkButton>
+              . A copy of the Terms will be emailed to you after registration.
             </span>
           </label>
 

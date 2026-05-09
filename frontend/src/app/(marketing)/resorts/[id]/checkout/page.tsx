@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import Link from "next/link";
 
 type Step = "auth" | "confirm" | "paying";
@@ -42,6 +43,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
+  const [acceptCheckoutTerms, setAcceptCheckoutTerms] = useState(false);
 
   // Booking
   const [guestCount, setGuestCount] = useState(1);
@@ -82,6 +84,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
   const onAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    if (authMode === "register" && !acceptCheckoutTerms) {
+      setAuthError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+      return;
+    }
     setAuthPending(true);
     try {
       if (authMode === "register") {
@@ -91,6 +97,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
           role_intent: "client",
           password,
           password_confirmation: password,
+          accept_terms: true,
         });
       } else {
         await login(email, password);
@@ -177,7 +184,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setAuthMode(m)}
+                    onClick={() => {
+                      setAuthMode(m);
+                      setAuthError(null);
+                    }}
                     className={`flex-1 rounded-full border py-2 text-sm font-semibold transition ${
                       authMode === m
                         ? "border-clOcean/40 bg-clOcean/10 text-clOcean"
@@ -236,9 +246,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
+                {authMode === "register" ? (
+                  <label className="flex items-start gap-2 rounded-xl border border-white/50 bg-white/20 px-3 py-2.5 text-xs text-zinc-700">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-clOcean"
+                      checked={acceptCheckoutTerms}
+                      onChange={(e) => setAcceptCheckoutTerms(e.target.checked)}
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <LegalLinkButton kind="terms">Terms &amp; Conditions</LegalLinkButton> and{" "}
+                      <LegalLinkButton kind="privacy">Privacy Policy</LegalLinkButton>
+                      . A copy of the Terms will be emailed to you.
+                    </span>
+                  </label>
+                ) : null}
                 <button
                   type="submit"
-                  disabled={authPending}
+                  disabled={authPending || (authMode === "register" && !acceptCheckoutTerms)}
                   className="cl-btn-primary w-full disabled:opacity-60 disabled:pointer-events-none"
                 >
                   {authPending ? (

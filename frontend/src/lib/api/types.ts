@@ -42,7 +42,33 @@ export type AuthUser = {
   tenant_id: number | null;
   google_id: string | null;
   email_verified_at: string | null;
+  /** Set when the user accepted the current platform Terms & Conditions */
+  terms_accepted_at?: string | null;
+  terms_version?: string | null;
   created_at: string;
+  /** Marketing: masked GCash number, e.g. ••••••1234 */
+  gcash_masked_number?: string | null;
+  gcash_account_holder_name?: string | null;
+  gcash_payout_configured?: boolean;
+  /** Marketing: government ID verification */
+  marketer_gov_id_type?: string | null;
+  /** True when an ID number is stored (use for UI gating; masked may be absent in edge cases). */
+  marketer_gov_id_has_number?: boolean;
+  marketer_gov_id_number_masked?: string | null;
+  marketer_gov_id_document_url?: string | null;
+  marketer_gov_id_placeholder?: string | null;
+  marketer_gov_id_format_hint?: string | null;
+  marketer_gov_id_label?: string | null;
+  marketer_gov_id_complete?: boolean;
+  /** Marketing: complete mailing address for KYC / BIR */
+  marketer_mailing_address?: string | null;
+  /** Marketing: masked TIN, e.g. ••••••1234 */
+  marketer_tin_masked?: string | null;
+  marketer_bank_name?: string | null;
+  marketer_bank_branch?: string | null;
+  marketer_bank_account_name?: string | null;
+  marketer_bank_account_masked?: string | null;
+  marketer_bank_details_complete?: boolean;
 };
 
 // ── Resort ────────────────────────────────────────────────────────────────────

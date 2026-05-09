@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Storage;
 class LandingReadinessService
 {
     /**
-     * Check whether a resort's auto-generated landing page has all required data.
+     * Check whether a resort's profile and rooms are complete enough to:
+     *  (a) display a public landing page, AND
+     *  (b) be eligible for the referral first-month-free promo.
      *
      * Returns:
      *   is_ready       bool
@@ -35,8 +37,20 @@ class LandingReadinessService
             $missing[] = 'background_image';
         }
 
+        // Require at least one active room with at least one image so the
+        // listing is genuinely bookable, not just header-complete.
+        $hasActiveRoomWithImage = $resort->rooms()
+            ->with('images')
+            ->where('status', 'active')
+            ->get()
+            ->contains(fn ($room) => $room->images->isNotEmpty());
+
+        if (! $hasActiveRoomWithImage) {
+            $missing[] = 'room_with_image';
+        }
+
         return [
-            'is_ready'      => count($missing) === 0,
+            'is_ready' => count($missing) === 0,
             'missing_fields' => $missing,
         ];
     }
@@ -66,49 +80,49 @@ class LandingReadinessService
         }
 
         // Google Maps embed URL (no API key needed for basic search embed)
-        $mapEmbedUrl   = null;
-        $mapSearchUrl  = null;
+        $mapEmbedUrl = null;
+        $mapSearchUrl = null;
         if (! empty($resort->address)) {
-            $encoded      = rawurlencode($resort->address);
-            $mapEmbedUrl  = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
+            $encoded = rawurlencode($resort->address);
+            $mapEmbedUrl = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
             $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$encoded}";
         }
 
         return [
             'hero' => [
-                'heading'    => $resort->name,
+                'heading' => $resort->name,
                 'subheading' => $resort->description,
                 'bgImageUrl' => $resort->background_image_url,
-                'logoUrl'    => $resort->logo_url,
+                'logoUrl' => $resort->logo_url,
             ],
             'about' => [
-                'heading' => 'About ' . $resort->name,
-                'body'    => $resort->description,
+                'heading' => 'About '.$resort->name,
+                'body' => $resort->description,
             ],
             'rooms' => $rooms->map(fn ($room): array => [
-                'id'        => $room->id,
-                'name'      => $room->name,
-                'capacity'  => $room->capacity,
+                'id' => $room->id,
+                'name' => $room->name,
+                'capacity' => $room->capacity,
                 'basePrice' => (float) $room->base_price,
                 'amenities' => $room->amenities ?? [],
-                'rules'     => $room->rules,
-                'images'    => $room->images->map(
+                'rules' => $room->rules,
+                'images' => $room->images->map(
                     fn ($img): string => Storage::disk($img->disk)->url($img->path)
                 )->values()->all(),
             ])->values()->all(),
             'gallery' => $gallery,
             'footer' => [
-                'ownerName'               => $owner?->name,
-                'ownerContact'            => $owner?->phone,
-                'representativeName'      => $resort->representative_name,
-                'representativeContact'   => $resort->representative_contact_number,
-                'contactEmail'            => $owner?->email,
-                'resortContact'           => $resort->contact_number,
-                'address'                 => $resort->address,
+                'ownerName' => $owner?->name,
+                'ownerContact' => $owner?->phone,
+                'representativeName' => $resort->representative_name,
+                'representativeContact' => $resort->representative_contact_number,
+                'contactEmail' => $owner?->email,
+                'resortContact' => $resort->contact_number,
+                'address' => $resort->address,
             ],
             'map' => [
-                'address'   => $resort->address,
-                'embedUrl'  => $mapEmbedUrl,
+                'address' => $resort->address,
+                'embedUrl' => $mapEmbedUrl,
                 'searchUrl' => $mapSearchUrl,
             ],
         ];

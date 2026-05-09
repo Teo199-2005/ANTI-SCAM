@@ -3,10 +3,12 @@
 namespace App\Modules\Admin\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Legal\PlatformTerms;
 use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Modules\Subscriptions\Services\SubscriptionService;
+use App\Services\EmailNotificationService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,10 @@ class AdminOnboardController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly SubscriptionService $subscriptions) {}
+    public function __construct(
+        private readonly SubscriptionService $subscriptions,
+        private readonly EmailNotificationService $emailNotifications,
+    ) {}
 
     public function store(Request $request)
     {
@@ -34,6 +39,7 @@ class AdminOnboardController extends Controller
             'subdomain' => ['nullable', 'string', 'max:80', 'alpha_dash', 'unique:tenants,subdomain'],
             'slug' => ['nullable', 'string', 'max:120', 'alpha_dash', 'unique:tenants,slug'],
             'is_publicly_listed' => ['nullable', 'boolean'],
+            'accept_terms' => ['required', 'accepted'],
         ]);
 
         $payload = DB::transaction(function () use ($validated): array {
@@ -66,7 +72,11 @@ class AdminOnboardController extends Controller
                 ]);
             }
 
-            $owner->update(['tenant_id' => $tenant->id]);
+            $owner->update([
+                'tenant_id' => $tenant->id,
+                'terms_accepted_at' => now(),
+                'terms_version' => PlatformTerms::version(),
+            ]);
 
             $resortPayload = [
                 'tenant_id' => $tenant->id,
@@ -90,8 +100,13 @@ class AdminOnboardController extends Controller
                 'tenant' => $tenant,
                 'resort' => $resort->fresh()->loadCount('rooms'),
                 'subscription' => $subscription,
+                'owner' => $owner->fresh(),
             ];
         });
+
+        $this->emailNotifications->sendTermsAccepted($payload['owner'], 'admin resort onboarding');
+
+        unset($payload['owner']);
 
         return $this->successResponse($payload, 'Resort onboarded successfully', 201);
     }
@@ -116,7 +131,7 @@ class AdminOnboardController extends Controller
         $path = $request->file('logo')->store('resort-logos', 'public');
 
         return $this->successResponse([
-            'logo_url' => '/storage/' . $path,
+            'logo_url' => '/storage/'.$path,
         ], 'Resort logo uploaded');
     }
 
@@ -142,6 +157,7 @@ class AdminOnboardController extends Controller
             'subdomain' => ['nullable', 'string', 'max:80', 'alpha_dash', 'unique:tenants,subdomain'],
             'slug' => ['nullable', 'string', 'max:120', 'alpha_dash', 'unique:tenants,slug'],
             'is_publicly_listed' => ['nullable', 'boolean'],
+            'accept_terms' => ['required', 'accepted'],
         ]);
 
         $payload = DB::transaction(function () use ($validated, $user): array {
@@ -156,7 +172,11 @@ class AdminOnboardController extends Controller
                 'status' => 'active',
             ]);
 
-            $user->update(['tenant_id' => $tenant->id]);
+            $user->update([
+                'tenant_id' => $tenant->id,
+                'terms_accepted_at' => now(),
+                'terms_version' => PlatformTerms::version(),
+            ]);
 
             $resortPayload = [
                 'tenant_id' => $tenant->id,
@@ -178,8 +198,13 @@ class AdminOnboardController extends Controller
                 'tenant' => $tenant,
                 'resort' => $resort->fresh()->loadCount('rooms'),
                 'subscription' => $subscription,
+                'owner' => $user->fresh(),
             ];
         });
+
+        $this->emailNotifications->sendTermsAccepted($payload['owner'], 'resort onboarding');
+
+        unset($payload['owner']);
 
         return $this->successResponse($payload, 'Resort onboarded successfully', 201);
     }

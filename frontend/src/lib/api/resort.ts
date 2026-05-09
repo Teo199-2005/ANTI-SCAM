@@ -83,6 +83,8 @@ export async function ownerOnboardResort(payload: {
   description?: string;
   plan?: "basic";
   is_publicly_listed?: boolean;
+  /** Required: explicit acceptance of platform Terms & Conditions before first resort workspace is created. */
+  accept_terms: boolean;
 }) {
   const { data } = await apiClient.post<ApiEnvelope<{ resort: ResortItem }>>("/resort-owner/onboard", payload);
   return data.data;

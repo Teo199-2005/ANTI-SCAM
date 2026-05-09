@@ -1,6 +1,7 @@
 "use client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
+import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
 import { listResorts, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
 import { getOwnerLandingPage, uploadBgImage } from "@/lib/api/landingPage";
@@ -70,6 +71,9 @@ export default function ResortProfilePage() {
   const [uploadingBg, setUploadingBg] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subdomain, setSubdomain] = useState<string | null>(null);
+  const [onboardingGate, setOnboardingGate] = useState(false);
+  const [acceptOnboardTerms, setAcceptOnboardTerms] = useState(false);
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
 
   const publicLink = (() => {
     if (!subdomain || typeof window === "undefined") return "";
@@ -85,28 +89,21 @@ export default function ResortProfilePage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setOnboardingGate(false);
       try {
-        let resorts = await listResorts({ perPage: 10 });
-        let first = resorts.data[0];
+        const resorts = await listResorts({ perPage: 10 });
+        const first = resorts.data[0];
         if (!first) {
           if (user?.role === "resort_owner") {
-            const ownerLabel = (user.name ?? "Resort Owner").trim();
-            const onboarding = await ownerOnboardResort({
-              tenant_name: ownerLabel,
-              resort_name: `${ownerLabel}'s Resort`,
-              is_publicly_listed: false,
-            });
-            first = onboarding?.resort ?? null;
-            await refreshUser();
-            if (!first) {
-              resorts = await listResorts({ perPage: 10 });
-              first = resorts.data[0];
-            }
-          }
-          if (!first) {
-            setError("No resort assigned to this account.");
+            setOnboardingGate(true);
+            setForm(null);
+            setError(null);
+            setLoading(false);
             return;
           }
+          setError("No resort assigned to this account.");
+          setLoading(false);
+          return;
         }
         const raw = first as Record<string, unknown>;
 
@@ -148,8 +145,110 @@ export default function ResortProfilePage() {
     void load();
   }, [refreshUser, user?.email, user?.name, user?.phone, user?.role]);
 
+  const completeOwnerOnboarding = async () => {
+    if (!user?.name || !acceptOnboardTerms) return;
+    const ownerLabel = (user.name ?? "Resort Owner").trim();
+    setOnboardingBusy(true);
+    try {
+      await ownerOnboardResort({
+        tenant_name: ownerLabel,
+        resort_name: `${ownerLabel}'s Resort`,
+        is_publicly_listed: false,
+        accept_terms: true,
+      });
+      await refreshUser();
+      setAcceptOnboardTerms(false);
+      setOnboardingGate(false);
+      setLoading(true);
+      const resorts = await listResorts({ perPage: 10 });
+      const first = resorts.data[0];
+      if (!first) {
+        setError("Resort was created but could not be loaded. Refresh the page.");
+        setLoading(false);
+        return;
+      }
+      const raw = first as Record<string, unknown>;
+      let ownerSubdomain: string | null = null;
+      try {
+        const landing = await getOwnerLandingPage();
+        ownerSubdomain = landing.subdomain ?? null;
+      } catch {
+        /* keep null */
+      }
+      setSubdomain(ownerSubdomain);
+      setForm({
+        id: first.id,
+        name: first.name,
+        description: first.description ?? "",
+        address: first.address ?? "",
+        contact_number: first.contact_number ?? "",
+        is_publicly_listed: first.is_publicly_listed,
+        cancellation_policy: (raw.cancellation_policy as string) ?? "",
+        amenities: Array.isArray(raw.amenities)
+          ? (raw.amenities as string[]).join(", ")
+          : ((raw.amenities as string) ?? ""),
+        logo_url: first.logo_url ?? "",
+        background_image_url: (raw.background_image_url as string) ?? "",
+        owner_name: user?.name ?? "",
+        owner_contact_number: user?.phone ?? "",
+        representative_name: (raw.representative_name as string) ?? "",
+        representative_email: user?.email ?? "",
+        representative_contact_number: (raw.representative_contact_number as string) ?? "",
+      });
+      setError(null);
+      pushToast({
+        title: "Workspace ready",
+        description: "Your resort workspace was created. A copy of the Terms was sent to your email.",
+        tone: "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Onboarding failed",
+        description: parseApiErrorMessage(err, "Could not create your resort workspace."),
+        tone: "error",
+      });
+    } finally {
+      setOnboardingBusy(false);
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="dash-card p-8 text-center text-zinc-600">Loading resort profile…</div>;
+  }
+
+  if (onboardingGate && user?.role === "resort_owner") {
+    return (
+      <div className="dash-card max-w-xl p-8">
+        <h1 className="dash-page-title inline-flex items-center gap-2">
+          <Building2 size={24} className="text-skyBlue" />
+          Accept terms to continue
+        </h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Before we create your resort workspace, please confirm you have read and agree to the Anti-Scam PH Terms &amp;
+          Conditions. A full copy will be emailed to you for your records.
+        </p>
+        <label className="mt-6 flex items-start gap-3 rounded-xl border border-softBorder bg-softGray/30 p-4 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-softBorder accent-primaryBlue"
+            checked={acceptOnboardTerms}
+            onChange={(e) => setAcceptOnboardTerms(e.target.checked)}
+          />
+          <span>
+            I have read and agree to the <LegalLinkButton kind="terms">Terms &amp; Conditions</LegalLinkButton>.
+          </span>
+        </label>
+        <button
+          type="button"
+          disabled={!acceptOnboardTerms || onboardingBusy}
+          className="dash-btn-primary mt-6 px-6 py-2.5 disabled:opacity-50"
+          onClick={() => void completeOwnerOnboarding()}
+        >
+          {onboardingBusy ? "Creating workspace…" : "Create my resort workspace"}
+        </button>
+      </div>
+    );
   }
 
   if (!form || error) {

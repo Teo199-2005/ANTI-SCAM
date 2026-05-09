@@ -1,6 +1,7 @@
 "use client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
+import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
 import { adminOnboard, AssignableOwner, getAssignableOwners, uploadResortLogo } from "@/lib/api/admin";
 import { getResort, updateResort } from "@/lib/api/resort";
@@ -54,6 +55,7 @@ export default function AdminOnboardPage() {
   const [ownerLoadError, setOwnerLoadError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptAdminTerms, setAcceptAdminTerms] = useState(false);
 
   const update = (key: keyof FormState, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -135,11 +137,13 @@ export default function AdminOnboardPage() {
           plan: form.plan,
           owner_user_id: Number(form.owner_user_id),
           is_publicly_listed: form.is_publicly_listed,
+          accept_terms: true,
         });
       }
       setSuccess(true);
       if (!isEditMode) {
         setForm(initial);
+        setAcceptAdminTerms(false);
       }
       pushToast({
         title: isEditMode ? "Resort updated" : "Resort onboarded",
@@ -274,8 +278,8 @@ export default function AdminOnboardPage() {
             <div className="mt-2 rounded-xl border border-softBorder bg-softGray/40 p-3 text-xs text-zinc-600">
               <p className="font-semibold text-navy">Current pricing model:</p>
               <p className="mt-1">Standard: 1M ₱2,300/mo, 3M ₱2,000/mo, 6M ₱1,900/mo, 12M ₱1,800/mo (+VAT).</p>
-              <p className="mt-1">Referral: 1M ₱2,000/mo, 3M ₱1,800/mo, 6M ₱1,700/mo, 12M ₱1,500/mo (+VAT) with +1 bonus month.</p>
-              <p className="mt-1">Owners choose duration and apply referral in the Subscribe modal.</p>
+              <p className="mt-1">Referral promo: owners who enter a valid referral code get their <strong>first month free</strong> on 3, 6, or 12-month plans (same standard rates apply). Requires a complete resort profile (logo, address, contact, background image, and at least one active room with a photo) before the code is accepted.</p>
+              <p className="mt-1">Owners choose duration and apply a referral code in the Subscribe modal.</p>
             </div>
           </div>
           ) : null}
@@ -396,11 +400,31 @@ export default function AdminOnboardPage() {
             </label>
           </div>
 
+          {!isEditMode ? (
+            <div className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
+              <input
+                id="admin-accept-terms"
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-softBorder accent-primaryBlue"
+                checked={acceptAdminTerms}
+                onChange={(e) => setAcceptAdminTerms(e.target.checked)}
+              />
+              <label htmlFor="admin-accept-terms" className="text-sm text-zinc-700">
+                I confirm the selected resort owner has been given access to the{" "}
+                <LegalLinkButton kind="terms">Terms &amp; Conditions</LegalLinkButton> and agrees to them as part of
+                onboarding. A copy will be emailed to the owner.
+              </label>
+            </div>
+          ) : null}
+
           {/* Submit */}
           <div className="sm:col-span-2">
             <button
               type="submit"
-              disabled={saving || (!isEditMode && (loadingOwners || Boolean(ownerLoadError)))}
+              disabled={
+                saving ||
+                (!isEditMode && (loadingOwners || Boolean(ownerLoadError) || !acceptAdminTerms))
+              }
               className="dash-btn-primary px-8 py-3 disabled:opacity-60"
             >
               {saving ? (

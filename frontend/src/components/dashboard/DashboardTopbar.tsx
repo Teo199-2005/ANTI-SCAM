@@ -5,9 +5,10 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { createSubscriptionInvoice } from "@/lib/api/subscription";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { validateReferralCode } from "@/lib/api/referral";
+import type { ReadinessPayload } from "@/lib/api/referral";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { formatRoleLabel } from "@/lib/utils";
-import { CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
+import { AlertCircle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,21 +33,23 @@ type OwnerSubscriptionInfo = {
 };
 
 type PlanDuration = 1 | 3 | 6 | 12;
-type PlanOffer = { duration: PlanDuration; monthlyRate: number; billingType: "Monthly" | "Upfront"; bonusMonths: number };
+type PlanOffer = { duration: PlanDuration; monthlyRate: number; billingType: "Monthly" | "Upfront" };
 
 const STANDARD_OFFERS: PlanOffer[] = [
-  { duration: 1, monthlyRate: 2300, billingType: "Monthly", bonusMonths: 0 },
-  { duration: 3, monthlyRate: 2000, billingType: "Upfront", bonusMonths: 0 },
-  { duration: 6, monthlyRate: 1900, billingType: "Upfront", bonusMonths: 0 },
-  { duration: 12, monthlyRate: 1800, billingType: "Upfront", bonusMonths: 0 },
+  { duration: 1,  monthlyRate: 2300, billingType: "Monthly" },
+  { duration: 3,  monthlyRate: 2000, billingType: "Upfront" },
+  { duration: 6,  monthlyRate: 1900, billingType: "Upfront" },
+  { duration: 12, monthlyRate: 1800, billingType: "Upfront" },
 ];
 
-const REFERRAL_OFFERS: PlanOffer[] = [
-  { duration: 1, monthlyRate: 2000, billingType: "Monthly", bonusMonths: 1 },
-  { duration: 3, monthlyRate: 1800, billingType: "Upfront", bonusMonths: 1 },
-  { duration: 6, monthlyRate: 1700, billingType: "Upfront", bonusMonths: 1 },
-  { duration: 12, monthlyRate: 1500, billingType: "Upfront", bonusMonths: 1 },
-];
+const MISSING_FIELD_LABELS: Record<string, string> = {
+  resort_name:      "Resort name",
+  address:          "Address",
+  contact_number:   "Contact number",
+  logo:             "Resort logo",
+  background_image: "Background/hero image",
+  room_with_image:  "At least one active room with a photo",
+};
 
 export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const pathname = usePathname();
@@ -57,6 +60,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const [mounted, setMounted] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
+  const [referralReadiness, setReferralReadiness] = useState<ReadinessPayload | null>(null);
   const [applyingReferral, setApplyingReferral] = useState(false);
   const [subscribingNow, setSubscribingNow] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
@@ -79,11 +83,14 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const formattedEndDate = subscriptionInfo?.endsAt
     ? new Date(subscriptionInfo.endsAt).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
     : "Not available";
-  const usingReferralOffer = Boolean(appliedReferralCode);
-  const selectedOffer =
-    (usingReferralOffer ? REFERRAL_OFFERS : STANDARD_OFFERS).find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0];
-  const totalCharge = selectedOffer.monthlyRate * selectedOffer.duration;
-  const effectiveMonths = selectedOffer.duration + selectedOffer.bonusMonths;
+  const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
+  // First-month-free: promo only applies when referral code is verified, duration > 1 month,
+  // and the resort profile is complete.
+  const referralIsReady = Boolean(appliedReferralCode) && (referralReadiness?.is_ready ?? false);
+  const isFirstMonthFree = referralIsReady && selectedDuration > 1;
+  const totalCharge = isFirstMonthFree
+    ? selectedOffer.monthlyRate * (selectedDuration - 1)
+    : selectedOffer.monthlyRate * selectedDuration;
 
   useEffect(() => {
     setMounted(true);
@@ -124,7 +131,12 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   }, [user]);
 
   useEffect(() => {
-    if (!showSubscribeModal) return;
+    if (!showSubscribeModal) {
+      setReferralCode("");
+      setAppliedReferralCode(null);
+      setReferralReadiness(null);
+      return;
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowSubscribeModal(false);
     };
@@ -151,10 +163,14 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         return;
       }
       setAppliedReferralCode(result.code);
+      setReferralReadiness(result.readiness);
+      const ready = result.readiness?.is_ready ?? false;
       pushToast({
-        title: "Referral code applied",
-        description: `Verified with ${result.marketer_name}. Referral pricing and bonus month are now enabled.`,
-        tone: "success",
+        title: "Referral code verified",
+        description: ready
+          ? `Code verified with ${result.marketer_name}. Your first month is free on 3, 6, or 12-month plans.`
+          : `Code verified with ${result.marketer_name}. Complete your resort profile to unlock the first-month-free promo.`,
+        tone: ready ? "success" : "warning",
       });
     } catch (err) {
       pushToast({
@@ -410,19 +426,21 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     <WalletCards size={22} className="mb-1 text-primaryBlue" />
                     ₱{selectedOffer.monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="pb-1 text-xs font-medium lowercase text-zinc-500">monthly rate</p>
+                  <p className="pb-1 text-xs font-medium lowercase text-zinc-500">/ month (standard rate)</p>
                 </div>
                 <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-zinc-500">
                   <Crown size={13} className="text-primaryBlue" />
-                  Total due now: <span className="font-semibold text-navy">₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  Total due now:{" "}
+                  <span className="font-semibold text-navy">
+                    ₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {isFirstMonthFree ? ` (${selectedDuration - 1} of ${selectedDuration} months billed)` : ""}
+                  </span>
                 </p>
-                {selectedOffer.bonusMonths > 0 ? (
-                  <p className="mt-1 text-xs font-semibold text-emerald-700">
-                    Referral bonus applied: +{selectedOffer.bonusMonths} month (effective {effectiveMonths} months access).
+                {isFirstMonthFree ? (
+                  <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                    <Gift size={13} />
+                    First month free via referral — you get {selectedDuration} months of access.
                   </p>
-                ) : null}
-                {appliedReferralCode ? (
-                  <p className="mt-1 text-xs font-semibold text-emerald-700">Referral applied: {appliedReferralCode}</p>
                 ) : null}
               </div>
 
@@ -442,7 +460,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
               <div>
                 <label htmlFor="subscribe-referral-code" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
                   <Tag size={13} className="text-primaryBlue" />
-                  Referral code (optional)
+                  Referral code (optional — unlocks 1st month free)
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -450,10 +468,13 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     value={referralCode}
                     onChange={(e) => {
                       setReferralCode(e.target.value.toUpperCase());
-                      if (!e.target.value.trim()) setAppliedReferralCode(null);
+                      if (!e.target.value.trim()) {
+                        setAppliedReferralCode(null);
+                        setReferralReadiness(null);
+                      }
                     }}
                     className="dash-input"
-                    placeholder="Enter referral code"
+                    placeholder="e.g. SANTOS1234"
                   />
                   <button
                     type="button"
@@ -461,9 +482,38 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     disabled={applyingReferral}
                     className="inline-flex min-w-[92px] items-center justify-center rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60"
                   >
-                    {applyingReferral ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+                    {applyingReferral ? <Loader2 size={14} className="animate-spin" /> : "Verify"}
                   </button>
                 </div>
+                {/* Profile readiness checklist shown after code verification */}
+                {appliedReferralCode && referralReadiness && !referralReadiness.is_ready ? (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                    <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+                      <AlertCircle size={13} />
+                      Complete your resort profile to unlock the first-month-free promo:
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {referralReadiness.missing_fields.map((f) => (
+                        <li key={f} className="inline-flex items-center gap-1.5 text-xs text-amber-700">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          {MISSING_FIELD_LABELS[f] ?? f}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href="/dashboard/resort/profile"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                      onClick={() => setShowSubscribeModal(false)}
+                    >
+                      Go to Resort Profile →
+                    </Link>
+                  </div>
+                ) : null}
+                {appliedReferralCode && referralReadiness?.is_ready && selectedDuration === 1 ? (
+                  <p className="mt-1.5 text-xs text-amber-700">
+                    Select a 3, 6, or 12-month plan to apply the first-month-free promo.
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
@@ -473,6 +523,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     setShowSubscribeModal(false);
                     setReferralCode("");
                     setAppliedReferralCode(null);
+                    setReferralReadiness(null);
                   }}
                   className="rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >

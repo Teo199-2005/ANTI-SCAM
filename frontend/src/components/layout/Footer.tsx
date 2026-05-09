@@ -2,19 +2,13 @@ import Link from "next/link";
 import { Facebook, Instagram, Mail, MapPin, PhoneCall } from "lucide-react";
 import Logo from "./Logo";
 import PoweredByMark from "@/components/branding/PoweredByMark";
+import { FooterLegalLinks } from "./FooterLegalLinks";
 
 const quickLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About Us" },
   { href: "/blogs", label: "Blogs" },
   { href: "/contact", label: "Contact" },
-];
-
-const guestLinks = [
-  { href: "/login", label: "Sign In" },
-  { href: "/register", label: "Create Account" },
-  { href: "/dashboard/client", label: "My Bookings" },
-  { href: "/dashboard/client/profile", label: "My Profile" },
 ];
 
 const featureBullets = [
@@ -116,7 +110,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:col-span-4">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:col-span-4">
             <div>
               <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Explore</h3>
               <ul className="space-y-1">
@@ -130,18 +124,6 @@ export default function Footer() {
               </ul>
             </div>
             <div>
-              <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">My Account</h3>
-              <ul className="space-y-1">
-                {guestLinks.map(({ href, label }) => (
-                  <li key={href}>
-                    <Link href={href} className={linkClass}>
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="col-span-2">
               <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Contact</h3>
               <ul className="space-y-1 text-xs text-white/50">
                 <li>
@@ -171,10 +153,11 @@ export default function Footer() {
                 title="Anti-Scam PH — location map"
                 src="https://www.google.com/maps?q=Tagaytay%20City%20Cavite&z=14&output=embed"
                 width="100%"
-                height={120}
+                height={280}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                className="block"
+                className="block h-[280px] w-full"
+                style={{ minHeight: 280, width: "100%", border: 0 }}
               />
             </div>
             <Link
@@ -195,17 +178,7 @@ export default function Footer() {
             </span>
             <PoweredByMark compact showOperatorLogo={false} />
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <Link href="/privacy" className="hover:text-white/60">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-white/60">
-              Terms of Service
-            </Link>
-            <Link href="/contact" className="hover:text-white/60">
-              Support
-            </Link>
-          </div>
+          <FooterLegalLinks />
         </div>
       </div>
     </footer>

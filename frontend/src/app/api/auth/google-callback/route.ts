@@ -7,6 +7,7 @@
  * to httpOnly cookie and then the URL is replaced.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { sessionCookieSecure } from "../sessionCookieSecure";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -15,13 +16,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=oauth_failed", req.url));
   }
 
-  const isSecure = process.env.NODE_ENV === "production";
   const res = NextResponse.redirect(new URL("/dashboard", req.url));
 
   res.cookies.set("rs_session", token, {
     httpOnly: true,
-    sameSite: "strict",
-    secure: isSecure,
+    sameSite: "lax",
+    secure: sessionCookieSecure(req),
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });

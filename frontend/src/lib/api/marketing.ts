@@ -34,11 +34,17 @@ export type MarketingAnalyticsPayload = {
 export type MarketingStats = {
   totalCommissions: number;
   pendingCommissions: number;
+  /** Estimated GCash disbursement for current pending rows after withholding */
+  pendingPayoutNetEstimate: number;
+  /** Sum of release amounts actually paid (net for Xendit; gross for manual admin releases) */
   releasedCommissions: number;
+  releasedCommissionsGross: number;
+  payoutWithholdingRate: number;
   assignedResorts: number;
   referral_code: string | null;
   referral_share_register_url: string | null;
   referral_subscribe_hint: string | null;
+  commission_payout_schedule?: string | null;
 };
 
 export type AssignedResort = {
@@ -77,11 +83,15 @@ function mapStats(raw: Record<string, unknown>): MarketingStats {
   return {
     totalCommissions: Number(raw.totalCommissions ?? raw.total_commissions ?? 0),
     pendingCommissions: Number(raw.pendingCommissions ?? raw.pending_commissions ?? 0),
+    pendingPayoutNetEstimate: Number(raw.pendingPayoutNetEstimate ?? raw.pending_payout_net_estimate ?? 0),
     releasedCommissions: Number(raw.releasedCommissions ?? raw.released_commissions ?? 0),
+    releasedCommissionsGross: Number(raw.releasedCommissionsGross ?? raw.released_commissions_gross ?? 0),
+    payoutWithholdingRate: Number(raw.payoutWithholdingRate ?? raw.payout_withholding_rate ?? 0),
     assignedResorts: Number(raw.assignedResorts ?? raw.assigned_resorts ?? 0),
     referral_code: (raw.referral_code as string | null) ?? null,
     referral_share_register_url: (raw.referral_share_register_url as string | null) ?? null,
     referral_subscribe_hint: (raw.referral_subscribe_hint as string | null) ?? null,
+    commission_payout_schedule: (raw.commission_payout_schedule as string | null) ?? null,
   };
 }
 

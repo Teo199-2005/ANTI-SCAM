@@ -1,35 +1,44 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-const securityHeaders = [
+const baseSecurityHeaders: { key: string; value: string }[] = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-XSS-Protection", value: "1; mode=block" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  {
-    key: "Strict-Transport-Security",
-    value: "max-age=63072000; includeSubDomains; preload",
-  },
 ];
 
 const nextConfig: NextConfig = {
-  // Fix workspace root detection warning (multiple lockfiles in parent dirs)
-  outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Keep tracing rooted to this app (avoids parent-folder lockfile noise without pulling in long spaced paths).
+  outputFileTracingRoot: path.join(__dirname),
 
   // Avoid build failures when ESLint CLI options drift from eslint-config-next (CI / Linux).
   eslint: {
     ignoreDuringBuilds: true,
   },
 
-  async headers() {
+  async redirects() {
     return [
-      {
-        source: "/(.*)",
-        headers: securityHeaders,
-      },
+      { source: "/terms", destination: "/", permanent: true },
+      { source: "/privacy", destination: "/", permanent: true },
     ];
+  },
+
+  async headers() {
+    const headers =
+      process.env.NODE_ENV === "production"
+        ? [
+            ...baseSecurityHeaders,
+            {
+              key: "Strict-Transport-Security",
+              value: "max-age=63072000; includeSubDomains; preload",
+            },
+          ]
+        : [...baseSecurityHeaders];
+
+    return [{ source: "/(.*)", headers }];
   },
 
   images: {
@@ -37,6 +46,8 @@ const nextConfig: NextConfig = {
     // This removes the 20-second hangs caused by Next.js downloading
     // and resizing remote Unsplash/Pexels images on every request.
     unoptimized: process.env.NODE_ENV === "development",
+
+    qualities: [75, 100],
 
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

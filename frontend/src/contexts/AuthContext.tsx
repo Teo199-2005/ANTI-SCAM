@@ -21,6 +21,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -37,6 +38,7 @@ type AuthContextValue = {
     role_intent?: "resort_owner" | "client";
     password: string;
     password_confirmation: string;
+    accept_terms: boolean;
   }) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -56,8 +58,19 @@ const ME_TIMEOUT_MS = 20_000;
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * Invalidates in-flight `refreshUser` work so a slow `/me` from the initial page load cannot:
+   * - overwrite a user just set by `login` / `register`, or
+   * - clear the session with a stale 401 after the cookie was set, or
+   * - leave `loading` stuck true by returning early without `setLoading(false)`.
+   */
+  const authEpochRef = useRef(0);
+  const bumpAuthEpoch = useCallback(() => {
+    authEpochRef.current += 1;
+  }, []);
 
   const refreshUser = useCallback(async () => {
+    const epochAtRefreshStart = authEpochRef.current;
     for (let attempt = 0; attempt < ME_ATTEMPTS; attempt++) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ME_TIMEOUT_MS);
@@ -66,11 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
         });
         clearTimeout(timer);
+        if (authEpochRef.current !== epochAtRefreshStart) return;
         setUser(data.success && data.data?.user ? data.data.user : null);
         setLoading(false);
         return;
       } catch (err) {
         clearTimeout(timer);
+        if (authEpochRef.current !== epochAtRefreshStart) return;
 
         if (axios.isAxiosError(err) && err.response?.status === 401) {
           setUser(null);
@@ -80,10 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (attempt < ME_ATTEMPTS - 1) {
           await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+          if (authEpochRef.current !== epochAtRefreshStart) return;
         }
       }
     }
 
+    if (authEpochRef.current !== epochAtRefreshStart) return;
     setUser(null);
     setLoading(false);
   }, []);
@@ -112,17 +129,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    try {
-      const { data } = await authClient.post<AuthEnvelope>("/login", { email, password });
-      if (!data.success || !data.data?.user) {
-        throw new Error(data.message ?? "Login failed.");
+  const login = useCallback(
+    async (email: string, password: string) => {
+      bumpAuthEpoch();
+      try {
+        const { data } = await authClient.post<AuthEnvelope>("/login", { email, password });
+        if (!data.success || !data.data?.user) {
+          throw new Error(data.message ?? "Login failed.");
+        }
+        setUser(data.data.user);
+        setLoading(false);
+      } catch (err) {
+        setLoading(false);
+        throw new Error(parseApiErrorMessage(err, "Login failed."));
       }
-      setUser(data.data.user);
-    } catch (err) {
-      throw new Error(parseApiErrorMessage(err, "Login failed."));
-    }
-  }, []);
+    },
+    [bumpAuthEpoch],
+  );
 
   const register = useCallback(
     async (input: {
@@ -133,28 +156,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role_intent?: "resort_owner" | "client";
       password: string;
       password_confirmation: string;
+      accept_terms: boolean;
     }) => {
+      bumpAuthEpoch();
       try {
         const { data } = await authClient.post<AuthEnvelope>("/register", input);
         if (!data.success || !data.data?.user) {
           throw new Error(data.message ?? "Registration failed.");
         }
         setUser(data.data.user);
+        setLoading(false);
       } catch (err) {
+        setLoading(false);
         throw new Error(parseApiErrorMessage(err, "Registration failed."));
       }
     },
-    [],
+    [bumpAuthEpoch],
   );
 
   const logout = useCallback(async () => {
+    bumpAuthEpoch();
     try {
       await authClient.post("/logout");
     } catch {
       /* Always clear local state even if backend call fails */
     }
     setUser(null);
-  }, []);
+    setLoading(false);
+  }, [bumpAuthEpoch]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, loading, login, register, logout, refreshUser }),

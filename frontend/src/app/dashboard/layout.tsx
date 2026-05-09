@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/");
+      router.replace("/login");
       return;
     }
 

@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             FullDashboardDemoSeeder::class,
             MarketingPartnerDemoSeeder::class,
+            DemoLoginAccountsSeeder::class,
         ]);
     }
 }

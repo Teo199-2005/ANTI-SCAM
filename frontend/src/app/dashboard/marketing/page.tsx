@@ -62,8 +62,30 @@ export default function MarketingDashboardPage() {
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <StatCard compact label="Assigned resorts"  value={stats?.assignedResorts ?? "–"}                                       icon={Building2}  iconTone="navy" />
         <StatCard compact label="Total commissions" value={stats ? `₱${Number(stats.totalCommissions).toLocaleString()}` : "–"}    icon={TrendingUp}  iconTone="emerald" />
-        <StatCard compact label="Pending release"   value={stats ? `₱${Number(stats.pendingCommissions).toLocaleString()}` : "–"}  icon={Clock}       iconTone="amber" />
-        <StatCard compact label="Released to date"  value={stats ? `₱${Number(stats.releasedCommissions).toLocaleString()}` : "–"} icon={DollarSign}  iconTone="violet" />
+        <StatCard
+          compact
+          label="Pending (gross)"
+          value={stats ? `₱${Number(stats.pendingCommissions).toLocaleString()}` : "–"}
+          subtitle={
+            stats
+              ? `Est. payout ₱${Number(stats.pendingPayoutNetEstimate).toLocaleString()} (${Math.round(stats.payoutWithholdingRate * 100)}% taxes & fees)`
+              : undefined
+          }
+          icon={Clock}
+          iconTone="amber"
+        />
+        <StatCard
+          compact
+          label="Paid out (net)"
+          value={stats ? `₱${Number(stats.releasedCommissions).toLocaleString()}` : "–"}
+          subtitle={
+            stats && stats.releasedCommissionsGross > 0
+              ? `Booked gross ₱${Number(stats.releasedCommissionsGross).toLocaleString()}`
+              : undefined
+          }
+          icon={DollarSign}
+          iconTone="violet"
+        />
       </div>
 
       <DashCard className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">

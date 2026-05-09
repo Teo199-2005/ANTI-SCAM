@@ -44,6 +44,17 @@ return [
         'allow_mock_paid' => env('XENDIT_ALLOW_MOCK_PAID', false),
         // if true, forbidden key (403) can also use local mock flow (still local-only)
         'local_mock_on_forbidden' => env('XENDIT_LOCAL_MOCK_ON_FORBIDDEN', false),
+        /** GCash channel for Create Payout (PH). */
+        'payout_channel_code' => env('XENDIT_PAYOUT_CHANNEL_CODE', 'PH_GCASH'),
+    ],
+
+    'marketing_payout' => [
+        /** When false, the scheduled job and artisan command no-op (safe default). */
+        'enabled' => env('MARKETING_PAYOUT_ENABLED', false),
+        'min_php' => (float) env('MARKETING_PAYOUT_MIN_PHP', 1),
+        'timezone' => env('MARKETING_PAYOUT_TIMEZONE', 'Asia/Manila'),
+        /** Fraction withheld from gross commissions before GCash payout (taxes & platform fees), e.g. 0.10 = 10%. */
+        'withholding_rate' => (float) env('MARKETING_PAYOUT_WITHHOLDING_RATE', 0.10),
     ],
 
     'google' => [

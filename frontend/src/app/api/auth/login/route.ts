@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sessionCookieSecure } from "../sessionCookieSecure";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -34,13 +35,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const isSecure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ success: true, data: { user: payload.data.user } });
 
   res.cookies.set("rs_session", payload.data.token, {
     httpOnly: true,
     sameSite: "strict",
-    secure: isSecure,
+    secure: sessionCookieSecure(req),
     path: "/",
     maxAge: 60 * 60 * 24 * 7, // 7 days
   });

@@ -2,10 +2,10 @@
 
 namespace App\Modules\Billing\Services;
 
-use App\Modules\Billing\Support\XenditTls;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
+use App\Modules\Billing\Support\XenditTls;
 use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -40,7 +40,7 @@ class XenditSubscriptionInvoiceService
             return null;
         }
 
-        $url = 'https://api.xendit.co/v2/invoices/' . rawurlencode($xenditInvoiceId);
+        $url = 'https://api.xendit.co/v2/invoices/'.rawurlencode($xenditInvoiceId);
 
         try {
             $response = Http::withBasicAuth($this->secretKey(), '')
@@ -77,8 +77,7 @@ class XenditSubscriptionInvoiceService
         ?string $storedReferralCode = null,
         int $durationMonths = 1,
         ?string $checkoutReturnBase = null,
-    ): array
-    {
+    ): array {
         $subscription->loadMissing('resort');
 
         $owner = User::withoutGlobalScopes()
@@ -117,7 +116,7 @@ class XenditSubscriptionInvoiceService
                 throw new RuntimeException('Extra room fee is not configured for this subscription.');
             }
             // Same duration discounts as the main subscription (standard tier), applied to per-slot fee.
-            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths, false) / 2300.0), 2);
+            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / 2300.0), 2);
             $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
             if ($chargeAmount <= 0) {
                 throw new RuntimeException('Could not compute room add-on amount.');
@@ -133,19 +132,29 @@ class XenditSubscriptionInvoiceService
             $invoicePlan = sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths);
         } else {
             $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-            $monthlyRate = $this->monthlyRate($durationMonths, $hasReferral);
-            $bonusMonths = $hasReferral ? 1 : 0;
-            $chargeAmount = $monthlyRate * $durationMonths;
+            // Always use standard (non-referral) rates. Referral benefit is 1 free month,
+            // not a cheaper per-month price. The 1-month term cannot use the promo
+            // (there is no "N-1" month to charge when N=1).
+            $monthlyRate = $this->monthlyRate($durationMonths);
+            $isFirstMonthFree = $hasReferral && $durationMonths > 1;
+            // First-month-free: charge for (N-1) months at standard rate, covering N months of service.
+            $chargeAmount = $isFirstMonthFree
+                ? $monthlyRate * ($durationMonths - 1)
+                : $monthlyRate * $durationMonths;
             $description = sprintf(
                 'Subscription fee — %s (%s) · %d month%s%s',
                 $subscription->resort?->name,
                 $subscription->plan,
                 $durationMonths,
                 $durationMonths > 1 ? 's' : '',
-                $bonusMonths > 0 ? ' +1 bonus month' : ''
+                $isFirstMonthFree ? ' (1st month free via referral)' : ''
             );
             $itemName = 'Subscription Plan';
-            $invoicePlan = sprintf('%s_m%d_b%d', (string) $subscription->plan, $durationMonths, $bonusMonths);
+            // Plan tag: _fmf suffix indicates first-month-free so the webhook knows to
+            // credit the full N-month term despite charging only N-1 months.
+            $invoicePlan = $isFirstMonthFree
+                ? sprintf('%s_m%d_fmf', (string) $subscription->plan, $durationMonths)
+                : sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
         }
 
         if (! $this->isConfigured()) {
@@ -170,25 +179,26 @@ class XenditSubscriptionInvoiceService
         }
 
         $invoiceBody = [
-            'external_id'          => $externalId,
-            'amount'               => $chargeAmount,
-            'description'          => $description,
-            'currency'             => 'PHP',
-            'invoice_duration'     => 86400 * 7, // 7 days
-            'customer'             => [
+            'external_id' => $externalId,
+            'amount' => $chargeAmount,
+            'description' => $description,
+            'currency' => 'PHP',
+            'invoice_duration' => 86400 * 7, // 7 days
+            'customer' => [
                 'given_names' => $owner->name,
-                'email'       => $owner->email,
+                'email' => $owner->email,
             ],
             'success_redirect_url' => $successUrl,
             'failure_redirect_url' => $failureUrl,
-            'items'                => [[
-                'name'     => $itemName,
+            'items' => [[
+                'name' => $itemName,
                 'quantity' => $isRoomAddon
                     ? $roomAddonQuantity * $durationMonths
-                    : ($durationMonths > 0 ? $durationMonths : 1),
-                'price'    => $isRoomAddon
+                    // First-month-free: quantity = paid months (N-1); standard: quantity = N.
+                    : ($isFirstMonthFree ? $durationMonths - 1 : max(1, $durationMonths)),
+                'price' => $isRoomAddon
                     ? $slotMonthly
-                    : ($chargeAmount / max(1, $durationMonths)),
+                    : $monthlyRate,
                 'category' => 'Subscription',
             ]],
         ];
@@ -308,24 +318,23 @@ class XenditSubscriptionInvoiceService
         int $roomAddonQuantity = 1,
         ?int $marketerId = null,
         ?string $storedReferralCode = null,
-    ): array
-    {
-        $mockInvoiceId = 'mock-sub-inv-' . $subscription->id . '-' . now()->timestamp;
+    ): array {
+        $mockInvoiceId = 'mock-sub-inv-'.$subscription->id.'-'.now()->timestamp;
 
         $invoice = SubscriptionInvoice::create([
-            'tenant_id'            => $subscription->tenant_id,
-            'subscription_id'      => $subscription->id,
-            'resort_id'            => $subscription->resort_id,
-            'xendit_invoice_id'    => $mockInvoiceId,
-            'xendit_invoice_url'   => $successUrl,
-            'amount'               => $chargeAmount,
-            'plan'                 => $invoicePlan,
-            'referral_code'        => $storedReferralCode,
-            'marketer_id'          => $marketerId,
-            'status'               => 'paid',
-            'paid_at'              => now(),
-            'billing_cycle_start'  => $subscription->billing_cycle_start,
-            'billing_cycle_end'    => $subscription->billing_cycle_end,
+            'tenant_id' => $subscription->tenant_id,
+            'subscription_id' => $subscription->id,
+            'resort_id' => $subscription->resort_id,
+            'xendit_invoice_id' => $mockInvoiceId,
+            'xendit_invoice_url' => $successUrl,
+            'amount' => $chargeAmount,
+            'plan' => $invoicePlan,
+            'referral_code' => $storedReferralCode,
+            'marketer_id' => $marketerId,
+            'status' => 'paid',
+            'paid_at' => now(),
+            'billing_cycle_start' => $subscription->billing_cycle_start,
+            'billing_cycle_end' => $subscription->billing_cycle_end,
         ]);
 
         if ($billingScope === 'room_addon') {
@@ -343,8 +352,8 @@ class XenditSubscriptionInvoiceService
             $subscription->save();
 
             return [
-                'invoice_id'              => $mockInvoiceId,
-                'invoice_url'             => $successUrl,
+                'invoice_id' => $mockInvoiceId,
+                'invoice_url' => $successUrl,
                 'subscription_invoice_id' => $invoice->id,
             ];
         }
@@ -352,23 +361,24 @@ class XenditSubscriptionInvoiceService
         $newStart = $subscription->billing_cycle_end
             ? $subscription->billing_cycle_end->copy()->addDay()
             : now()->startOfMonth();
-        [$paidMonths, $bonusMonths] = $this->extractTermFromPlan($invoicePlan);
-        $creditedMonths = max(1, $paidMonths + $bonusMonths);
-        $newEnd = $newStart->copy()->addMonthsNoOverflow($creditedMonths)->subDay();
+        // extractTermFromPlan returns [termMonths, isFmf].
+        // For first-month-free the full term (N months) is credited even though only N-1 were charged.
+        [$termMonths] = $this->extractTermFromPlan($invoicePlan);
+        $newEnd = $newStart->copy()->addMonthsNoOverflow($termMonths)->subDay();
 
         $subscription->update([
             'billing_cycle_start' => $newStart->toDateString(),
-            'billing_cycle_end'   => $newEnd->toDateString(),
-            'next_due_date'       => $newEnd->toDateString(),
-            'status'              => 'active',
-            'grace_until'         => null,
+            'billing_cycle_end' => $newEnd->toDateString(),
+            'next_due_date' => $newEnd->toDateString(),
+            'status' => 'active',
+            'grace_until' => null,
         ]);
 
         app(SubscriptionReferralCommissionService::class)->creditFromPaidMonthlyInvoice($invoice);
 
         return [
-            'invoice_id'              => $mockInvoiceId,
-            'invoice_url'             => $successUrl,
+            'invoice_id' => $mockInvoiceId,
+            'invoice_url' => $successUrl,
             'subscription_invoice_id' => $invoice->id,
         ];
     }
@@ -407,7 +417,7 @@ class XenditSubscriptionInvoiceService
         if (! $this->isAllowedCheckoutReturnHost($host)) {
             return $default;
         }
-        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+        $port = isset($parts['port']) ? ':'.(int) $parts['port'] : '';
 
         return rtrim("{$scheme}://{$host}{$port}", '/');
     }
@@ -436,23 +446,35 @@ class XenditSubscriptionInvoiceService
         return false;
     }
 
-    private function monthlyRate(int $durationMonths, bool $hasReferral): float
+    private function monthlyRate(int $durationMonths): float
     {
         $standard = [1 => 2300.0, 3 => 2000.0, 6 => 1900.0, 12 => 1800.0];
-        $referral = [1 => 2000.0, 3 => 1800.0, 6 => 1700.0, 12 => 1500.0];
-        $matrix = $hasReferral ? $referral : $standard;
 
-        return $matrix[$durationMonths] ?? $matrix[1];
+        return $standard[$durationMonths] ?? $standard[1];
     }
 
-    /** @return array{0:int,1:int} */
+    /**
+     * Parse the invoice plan tag and return [termMonths, isFirstMonthFree].
+     * For first-month-free (_fmf) plans the full term is credited even though
+     * chargeAmount only covers N-1 months.
+     * For legacy bonus (_b1) plans we preserve the old "+1 bonus" credit.
+     *
+     * @return array{0:int,1:bool}
+     */
     private function extractTermFromPlan(string $invoicePlan): array
     {
+        // New first-month-free tag: basic_m12_fmf
+        if (preg_match('/_m(\d+)_fmf$/', $invoicePlan, $m) === 1) {
+            return [max(1, (int) $m[1]), true];
+        }
+        // Legacy bonus tag: basic_m12_b1 (keep creditedMonths = paidMonths + bonusMonths)
         if (preg_match('/_m(\d+)_b(\d+)$/', $invoicePlan, $m) === 1) {
-            return [max(1, (int) $m[1]), max(0, (int) $m[2])];
+            $paidMonths = max(1, (int) $m[1]);
+            $bonusMonths = max(0, (int) $m[2]);
+
+            return [$paidMonths + $bonusMonths, false];
         }
 
-        return [1, 0];
+        return [1, false];
     }
 }
-

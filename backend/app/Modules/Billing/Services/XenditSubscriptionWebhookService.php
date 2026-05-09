@@ -36,7 +36,7 @@ class XenditSubscriptionWebhookService
                 return null;
             }
 
-            $webhookEventId = 'sub-' . $eventId;
+            $webhookEventId = 'sub-'.$eventId;
 
             $alreadyProcessed = XenditWebhookEvent::query()
                 ->where('event_id', $webhookEventId)
@@ -126,8 +126,9 @@ class XenditSubscriptionWebhookService
                     $newStart = $subscription->billing_cycle_end
                         ? $subscription->billing_cycle_end->copy()->addDay()
                         : now()->startOfMonth();
-                    [$paidMonths, $bonusMonths] = $this->extractTermFromPlan((string) $invoice->plan);
-                    $creditedMonths = max(1, $paidMonths + $bonusMonths);
+                    // extractTermFromPlan returns the full subscription term to credit,
+                    // already accounting for first-month-free and legacy bonus plans.
+                    $creditedMonths = $this->extractTermFromPlan((string) $invoice->plan);
                     $newEnd = $newStart->copy()->addMonthsNoOverflow($creditedMonths)->subDay();
 
                     $subscription->update([
@@ -168,14 +169,25 @@ class XenditSubscriptionWebhookService
         });
     }
 
-    /** @return array{0:int,1:int} */
-    private function extractTermFromPlan(string $invoicePlan): array
+    /**
+     * Return the number of months to credit to the subscription when an invoice is paid.
+     *
+     * - _fmf (first-month-free): full N-month term is credited even though only N-1 months
+     *   were charged (the owner got the first month free via referral).
+     * - _bN (legacy bonus): paidMonths + bonusMonths (keep backwards-compat for old invoices).
+     * - fallback: 1 month.
+     */
+    private function extractTermFromPlan(string $invoicePlan): int
     {
-        if (preg_match('/_m(\d+)_b(\d+)$/', $invoicePlan, $m) === 1) {
-            return [max(1, (int) $m[1]), max(0, (int) $m[2])];
+        if (preg_match('/_m(\d+)_fmf$/', $invoicePlan, $m) === 1) {
+            return max(1, (int) $m[1]);
         }
 
-        return [1, 0];
+        if (preg_match('/_m(\d+)_b(\d+)$/', $invoicePlan, $m) === 1) {
+            return max(1, (int) $m[1] + (int) $m[2]);
+        }
+
+        return 1;
     }
 
     /**
@@ -194,4 +206,3 @@ class XenditSubscriptionWebhookService
         return 1;
     }
 }
-

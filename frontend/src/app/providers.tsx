@@ -1,5 +1,6 @@
 "use client";
 
+import { LegalDocumentModalsProvider } from "@/contexts/LegalDocumentModalsContext";
 import { ToastProvider } from "@/components/shared/ToastProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import type { ReactNode } from "react";
@@ -7,7 +8,9 @@ import type { ReactNode } from "react";
 export default function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <ToastProvider>{children}</ToastProvider>
+      <LegalDocumentModalsProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </LegalDocumentModalsProvider>
     </AuthProvider>
   );
 }

@@ -4,10 +4,10 @@ import PageContainer from "@/components/layout/PageContainer";
 import { getReservation, ReservationDetail } from "@/lib/api/payment";
 import { BadgeCheck, CalendarDays, Home, ReceiptText } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams  = useSearchParams();
   const reservationId = searchParams.get("reservation_id");
   const ref           = searchParams.get("ref");
@@ -86,5 +86,19 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </PageContainer>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="section-padding">
+          <div className="soft-panel mx-auto max-w-lg p-10 text-center text-zinc-600">Loading…</div>
+        </PageContainer>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

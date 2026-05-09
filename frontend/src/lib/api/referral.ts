@@ -1,8 +1,13 @@
 import { publicClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 
+export type ReadinessPayload = {
+  is_ready: boolean;
+  missing_fields: string[];
+};
+
 export type ReferralValidateResult =
-  | { valid: true; code: string; marketer_name: string }
+  | { valid: true; code: string; marketer_name: string; readiness: ReadinessPayload | null }
   | { valid: false; message: string };
 
 export async function validateReferralCode(code: string, resortId: number): Promise<ReferralValidateResult> {

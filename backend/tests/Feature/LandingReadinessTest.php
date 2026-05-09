@@ -22,7 +22,7 @@ class LandingReadinessTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new LandingReadinessService();
+        $this->service = new LandingReadinessService;
     }
 
     private static int $counter = 0;
@@ -30,19 +30,20 @@ class LandingReadinessTest extends TestCase
     private function makeTenant(array $attrs = []): Tenant
     {
         self::$counter++;
+
         return Tenant::create(array_merge([
-            'name'      => 'Tenant ' . self::$counter,
-            'slug'      => 'tenant-' . self::$counter,
-            'subdomain' => 'tenant-' . self::$counter,
-            'status'    => 'active',
+            'name' => 'Tenant '.self::$counter,
+            'slug' => 'tenant-'.self::$counter,
+            'subdomain' => 'tenant-'.self::$counter,
+            'status' => 'active',
         ], $attrs));
     }
 
     private function makeResort(Tenant $tenant, array $attrs = []): Resort
     {
         return Resort::withoutGlobalScopes()->create(array_merge([
-            'tenant_id'          => $tenant->id,
-            'name'               => 'Test Resort',
+            'tenant_id' => $tenant->id,
+            'name' => 'Test Resort',
             'is_publicly_listed' => true,
         ], $attrs));
     }
@@ -50,18 +51,18 @@ class LandingReadinessTest extends TestCase
     private function makeSubscription(Resort $resort, string $status = 'active'): Subscription
     {
         return Subscription::create([
-            'tenant_id'           => $resort->tenant_id,
-            'resort_id'           => $resort->id,
-            'plan'                => 'basic',
-            'base_price'          => 2000,
-            'included_rooms'      => 3,
-            'extra_room_fee'      => 300,
-            'active_room_count'   => 0,
-            'total_monthly_fee'   => 2000,
-            'status'              => $status,
+            'tenant_id' => $resort->tenant_id,
+            'resort_id' => $resort->id,
+            'plan' => 'basic',
+            'base_price' => 2000,
+            'included_rooms' => 3,
+            'extra_room_fee' => 300,
+            'active_room_count' => 0,
+            'total_monthly_fee' => 2000,
+            'status' => $status,
             'billing_cycle_start' => now()->startOfMonth()->toDateString(),
-            'billing_cycle_end'   => now()->endOfMonth()->toDateString(),
-            'next_due_date'       => now()->endOfMonth()->toDateString(),
+            'billing_cycle_end' => now()->endOfMonth()->toDateString(),
+            'next_due_date' => now()->endOfMonth()->toDateString(),
         ]);
     }
 
@@ -71,9 +72,9 @@ class LandingReadinessTest extends TestCase
     {
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'address'              => null,
-            'contact_number'       => null,
-            'logo_url'             => null,
+            'address' => null,
+            'contact_number' => null,
+            'logo_url' => null,
             'background_image_url' => null,
         ]);
 
@@ -93,31 +94,31 @@ class LandingReadinessTest extends TestCase
 
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'address'              => '123 Shore Rd',
-            'contact_number'       => '0917-111-2222',
-            'logo_url'             => '/storage/logos/logo.png',
+            'address' => '123 Shore Rd',
+            'contact_number' => '0917-111-2222',
+            'logo_url' => '/storage/logos/logo.png',
             'background_image_url' => '/storage/resort-backgrounds/bg.jpg',
         ]);
 
         $room = Room::withoutGlobalScopes()->create([
             'resort_id' => $resort->id,
             'tenant_id' => $resort->tenant_id,
-            'name'      => 'Room A',
-            'status'    => 'active',
+            'name' => 'Room A',
+            'status' => 'active',
             'base_price' => 1000,
-            'capacity'  => 2,
+            'capacity' => 2,
         ]);
 
         Storage::disk('public')->put('rooms/photo.jpg', 'fake-image-data');
 
         RoomImage::create([
-            'room_id'       => $room->id,
-            'tenant_id'     => $resort->tenant_id,
-            'path'          => 'rooms/photo.jpg',
-            'disk'          => 'public',
+            'room_id' => $room->id,
+            'tenant_id' => $resort->tenant_id,
+            'path' => 'rooms/photo.jpg',
+            'disk' => 'public',
             'original_name' => 'photo.jpg',
-            'sort_order'    => 1,
-            'is_primary'    => true,
+            'sort_order' => 1,
+            'is_primary' => true,
         ]);
 
         $result = $this->service->check($resort);
@@ -130,9 +131,9 @@ class LandingReadinessTest extends TestCase
     {
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'address'              => '123 Rd',
-            'contact_number'       => '09171234567',
-            'logo_url'             => '/storage/logo.png',
+            'address' => '123 Rd',
+            'contact_number' => '09171234567',
+            'logo_url' => '/storage/logo.png',
             'background_image_url' => '/storage/bg.jpg',
         ]);
 
@@ -149,7 +150,7 @@ class LandingReadinessTest extends TestCase
     {
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'name'    => 'Palm Crest',
+            'name' => 'Palm Crest',
             'address' => 'Boracay Island, Aklan',
         ]);
 
@@ -177,16 +178,16 @@ class LandingReadinessTest extends TestCase
     {
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'representative_name'           => 'Rep Name',
+            'representative_name' => 'Rep Name',
             'representative_contact_number' => '09171112222',
         ]);
 
         $owner = User::factory()->create([
             'tenant_id' => $tenant->id,
-            'role'      => 'resort_owner',
-            'name'      => 'Owner Name',
-            'phone'     => '09179998888',
-            'email'     => 'owner@test.com',
+            'role' => 'resort_owner',
+            'name' => 'Owner Name',
+            'phone' => '09179998888',
+            'email' => 'owner@test.com',
         ]);
 
         $payload = $this->service->computePayload($resort, $owner);
@@ -205,8 +206,8 @@ class LandingReadinessTest extends TestCase
         $tenant = $this->makeTenant(['subdomain' => 'incomplete-resort', 'slug' => 'incomplete-resort']);
         $resort = $this->makeResort($tenant, [
             'background_image_url' => null,
-            'logo_url'             => null,
-            'address'              => null,
+            'logo_url' => null,
+            'address' => null,
         ]);
         $this->makeSubscription($resort, 'active');
 
@@ -216,15 +217,21 @@ class LandingReadinessTest extends TestCase
         $response->assertJsonPath('errors.code', 'landing_incomplete');
     }
 
-    public function test_public_landing_returns_403_when_subscription_inactive(): void
+    public function test_public_landing_returns_503_when_subscription_pending_and_profile_incomplete(): void
     {
+        // The public landing endpoint gates on readiness (profile completeness), not
+        // subscription status. A pending_payment subscription with an incomplete
+        // profile still returns 503 landing_incomplete.
         $tenant = $this->makeTenant(['subdomain' => 'no-sub-resort', 'slug' => 'no-sub-resort']);
-        $resort = $this->makeResort($tenant);
+        $resort = $this->makeResort($tenant, [
+            'logo_url' => null,
+            'background_image_url' => null,
+        ]);
         $this->makeSubscription($resort, 'pending_payment');
 
         $response = $this->getJson('/api/v1/public/resorts/landing/no-sub-resort');
 
-        $response->assertStatus(403);
-        $response->assertJsonPath('errors.code', 'subscription_inactive');
+        $response->assertStatus(503);
+        $response->assertJsonPath('errors.code', 'landing_incomplete');
     }
 }

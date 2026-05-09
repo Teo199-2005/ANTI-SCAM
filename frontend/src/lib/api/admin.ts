@@ -215,6 +215,7 @@ export async function adminOnboard(payload: {
   plan?: "basic";
   owner_user_id: number;
   is_publicly_listed?: boolean;
+  accept_terms: boolean;
 }) {
   const { data } = await apiClient.post("/admin/resorts/onboard", payload);
   return data.data;
@@ -238,6 +239,193 @@ function normalizeArray<T>(value: unknown): T[] {
     return (value as { data: T[] }).data;
   }
   return [];
+}
+
+// ── Admin finance (payment ledger, commissions, withholding) ───────────────────
+
+export type AdminFinanceOverview = {
+  withholding_rate: number;
+  withholding_percent_label: string;
+  subscription_inflows_paid: number;
+  subscription_inflows_pending: number;
+  guest_booking_paid_total: number;
+  commission_gross_pending: number;
+  commission_gross_released: number;
+  commission_net_paid_to_marketers: number;
+  payout_batches_succeeded_gross: number;
+  payout_batches_succeeded_net: number;
+  withheld_on_succeeded_batches: number;
+  counts: {
+    subscription_invoices_paid: number;
+    subscription_invoices_unpaid: number;
+    reservations_paid: number;
+    commissions_pending: number;
+    commissions_released: number;
+    payout_batches_total: number;
+  };
+};
+
+export type FinanceLedgerRow = {
+  entry_type: "subscription" | "booking";
+  entry_id: number;
+  reference: string | null;
+  resort_id: number;
+  resort_name: string;
+  amount: number;
+  currency: string;
+  status: string;
+  referral_code: string | null;
+  marketer_id: number | null;
+  occurred_at: string | null;
+  created_at: string;
+};
+
+export type FinanceCommissionsSummary = {
+  pending_count: number;
+  released_count: number;
+  pending_gross: number;
+  released_gross: number;
+};
+
+export type FinanceCommissionRow = {
+  id: number;
+  marketer_id: number;
+  resort_id: number;
+  period: string;
+  commission_amount: string;
+  status: string;
+  payout_batch_id: number | null;
+  marketer?: { id: number; name: string; email: string };
+  resort?: { id: number; name: string };
+  payout_batch?: {
+    id: number;
+    reference_id: string;
+    status: string;
+    total_amount: string;
+    run_period: string;
+  } | null;
+};
+
+export type FinanceWithholdingBatchRow = {
+  id: number;
+  marketer_id: number;
+  marketer?: { id: number; name: string; email: string };
+  run_period: string;
+  reference_id: string;
+  currency: string;
+  status: string;
+  gross_commissions: number;
+  net_disbursed: number;
+  withheld: number;
+  withholding_rate_effective: number | null;
+  xendit_payout_id: string | null;
+  failure_message: string | null;
+  submitted_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type FinanceWithholdingSummary = {
+  all_batches_count: number;
+  succeeded_gross: number;
+  succeeded_net: number;
+  succeeded_withheld: number;
+};
+
+export type CommissionReleaseRow = {
+  id: number;
+  commission_id: number;
+  released_by: number | null;
+  amount: string;
+  notes: string | null;
+  released_at: string;
+  release_source: string;
+  payout_batch_id: number | null;
+  commission?: {
+    marketer?: { id: number; name: string; email: string };
+    resort?: { id: number; name: string };
+  };
+  released_by_user?: { id: number; name: string } | null;
+  payout_batch?: { id: number; reference_id: string; status: string } | null;
+};
+
+type LaravelPaginated<T> = {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
+function normalizeLaravelPaginated<T>(raw: unknown): LaravelPaginated<T> {
+  const r = raw as LaravelPaginated<T>;
+  return {
+    data: Array.isArray(r?.data) ? r.data : [],
+    current_page: typeof r?.current_page === "number" ? r.current_page : 1,
+    last_page: typeof r?.last_page === "number" ? r.last_page : 1,
+    per_page: typeof r?.per_page === "number" ? r.per_page : 20,
+    total: typeof r?.total === "number" ? r.total : 0,
+  };
+}
+
+export async function getAdminFinanceOverview(): Promise<AdminFinanceOverview> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminFinanceOverview>>("/admin/finance/overview");
+  return data.data;
+}
+
+export async function getAdminPaymentLedger(params?: {
+  page?: number;
+  per_page?: number;
+  type?: "all" | "subscription" | "booking";
+  from?: string;
+  to?: string;
+}): Promise<LaravelPaginated<FinanceLedgerRow>> {
+  const { data } = await apiClient.get<ApiEnvelope<LaravelPaginated<FinanceLedgerRow>>>(
+    "/admin/finance/payment-ledger",
+    { params },
+  );
+  return normalizeLaravelPaginated<FinanceLedgerRow>(data.data);
+}
+
+export async function getAdminFinanceCommissions(params?: {
+  page?: number;
+  per_page?: number;
+  status?: string;
+}): Promise<{ summary: FinanceCommissionsSummary; commissions: LaravelPaginated<FinanceCommissionRow> }> {
+  const { data } = await apiClient.get<
+    ApiEnvelope<{ summary: FinanceCommissionsSummary; commissions: LaravelPaginated<FinanceCommissionRow> }>
+  >("/admin/finance/commissions", { params });
+  const payload = data.data;
+  return {
+    summary: payload.summary,
+    commissions: normalizeLaravelPaginated<FinanceCommissionRow>(payload.commissions),
+  };
+}
+
+export async function getAdminWithholdingBatches(params?: {
+  page?: number;
+  per_page?: number;
+  status?: string;
+}): Promise<{ summary: FinanceWithholdingSummary; batches: LaravelPaginated<FinanceWithholdingBatchRow> }> {
+  const { data } = await apiClient.get<
+    ApiEnvelope<{ summary: FinanceWithholdingSummary; batches: LaravelPaginated<FinanceWithholdingBatchRow> }>
+  >("/admin/finance/withholding-batches", { params });
+  const payload = data.data;
+  return {
+    summary: payload.summary,
+    batches: normalizeLaravelPaginated<FinanceWithholdingBatchRow>(payload.batches),
+  };
+}
+
+export async function getAdminCommissionReleases(params?: {
+  page?: number;
+  per_page?: number;
+}): Promise<LaravelPaginated<CommissionReleaseRow>> {
+  const { data } = await apiClient.get<ApiEnvelope<LaravelPaginated<CommissionReleaseRow>>>(
+    "/admin/finance/commission-releases",
+    { params },
+  );
+  return normalizeLaravelPaginated<CommissionReleaseRow>(data.data);
 }
 
 export async function getAdminAnalytics(filters?: AnalyticsFilters): Promise<AdminAnalytics> {

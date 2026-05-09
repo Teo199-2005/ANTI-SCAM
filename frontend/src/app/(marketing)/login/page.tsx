@@ -7,7 +7,7 @@ import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
 import { useHydrated } from "@/hooks/useHydrated";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Eye, EyeOff, LogIn, Mail, Shield } from "lucide-react";
 import DemoQuickLogin from "./DemoQuickLogin";
 
@@ -18,7 +18,25 @@ const loginCardClass =
 const authInput =
   "w-full rounded-xl border border-zinc-200/80 bg-sky-50/35 px-4 py-3 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25";
 
-export default function LoginPage() {
+function LoginFallback() {
+  return (
+    <AuthSplitShell>
+      <div className={`${loginCardClass} animate-pulse`}>
+        <div className="mb-6 h-12 w-12 rounded-2xl bg-zinc-200" />
+        <div className="mb-4 h-8 w-3/4 max-w-xs rounded-lg bg-zinc-200" />
+        <div className="mb-8 h-4 w-full max-w-sm rounded bg-zinc-100" />
+        <div className="space-y-4">
+          <div className="h-12 rounded-xl bg-zinc-100" />
+          <div className="h-12 rounded-xl bg-zinc-100" />
+          <div className="h-12 rounded-xl bg-zinc-200" />
+        </div>
+        <p className="mt-8 text-center text-sm text-zinc-500">Loading sign-in…</p>
+      </div>
+    </AuthSplitShell>
+  );
+}
+
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -44,7 +62,23 @@ export default function LoginPage() {
     }
   };
 
+  const onDemoLogin = async (demoEmail: string, demoPassword: string) => {
+    const e = demoEmail.trim();
+    setError(null);
+    setEmail(e);
+    setPassword(demoPassword);
+    try {
+      await login(e, demoPassword);
+      router.push("/dashboard");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Login failed.";
+      setError(msg);
+      throw err;
+    }
+  };
+
   return (
+    <>
     <AuthSplitShell>
       <div className={loginCardClass}>
         <div className="mb-6 flex gap-4 sm:items-center">
@@ -173,16 +207,17 @@ export default function LoginPage() {
           <span>Anti-Scam PH · Verified-safe bookings</span>
         </div>
       </div>
-
-      <DemoQuickLogin
-        onLoginAs={async (demoEmail, demoPassword) => {
-          setError(null);
-          setEmail(demoEmail);
-          setPassword(demoPassword);
-          await login(demoEmail.trim(), demoPassword);
-          router.push("/dashboard");
-        }}
-      />
     </AuthSplitShell>
+    <DemoQuickLogin variant="floating" onLoginAs={onDemoLogin} />
+    </>
+  );
+}
+
+/** `useSearchParams` must sit under `Suspense` (Next.js 15) so `/login` and `/login?…` render reliably. */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

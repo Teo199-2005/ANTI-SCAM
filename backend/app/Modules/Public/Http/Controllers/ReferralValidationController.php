@@ -3,7 +3,9 @@
 namespace App\Modules\Public\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Resort;
 use App\Models\User;
+use App\Services\LandingReadinessService;
 use App\Services\MarketingReferralCodeService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
@@ -13,7 +15,10 @@ class ReferralValidationController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly MarketingReferralCodeService $referrals) {}
+    public function __construct(
+        private readonly MarketingReferralCodeService $referrals,
+        private readonly LandingReadinessService $readiness,
+    ) {}
 
     /** Validate a marketer referral code (optional resort scope for assignment checks). */
     public function validateCode(Request $request)
@@ -37,6 +42,8 @@ class ReferralValidationController extends Controller
         }
 
         $resortId = isset($data['resort_id']) ? (int) $data['resort_id'] : null;
+        $readinessPayload = null;
+
         if ($resortId !== null) {
             $assigned = DB::table('marketer_resorts')
                 ->where('marketer_id', $marketer->id)
@@ -49,12 +56,20 @@ class ReferralValidationController extends Controller
                     'message' => 'This referral code is not linked to this resort. Ask your marketer for the correct code.',
                 ], 'Referral check');
             }
+
+            // Include readiness so the frontend can show a checklist before the owner
+            // proceeds to checkout; enforcement also happens in SubscriptionInvoiceController.
+            $resort = Resort::withoutGlobalScopes()->find($resortId);
+            if ($resort) {
+                $readinessPayload = $this->readiness->check($resort);
+            }
         }
 
         return $this->successResponse([
             'valid' => true,
             'code' => $normalized,
             'marketer_name' => $marketer->name,
+            'readiness' => $readinessPayload,
         ], 'Referral valid');
     }
 }
