@@ -25,6 +25,11 @@ class TenantMiddleware
             return $next($request);
         }
 
+        // Apex hostnames (e.g. anti-scamph.com): only two labels — main site/API, not tenant.parent.com.
+        if (count($segments) === 2) {
+            return $next($request);
+        }
+
         $tenant = Tenant::query()
             ->where('subdomain', $subdomain)
             ->where('status', 'active')
