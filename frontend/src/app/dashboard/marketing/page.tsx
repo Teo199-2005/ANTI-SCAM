@@ -5,7 +5,8 @@ import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/share
 import StatCard from "@/components/dashboard/StatCard";
 import { getAssignedResorts, getCommissions, getMarketingStats, getReleaseHistory, AssignedResort, Commission, CommissionRelease, MarketingStats } from "@/lib/api/marketing";
 import { useAuth } from "@/contexts/AuthContext";
-import { BadgeCheck, Building2, Clock, DollarSign, TrendingUp } from "lucide-react";
+import { BadgeCheck, Building2, Clock, DollarSign, Link2, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const statusBadge: Record<string, string> = {
@@ -64,6 +65,43 @@ export default function MarketingDashboardPage() {
         <StatCard compact label="Pending release"   value={stats ? `₱${Number(stats.pendingCommissions).toLocaleString()}` : "–"}  icon={Clock}       iconTone="amber" />
         <StatCard compact label="Released to date"  value={stats ? `₱${Number(stats.releasedCommissions).toLocaleString()}` : "–"} icon={DollarSign}  iconTone="violet" />
       </div>
+
+      <DashCard className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-violet-100 p-2">
+            <Link2 size={18} className="text-violet-700" />
+          </div>
+          <div>
+            <h2 className="font-dash text-sm font-semibold text-navy">Referral code & share links</h2>
+            <p className="mt-0.5 font-mono text-sm font-bold tracking-wide text-zinc-800">
+              {loading ? "…" : stats?.referral_code ?? "Generating…"}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Owners on your assigned resorts apply this in Subscribe checkout for discounted billing and your commission.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Link
+            href="/dashboard/marketing/analytics"
+            className="dash-btn-sm justify-center border-navy/15 bg-white text-navy hover:bg-navy/5 sm:inline-flex"
+          >
+            Analytics
+          </Link>
+          <Link
+            href="/dashboard/marketing/profile"
+            className="dash-btn-sm justify-center border-navy/15 bg-white text-navy hover:bg-navy/5 sm:inline-flex"
+          >
+            Profile
+          </Link>
+          <Link
+            href="/dashboard/marketing/referrals"
+            className="dash-btn-sm justify-center border-primaryBlue/20 bg-primaryBlue text-white hover:bg-primaryBlueDark sm:inline-flex"
+          >
+            Open toolkit
+          </Link>
+        </div>
+      </DashCard>
 
       {/* Assigned Resorts */}
       <DashCard className="overflow-hidden p-0">

@@ -17,6 +17,10 @@ class BookingLockController extends Controller
 
     public function store(Request $request)
     {
+        if (! in_array($request->user()?->role, ['admin', 'client', 'user'], true)) {
+            return $this->errorResponse('Only guests can initiate booking locks.', null, 403);
+        }
+
         $validated = $request->validate([
             'room_id'        => ['required', 'integer', 'exists:rooms,id'],
             'check_in_date'  => ['required', 'date', 'after_or_equal:today'],
@@ -26,10 +30,20 @@ class BookingLockController extends Controller
         // Resolve tenant_id: from middleware context → authenticated user → room's own tenant
         $tenant   = app()->bound('tenant') ? app('tenant') : null;
         $room     = Room::withoutGlobalScopes()->findOrFail($validated['room_id']);
-        $tenantId = $tenant?->id ?? $request->user()?->tenant_id ?? $room->tenant_id;
+        $tenantId = (int) $room->tenant_id;
 
         if (! $tenantId) {
             return $this->errorResponse('Tenant context could not be resolved.', null, 400);
+        }
+
+        // Reject cross-tenant lock attempts from authenticated users.
+        if ($request->user()?->tenant_id && (int) $request->user()->tenant_id !== $tenantId) {
+            return $this->errorResponse('You cannot book rooms outside your tenant scope.', null, 403);
+        }
+
+        // If request is bound to subdomain tenant, it must match the room tenant.
+        if ($tenant?->id && (int) $tenant->id !== $tenantId) {
+            return $this->errorResponse('Booking tenant context does not match selected room.', null, 409);
         }
 
         try {

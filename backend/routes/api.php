@@ -1,25 +1,32 @@
 <?php
 
 use App\Modules\Admin\Http\Controllers\AdminOnboardController;
+use App\Modules\Admin\Http\Controllers\AdminAnalyticsController;
+use App\Modules\Admin\Http\Controllers\AdminSubscriptionOverviewController;
 use App\Modules\Admin\Http\Controllers\AdminStatsController;
 use App\Modules\Admin\Http\Controllers\MarketingController;
+use App\Modules\Admin\Http\Controllers\AdminMailHealthController;
 use App\Modules\Admin\Http\Controllers\SuspensionController;
 use App\Modules\Admin\Http\Controllers\SystemSettingController;
 use App\Modules\Admin\Http\Controllers\VipController;
 use App\Modules\Admin\Http\Controllers\XenditLogController;
 use App\Modules\Audit\Http\Controllers\AuditLogController;
 use App\Modules\Auth\Http\Controllers\AuthController;
+use App\Modules\Billing\Http\Controllers\SubscriptionInvoiceController;
+use App\Modules\Billing\Http\Controllers\SubscriptionWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditInvoiceController;
 use App\Modules\Billing\Http\Controllers\XenditWebhookController;
 use App\Modules\Dashboard\Http\Controllers\DashboardController;
 use App\Modules\Dashboard\Http\Controllers\MarketingDashboardController;
 use App\Modules\Public\Http\Controllers\PublicCatalogController;
+use App\Modules\Public\Http\Controllers\ReferralValidationController;
 use App\Modules\Reservations\Http\Controllers\BookingLockController;
 use App\Modules\Reservations\Http\Controllers\ReservationController;
 use App\Modules\Reservations\Http\Controllers\StaffNoteController;
 use App\Modules\Resorts\Http\Controllers\DiscountCodeController;
 use App\Modules\Resorts\Http\Controllers\ResortController;
 use App\Modules\Resorts\Http\Controllers\ResortGuestController;
+use App\Modules\Resorts\Http\Controllers\ResortLandingPageController;
 use App\Modules\Rooms\Http\Controllers\RoomController;
 use App\Modules\Rooms\Http\Controllers\RoomImageController;
 use App\Modules\Subscriptions\Http\Controllers\SubscriptionController;
@@ -31,6 +38,7 @@ Route::prefix('v1')->group(function (): void {
 
     // ---------- Webhooks (no auth, verified by token header) ----------
     Route::post('/webhooks/xendit/invoice', [XenditWebhookController::class, 'invoice']);
+    Route::post('/webhooks/xendit/subscription-invoice', [SubscriptionWebhookController::class, 'invoice']);
 
     // ---------- Auth (rate limited) ----------
     // 10 attempts per minute for login (brute-force protection).
@@ -41,16 +49,27 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('throttle:5,60')->group(function (): void {
         Route::post('/auth/register', [AuthController::class, 'register']);
     });
+    Route::middleware('throttle:5,1')->group(function (): void {
+        Route::post('/auth/forgot-password', [AuthController::class, 'forgotPasswordRequest']);
+    });
+    Route::middleware('throttle:10,1')->group(function (): void {
+        Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswordReset']);
+    });
 
     // ---------- Public catalog ----------
     Route::get('/public/resorts',                          [PublicCatalogController::class, 'resorts']);
-    Route::get('/public/resorts/{resort}',                 [PublicCatalogController::class, 'resort']);
+    Route::get('/public/resorts/landing/{slug}',           [PublicCatalogController::class, 'landingBySlug']);
     Route::get('/public/resorts/slug/{slug}',              [PublicCatalogController::class, 'resortBySlug']);
+    Route::get('/public/resorts/{resort}',                 [PublicCatalogController::class, 'resort']);
     Route::get('/public/rooms/{room}',                     [PublicCatalogController::class, 'room']);
     Route::get('/public/rooms/{room}/availability',        [PublicCatalogController::class, 'checkAvailability']);
 
     // Discount code validation (public, called from checkout)
-    Route::post('/public/discount-codes/validate',         [DiscountCodeController::class, 'validate']);
+    Route::post('/public/discount-codes/validate',         [DiscountCodeController::class, 'validateCode']);
+
+    Route::middleware('throttle:30,1')->group(function (): void {
+        Route::post('/public/referrals/validate', [ReferralValidationController::class, 'validateCode']);
+    });
 
     // ---------- Authenticated ----------
     Route::middleware('auth:sanctum')->group(function (): void {
@@ -61,6 +80,8 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('/auth/profile',         [AuthController::class, 'updateProfile']);
         Route::post('/auth/password',         [AuthController::class, 'changePassword']);
         Route::post('/auth/avatar',           [AuthController::class, 'updateAvatar']);
+        Route::post('/auth/email-otp/send',   [AuthController::class, 'sendEmailVerificationOtp']);
+        Route::post('/auth/email-otp/verify', [AuthController::class, 'verifyEmailVerificationOtp']);
 
         Route::get('/notifications', [ClientNotificationController::class, 'index']);
         Route::post('/notifications/mark-all-read', [ClientNotificationController::class, 'markAllRead']);
@@ -68,6 +89,8 @@ Route::prefix('v1')->group(function (): void {
         // Dashboard stats
         Route::get('/dashboard/stats',        [DashboardController::class, 'stats']);
         Route::get('/dashboard/resort-stats', [DashboardController::class, 'resortStats']);
+        Route::get('/dashboard/resort-booking-calendar', [DashboardController::class, 'resortBookingCalendar']);
+        Route::get('/dashboard/resort-revenue-analytics', [DashboardController::class, 'resortRevenueAnalytics']);
 
         // Marketing dashboard (role: marketing)
         Route::middleware('role:marketing,admin')->group(function (): void {
@@ -77,11 +100,19 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/dashboard/marketing/releases',       [MarketingDashboardController::class, 'releaseHistory']);
         });
 
+        Route::middleware('role:marketing')->group(function (): void {
+            Route::get('/dashboard/marketing/analytics', [MarketingDashboardController::class, 'analytics']);
+        });
+
         // Admin-only routes
         Route::middleware('role:admin')->group(function (): void {
             Route::get('/admin/stats',                           [AdminStatsController::class, 'stats']);
+            Route::get('/admin/analytics',                       [AdminAnalyticsController::class, 'index']);
+            Route::get('/admin/subscriptions/overview',          [AdminSubscriptionOverviewController::class, 'index']);
             Route::get('/admin/audit-logs',                      [AuditLogController::class, 'index']);
+            Route::get('/admin/resorts/assignable-owners',       [AdminOnboardController::class, 'assignableOwners']);
             Route::post('/admin/resorts/onboard',                [AdminOnboardController::class, 'store']);
+            Route::post('/admin/resorts/onboard/upload-logo',    [AdminOnboardController::class, 'uploadLogo']);
             Route::post('/subscriptions/enforce-grace-period',   [SubscriptionController::class, 'enforceGracePeriod']);
 
             // VIP badge management
@@ -92,6 +123,8 @@ Route::prefix('v1')->group(function (): void {
 
             // Xendit payment logs
             Route::get('/admin/xendit-logs',                     [XenditLogController::class, 'index']);
+            Route::post('/admin/resorts/{resort}/subscriptions/trigger-invoice', [SubscriptionInvoiceController::class, 'create']);
+            Route::post('/admin/mail/test',                      [AdminMailHealthController::class, 'send']);
 
             // System settings
             Route::get('/admin/settings',                        [SystemSettingController::class, 'index']);
@@ -125,7 +158,21 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/reservations/{reservation}/invoice',           [XenditInvoiceController::class, 'create']);
 
         // Subscriptions
-        Route::post('/resorts/{resort}/subscriptions/refresh', [SubscriptionController::class, 'refresh']);
+        Route::middleware('role:resort_owner,admin')->group(function (): void {
+            Route::post('/resorts/{resort}/subscriptions/refresh', [SubscriptionController::class, 'refresh']);
+            Route::post('/resorts/{resort}/subscriptions/pay-invoice', [SubscriptionInvoiceController::class, 'create']);
+            Route::post('/resorts/{resort}/subscriptions/sync-invoice', [SubscriptionInvoiceController::class, 'syncPendingFromGateway']);
+            Route::get('/resorts/{resort}/subscriptions/invoices', [SubscriptionInvoiceController::class, 'index']);
+        });
+
+        // Resort-owner self-onboarding
+        Route::middleware('role:resort_owner')->group(function (): void {
+            Route::post('/resort-owner/onboard', [AdminOnboardController::class, 'ownerStore']);
+            Route::post('/resort-owner/onboard/upload-logo', [AdminOnboardController::class, 'ownerUploadLogo']);
+            Route::get('/resort-owner/landing-page', [ResortLandingPageController::class, 'show']);
+            Route::post('/resort-owner/landing-page/upload-bg-image', [ResortLandingPageController::class, 'uploadBgImage']);
+            Route::post('/resort-owner/landing-page/upload-image', [ResortLandingPageController::class, 'uploadImage']);
+        });
 
         // Resources
         Route::apiResource('resorts', ResortController::class);

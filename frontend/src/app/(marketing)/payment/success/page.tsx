@@ -27,6 +27,10 @@ export default function PaymentSuccessPage() {
     void load();
   }, [reservationId]);
 
+  const paymentState = reservation?.xenditPaymentStatus ?? "pending";
+  const isConfirmed = reservation?.status === "confirmed" && paymentState === "paid";
+  const isProcessing = !reservation || (!isConfirmed && paymentState === "pending");
+
   return (
     <PageContainer className="section-padding">
       <div className="mx-auto max-w-lg">
@@ -34,9 +38,13 @@ export default function PaymentSuccessPage() {
           <div className="glass-pill-icon mx-auto w-fit text-emerald-700">
             <BadgeCheck size={24} />
           </div>
-          <h1 className="mt-5 font-heading text-4xl text-zinc-900">Payment Successful!</h1>
+          <h1 className="mt-5 font-heading text-4xl text-zinc-900">
+            {isConfirmed ? "Payment Successful!" : "Payment Received"}
+          </h1>
           <p className="mt-3 text-zinc-600">
-            Your ₱500 reservation fee has been received. Your booking is confirmed!
+            {isConfirmed
+              ? "Your reservation fee has been received. Your booking is confirmed."
+              : "Your payment is being verified. Booking confirmation will appear once Xendit webhook processing completes."}
           </p>
 
           {loading ? (
@@ -57,8 +65,9 @@ export default function PaymentSuccessPage() {
           ) : null}
 
           <p className="mt-5 text-sm text-zinc-500">
-            A confirmation email has been sent to your registered address. The remaining balance is
-            payable directly at the resort upon check-in.
+            {isProcessing
+              ? "Please wait a moment and refresh this page if confirmation is still processing."
+              : "A confirmation email has been sent to your registered address. The remaining balance is payable directly at the resort upon check-in."}
           </p>
 
           <div className="mt-8 flex flex-col gap-3">

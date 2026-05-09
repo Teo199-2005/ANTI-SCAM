@@ -1,13 +1,22 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import DashModal from "@/components/dash/DashModal";
 import ProgressRing from "@/components/dashboard/ProgressRing";
 import StatCard from "@/components/dashboard/StatCard";
-import { getResortStats, ResortDashboardStats } from "@/lib/api/dashboard";
+import {
+  getResortBookingCalendar,
+  getResortStats,
+  ResortBookingCalendarReservation,
+  ResortDashboardStats,
+} from "@/lib/api/dashboard";
+import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { syncPendingSubscriptionInvoice } from "@/lib/api/subscription";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
-import { BadgeDollarSign, CalendarCheck2, DoorOpen, LockKeyhole, ReceiptText, TrendingUp } from "lucide-react";
+import { useToast } from "@/components/shared/ToastProvider";
+import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, ReceiptText, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -19,16 +28,112 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function ResortOverviewPage() {
+  const { pushToast } = useToast();
   const [stats, setStats] = useState<ResortDashboardStats | null>(null);
+  const [calendarReservations, setCalendarReservations] = useState<ResortBookingCalendarReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const calendarMonth = useMemo(() => new Date(), []);
+  const monthStart = useMemo(
+    () => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1),
+    [calendarMonth],
+  );
+  const monthEnd = useMemo(
+    () => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0),
+    [calendarMonth],
+  );
+  const monthLabel = useMemo(
+    () => monthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+    [monthStart],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (!payment) return;
+
+    const stripPaymentQuery = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    };
+
+    const notifyTopbar = () => {
+      window.dispatchEvent(new CustomEvent("subscription:refresh"));
+    };
+
+    if (payment === "failed") {
+      pushToast({
+        title: "Payment not completed",
+        description: "You can try again from Subscribe now in the top bar.",
+        tone: "warning",
+      });
+      stripPaymentQuery();
+      notifyTopbar();
+      return;
+    }
+
+    if (payment === "success") {
+      void (async () => {
+        try {
+          const landing = await getOwnerLandingPage();
+          const result = await syncPendingSubscriptionInvoice(landing.resort_id);
+          if (result.synced) {
+            pushToast({
+              title: "Subscription active",
+              description: "Your payment was confirmed. Premium status is updated.",
+              tone: "success",
+            });
+          } else if (result.gateway_status === "PENDING") {
+            pushToast({
+              title: "Payment processing",
+              description: "The provider still shows pending. Wait a few seconds and refresh, or check your email.",
+              tone: "info",
+            });
+          } else {
+            pushToast({
+              title: "Payment received",
+              description: "If the top bar still shows pending, refresh the page in a moment.",
+              tone: "success",
+            });
+          }
+        } catch {
+          pushToast({
+            title: "Could not confirm instantly",
+            description: "Your payment may still succeed via webhook. Refresh shortly or contact support if it stays pending.",
+            tone: "warning",
+          });
+        } finally {
+          stripPaymentQuery();
+          notifyTopbar();
+        }
+      })();
+      return;
+    }
+
+    stripPaymentQuery();
+    notifyTopbar();
+  }, [pushToast]);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const payload = await getResortStats();
-        setStats(payload);
+        const now = new Date();
+        const [statsResult, calendarResult] = await Promise.allSettled([
+          getResortStats(),
+          getResortBookingCalendar(now.getFullYear(), now.getMonth() + 1),
+        ]);
+        if (statsResult.status !== "fulfilled") {
+          throw new Error("stats_failed");
+        }
+        setStats(statsResult.value);
+        setCalendarReservations(
+          calendarResult.status === "fulfilled" ? calendarResult.value.reservations : [],
+        );
         setError(null);
       } catch (err) {
         setError("Unable to load resort dashboard stats.");
@@ -64,6 +169,31 @@ export default function ResortOverviewPage() {
     stats.activeRooms > 0
       ? Math.round((stats.lockedBookings / stats.activeRooms) * 100)
       : 0;
+
+  const normalizeDate = (value: string) => {
+    const [y, m, d] = value.split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+  const dateToKey = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const isDateInRange = (target: Date, start: Date, end: Date) => target >= start && target <= end;
+
+  const daysInMonth = monthEnd.getDate();
+  const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1);
+    const key = dateToKey(date);
+    const reservations = calendarReservations.filter((item) =>
+      isDateInRange(date, normalizeDate(item.check_in_date), normalizeDate(item.check_out_date)),
+    );
+    const hasConfirmed = reservations.some((r) => r.status === "confirmed");
+    const hasPending = reservations.some((r) => r.status === "pending_payment");
+    return { key, day: i + 1, reservations, hasConfirmed, hasPending };
+  });
+
+  const firstDayOffset = (monthStart.getDay() + 6) % 7;
+  const selectedReservations = selectedDate
+    ? monthDays.find((d) => d.key === selectedDate)?.reservations ?? []
+    : [];
 
   return (
     <div className="space-y-6">
@@ -195,52 +325,142 @@ export default function ResortOverviewPage() {
         </div>
       )}
 
-      {/* ── Recent reservations ──────────────────────────────── */}
-      <DashCard className="overflow-hidden p-0">
-        {/* Section header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="inline-flex rounded-lg bg-emerald-100 p-2">
-              <ReceiptText size={16} className="text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="font-dash text-base font-semibold text-navy">Recent reservations</h2>
-              <p className="text-xs text-zinc-400">Latest booking activity</p>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        {/* ── Booking calendar ──────────────────────────────── */}
+        <DashCard className="overflow-hidden p-0">
+          <div className="border-b border-softBorder px-6 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="inline-flex rounded-lg bg-primaryBlue/10 p-2">
+                <CalendarDays size={16} className="text-primaryBlue" />
+              </div>
+              <div>
+                <h2 className="font-dash text-base font-semibold text-navy">Booking calendar</h2>
+                <p className="text-xs text-zinc-400">{monthLabel}</p>
+              </div>
             </div>
           </div>
-          <Link href="/dashboard/resort/reservations" className="dash-btn-sm">
-            View all
-          </Link>
-        </div>
+          <div className="space-y-3 p-4">
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: firstDayOffset }).map((_, i) => (
+                <div key={`empty-${i}`} className="h-10 rounded-lg bg-transparent" />
+              ))}
+              {monthDays.map((day) => (
+                <button
+                  key={day.key}
+                  type="button"
+                  onClick={() => setSelectedDate(day.key)}
+                  className={`relative h-10 rounded-lg border text-xs font-medium transition ${
+                    day.reservations.length > 0
+                      ? "border-primaryBlue/40 bg-primaryBlue/10 text-navy hover:bg-primaryBlue/15"
+                      : "border-softBorder bg-white text-zinc-500 hover:bg-softGray/50"
+                  }`}
+                >
+                  {day.day}
+                  {day.reservations.length > 0 ? (
+                    <span className="absolute bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1">
+                      <span className={`h-1.5 w-1.5 rounded-full ${day.hasConfirmed ? "bg-emerald-500" : "bg-amber-500"}`} />
+                      {day.hasConfirmed && day.hasPending ? <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> : null}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Confirmed booking
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                Pending booking
+              </span>
+            </div>
+          </div>
+        </DashCard>
 
-        {stats.recentReservations.length === 0 ? (
-          <p className="px-6 py-8 text-sm text-zinc-500">No reservations yet.</p>
-        ) : (
-          <div className="divide-y divide-softBorder">
-            {stats.recentReservations.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 transition-colors hover:bg-dsRowHover"
-              >
-                <div>
-                  <p className="font-mono text-xs font-semibold text-navy">{item.reference_no}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {item.check_in_date} → {item.check_out_date}
-                  </p>
+        {/* ── Recent reservations ──────────────────────────────── */}
+        <DashCard className="overflow-hidden p-0">
+          {/* Section header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="inline-flex rounded-lg bg-emerald-100 p-2">
+                <ReceiptText size={16} className="text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="font-dash text-base font-semibold text-navy">Recent reservations</h2>
+                <p className="text-xs text-zinc-400">Latest booking activity</p>
+              </div>
+            </div>
+            <Link href="/dashboard/resort/reservations" className="dash-btn-sm">
+              View all
+            </Link>
+          </div>
+
+          {stats.recentReservations.length === 0 ? (
+            <p className="px-6 py-8 text-sm text-zinc-500">No reservations yet.</p>
+          ) : (
+            <div className="divide-y divide-softBorder">
+              {stats.recentReservations.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 transition-colors hover:bg-dsRowHover"
+                >
+                  <div>
+                    <p className="font-mono text-xs font-semibold text-navy">{item.reference_no}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {item.check_in_date} → {item.check_out_date}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm font-semibold text-emerald-700">
+                      ₱{Number(item.total_amount).toLocaleString()}
+                    </p>
+                    <span className={statusBadge[item.status] ?? "dash-badge-slate"}>
+                      {item.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold text-emerald-700">
-                    ₱{Number(item.total_amount).toLocaleString()}
-                  </p>
+              ))}
+            </div>
+          )}
+        </DashCard>
+      </div>
+
+      <DashModal
+        open={Boolean(selectedDate)}
+        onClose={() => setSelectedDate(null)}
+        title="Date booking details"
+        description={selectedDate ?? undefined}
+        className="max-w-xl"
+      >
+        {selectedReservations.length === 0 ? (
+          <p className="text-sm text-zinc-500">No bookings for this date.</p>
+        ) : (
+          <div className="space-y-2">
+            {selectedReservations.map((item) => (
+              <div key={item.id} className="rounded-xl border border-softBorder bg-white px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-xs font-semibold text-navy">{item.reference_no}</p>
                   <span className={statusBadge[item.status] ?? "dash-badge-slate"}>
                     {item.status.replaceAll("_", " ")}
                   </span>
                 </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  {item.check_in_date} → {item.check_out_date}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-emerald-700">
+                  ₱{Number(item.total_amount).toLocaleString()}
+                </p>
               </div>
             ))}
           </div>
         )}
-      </DashCard>
+      </DashModal>
     </div>
   );
 }

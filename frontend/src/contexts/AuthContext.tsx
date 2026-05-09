@@ -32,6 +32,9 @@ type AuthContextValue = {
   register: (input: {
     name: string;
     email: string;
+    phone?: string;
+    business_name?: string;
+    role_intent?: "resort_owner" | "client";
     password: string;
     password_confirmation: string;
   }) => Promise<void>;
@@ -125,6 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (input: {
       name: string;
       email: string;
+      phone?: string;
+      business_name?: string;
+      role_intent?: "resort_owner" | "client";
       password: string;
       password_confirmation: string;
     }) => {

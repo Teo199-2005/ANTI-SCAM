@@ -3,7 +3,6 @@
 namespace App\Modules\Reservations\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Resort;
 use App\Modules\Reservations\Http\Requests\AdminOverrideReservationRequest;
 use App\Modules\Reservations\Http\Requests\CancelReservationRequest;
 use App\Modules\Reservations\Http\Requests\StoreReservationRequest;
@@ -21,15 +20,11 @@ class ReservationController extends Controller
 
     public function store(StoreReservationRequest $request)
     {
-        // Resolve tenant_id: middleware context → user's tenant → resort's tenant
-        $tenant   = app()->bound('tenant') ? app('tenant') : null;
-        $resort   = Resort::withoutGlobalScopes()->findOrFail($request->validated()['resort_id']);
-        $tenantId = $tenant?->id ?? $request->user()->tenant_id ?? $resort->tenant_id;
+        $this->authorize('create', Reservation::class);
 
         try {
             $reservation = $this->service->createFromLock([
                 ...$request->validated(),
-                'tenant_id' => $tenantId,
                 'client_id' => $request->user()->id,
             ]);
         } catch (RuntimeException $exception) {
@@ -76,6 +71,10 @@ class ReservationController extends Controller
 
         if (in_array($user->role, ['client', 'user'], true)) {
             $query->where('client_id', $user->id);
+        }
+
+        if (! in_array($user->role, ['admin'], true)) {
+            $query->where('tenant_id', $user->tenant_id);
         }
 
         $reservations = ReservationResource::collection($query->paginate($perPage));

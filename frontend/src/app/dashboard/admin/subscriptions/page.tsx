@@ -11,8 +11,10 @@ import {
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
+import { getAdminSubscriptionOverview } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
-import { listResorts, ResortItem } from "@/lib/api/resort";
+import { ResortItem } from "@/lib/api/resort";
+import { triggerSubscriptionInvoice } from "@/lib/api/subscription";
 import { CreditCard, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -26,23 +28,55 @@ const statusBadge: Record<string, string> = {
 
 export default function AdminSubscriptionsPage() {
   const [resorts, setResorts] = useState<ResortItem[]>([]);
+  const [latestInvoiceStatus, setLatestInvoiceStatus] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<number | null>(null);
+  const [triggering, setTriggering] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmRefresh, setConfirmRefresh] = useState<ResortItem | null>(null);
+  const [confirmTrigger, setConfirmTrigger] = useState<ResortItem | null>(null);
   const { pushToast } = useToast();
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await listResorts({ perPage: 100 });
-      setResorts(res.data);
+      const overview = await getAdminSubscriptionOverview();
+      setResorts(overview);
+      setLatestInvoiceStatus(
+        Object.fromEntries(overview.map((resort) => [resort.id, resort.latest_invoice_status ?? "none"])),
+      );
       setError(null);
     } catch (err) {
       setResorts([]);
       setError("Failed to load subscriptions.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerInvoice = async (resort: ResortItem) => {
+    setTriggering(resort.id);
+    try {
+      const result = await triggerSubscriptionInvoice(resort.id);
+      pushToast({
+        title: "Invoice triggered",
+        description: `${resort.name} invoice created.`,
+        tone: "success",
+      });
+      if (result.invoice_url) {
+        pushToast({
+          title: "Payment link ready",
+          description: "Resort owner can complete payment using generated invoice link.",
+          tone: "info",
+        });
+      }
+      await load();
+    } catch (err) {
+      const msg = parseApiErrorMessage(err, "Unable to trigger subscription invoice.");
+      pushToast({ title: "Trigger failed", description: msg, tone: "error" });
+    } finally {
+      setTriggering(null);
+      setConfirmTrigger(null);
     }
   };
 
@@ -106,18 +140,32 @@ export default function AdminSubscriptionsPage() {
                         <span className="text-xs text-zinc-600">No subscription</span>
                       ),
                     },
+                    {
+                      label: "Latest invoice",
+                      value: <span className="capitalize">{latestInvoiceStatus[resort.id] ?? "none"}</span>,
+                    },
                     { label: "Next due", value: sub?.next_due_date ?? "—" },
                   ]}
                   actions={
-                    <button
-                      type="button"
-                      disabled={refreshing === resort.id}
-                      onClick={() => setConfirmRefresh(resort)}
-                      className="dash-btn-sm w-full justify-center"
-                    >
-                      <RefreshCw size={11} className={refreshing === resort.id ? "animate-spin" : ""} />
-                      Refresh billing
-                    </button>
+                    <div className="flex w-full gap-2">
+                      <button
+                        type="button"
+                        disabled={refreshing === resort.id}
+                        onClick={() => setConfirmRefresh(resort)}
+                        className="dash-btn-sm w-full justify-center"
+                      >
+                        <RefreshCw size={11} className={refreshing === resort.id ? "animate-spin" : ""} />
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        disabled={triggering === resort.id}
+                        onClick={() => setConfirmTrigger(resort)}
+                        className="dash-btn-accent w-full justify-center"
+                      >
+                        Trigger
+                      </button>
+                    </div>
                   }
                 />
               );
@@ -135,12 +183,13 @@ export default function AdminSubscriptionsPage() {
               <th>Rooms</th>
               <th>Monthly fee</th>
               <th>Status</th>
+              <th>Latest invoice</th>
               <th>Next due</th>
               <DashTableActionsHead srOnly>Row actions</DashTableActionsHead>
             </>
           }
         >
-          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={7}>
+          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={8}>
             {resorts.map((resort) => {
               const sub = resort.subscription;
               return (
@@ -160,6 +209,7 @@ export default function AdminSubscriptionsPage() {
                       <span className="text-xs text-zinc-600">No subscription</span>
                     )}
                   </td>
+                  <td className="capitalize text-zinc-700">{latestInvoiceStatus[resort.id] ?? "none"}</td>
                   <td className="text-zinc-600">{sub?.next_due_date ?? "—"}</td>
                   <DashTableActionsCell>
                     <DashTableActionsInner>
@@ -171,6 +221,14 @@ export default function AdminSubscriptionsPage() {
                       >
                         <RefreshCw size={11} className={refreshing === resort.id ? "animate-spin" : ""} />
                         Refresh
+                      </button>
+                      <button
+                        type="button"
+                        disabled={triggering === resort.id}
+                        onClick={() => setConfirmTrigger(resort)}
+                        className="dash-btn-accent"
+                      >
+                        Trigger Invoice
                       </button>
                     </DashTableActionsInner>
                   </DashTableActionsCell>
@@ -194,6 +252,21 @@ export default function AdminSubscriptionsPage() {
         onCancel={() => setConfirmRefresh(null)}
         onConfirm={() => {
           if (confirmRefresh) void refreshSub(confirmRefresh);
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmTrigger)}
+        title="Trigger subscription invoice?"
+        description={
+          confirmTrigger
+            ? `Create a payment invoice now for ${confirmTrigger.name}.`
+            : "Create a payment invoice."
+        }
+        confirmLabel="Trigger invoice"
+        loading={triggering !== null}
+        onCancel={() => setConfirmTrigger(null)}
+        onConfirm={() => {
+          if (confirmTrigger) void triggerInvoice(confirmTrigger);
         }}
       />
     </div>

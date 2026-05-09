@@ -20,7 +20,8 @@ class StoreResortRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'address' => ['nullable', 'string', 'max:255'],
             'contact_number' => ['nullable', 'string', 'max:30'],
-            'logo_url' => ['nullable', 'url', 'max:2048'],
+            'logo_url' => ['nullable', 'string', 'max:2048'],
+            'background_image_url' => ['nullable', 'string', 'max:2048'],
             'is_publicly_listed' => ['nullable', 'boolean'],
         ];
     }

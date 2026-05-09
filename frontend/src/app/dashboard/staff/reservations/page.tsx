@@ -11,6 +11,7 @@ import { apiClient } from "@/lib/api/client";
 import { CalendarDays, ChevronLeft, MessageSquare, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
 type Reservation = {
   id: number;
@@ -37,16 +38,21 @@ const statusBadge: Record<string, string> = {
 export default function StaffReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
 
   const load = async (q = "") => {
     setLoading(true);
+    setError(null);
     try {
       const { data } = await apiClient.get<ApiEnvelope<Reservation>>("/reservations", {
         params: { perPage: 50, search: q || undefined },
       });
       setReservations(data.data?.data ?? []);
+    } catch (err: unknown) {
+      setReservations([]);
+      setError(parseApiErrorMessage(err, "Failed to load reservations."));
     } finally {
       setLoading(false);
     }
@@ -93,6 +99,13 @@ export default function StaffReservationsPage() {
             <div className="md:hidden p-4"><DashMobileTableSkeleton rows={5} /></div>
             <div className="hidden md:block space-y-2 p-4">{[1,2,3,4,5].map(i=><div key={i} className="h-12 animate-pulse rounded-xl bg-softGray"/>)}</div>
           </>
+        ) : error ? (
+          <div className="px-6 py-8 text-center">
+            <p className="text-sm text-rose-700">{error}</p>
+            <button type="button" className="dash-btn-sm mt-3" onClick={() => void load(search)}>
+              Retry
+            </button>
+          </div>
         ) : reservations.length === 0 ? (
           <p className="px-6 py-10 text-center text-sm text-zinc-500">No reservations found.</p>
         ) : (

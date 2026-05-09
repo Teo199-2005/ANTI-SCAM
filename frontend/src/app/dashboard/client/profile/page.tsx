@@ -196,120 +196,128 @@ export default function ClientProfilePage() {
       {/* Personal info */}
       <div className="dash-card p-6">
         <h2 className="mb-4 font-dash text-lg text-navy">Personal information</h2>
-        <form className="max-w-md space-y-4" onSubmit={onSave}>
-          <div>
-            <label htmlFor="client-profile-name" className="mb-1.5 block text-xs font-semibold text-zinc-600">Full name</label>
-            <div className="relative">
-              <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input id="client-profile-name" className="dash-input pl-9" value={name} onChange={(e) => setName(e.target.value)} required />
+        <form className="space-y-4" onSubmit={onSave}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="client-profile-name" className="mb-1.5 block text-xs font-semibold text-zinc-600">Full name</label>
+              <div className="relative">
+                <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input id="client-profile-name" className="dash-input pl-9" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="client-profile-email" className="mb-1.5 block text-xs font-semibold text-zinc-600">Email</label>
+              <div className="relative">
+                <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input id="client-profile-email" className="dash-input pl-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+            </div>
+
+            <div className="dash-inset md:col-span-2">
+              <p>
+                <span className="font-semibold text-navy">Role:</span> {formatRoleLabel(user?.role)}
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <button type="submit" disabled={saving} className="dash-btn-primary disabled:opacity-60">
+                {saving ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin" /> Saving…
+                  </span>
+                ) : (
+                  "Save changes"
+                )}
+              </button>
             </div>
           </div>
-
-          <div>
-            <label htmlFor="client-profile-email" className="mb-1.5 block text-xs font-semibold text-zinc-600">Email</label>
-            <div className="relative">
-              <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input id="client-profile-email" className="dash-input pl-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-          </div>
-
-          <div className="dash-inset">
-            <p>
-              <span className="font-semibold text-navy">Role:</span> {formatRoleLabel(user?.role)}
-            </p>
-          </div>
-
-          <button type="submit" disabled={saving} className="dash-btn-primary disabled:opacity-60">
-            {saving ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> Saving…
-              </span>
-            ) : (
-              "Save changes"
-            )}
-          </button>
         </form>
       </div>
 
       {/* Password change */}
       <div className="dash-card p-6">
         <h2 className="mb-4 font-dash text-lg text-navy">Change password</h2>
-        <form className="max-w-md space-y-4" onSubmit={onChangePassword}>
-          <div>
-            <label htmlFor="current-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">Current password</label>
-            <div className="relative">
-              <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
-                id="current-password"
-                className="dash-input pl-9 pr-10"
-                type={showCurrent ? "text" : "password"}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowCurrent((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
-                aria-label={showCurrent ? "Hide password" : "Show password"}
-              >
-                {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+        <form className="space-y-4" onSubmit={onChangePassword}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="current-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">Current password</label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  id="current-password"
+                  className="dash-input pl-9 pr-10"
+                  type={showCurrent ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
+                  aria-label={showCurrent ? "Hide password" : "Show password"}
+                >
+                  {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="new-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">New password</label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  id="new-password"
+                  className="dash-input pl-9 pr-10"
+                  type={showNew ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
+                  aria-label={showNew ? "Hide password" : "Show password"}
+                >
+                  {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="confirm-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">Confirm new password</label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  id="confirm-password"
+                  className="dash-input pl-9"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <button type="submit" disabled={savingPw} className="dash-btn-primary disabled:opacity-60">
+                {savingPw ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin" /> Updating…
+                  </span>
+                ) : (
+                  "Update password"
+                )}
               </button>
             </div>
           </div>
-
-          <div>
-            <label htmlFor="new-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">New password</label>
-            <div className="relative">
-              <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
-                id="new-password"
-                className="dash-input pl-9 pr-10"
-                type={showNew ? "text" : "password"}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowNew((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
-                aria-label={showNew ? "Hide password" : "Show password"}
-              >
-                {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="confirm-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">Confirm new password</label>
-            <div className="relative">
-              <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
-                id="confirm-password"
-                className="dash-input pl-9"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                minLength={8}
-              />
-            </div>
-          </div>
-
-          <button type="submit" disabled={savingPw} className="dash-btn-primary disabled:opacity-60">
-            {savingPw ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> Updating…
-              </span>
-            ) : (
-              "Update password"
-            )}
-          </button>
         </form>
       </div>
     </div>

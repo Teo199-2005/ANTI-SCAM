@@ -25,6 +25,13 @@ export const demoAccounts: DemoAccount[] = [
     password: DEMO_ACCOUNT_PASSWORD,
   },
   {
+    id: "marketing",
+    label: "Marketing partner",
+    roleLabel: "marketing",
+    email: "marketer@resort.test",
+    password: DEMO_ACCOUNT_PASSWORD,
+  },
+  {
     id: "client",
     label: "Guest (client)",
     roleLabel: "client",

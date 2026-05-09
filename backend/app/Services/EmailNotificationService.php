@@ -12,6 +12,10 @@ use Throwable;
 
 class EmailNotificationService
 {
+    public function __construct(private readonly BrandedEmailTemplateService $templateService)
+    {
+    }
+
     /** Send a booking confirmation email to the guest. */
     public function sendBookingConfirmation(Reservation $reservation): void
     {
@@ -26,7 +30,11 @@ class EmailNotificationService
                 Mail::send([], [], function ($m) use ($reservation, $user): void {
                     $m->to($user->email, $user->name)
                         ->subject('Booking Confirmed – ' . $reservation->reference_no)
-                        ->html($this->bookingConfirmationHtml($reservation));
+                        ->html($this->templateService->render(
+                            'Booking confirmed',
+                            $this->bookingConfirmationHtml($reservation),
+                            'Your booking has been confirmed.'
+                        ));
                 });
             },
             ['reservation_id' => $reservation->id],
@@ -48,7 +56,11 @@ class EmailNotificationService
                 Mail::send([], [], function ($m) use ($reservation, $user): void {
                     $m->to($user->email, $user->name)
                         ->subject('Payment Receipt – ' . $reservation->reference_no)
-                        ->html($this->paymentReceiptHtml($reservation));
+                        ->html($this->templateService->render(
+                            'Payment receipt',
+                            $this->paymentReceiptHtml($reservation),
+                            'Your reservation fee receipt is here.'
+                        ));
                 });
             },
             ['reservation_id' => $reservation->id],
@@ -78,7 +90,11 @@ class EmailNotificationService
                 Mail::send([], [], function ($m) use ($reservation, $resortOwner): void {
                     $m->to($resortOwner->email, $resortOwner->name)
                         ->subject('New Booking – ' . $reservation->reference_no)
-                        ->html($this->newBookingResortHtml($reservation));
+                        ->html($this->templateService->render(
+                            'New booking received',
+                            $this->newBookingResortHtml($reservation),
+                            'A new booking is confirmed for your resort.'
+                        ));
                 });
             },
             ['reservation_id' => $reservation->id],
@@ -104,7 +120,41 @@ class EmailNotificationService
                 Mail::send([], [], function ($m) use ($subscription, $owner): void {
                     $m->to($owner->email, $owner->name)
                         ->subject('Subscription Payment Due')
-                        ->html($this->subscriptionDueHtml($subscription));
+                        ->html($this->templateService->render(
+                            'Subscription payment due',
+                            $this->subscriptionDueHtml($subscription),
+                            'Your subscription payment due reminder.'
+                        ));
+                });
+            },
+            ['subscription_id' => $subscription->id],
+            $subscription->tenant_id
+        );
+    }
+
+    /** Subscription renewal confirmation. */
+    public function sendSubscriptionRenewalConfirmation(Subscription $subscription): void
+    {
+        $owner = User::withoutGlobalScopes()
+            ->where('tenant_id', $subscription->tenant_id)
+            ->where('role', 'resort_owner')
+            ->first();
+
+        if (! $owner?->email) return;
+
+        $this->dispatch(
+            'subscription_renewal_confirmation',
+            $owner->email,
+            'Subscription Renewed – ' . $subscription->resort?->name,
+            function () use ($subscription, $owner): void {
+                Mail::send([], [], function ($m) use ($subscription, $owner): void {
+                    $m->to($owner->email, $owner->name)
+                        ->subject('Subscription Renewed')
+                        ->html($this->templateService->render(
+                            'Subscription renewed',
+                            $this->subscriptionRenewalHtml($subscription),
+                            'Your subscription has been renewed successfully.'
+                        ));
                 });
             },
             ['subscription_id' => $subscription->id],
@@ -130,7 +180,11 @@ class EmailNotificationService
                 Mail::send([], [], function ($m) use ($subscription, $owner): void {
                     $m->to($owner->email)
                         ->subject('Subscription Grace Period Alert')
-                        ->html($this->gracePeriodHtml($subscription));
+                        ->html($this->templateService->render(
+                            'Grace period alert',
+                            $this->gracePeriodHtml($subscription),
+                            'Action required to avoid suspension.'
+                        ));
                 });
             },
             ['subscription_id' => $subscription->id],
@@ -154,7 +208,13 @@ class EmailNotificationService
             'Your resort listing has been suspended – ' . $resort->name,
             function () use ($resort, $owner): void {
                 Mail::send([], [], function ($m) use ($resort, $owner): void {
-                    $m->to($owner->email)->subject('Resort Listing Suspended')->html($this->suspensionHtml($resort));
+                    $m->to($owner->email)
+                        ->subject('Resort Listing Suspended')
+                        ->html($this->templateService->render(
+                            'Resort listing suspended',
+                            $this->suspensionHtml($resort),
+                            'Your resort listing has been suspended.'
+                        ));
                 });
             },
             ['resort_id' => $resort->id],
@@ -251,6 +311,19 @@ HTML;
   <h2 style="color:#92400e">Subscription Payment Due</h2>
   <p>Your subscription of <strong>₱{$amount}/month</strong> is due on <strong>{$due}</strong>.</p>
   <p>Please settle your payment to avoid a grace period and eventual suspension of your public listing.</p>
+</div>
+HTML;
+    }
+
+    private function subscriptionRenewalHtml(Subscription $s): string
+    {
+        $amount = number_format($s->total_monthly_fee, 2);
+        $nextDue = $s->next_due_date;
+        return <<<HTML
+<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #bbf7d0;border-radius:12px;background:#f0fdf4">
+  <h2 style="color:#166534">Subscription Renewed</h2>
+  <p>Your subscription payment of <strong>₱{$amount}</strong> has been received successfully.</p>
+  <p>Next due date: <strong>{$nextDue}</strong></p>
 </div>
 HTML;
     }

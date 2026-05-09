@@ -18,7 +18,7 @@ type Guest = {
   firstBooking: string | null;
 };
 
-type ApiEnvelope<T> = { success: boolean; data: T };
+type ApiEnvelope<T> = { success: boolean; data: T | { data: T } };
 
 export default function ResortGuestsPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -34,7 +34,12 @@ export default function ResortGuestsPage() {
       const { data } = await apiClient.get<ApiEnvelope<Guest[]>>("/resort/guests", {
         params: { search: q || undefined, perPage: 100 },
       });
-      setGuests(Array.isArray(data.data) ? data.data : []);
+      const payload = data.data;
+      if (Array.isArray(payload)) {
+        setGuests(payload);
+      } else {
+        setGuests(Array.isArray(payload?.data) ? payload.data : []);
+      }
     } catch (err) {
       setError("Failed to load guest list.");
     } finally {

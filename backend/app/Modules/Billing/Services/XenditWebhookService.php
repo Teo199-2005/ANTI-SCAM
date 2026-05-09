@@ -22,7 +22,12 @@ class XenditWebhookService
     public function verifySignature(string $signature): void
     {
         $configured = (string) config('services.xendit.webhook_token');
-        if ($configured === '' || ! hash_equals($configured, $signature)) {
+        // Reject all callbacks when webhook token is not configured.
+        if (trim($configured) === '') {
+            throw ValidationException::withMessages(['signature' => ['Webhook token is not configured.']]);
+        }
+
+        if (trim($signature) === '' || ! hash_equals($configured, $signature)) {
             throw ValidationException::withMessages(['signature' => ['Invalid Xendit signature.']]);
         }
     }
@@ -64,7 +69,7 @@ class XenditWebhookService
                 return null;
             }
 
-            if ($status === 'PAID') {
+            if ($eventType === 'invoice.paid' && $status === 'PAID') {
                 // Auto-create guest account if the reservation has no linked user
                 if (! $reservation->client_id) {
                     $guestUser = $this->ensureGuestAccount($payload, $reservation);
@@ -89,10 +94,12 @@ class XenditWebhookService
                     $reservation->only(['status', 'xendit_payment_status', 'client_id'])
                 );
 
-                // Send booking confirmation + receipt emails (outside the transaction is fine)
-                $this->emails->sendBookingConfirmation($reservation->load(['client', 'resort']));
-                $this->emails->sendPaymentReceipt($reservation);
-                $this->emails->sendNewBookingToResort($reservation);
+                $reservationForNotifications = $reservation->load(['client', 'resort']);
+                DB::afterCommit(function () use ($reservationForNotifications): void {
+                    $this->emails->sendBookingConfirmation($reservationForNotifications);
+                    $this->emails->sendPaymentReceipt($reservationForNotifications);
+                    $this->emails->sendNewBookingToResort($reservationForNotifications);
+                });
 
             } elseif (in_array($status, ['EXPIRED', 'FAILED'], true)) {
                 $oldValues = $reservation->only(['status', 'xendit_payment_status']);

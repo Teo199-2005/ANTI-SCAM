@@ -24,6 +24,9 @@ export type ResortItem = {
   address: string | null;
   contact_number: string | null;
   logo_url?: string | null;
+  background_image_url?: string | null;
+  representative_name?: string | null;
+  representative_contact_number?: string | null;
   is_publicly_listed: boolean;
   is_vip?: boolean;
   rooms_count?: number;
@@ -67,4 +70,29 @@ export async function updateResort(id: number | string, payload: Partial<ResortI
 
 export async function deleteResort(id: number | string) {
   await apiClient.delete(`/resorts/${id}`);
+}
+
+export async function ownerOnboardResort(payload: {
+  tenant_name: string;
+  resort_name: string;
+  subdomain: string;
+  address?: string;
+  contact_number?: string;
+  logo_url?: string;
+  description?: string;
+  plan?: "basic";
+  is_publicly_listed?: boolean;
+}) {
+  const { data } = await apiClient.post<ApiEnvelope<{ resort: ResortItem }>>("/resort-owner/onboard", payload);
+  return data.data;
+}
+
+export async function uploadOwnerResortLogo(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("logo", file);
+  const { data } = await apiClient.post<ApiEnvelope<{ logo_url: string }>>(
+    "/resort-owner/onboard/upload-logo",
+    form,
+  );
+  return data.data.logo_url;
 }

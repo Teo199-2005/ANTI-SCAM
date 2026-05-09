@@ -1,6 +1,7 @@
 "use client";
 
 import { demoAccounts } from "@/lib/auth/demoAccounts";
+import { useHydrated } from "@/hooks/useHydrated";
 import { ChevronDown, ChevronUp, FlaskConical, Loader2 } from "lucide-react";
 import { useState } from "react";
 
@@ -20,8 +21,12 @@ export default function DemoQuickLogin({ onLoginAs }: DemoQuickLoginProps) {
   const [open, setOpen] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  const hydrated = useHydrated();
 
   if (!showPanel) return null;
+
+  // Avoid hydrating <button> nodes that password-manager extensions mutate (e.g. fdprocessedid).
+  if (!hydrated) return null;
 
   const handleClick = async (id: string, email: string, password: string) => {
     if (busyId) return;
@@ -90,8 +95,9 @@ export default function DemoQuickLogin({ onLoginAs }: DemoQuickLoginProps) {
                         ? "!"
                         : acc.id === "admin" ? "A"
                           : acc.id === "owner" ? "O"
-                            : acc.id === "client" ? "G"
-                              : "U"}
+                            : acc.id === "marketing" ? "M"
+                              : acc.id === "client" ? "G"
+                                : "U"}
                   </span>
 
                   <span className="min-w-0 flex-1">
@@ -112,7 +118,10 @@ export default function DemoQuickLogin({ onLoginAs }: DemoQuickLoginProps) {
 
           <p className="mt-2.5 text-xs text-zinc-400">
             Passwords: <code className="rounded bg-zinc-100 px-1 font-mono text-zinc-700">password</code>
-            {" · "}Run <code className="rounded bg-zinc-100 px-1 font-mono text-zinc-700">php artisan db:seed</code> first
+            {" · "}If Marketing fails to login:{" "}
+            <code className="rounded bg-zinc-100 px-1 font-mono text-zinc-700">
+              php artisan db:seed --class=MarketingPartnerDemoSeeder
+            </code>
           </p>
         </div>
       )}

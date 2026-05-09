@@ -2,7 +2,7 @@ import { HERO_BANNER_INTRINSIC, images } from "@/lib/content/images";
 import Image from "next/image";
 
 /**
- * Landing hero: single full-width image only. Intrinsics 1942×809 — section uses the same aspect ratio
+ * Landing hero: single full-width image only. Intrinsics 1774×887 (`poster1.png`) — section uses the same aspect ratio
  * so the bitmap is not stretched or letterboxed.
  */
 export default function HeroSection() {
@@ -16,7 +16,7 @@ export default function HeroSection() {
     >
       <Image
         src={images.hero}
-        alt="Anti-Scam PH — Together, let's build a scam-free Philippines. Verify, check, protect. Anti booking scam of resorts."
+        alt="Anti-Scam PH — automate, protect, and grow your resort. Verified bookings and all-in-one platform for Philippine resorts."
         fill
         priority
         quality={100}

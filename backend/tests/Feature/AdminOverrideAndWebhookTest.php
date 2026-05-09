@@ -133,4 +133,73 @@ class AdminOverrideAndWebhookTest extends TestCase
             'xendit_payment_status' => 'paid',
         ]);
     }
+
+    public function test_xendit_webhook_rejects_when_token_not_configured(): void
+    {
+        config(['services.xendit.webhook_token' => '']);
+
+        $response = $this->postJson('/api/v1/webhooks/xendit/invoice', [
+            'id' => 'inv_test_401',
+            'status' => 'PAID',
+            'event' => 'invoice.paid',
+        ]);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_xendit_webhook_does_not_confirm_for_non_invoice_paid_event(): void
+    {
+        config(['services.xendit.webhook_token' => 'test-webhook-token']);
+
+        $tenant = Tenant::create([
+            'name' => 'Webhook Event Tenant',
+            'slug' => 'webhook-event-tenant',
+            'subdomain' => 'webhookevent',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Webhook Event Resort',
+            'is_publicly_listed' => true,
+        ]);
+
+        $room = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'name' => 'Webhook Event Room',
+            'code' => 'WER1',
+            'status' => 'active',
+            'base_price' => 1800,
+            'capacity' => 2,
+        ]);
+
+        Reservation::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'room_id' => $room->id,
+            'client_id' => null,
+            'reference_no' => 'RSV-WEBHOOK-EVENT-1',
+            'check_in_date' => now()->addDays(5)->toDateString(),
+            'check_out_date' => now()->addDays(6)->toDateString(),
+            'guest_count' => 1,
+            'reservation_fee' => 500,
+            'total_amount' => 1800,
+            'status' => 'pending_payment',
+            'xendit_invoice_id' => 'inv_test_event_123',
+            'xendit_payment_status' => 'pending',
+            'reserved_at' => now(),
+        ]);
+
+        $payload = ['id' => 'inv_test_event_123', 'status' => 'PAID', 'event' => 'invoice.created'];
+        $headers = ['x-callback-token' => 'test-webhook-token'];
+
+        $this->postJson('/api/v1/webhooks/xendit/invoice', $payload, $headers)->assertOk();
+
+        $this->assertDatabaseHas('reservations', [
+            'xendit_invoice_id' => 'inv_test_event_123',
+            'status' => 'pending_payment',
+            'xendit_payment_status' => 'pending',
+        ]);
+    }
 }

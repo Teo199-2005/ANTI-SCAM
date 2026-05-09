@@ -19,6 +19,9 @@ class Resort extends Model
         'address',
         'contact_number',
         'logo_url',
+        'background_image_url',
+        'representative_name',
+        'representative_contact_number',
         'is_publicly_listed',
         'is_vip',
     ];
@@ -44,5 +47,15 @@ class Resort extends Model
     public function subscription(): HasOne
     {
         return $this->hasOne(Subscription::class);
+    }
+
+    public function subscriptionInvoices(): HasMany
+    {
+        return $this->hasMany(SubscriptionInvoice::class);
+    }
+
+    public function landingPage(): HasOne
+    {
+        return $this->hasOne(ResortLandingPage::class);
     }
 }

@@ -15,9 +15,13 @@ use Illuminate\Support\Facades\Auth;
 class RoomService
 {
     public function __construct(private readonly \App\Modules\Subscriptions\Services\SubscriptionService $subscriptions) {}
-    public function list(int $perPage = 10, ?string $search = null, ?string $status = null): LengthAwarePaginator
+    public function list(int $perPage = 10, ?string $search = null, ?string $status = null, ?int $resortId = null): LengthAwarePaginator
     {
         $query = Room::query()->latest();
+
+        if ($resortId) {
+            $query->where('resort_id', $resortId);
+        }
 
         if ($search) {
             $query->where(function ($inner) use ($search): void {

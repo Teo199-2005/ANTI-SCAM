@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect width="48" height="48" rx="10" fill="#0F2A6E"/>
+  <!-- Wing/arch shapes representing UB logo -->
+  <path d="M12 30 Q24 10 36 30" stroke="#F5C518" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <path d="M16 34 Q24 16 32 34" stroke="#F5C518" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <text x="24" y="44" font-family="Arial,sans-serif" font-size="6.5" font-weight="700" fill="#F5C518" text-anchor="middle" letter-spacing="0.5">UnionBank</text>
+</svg>

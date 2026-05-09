@@ -30,6 +30,7 @@ class RoomController extends Controller
                 (int) $request->integer('perPage', 10),
                 $request->string('search')->value(),
                 $request->string('status')->value(),
+                $request->filled('resort_id') ? (int) $request->integer('resort_id') : null,
             )
         );
 

@@ -4,6 +4,8 @@ namespace App\Modules\Reservations\Services;
 
 use App\Models\BookingLock;
 use App\Models\Reservation;
+use App\Models\Resort;
+use App\Models\Room;
 use App\Modules\Audit\Services\AuditLogService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,11 +18,10 @@ class ReservationService
     public function createFromLock(array $payload): Reservation
     {
         return DB::transaction(function () use ($payload) {
-            $tenantId = (int) $payload['tenant_id'];
             $lockToken = (string) $payload['lock_token'];
+            $resortId = (int) $payload['resort_id'];
 
             $lock = BookingLock::query()
-                ->where('tenant_id', $tenantId)
                 ->where('lock_token', $lockToken)
                 ->lockForUpdate()
                 ->first();
@@ -29,6 +30,7 @@ class ReservationService
                 throw new RuntimeException('Invalid lock token.');
             }
 
+            $tenantId = (int) $lock->tenant_id;
             if ($lock->status !== 'locked') {
                 throw new RuntimeException('This lock is no longer active.');
             }
@@ -36,6 +38,25 @@ class ReservationService
             if ($lock->expires_at->isPast()) {
                 $lock->update(['status' => 'released']);
                 throw new RuntimeException('This lock has expired. Please reserve again.');
+            }
+
+            $resort = Resort::withoutGlobalScopes()
+                ->where('id', $resortId)
+                ->where('tenant_id', $tenantId)
+                ->first();
+            if (! $resort) {
+                throw new RuntimeException('Selected resort is invalid for this booking.');
+            }
+
+            $room = Room::withoutGlobalScopes()
+                ->where('id', $lock->room_id)
+                ->where('tenant_id', $tenantId)
+                ->first();
+            if (! $room) {
+                throw new RuntimeException('Selected room is invalid for this booking.');
+            }
+            if ((int) $room->resort_id !== $resortId) {
+                throw new RuntimeException('Selected room does not belong to the chosen resort.');
             }
 
             $hasConflict = Reservation::query()
@@ -61,7 +82,7 @@ class ReservationService
 
             $reservation = Reservation::create([
                 'tenant_id' => $tenantId,
-                'resort_id' => (int) $payload['resort_id'],
+                'resort_id' => $resortId,
                 'room_id' => $lock->room_id,
                 'client_id' => $payload['client_id'] ?? null,
                 'reference_no' => 'RSV-'.strtoupper(Str::random(10)),

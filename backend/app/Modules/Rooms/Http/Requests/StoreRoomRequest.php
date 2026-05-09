@@ -3,6 +3,7 @@
 namespace App\Modules\Rooms\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRoomRequest extends FormRequest
 {
@@ -13,8 +14,14 @@ class StoreRoomRequest extends FormRequest
 
     public function rules(): array
     {
+        $user = $this->user();
+        $resortRule = Rule::exists('resorts', 'id');
+        if ($user && $user->role !== 'admin') {
+            $resortRule = $resortRule->where(fn ($query) => $query->where('tenant_id', $user->tenant_id));
+        }
+
         return [
-            'resort_id' => ['required', 'exists:resorts,id'],
+            'resort_id' => ['required', 'integer', $resortRule],
             'name' => ['required', 'string', 'max:120'],
             'code' => ['nullable', 'string', 'max:40'],
             'capacity' => ['required', 'integer', 'min:1', 'max:50'],

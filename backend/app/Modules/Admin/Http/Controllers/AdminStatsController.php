@@ -8,6 +8,7 @@ use App\Models\Resort;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Shared\Traits\ApiResponseTrait;
+use Illuminate\Support\Facades\Cache;
 
 class AdminStatsController extends Controller
 {
@@ -15,31 +16,40 @@ class AdminStatsController extends Controller
 
     public function stats()
     {
-        $recentReservations = Reservation::withoutGlobalScopes()
-            ->with(['room:id,name', 'resort:id,name'])
-            ->latest()
-            ->limit(10)
-            ->get(['id', 'reference_no', 'status', 'check_in_date', 'check_out_date',
-                   'reservation_fee', 'total_amount', 'resort_id', 'room_id', 'created_at']);
+        $payload = Cache::remember('dashboard:admin_stats', now()->addSeconds(45), function () {
+            $recentReservations = Reservation::withoutGlobalScopes()
+                ->with(['room:id,name', 'resort:id,name'])
+                ->latest()
+                ->limit(10)
+                ->get(['id', 'reference_no', 'status', 'check_in_date', 'check_out_date',
+                    'reservation_fee', 'total_amount', 'resort_id', 'room_id', 'created_at']);
 
-        return $this->successResponse([
-            'totalResorts'           => Resort::withoutGlobalScopes()->count(),
-            'publicResorts'          => Resort::withoutGlobalScopes()->where('is_publicly_listed', true)->count(),
-            'suspendedResorts'       => Subscription::withoutGlobalScopes()->where('status', 'suspended')->count(),
-            'gracePeriodResorts'     => Subscription::withoutGlobalScopes()->where('status', 'grace_period')->count(),
-            'totalUsers'             => User::count(),
-            'newUsersThisWeek'       => User::where('created_at', '>=', now()->subDays(7))->count(),
-            'totalReservations'      => Reservation::withoutGlobalScopes()->count(),
-            'confirmedReservations'  => Reservation::withoutGlobalScopes()->where('status', 'confirmed')->count(),
-            'pendingPayment'         => Reservation::withoutGlobalScopes()->where('status', 'pending_payment')->count(),
-            'totalRevenue'           => (float) Reservation::withoutGlobalScopes()
-                                            ->where('status', 'confirmed')
-                                            ->sum('reservation_fee'),
-            'revenueThisMonth'       => (float) Reservation::withoutGlobalScopes()
-                                            ->where('status', 'confirmed')
-                                            ->where('created_at', '>=', now()->startOfMonth())
-                                            ->sum('reservation_fee'),
-            'recentReservations'     => $recentReservations,
-        ], 'Admin platform stats');
+            $reservationAgg = Reservation::withoutGlobalScopes()
+                ->selectRaw("
+                    COUNT(*) as total_reservations,
+                    SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_reservations,
+                    SUM(CASE WHEN status = 'pending_payment' THEN 1 ELSE 0 END) as pending_payment,
+                    SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as total_revenue,
+                    SUM(CASE WHEN status = 'confirmed' AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month
+                ", [now()->startOfMonth()])
+                ->first();
+
+            return [
+                'totalResorts'           => Resort::withoutGlobalScopes()->count(),
+                'publicResorts'          => Resort::withoutGlobalScopes()->where('is_publicly_listed', true)->count(),
+                'suspendedResorts'       => Subscription::withoutGlobalScopes()->where('status', 'suspended')->count(),
+                'gracePeriodResorts'     => Subscription::withoutGlobalScopes()->where('status', 'grace_period')->count(),
+                'totalUsers'             => User::count(),
+                'newUsersThisWeek'       => User::where('created_at', '>=', now()->subDays(7))->count(),
+                'totalReservations'      => (int) ($reservationAgg->total_reservations ?? 0),
+                'confirmedReservations'  => (int) ($reservationAgg->confirmed_reservations ?? 0),
+                'pendingPayment'         => (int) ($reservationAgg->pending_payment ?? 0),
+                'totalRevenue'           => (float) ($reservationAgg->total_revenue ?? 0),
+                'revenueThisMonth'       => (float) ($reservationAgg->revenue_this_month ?? 0),
+                'recentReservations'     => $recentReservations,
+            ];
+        });
+
+        return $this->successResponse($payload, 'Admin platform stats');
     }
 }

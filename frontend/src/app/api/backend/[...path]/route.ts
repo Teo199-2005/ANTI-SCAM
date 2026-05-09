@@ -23,28 +23,38 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
   const search = req.nextUrl.searchParams.toString();
   const targetUrl = `${BACKEND}${targetPath}${search ? `?${search}` : ""}`;
 
-  const isFormData = req.headers.get("content-type")?.includes("multipart/form-data");
+  const reqContentType = req.headers.get("content-type") ?? "";
+  const isMultipart = reqContentType.includes("multipart/form-data");
 
   const forwardHeaders: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     Accept: "application/json",
   };
 
-  if (!isFormData) {
-    forwardHeaders["Content-Type"] = req.headers.get("content-type") ?? "application/json";
+  // Preserve multipart boundary by forwarding the original content-type.
+  // Reconstructing formData() in the proxy can corrupt file uploads.
+  if (reqContentType && !["GET", "HEAD"].includes(req.method)) {
+    forwardHeaders["Content-Type"] = reqContentType;
   }
 
   let body: BodyInit | null = null;
   if (!["GET", "HEAD"].includes(req.method)) {
-    body = isFormData ? await req.formData() : await req.text();
+    body = isMultipart ? req.body : await req.text();
   }
 
   let backendRes: Response;
   try {
-    backendRes = await fetch(targetUrl, {
+    const fetchInit: RequestInit & { duplex?: "half" } = {
       method: req.method,
       headers: forwardHeaders,
       body: body ?? undefined,
+    };
+    if (isMultipart && body) {
+      fetchInit.duplex = "half";
+    }
+
+    backendRes = await fetch(targetUrl, {
+      ...fetchInit,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Backend unreachable.";

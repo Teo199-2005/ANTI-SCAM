@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 type Step = "auth" | "confirm" | "paying";
 
@@ -31,6 +32,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
 
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
+  const [roomError, setRoomError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(user ? "confirm" : "auth");
 
   // Auth form fields
@@ -53,12 +55,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
 
   useEffect(() => {
     const load = async () => {
-      if (!roomId) return;
+      if (!roomId) {
+        setRoomError("Missing room selection. Please choose a room again.");
+        setLoadingRoom(false);
+        return;
+      }
       try {
         const r = await getPublicRoom(Number(roomId));
         setRoom(r);
       } catch {
-        // room load failed
+        setRoomError("Unable to load room details. Please try again.");
       } finally {
         setLoadingRoom(false);
       }
@@ -79,7 +85,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
     setAuthPending(true);
     try {
       if (authMode === "register") {
-        await register({ name, email, password, password_confirmation: password });
+        await register({
+          name,
+          email,
+          role_intent: "client",
+          password,
+          password_confirmation: password,
+        });
       } else {
         await login(email, password);
       }
@@ -94,6 +106,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
   const onBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (redirecting.current) return;
+    if (!room || !roomId || !checkIn || !checkOut || nights <= 0) {
+      setBookingError("Booking details are incomplete. Please reselect your room and dates.");
+      return;
+    }
     setBookingError(null);
     setBooking(true);
     setStep("paying");
@@ -276,7 +292,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
 
               <button
                 type="submit"
-                disabled={booking}
+                disabled={booking || !room || !roomId || !checkIn || !checkOut || nights <= 0}
                 className="cl-btn-primary w-full disabled:opacity-60 disabled:pointer-events-none"
               >
                 {booking ? (
@@ -328,7 +344,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-zinc-600">Room details unavailable.</p>
+              <div className="space-y-2 text-sm text-zinc-600">
+                <p>{roomError ?? "Room details unavailable."}</p>
+                <div className="flex gap-2">
+                  <Link href={`/resorts/${resortId}`} className="cl-btn-secondary">
+                    Back to resort
+                  </Link>
+                  <Link href="/resorts" className="cl-btn-secondary">
+                    Browse resorts
+                  </Link>
+                </div>
+              </div>
             )}
           </div>
 

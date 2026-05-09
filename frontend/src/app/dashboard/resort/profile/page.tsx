@@ -2,8 +2,31 @@
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
 import { useToast } from "@/components/shared/ToastProvider";
-import { listResorts, updateResort } from "@/lib/api/resort";
-import { Building2 } from "lucide-react";
+import { listResorts, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
+import { getOwnerLandingPage, uploadBgImage } from "@/lib/api/landingPage";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiClient } from "@/lib/api/client";
+import { laravelPublicUrl } from "@/lib/publicAsset";
+import {
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  Upload,
+  User,
+  UserRoundCheck,
+  Waves,
+  XCircle,
+} from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type FormState = {
@@ -13,30 +36,89 @@ type FormState = {
   address: string;
   contact_number: string;
   is_publicly_listed: boolean;
-  check_in_time: string;
-  check_out_time: string;
   cancellation_policy: string;
   amenities: string;
+  logo_url: string;
+  background_image_url: string;
+  owner_name: string;
+  owner_contact_number: string;
+  representative_name: string;
+  representative_email: string;
+  representative_contact_number: string;
 };
 
+/** Required for the auto-generated landing page */
+const REQUIRED_FOR_LANDING: Array<{ key: keyof FormState; label: string }> = [
+  { key: "name", label: "Resort name" },
+  { key: "address", label: "Address" },
+  { key: "contact_number", label: "Contact number" },
+  { key: "logo_url", label: "Resort logo" },
+  { key: "background_image_url", label: "Background image" },
+];
+
+function RequiredBadge() {
+  return <span className="ml-1 text-rose-500">*</span>;
+}
+
 export default function ResortProfilePage() {
+  const { user, refreshUser } = useAuth();
   const { pushToast } = useToast();
   const [form, setForm] = useState<FormState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBg, setUploadingBg] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subdomain, setSubdomain] = useState<string | null>(null);
+
+  const publicLink = (() => {
+    if (!subdomain || typeof window === "undefined") return "";
+    const { protocol, hostname, port } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${subdomain}.localhost${port ? `:${port}` : ""}`;
+    }
+    const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim();
+    if (root) return `${protocol}//${subdomain}.${root}`;
+    return `${protocol}//${subdomain}.localhost${port ? `:${port}` : ""}`;
+  })();
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const resorts = await listResorts({ perPage: 10 });
-        const first = resorts.data[0];
+        let resorts = await listResorts({ perPage: 10 });
+        let first = resorts.data[0];
         if (!first) {
-          setError("No resort assigned to this account.");
-          return;
+          if (user?.role === "resort_owner") {
+            const ownerLabel = (user.name ?? "Resort Owner").trim();
+            const onboarding = await ownerOnboardResort({
+              tenant_name: ownerLabel,
+              resort_name: `${ownerLabel}'s Resort`,
+              is_publicly_listed: false,
+            });
+            first = onboarding?.resort ?? null;
+            await refreshUser();
+            if (!first) {
+              resorts = await listResorts({ perPage: 10 });
+              first = resorts.data[0];
+            }
+          }
+          if (!first) {
+            setError("No resort assigned to this account.");
+            return;
+          }
         }
         const raw = first as Record<string, unknown>;
+
+        let ownerSubdomain: string | null = null;
+        try {
+          const landing = await getOwnerLandingPage();
+          ownerSubdomain = landing.subdomain ?? null;
+        } catch {
+          // keep null
+        }
+        setSubdomain(ownerSubdomain);
+
         setForm({
           id: first.id,
           name: first.name,
@@ -44,12 +126,17 @@ export default function ResortProfilePage() {
           address: first.address ?? "",
           contact_number: first.contact_number ?? "",
           is_publicly_listed: first.is_publicly_listed,
-          check_in_time: (raw.check_in_time as string) ?? "14:00",
-          check_out_time: (raw.check_out_time as string) ?? "12:00",
           cancellation_policy: (raw.cancellation_policy as string) ?? "",
           amenities: Array.isArray(raw.amenities)
             ? (raw.amenities as string[]).join(", ")
             : ((raw.amenities as string) ?? ""),
+          logo_url: first.logo_url ?? "",
+          background_image_url: (raw.background_image_url as string) ?? "",
+          owner_name: user?.name ?? "",
+          owner_contact_number: user?.phone ?? "",
+          representative_name: (raw.representative_name as string) ?? "",
+          representative_email: user?.email ?? "",
+          representative_contact_number: (raw.representative_contact_number as string) ?? "",
         });
         setError(null);
       } catch (err) {
@@ -59,7 +146,7 @@ export default function ResortProfilePage() {
       }
     };
     void load();
-  }, []);
+  }, [refreshUser, user?.email, user?.name, user?.phone, user?.role]);
 
   if (loading) {
     return <div className="dash-card p-8 text-center text-zinc-600">Loading resort profile…</div>;
@@ -67,13 +154,20 @@ export default function ResortProfilePage() {
 
   if (!form || error) {
     return (
-      <div className="dash-card border-rose-200/80 bg-rose-50/90 p-8 text-rose-800">{error ?? "Resort profile unavailable."}</div>
+      <div className="dash-card border-rose-200/80 bg-rose-50/90 p-8 text-rose-800">
+        {error ?? "Resort profile unavailable."}
+      </div>
     );
   }
 
   const onChange = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
+
+  // Compute missing required fields for landing page hint
+  const missingLandingFields = REQUIRED_FOR_LANDING.filter((f) => !form[f.key]);
+  const landingReady = missingLandingFields.length === 0;
+  const emailVerified = Boolean(user?.email_verified_at);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,19 +178,27 @@ export default function ResortProfilePage() {
         description: form.description || null,
         address: form.address || null,
         contact_number: form.contact_number || null,
+        logo_url: form.logo_url || null,
+        background_image_url: form.background_image_url || null,
+        representative_name: form.representative_name || null,
+        representative_contact_number: form.representative_contact_number || null,
         is_publicly_listed: form.is_publicly_listed,
-        check_in_time: form.check_in_time || null,
-        check_out_time: form.check_out_time || null,
         cancellation_policy: form.cancellation_policy || null,
         amenities: form.amenities
           ? form.amenities.split(",").map((s) => s.trim()).filter(Boolean)
           : [],
       } as Parameters<typeof updateResort>[1]);
+      await apiClient.patch("/auth/profile", {
+        name: form.owner_name,
+        email: form.representative_email,
+        phone: form.owner_contact_number || null,
+      });
+      await refreshUser();
       pushToast({ title: "Resort profile saved", description: "Your property details were updated.", tone: "success" });
     } catch (err) {
       pushToast({
         title: "Save failed",
-        description: "We couldn’t update the resort profile. Try again.",
+        description: parseApiErrorMessage(err, "We couldn't update the resort profile. Try again."),
         tone: "error",
       });
     } finally {
@@ -104,103 +206,351 @@ export default function ResortProfilePage() {
     }
   };
 
+  const onLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !form) return;
+    setUploadingLogo(true);
+    try {
+      const logoUrl = await uploadOwnerResortLogo(file);
+      setForm({ ...form, logo_url: logoUrl });
+      pushToast({ title: "Logo uploaded", description: "Save profile to keep this logo.", tone: "success" });
+    } catch (err) {
+      pushToast({
+        title: "Logo upload failed",
+        description: parseApiErrorMessage(err, "Please try another image."),
+        tone: "error",
+      });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const onBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !form) return;
+    setUploadingBg(true);
+    try {
+      const url = await uploadBgImage(file);
+      setForm({ ...form, background_image_url: url });
+      pushToast({ title: "Background image uploaded", description: "Profile will update on save.", tone: "success" });
+    } catch (err) {
+      pushToast({
+        title: "Upload failed",
+        description: parseApiErrorMessage(err, "Please try another image."),
+        tone: "error",
+      });
+    } finally {
+      setUploadingBg(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!publicLink) {
+      pushToast({ title: "Link unavailable", description: "Subdomain not found yet.", tone: "error" });
+      return;
+    }
+    await navigator.clipboard.writeText(publicLink);
+    pushToast({ title: "Copied", description: "Resort link copied to clipboard.", tone: "success" });
+  };
+
   return (
     <form className="space-y-6" onSubmit={onSubmit}>
       <div className="dash-card p-6 lg:p-8">
-        <h1 className="dash-page-title inline-flex items-center gap-2">
-          <Building2 size={24} className="text-skyBlue" />
-          Resort profile
-        </h1>
-        <p className="dash-page-sub">Update your property details shown to staff and used for reservation operations.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="dash-page-title inline-flex items-center gap-2">
+            <Building2 size={24} className="text-skyBlue" />
+            Resort profile
+          </h1>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+              emailVerified
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-rose-200 bg-rose-50 text-rose-700"
+            }`}
+          >
+            {emailVerified ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+            {emailVerified ? "Email verified" : "Email not verified"}
+          </span>
+        </div>
+        <p className="dash-page-sub">Update your property details. Fields marked <span className="text-rose-500">*</span> are required for your landing page.</p>
       </div>
+
+      {/* Landing page readiness hint */}
+      {!landingReady && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Your landing page is missing: <strong>{missingLandingFields.map((f) => f.label).join(", ")}</strong>.{" "}
+            Fill these in and save to unlock your public page.
+          </span>
+        </div>
+      )}
+      {landingReady && (
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 size={16} className="shrink-0" />
+          <span>
+            Your profile has all required fields for the landing page.{" "}
+            {publicLink && (
+              <a href={publicLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">
+                View live page <ExternalLink size={12} />
+              </a>
+            )}
+          </span>
+        </div>
+      )}
+      {!emailVerified && (
+        <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <XCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Your email is not verified yet. Dashboard access for resort owners and marketing partners is blocked until OTP
+            verification is completed.
+          </span>
+        </div>
+      )}
 
       {/* Basic info */}
       <div className="dash-card space-y-4 p-6 lg:p-8">
-        <h2 className="font-dash text-lg text-navy">Basic information</h2>
-        <div>
-          <label htmlFor="resort-name" className="mb-1.5 block text-xs font-semibold text-zinc-600">Resort name</label>
-          <input
-            id="resort-name"
-            className="dash-input"
-            value={form.name}
-            onChange={(e) => onChange("name", e.target.value)}
-            placeholder="Resort name"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="resort-description" className="mb-1.5 block text-xs font-semibold text-zinc-600">Description</label>
-          <textarea
-            id="resort-description"
-            className="dash-input h-24 resize-none"
-            value={form.description}
-            onChange={(e) => onChange("description", e.target.value)}
-            placeholder="Describe your resort"
-          />
-        </div>
-        <div>
-          <label htmlFor="resort-address" className="mb-1.5 block text-xs font-semibold text-zinc-600">Address</label>
-          <input
-            id="resort-address"
-            className="dash-input"
-            value={form.address}
-            onChange={(e) => onChange("address", e.target.value)}
-            placeholder="Full address"
-          />
-        </div>
-        <div>
-          <label htmlFor="resort-contact" className="mb-1.5 block text-xs font-semibold text-zinc-600">Contact number</label>
-          <input
-            id="resort-contact"
-            className="dash-input"
-            value={form.contact_number}
-            onChange={(e) => onChange("contact_number", e.target.value)}
-            placeholder="+63 917 000 0000"
-          />
-        </div>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-zinc-700">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-softBorder bg-softCard text-skyBlue focus:ring-skyBlue/40"
-            checked={form.is_publicly_listed}
-            onChange={(e) => onChange("is_publicly_listed", e.target.checked)}
-          />
-          Publicly listed on platform
-        </label>
-      </div>
+        <h2 className="inline-flex items-center gap-2 font-dash text-lg text-navy">
+          <FileText size={16} className="text-skyBlue" />
+          Basic information
+        </h2>
 
-      {/* Check-in / check-out */}
-      <div className="dash-card space-y-4 p-6 lg:p-8">
-        <h2 className="font-dash text-lg text-navy">Check-in &amp; check-out</h2>
+        {/* Logo + Background image row */}
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="check-in-time" className="mb-1.5 block text-xs font-semibold text-zinc-600">Check-in time</label>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <ImageIcon size={13} className="text-zinc-500" />
+              Resort logo <RequiredBadge />
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              {form.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={laravelPublicUrl(form.logo_url)} alt="Resort logo" className="h-16 w-16 rounded-xl border border-softBorder object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 text-xs text-rose-400">
+                  No logo
+                </div>
+              )}
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-softBorder bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+                <Upload size={14} />
+                {uploadingLogo ? "Uploading..." : "Upload logo"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploadingLogo} onChange={onLogoUpload} />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <ImageIcon size={13} className="text-zinc-500" />
+              Hero background image <RequiredBadge />
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              {form.background_image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={laravelPublicUrl(form.background_image_url)} alt="Background" className="h-16 w-28 rounded-xl border border-softBorder object-cover" />
+              ) : (
+                <div className="flex h-16 w-28 items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 text-xs text-rose-400">
+                  No image
+                </div>
+              )}
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-softBorder bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+                <Upload size={14} />
+                {uploadingBg ? "Uploading..." : "Upload image"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploadingBg} onChange={onBgUpload} />
+              </label>
+            </div>
+            <p className="mt-1.5 text-xs text-zinc-500">Used as the full-width hero background on your landing page.</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="resort-name" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <Building2 size={13} className="text-zinc-500" />
+              Resort name <RequiredBadge />
+            </label>
             <input
-              id="check-in-time"
-              type="time"
+              id="resort-name"
               className="dash-input"
-              value={form.check_in_time}
-              onChange={(e) => onChange("check_in_time", e.target.value)}
+              value={form.name}
+              onChange={(e) => onChange("name", e.target.value)}
+              placeholder="Resort name"
+              required
             />
           </div>
           <div>
-            <label htmlFor="check-out-time" className="mb-1.5 block text-xs font-semibold text-zinc-600">Check-out time</label>
+            <label htmlFor="resort-contact" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <Phone size={13} className="text-zinc-500" />
+              Contact number <RequiredBadge />
+            </label>
             <input
-              id="check-out-time"
-              type="time"
+              id="resort-contact"
               className="dash-input"
-              value={form.check_out_time}
-              onChange={(e) => onChange("check_out_time", e.target.value)}
+              value={form.contact_number}
+              onChange={(e) => onChange("contact_number", e.target.value)}
+              placeholder="0917-874-4889"
             />
           </div>
+          <div className="md:col-span-2">
+            <label htmlFor="resort-address" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <MapPin size={13} className="text-zinc-500" />
+              Address <RequiredBadge />
+              <span className="ml-1.5 font-normal text-zinc-400">(used to generate Google Maps on your landing page)</span>
+            </label>
+            <input
+              id="resort-address"
+              className="dash-input"
+              value={form.address}
+              onChange={(e) => onChange("address", e.target.value)}
+              placeholder="Full address e.g. 123 Beach Rd, Palawan, Philippines"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="resort-description" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <FileText size={13} className="text-zinc-500" />
+              Description
+            </label>
+            <textarea
+              id="resort-description"
+              className="dash-input h-24 resize-none"
+              value={form.description}
+              onChange={(e) => onChange("description", e.target.value)}
+              placeholder="Describe your resort (shown in About section on landing page)"
+            />
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-zinc-700 md:col-span-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-softBorder bg-softCard text-skyBlue focus:ring-skyBlue/40"
+              checked={form.is_publicly_listed}
+              onChange={(e) => onChange("is_publicly_listed", e.target.checked)}
+            />
+            <Waves size={14} className="text-zinc-500" />
+            Publicly listed on platform
+          </label>
+        </div>
+      </div>
+
+      {/* Owner / representative */}
+      <div className="dash-card space-y-4 p-6 lg:p-8">
+        <h2 className="inline-flex items-center gap-2 font-dash text-lg text-navy">
+          <UserRoundCheck size={16} className="text-skyBlue" />
+          Owner &amp; representative
+        </h2>
+        <p className="text-xs text-zinc-500">These details appear in the footer of your public landing page.</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <User size={13} className="text-zinc-500" />
+              Owner name
+            </label>
+            <input
+              className="dash-input"
+              value={form.owner_name}
+              onChange={(e) => onChange("owner_name", e.target.value)}
+              placeholder="Owner name"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <Phone size={13} className="text-zinc-500" />
+              Owner contact number
+            </label>
+            <input
+              className="dash-input"
+              value={form.owner_contact_number}
+              onChange={(e) => onChange("owner_contact_number", e.target.value)}
+              placeholder="09xx xxx xxxx"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <User size={13} className="text-zinc-500" />
+              Representative name
+            </label>
+            <input
+              className="dash-input"
+              value={form.representative_name}
+              onChange={(e) => onChange("representative_name", e.target.value)}
+              placeholder="Representative name"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <Mail size={13} className="text-zinc-500" />
+              Contact email
+              {emailVerified ? (
+                <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                  <CheckCircle2 size={10} />
+                  Verified
+                </span>
+              ) : (
+                <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                  <XCircle size={10} />
+                  Unverified
+                </span>
+              )}
+            </label>
+            <input
+              type="email"
+              className="dash-input"
+              value={form.representative_email}
+              onChange={(e) => onChange("representative_email", e.target.value)}
+              placeholder="contact@example.com"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <Phone size={13} className="text-zinc-500" />
+              Representative contact number
+            </label>
+            <input
+              className="dash-input"
+              value={form.representative_contact_number}
+              onChange={(e) => onChange("representative_contact_number", e.target.value)}
+              placeholder="09xx xxx xxxx"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Resort public link */}
+      <div className="dash-card space-y-4 p-6 lg:p-8">
+        <h2 className="inline-flex items-center gap-2 font-dash text-lg text-navy">
+          <LinkIcon size={16} className="text-skyBlue" />
+          Resort public link
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            className="dash-input min-w-[280px] flex-1"
+            value={publicLink}
+            readOnly
+            placeholder="Subdomain link will appear here"
+          />
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="inline-flex items-center gap-2 rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <Copy size={14} />
+            Copy link
+          </button>
         </div>
       </div>
 
       {/* Cancellation policy */}
       <div className="dash-card space-y-4 p-6 lg:p-8">
-        <h2 className="font-dash text-lg text-navy">Cancellation policy</h2>
+        <h2 className="inline-flex items-center gap-2 font-dash text-lg text-navy">
+          <ShieldCheck size={16} className="text-skyBlue" />
+          Cancellation policy
+        </h2>
         <div>
-          <label htmlFor="cancellation-policy" className="mb-1.5 block text-xs font-semibold text-zinc-600">Policy description</label>
+          <label htmlFor="cancellation-policy" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+            <FileText size={13} className="text-zinc-500" />
+            Policy description
+          </label>
           <textarea
             id="cancellation-policy"
             className="dash-input h-24 resize-none"
@@ -213,9 +563,15 @@ export default function ResortProfilePage() {
 
       {/* Amenities */}
       <div className="dash-card space-y-4 p-6 lg:p-8">
-        <h2 className="font-dash text-lg text-navy">Amenities</h2>
+        <h2 className="inline-flex items-center gap-2 font-dash text-lg text-navy">
+          <Waves size={16} className="text-skyBlue" />
+          Amenities
+        </h2>
         <div>
-          <label htmlFor="resort-amenities" className="mb-1.5 block text-xs font-semibold text-zinc-600">Amenities (comma-separated)</label>
+          <label htmlFor="resort-amenities" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+            <Waves size={13} className="text-zinc-500" />
+            Amenities (comma-separated)
+          </label>
           <input
             id="resort-amenities"
             className="dash-input"
@@ -240,8 +596,18 @@ export default function ResortProfilePage() {
         <button type="submit" disabled={saving} className="dash-btn-primary disabled:opacity-50">
           {saving ? "Saving…" : "Save profile"}
         </button>
+        {publicLink ? (
+          <a
+            href={publicLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <ExternalLink size={14} />
+            View landing page
+          </a>
+        ) : null}
       </div>
     </form>
   );
 }
-

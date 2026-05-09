@@ -2,70 +2,264 @@
 
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
-import { getResortStats } from "@/lib/api/dashboard";
-import { apiClient } from "@/lib/api/client";
+import {
+  getResortRevenueAnalytics,
+  type ResortRevenueAnalyticsPayload,
+  type ResortRevenueFilterPeriod,
+  type ResortRevenueFilters,
+} from "@/lib/api/dashboard";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
-import { BadgeDollarSign, CalendarCheck2, Loader2, ReceiptText, RefreshCw, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { laravelPublicUrl } from "@/lib/publicAsset";
+import { jsPDF } from "jspdf";
+import {
+  BadgeDollarSign,
+  CalendarCheck2,
+  Download,
+  Filter,
+  Loader2,
+  ReceiptText,
+  RefreshCw,
+  RotateCcw,
+  TrendingUp,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-type MonthlyBreakdown = {
-  month: string;
-  year: number;
-  reservations: number;
-  confirmed: number;
-  grossBookings: number;
-  feesCollected: number;
-};
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
-type ApiEnvelope<T> = { success: boolean; data: T };
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
+const WEEK_OPTIONS = Array.from({ length: 53 }, (_, i) => i + 1);
 
 export default function ResortRevenuePage() {
   const [loading, setLoading] = useState(true);
-  const [totals, setTotals] = useState({
-    totalReservationFees: 0,
-    totalGrossBookings: 0,
-    revenueThisMonth: 0,
-    totalConfirmed: 0,
-    totalPending: 0,
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [payload, setPayload] = useState<ResortRevenueAnalyticsPayload | null>(null);
+  const [filters, setFilters] = useState<ResortRevenueFilters>({
+    period: "monthly",
+    year: CURRENT_YEAR,
+    month: "",
+    week: "",
   });
-  const [breakdown, setBreakdown] = useState<MonthlyBreakdown[]>([]);
-  const [monthlyError, setMonthlyError] = useState<string | null>(null);
+  const [applied, setApplied] = useState<ResortRevenueFilters>({
+    period: "monthly",
+    year: CURRENT_YEAR,
+    month: "",
+    week: "",
+  });
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = async (f: ResortRevenueFilters) => {
     setLoading(true);
     setError(null);
     try {
-      const stats = await getResortStats();
-      setTotals({
-        totalReservationFees: stats.totalReservationFees ?? 0,
-        totalGrossBookings:   stats.totalGrossBookings ?? 0,
-        revenueThisMonth:     stats.revenueThisMonth ?? 0,
-        totalConfirmed:       stats.totalConfirmed ?? 0,
-        totalPending:         stats.totalPending ?? 0,
-      });
-
-      try {
-        const { data } = await apiClient.get<ApiEnvelope<MonthlyBreakdown[]>>("/resort/revenue/monthly");
-        setBreakdown(Array.isArray(data.data) ? data.data : []);
-        setMonthlyError(null);
-      } catch (err: unknown) {
-        setBreakdown([]);
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        setMonthlyError(
-          status === 404
-            ? "Monthly breakdown endpoint is not available yet."
-            : "Could not load monthly breakdown right now.",
-        );
-      }
-    } catch (err) {
+      const data = await getResortRevenueAnalytics(f);
+      setPayload(data);
+    } catch {
       setError("Failed to load revenue data.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(applied); }, [applied]);
+
+  const totals = useMemo(() => ({
+    totalReservationFees: payload?.summary.totalReservationFees ?? 0,
+    totalGrossBookings: payload?.summary.totalGrossBookings ?? 0,
+    revenueThisMonth: payload?.summary.revenueThisMonth ?? 0,
+    totalConfirmed: payload?.summary.totalConfirmed ?? 0,
+    totalPending: payload?.summary.totalPending ?? 0,
+  }), [payload]);
+
+  const breakdown = Array.isArray(payload?.series) ? payload.series : [];
+
+  const applyFilters = () => {
+    const next: ResortRevenueFilters = { ...filters };
+    if (next.period !== "monthly") next.month = "";
+    if (next.period !== "weekly") next.week = "";
+    if (next.period !== "custom") {
+      next.from = "";
+      next.to = "";
+    }
+    setApplied(next);
+  };
+
+  const resetFilters = () => {
+    const next: ResortRevenueFilters = {
+      period: "monthly",
+      year: CURRENT_YEAR,
+      month: "",
+      week: "",
+      from: "",
+      to: "",
+    };
+    setFilters(next);
+    setApplied(next);
+  };
+
+  const handleExportPdf = async () => {
+    if (!payload) return;
+    setExportingPdf(true);
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [210, 297], // explicit A4 size
+      });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const left = 12;
+      const right = pageWidth - 12;
+      let y = 12;
+      const fmtMoney = (value: number) => `PHP ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const drawFooter = (pageNum: number) => {
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.15);
+        doc.line(left, pageHeight - 14, right, pageHeight - 14);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(7.5);
+        doc.text("Anti-Scam PH · Revenue Report", left, pageHeight - 11);
+        doc.setFontSize(6.8);
+        const disclaimer = doc.splitTextToSize(
+          "Anti-Scam PH is a product and service operated by The Rising 2 Brothers OPC.",
+          right - left - 22,
+        );
+        doc.text(disclaimer, left, pageHeight - 8, { lineHeightFactor: 1.15 });
+        doc.setFontSize(7.5);
+        doc.text(`Page ${pageNum}`, right, pageHeight - 3.5, { align: "right" });
+      };
+      const drawTableHeader = (top: number) => {
+        doc.setDrawColor(0, 0, 0);
+        doc.setFillColor(245, 245, 245);
+        doc.rect(left, top, right - left, 8, "FD");
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.text("Date", left + 2, top + 5.2);
+        doc.text("Reservations", left + 38, top + 5.2);
+        doc.text("Confirmed", left + 72, top + 5.2);
+        doc.text("Fees", left + 98, top + 5.2);
+        doc.text("Gross", left + 144, top + 5.2);
+      };
+      const drawWatermark = () => {
+        doc.saveGraphicsState();
+        doc.setTextColor(180, 180, 180);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(38);
+        doc.text("ANTI-SCAM PH", pageWidth / 2, pageHeight / 2, { angle: 28, align: "center" });
+        doc.restoreGraphicsState();
+      };
+
+      let logoDataUrl: string | null = null;
+      if (payload.resort.logo_url) {
+        try {
+          const logoUrl = laravelPublicUrl(payload.resort.logo_url);
+          const res = await fetch(logoUrl, { mode: "cors" });
+          const blob = await res.blob();
+          logoDataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          logoDataUrl = null;
+        }
+      }
+
+      // Header (black & white)
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(0, 0, 0);
+      doc.rect(left, y, right - left, 24, "S");
+      if (logoDataUrl) {
+        doc.addImage(logoDataUrl, "PNG", left + 3, y + 4, 14, 14);
+      }
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text(payload.resort.name || "Resort Revenue Report", logoDataUrl ? left + 20 : left + 3, y + 9);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text("Anti-Scam PH - Revenue Analytics Report", logoDataUrl ? left + 20 : left + 3, y + 15);
+      doc.text(`Period: ${applied.period.toUpperCase()}`, right - 2, y + 9, { align: "right" });
+      doc.text(`Generated: ${new Date().toLocaleString()}`, right - 2, y + 15, { align: "right" });
+      y += 30;
+
+      drawWatermark();
+
+      // Summary cards (black/white)
+      const cardW = (right - left - 6) / 2;
+      const drawKpi = (x: number, top: number, label: string, value: string) => {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(0, 0, 0);
+        doc.rect(x, top, cardW, 18, "S");
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.text(label, x + 3, top + 6);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text(value, x + 3, top + 13);
+      };
+      drawKpi(left, y, "Fees Collected", fmtMoney(totals.totalReservationFees));
+      drawKpi(left + cardW + 6, y, "Gross Bookings", fmtMoney(totals.totalGrossBookings));
+      y += 21;
+      drawKpi(left, y, "Revenue This Month", fmtMoney(totals.revenueThisMonth));
+      drawKpi(left + cardW + 6, y, "Confirmed / Pending", `${totals.totalConfirmed} / ${totals.totalPending}`);
+      y += 24;
+
+      // Table
+      drawTableHeader(y);
+      y += 11;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(0, 0, 0);
+      let pageNum = 1;
+
+      for (const row of breakdown) {
+        if (y > pageHeight - 18) {
+          drawFooter(pageNum);
+          doc.addPage();
+          pageNum += 1;
+          drawWatermark();
+          y = 16;
+          drawTableHeader(y);
+          y += 11;
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(0, 0, 0);
+        }
+        doc.setDrawColor(0, 0, 0);
+        doc.line(left, y + 0.8, right, y + 0.8);
+        doc.text(row.date, left + 2, y + 4.7);
+        doc.text(String(row.reservations), left + 47, y + 4.7);
+        doc.text(String(row.confirmed), left + 79, y + 4.7);
+        doc.text(fmtMoney(Number(row.feesCollected)), left + 100, y + 4.7);
+        doc.text(fmtMoney(Number(row.grossBookings)), left + 145, y + 4.7);
+        y += 7;
+      }
+      drawFooter(pageNum);
+
+      const fileDate = new Date().toISOString().slice(0, 10);
+      const fileName = `${(payload.resort.name || "resort").replace(/\s+/g, "-").toLowerCase()}-revenue-${fileDate}.pdf`;
+
+      // Use Blob download to avoid file:// navigation issues on some browsers.
+      const pdfBlob = doc.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const kpis = [
     {
@@ -111,10 +305,113 @@ export default function ResortRevenuePage() {
           </h1>
           <p className="dash-page-sub">Overview of all reservation revenue for this resort.</p>
         </div>
-        <button onClick={() => void load()} disabled={loading} className="dash-btn-sm disabled:opacity-60">
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => void load(applied)} disabled={loading} className="dash-btn-sm disabled:opacity-60">
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportPdf()}
+            disabled={loading || exportingPdf || !payload}
+            className="dash-btn-primary disabled:opacity-60"
+          >
+            {exportingPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            Export PDF
+          </button>
+        </div>
       </div>
+
+      <DashCard className="p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Filter size={15} className="text-skyBlue" />
+          <span className="text-sm font-semibold text-navy">Revenue Filters</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Period</label>
+            <select
+              className="dash-input w-full"
+              value={filters.period}
+              onChange={(e) => setFilters((f) => ({ ...f, period: e.target.value as ResortRevenueFilterPeriod }))}
+            >
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+              <option value="custom">Custom date range</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Year</label>
+            <select
+              className="dash-input w-full"
+              value={filters.year ?? CURRENT_YEAR}
+              onChange={(e) => setFilters((f) => ({ ...f, year: Number(e.target.value) }))}
+            >
+              {YEAR_OPTIONS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Month</label>
+            <select
+              className="dash-input w-full"
+              disabled={filters.period !== "monthly"}
+              value={filters.month ?? ""}
+              onChange={(e) => setFilters((f) => ({ ...f, month: e.target.value ? Number(e.target.value) : "" }))}
+            >
+              <option value="">All months</option>
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Week</label>
+            <select
+              className="dash-input w-full"
+              disabled={filters.period !== "weekly"}
+              value={filters.week ?? ""}
+              onChange={(e) => setFilters((f) => ({ ...f, week: e.target.value ? Number(e.target.value) : "" }))}
+            >
+              <option value="">Current week</option>
+              {WEEK_OPTIONS.map((w) => (
+                <option key={w} value={w}>Week {w}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">From</label>
+              <input
+                type="date"
+                className="dash-input w-full"
+                disabled={filters.period !== "custom"}
+                value={filters.from ?? ""}
+                onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">To</label>
+              <input
+                type="date"
+                className="dash-input w-full"
+                disabled={filters.period !== "custom"}
+                value={filters.to ?? ""}
+                onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button type="button" onClick={applyFilters} disabled={loading} className="dash-btn-primary disabled:opacity-60">
+            <Filter size={13} /> Apply
+          </button>
+          <button type="button" onClick={resetFilters} disabled={loading} className="dash-btn-sm disabled:opacity-60">
+            <RotateCcw size={13} /> Reset
+          </button>
+        </div>
+      </DashCard>
 
       {error && (
         <div className="dash-alert-error">{error}</div>
@@ -154,11 +451,11 @@ export default function ResortRevenuePage() {
         </div>
       )}
 
-      {/* Monthly breakdown table */}
+      {/* Breakdown table */}
       <DashCard className="overflow-hidden p-0">
         <div className="border-b border-softBorder px-6 py-4">
-          <h2 className="font-dash text-base font-semibold text-navy">Monthly breakdown</h2>
-          <p className="text-xs text-zinc-400">Revenue and reservation count per month</p>
+          <h2 className="font-dash text-base font-semibold text-navy">Revenue breakdown</h2>
+          <p className="text-xs text-zinc-400">Revenue and reservation count by selected filter range</p>
         </div>
 
         {loading ? (
@@ -168,16 +465,16 @@ export default function ResortRevenuePage() {
         ) : breakdown.length === 0 ? (
           <div className="px-6 py-12 text-center text-zinc-500">
             <TrendingUp size={28} className="mx-auto text-zinc-300 mb-3" />
-            <p>No monthly data available yet.</p>
-            <p className="text-xs mt-1 text-zinc-400">{monthlyError ?? "No monthly records returned yet."}</p>
+            <p>No data available for selected filters.</p>
+            <p className="text-xs mt-1 text-zinc-400">Try changing period or date range.</p>
           </div>
         ) : (
           <>
             <div className="md:hidden space-y-3 p-4">
               {breakdown.map((row) => (
                 <DashMobileTableCard
-                  key={`${row.year}-${row.month}`}
-                  title={`${row.month} ${row.year}`}
+                  key={row.date}
+                  title={row.date}
                   fields={[
                     { label: "Total bookings", value: row.reservations },
                     {
@@ -194,7 +491,7 @@ export default function ResortRevenuePage() {
               <table className="dash-table">
                 <thead>
                   <tr>
-                    <th>Month</th>
+                    <th>Date</th>
                     <th>Total bookings</th>
                     <th>Confirmed</th>
                     <th>Fees collected</th>
@@ -203,8 +500,8 @@ export default function ResortRevenuePage() {
                 </thead>
                 <tbody>
                   {breakdown.map((row) => (
-                    <tr key={`${row.year}-${row.month}`}>
-                      <td className="font-semibold text-navy">{row.month} {row.year}</td>
+                    <tr key={row.date}>
+                      <td className="font-semibold text-navy">{row.date}</td>
                       <td className="text-zinc-600">{row.reservations}</td>
                       <td>
                         <span className="dash-badge-emerald">{row.confirmed}</span>

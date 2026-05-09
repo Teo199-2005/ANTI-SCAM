@@ -125,4 +125,109 @@ class ReservationFlowTest extends TestCase
             'action' => 'reservation_cancelled_by_client',
         ]);
     }
+
+    public function test_user_cannot_create_booking_lock_for_room_of_different_tenant(): void
+    {
+        $tenantA = Tenant::create([
+            'name' => 'Tenant A',
+            'slug' => 'tenant-a',
+            'subdomain' => 'tenant-a',
+            'status' => 'active',
+        ]);
+        $tenantB = Tenant::create([
+            'name' => 'Tenant B',
+            'slug' => 'tenant-b',
+            'subdomain' => 'tenant-b',
+            'status' => 'active',
+        ]);
+
+        $resortB = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenantB->id,
+            'name' => 'Resort B',
+            'is_publicly_listed' => true,
+        ]);
+
+        $roomB = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenantB->id,
+            'resort_id' => $resortB->id,
+            'name' => 'Tenant B Room',
+            'code' => 'TB-1',
+            'status' => 'active',
+            'base_price' => 1500,
+            'capacity' => 2,
+        ]);
+
+        $userA = User::factory()->create([
+            'tenant_id' => $tenantA->id,
+            'role' => 'user',
+        ]);
+        Sanctum::actingAs($userA);
+
+        $response = $this->postJson('/api/v1/booking-locks', [
+            'room_id' => $roomB->id,
+            'check_in_date' => now()->addDays(1)->toDateString(),
+            'check_out_date' => now()->addDays(2)->toDateString(),
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_reservation_fails_when_resort_id_does_not_match_lock_room_resort(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Mismatch Tenant',
+            'slug' => 'mismatch-tenant',
+            'subdomain' => 'mismatch',
+            'status' => 'active',
+        ]);
+
+        $resortA = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Resort A',
+            'is_publicly_listed' => true,
+        ]);
+        $resortB = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Resort B',
+            'is_publicly_listed' => true,
+        ]);
+
+        $roomA = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resortA->id,
+            'name' => 'Room A',
+            'code' => 'RA-1',
+            'status' => 'active',
+            'base_price' => 1800,
+            'capacity' => 2,
+        ]);
+
+        $user = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'user',
+        ]);
+        Sanctum::actingAs($user);
+
+        $lockResponse = $this->postJson('/api/v1/booking-locks', [
+            'room_id' => $roomA->id,
+            'check_in_date' => now()->addDays(1)->toDateString(),
+            'check_out_date' => now()->addDays(2)->toDateString(),
+        ]);
+        $lockResponse->assertCreated();
+        $lockToken = $lockResponse->json('data.lock_token');
+
+        $reservationResponse = $this->postJson('/api/v1/reservations', [
+            'resort_id' => $resortB->id, // intentionally wrong
+            'lock_token' => $lockToken,
+            'guest_count' => 2,
+            'total_amount' => 3600,
+        ]);
+
+        $reservationResponse->assertStatus(409);
+        $this->assertDatabaseMissing('reservations', [
+            'resort_id' => $resortB->id,
+            'room_id' => $roomA->id,
+            'client_id' => $user->id,
+        ]);
+    }
 }

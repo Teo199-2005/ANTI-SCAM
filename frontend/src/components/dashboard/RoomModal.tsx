@@ -1,9 +1,22 @@
 "use client";
 
 import { apiClient } from "@/lib/api/client";
-import { Image as ImageIcon, Loader2, Star, Trash2, Upload, X } from "lucide-react";
+import {
+  AlignLeft,
+  CircleDollarSign,
+  Hash,
+  Image as ImageIcon,
+  Loader2,
+  ScrollText,
+  Star,
+  Trash2,
+  Upload,
+  UserRound,
+  X,
+} from "lucide-react";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type RoomFormValues = {
   resort_id: number;
@@ -11,6 +24,9 @@ export type RoomFormValues = {
   code: string;
   capacity: number;
   base_price: number;
+  bed_count: number;
+  bed_type: string;
+  inclusions: string[];
   amenities: string[];
   rules: string;
   status: "active" | "inactive" | "maintenance";
@@ -35,9 +51,25 @@ type RoomModalProps = {
 
 type Tab = "details" | "images";
 
+const INCLUSION_OPTIONS = [
+  "WiFi",
+  "Hot Shower",
+  "Air Conditioning",
+  "TV",
+  "Mini Fridge",
+  "Breakfast Included",
+  "Parking",
+  "Pool Access",
+  "Jacuzzi",
+  "Balcony",
+  "Toiletries",
+  "Room Service",
+];
+
 export default function RoomModal({ open, title, initialValues, loading, roomId, onClose, onSave }: RoomModalProps) {
   const [form, setForm] = useState<RoomFormValues>(initialValues);
   const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<Tab>("details");
   const [images, setImages] = useState<RoomImage[]>([]);
   const [loadingImages, setLoadingImages] = useState(false);
@@ -59,6 +91,10 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
       setVisible(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -155,16 +191,24 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
     }
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const updateField = <K extends keyof RoomFormValues>(key: K, value: RoomFormValues[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  return (
+  const inputWrap =
+    "group relative rounded-xl border border-softBorder bg-white/95 transition focus-within:border-skyBlue focus-within:ring-2 focus-within:ring-skyBlue/20";
+  const iconCls =
+    "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-skyBlue";
+  const inputCls =
+    "h-11 w-full rounded-xl border-0 bg-transparent pl-10 pr-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none";
+  const fieldLabelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-zinc-500";
+
+  return createPortal(
     <div
       role="presentation"
-      className={`fixed inset-0 z-[80] flex items-end justify-center p-0 transition-all duration-200 md:items-center md:p-4 ${visible ? "bg-zinc-900/40 backdrop-blur-sm" : "bg-transparent"}`}
+      className={`fixed inset-0 z-[120] flex items-end justify-center p-0 transition-all duration-200 md:items-center md:p-4 ${visible ? "bg-zinc-900/55 backdrop-blur-md" : "bg-zinc-900/0"}`}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -217,30 +261,174 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
             }}
           >
             <div className="grid gap-3 md:grid-cols-2">
-              <input className="dash-input" placeholder="Room name" value={form.name}
-                onChange={(e) => updateField("name", e.target.value)} required />
-              <input className="dash-input" placeholder="Room code" value={form.code}
-                onChange={(e) => updateField("code", e.target.value)} />
+              <div>
+                <p className={fieldLabelCls}>Room name</p>
+                <label className={inputWrap}>
+                  <AlignLeft size={15} className={iconCls} />
+                  <input
+                    className={inputCls}
+                    placeholder="e.g. Deluxe Ocean View"
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+              <div>
+                <p className={fieldLabelCls}>Room code</p>
+                <label className={inputWrap}>
+                  <Hash size={15} className={iconCls} />
+                  <input
+                    className={inputCls}
+                    placeholder="e.g. A101"
+                    value={form.code}
+                    onChange={(e) => updateField("code", e.target.value)}
+                  />
+                </label>
+              </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <input className="dash-input" type="number" min={1} max={50} placeholder="Capacity" value={form.capacity}
-                onChange={(e) => updateField("capacity", Number(e.target.value))} required />
-              <input className="dash-input" type="number" min={0} step="0.01" placeholder="Base price" value={form.base_price}
-                onChange={(e) => updateField("base_price", Number(e.target.value))} required />
+              <div>
+                <p className={fieldLabelCls}>Capacity</p>
+                <label className={inputWrap}>
+                  <UserRound size={15} className={iconCls} />
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={1}
+                    max={50}
+                    placeholder="e.g. 2"
+                    value={form.capacity}
+                    onChange={(e) => updateField("capacity", Number(e.target.value))}
+                    required
+                  />
+                </label>
+              </div>
+              <div>
+                <p className={fieldLabelCls}>Base price</p>
+                <label className={inputWrap}>
+                  <CircleDollarSign size={15} className={iconCls} />
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="e.g. 3500"
+                    value={form.base_price}
+                    onChange={(e) => updateField("base_price", Number(e.target.value))}
+                    required
+                  />
+                </label>
+              </div>
             </div>
-            <input className="dash-input" placeholder="Amenities (comma separated)" value={form.amenities.join(", ")}
-              onChange={(e) => updateField("amenities", e.target.value.split(",").map((i) => i.trim()).filter(Boolean))} />
-            <textarea className="dash-input h-24 resize-none" placeholder="Rules and regulations" value={form.rules}
-              onChange={(e) => updateField("rules", e.target.value)} />
-            <select className="dash-input" value={form.status}
-              onChange={(e) => updateField("status", e.target.value as RoomFormValues["status"])}>
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
-              <option value="maintenance">maintenance</option>
-            </select>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <p className={fieldLabelCls}>Bed count</p>
+                <label className={inputWrap}>
+                  <Hash size={15} className={iconCls} />
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={1}
+                    max={20}
+                    placeholder="e.g. 1"
+                    value={form.bed_count}
+                    onChange={(e) => updateField("bed_count", Number(e.target.value))}
+                    required
+                  />
+                </label>
+              </div>
+              <div>
+                <p className={fieldLabelCls}>Bed type</p>
+                <label className={inputWrap}>
+                  <AlignLeft size={15} className={iconCls} />
+                  <select
+                    className={`${inputCls} appearance-none`}
+                    value={form.bed_type}
+                    onChange={(e) => updateField("bed_type", e.target.value)}
+                  >
+                    <option value="Single">Single bed</option>
+                    <option value="Double">Double bed</option>
+                    <option value="Queen">Queen bed</option>
+                    <option value="King">King bed</option>
+                    <option value="Bunk Bed">Bunk bed</option>
+                    <option value="Mixed">Mixed bed types</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div className="rounded-xl border border-softBorder bg-white p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Inclusions</p>
+              <div className="flex flex-wrap gap-2">
+                {INCLUSION_OPTIONS.map((item) => {
+                  const checked = form.inclusions.includes(item);
+                  return (
+                    <label
+                      key={item}
+                      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                        checked
+                          ? "border-skyBlue/50 bg-skyBlue/10 text-skyBlue"
+                          : "border-softBorder bg-softGray/30 text-zinc-600 hover:bg-softGray/60"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-softBorder accent-skyBlue"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            updateField("inclusions", [...form.inclusions, item]);
+                          } else {
+                            updateField("inclusions", form.inclusions.filter((v) => v !== item));
+                          }
+                        }}
+                      />
+                      {item}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <p className={fieldLabelCls}>Rules and regulations</p>
+              <label className={`${inputWrap} block`}>
+                <ScrollText size={15} className="pointer-events-none absolute left-3 top-4 text-zinc-400 transition group-focus-within:text-skyBlue" />
+                <textarea
+                  className="h-24 w-full resize-none rounded-xl border-0 bg-transparent pl-10 pr-3 pt-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+                  placeholder="e.g. No smoking, Quiet hours at 10 PM"
+                  value={form.rules}
+                  onChange={(e) => updateField("rules", e.target.value)}
+                />
+              </label>
+            </div>
+            <div>
+              <p className={fieldLabelCls}>Room status</p>
+              <label className={inputWrap}>
+                <Hash size={15} className={iconCls} />
+                <select
+                  className={`${inputCls} appearance-none capitalize`}
+                  value={form.status}
+                  onChange={(e) => updateField("status", e.target.value as RoomFormValues["status"])}
+                >
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+                <option value="maintenance">maintenance</option>
+                </select>
+              </label>
+            </div>
             <div className="flex flex-col-reverse gap-2 pt-2 max-md:w-full md:flex-row md:flex-wrap md:justify-end [&_button]:max-md:w-full">
-              <button type="button" onClick={onClose} className="dash-btn-sm px-4 py-2">Cancel</button>
-              <button type="submit" disabled={loading} className="dash-btn-primary disabled:opacity-50">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center justify-center rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex items-center justify-center rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-50"
+              >
                 {loading ? "Saving…" : "Save room"}
               </button>
             </div>
@@ -327,5 +515,5 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
         )}
       </div>
     </div>
-  );
+  , document.body);
 }

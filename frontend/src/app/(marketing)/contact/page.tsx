@@ -68,11 +68,16 @@ export default function ContactPage() {
           </Button>
         </form>
         <div className="soft-panel p-2">
-          <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-white/50 bg-white/30 text-zinc-700 shadow-inner backdrop-blur-md">
-            <span className="inline-flex items-center gap-2">
-              <MapPin size={16} />
-              Interactive Map Placeholder
-            </span>
+          <div className="overflow-hidden rounded-xl border border-white/45 bg-white/30 shadow-inner backdrop-blur-md">
+            <iframe
+              title="Anti-Scam PH Tagaytay location map"
+              src="https://www.google.com/maps?q=Tagaytay%20City%20Cavite&z=14&output=embed"
+              width="100%"
+              height="320"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="block"
+            />
           </div>
         </div>
       </div>
@@ -87,7 +92,7 @@ export default function ContactPage() {
             <Mail size={14} />
             support@antiscamph.com
           </p>
-          <p className="text-sm text-zinc-600">+63 917 123 4567</p>
+          <p className="text-sm text-zinc-600">0917-874-4889</p>
           <p className="text-sm text-zinc-600">(02) 8123 4567</p>
         </Card>
         <Card>
@@ -106,8 +111,8 @@ export default function ContactPage() {
             <MapPin size={16} />
           </div>
           <h3 className="font-heading text-xl text-zinc-900">Address</h3>
-          <p className="mt-3 text-sm text-zinc-600">BGC, Taguig City</p>
-          <p className="text-sm text-zinc-600">Metro Manila, Philippines</p>
+          <p className="mt-3 text-sm text-zinc-600">Tagaytay City, Cavite</p>
+          <p className="text-sm text-zinc-600">Philippines</p>
         </Card>
       </div>
 

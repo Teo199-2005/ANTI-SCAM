@@ -308,6 +308,8 @@ class FullDashboardDemoSeeder extends Seeder
             ]);
         }
 
+        // Demo marketer lives in MarketingPartnerDemoSeeder (idempotent; run via DatabaseSeeder after this).
+
         // Keep one known owner login mapped to first tenant for quick role testing
         User::query()->create([
             'tenant_id' => $tenants->first()?->id,

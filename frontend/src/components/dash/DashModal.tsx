@@ -3,7 +3,8 @@
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   const sel = [
@@ -49,6 +50,7 @@ export default function DashModal({
   const titleId = useId();
   const descId = useId();
   const prevActive = useRef<HTMLElement | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -78,6 +80,10 @@ export default function DashModal({
   );
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     prevActive.current = document.activeElement as HTMLElement | null;
     document.addEventListener("keydown", handleKeyDown);
@@ -101,9 +107,9 @@ export default function DashModal({
     };
   }, [open, handleKeyDown, initialFocusSelector]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-end justify-center bg-zinc-900/45 p-0 motion-safe:transition-opacity motion-safe:duration-150 md:items-center md:p-4"
       role="presentation"
@@ -148,5 +154,5 @@ export default function DashModal({
         <div className={cn(padded && "px-dash-6 pb-dash-6 pt-dash-4")}>{children}</div>
       </div>
     </div>
-  );
+  , document.body);
 }

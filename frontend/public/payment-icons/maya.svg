@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect width="48" height="48" rx="10" fill="#00B14F"/>
+  <path d="M24 8 C17 8 11 14 11 22 C11 29 16 35 24 40 C32 35 37 29 37 22 C37 14 31 8 24 8Z" fill="white" opacity="0.95"/>
+  <path d="M24 14 C19 14 15 18 15 22 C15 27 19 31 24 36 C29 31 33 27 33 22 C33 18 29 14 24 14Z" fill="#00B14F"/>
+  <text x="24" y="46" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="white" text-anchor="middle" letter-spacing="1">maya</text>
+</svg>

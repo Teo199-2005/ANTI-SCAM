@@ -25,6 +25,7 @@ export default function Logo({ size = "md", className }: LogoProps) {
         alt="Anti-Scam PH — anti booking scam of resorts"
         width={80}
         height={80}
+        unoptimized
         className={cn("object-contain", sizeMap[size])}
         priority={size !== "sm"}
       />

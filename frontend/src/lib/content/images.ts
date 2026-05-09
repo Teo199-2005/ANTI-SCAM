@@ -1,10 +1,10 @@
 /**
  * Marketing imagery paths / URLs.
  *
- * Landing hero: full-bleed PNG `coverphoto.png` — **1942 × 809 px** (~2.401∶1).
+ * Landing hero: full-bleed PNG `poster1.png` — **1774 × 887 px** (~2∶1).
  * Hero section uses this exact aspect ratio (no overlay UI; artwork includes all messaging).
  */
-export const HERO_BANNER_INTRINSIC = { width: 1942, height: 809, aspect: 1942 / 809 } as const;
+export const HERO_BANNER_INTRINSIC = { width: 1774, height: 887, aspect: 1774 / 887 } as const;
 
 /** Visionaries — Charles Andrew Santiago (`CEO.png`), intrinsic **1254 × 1254** px (1∶1). */
 export const VISIONARY_CEO_INTRINSIC = { width: 1254, height: 1254 } as const;
@@ -19,8 +19,8 @@ export const VISIONARY_CMO_INTRINSIC = { width: 1188, height: 1324 } as const;
 export const VISIONARY_COO_INTRINSIC = { width: 819, height: 819 } as const;
 
 export const images = {
-  /** Anti-SCAM PH campaign hero — full graphic (text and CTAs baked in) */
-  hero: "/coverphoto.png",
+  /** Anti-SCAM PH homepage hero — full graphic (text and CTAs baked in) */
+  hero: "/poster1.png",
   spa: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874",
   dining: "https://images.unsplash.com/photo-1559339352-11d035aa65de",
   pool: "https://images.unsplash.com/photo-1571896349842-33c89424de2d",

@@ -75,7 +75,7 @@ class DiscountCodeController extends Controller
     }
 
     /** Validate a code at checkout. */
-    public function validate(Request $request)
+    public function validateCode(Request $request)
     {
         $request->validate([
             'code'      => ['required', 'string'],

@@ -1,10 +1,17 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/shared/ToastProvider";
+import { createSubscriptionInvoice } from "@/lib/api/subscription";
+import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { validateReferralCode } from "@/lib/api/referral";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { formatRoleLabel } from "@/lib/utils";
-import { ChevronRight, LogOut, Menu } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 function segmentLabel(segment: string): string {
   return segment.replaceAll("-", " ").replaceAll("_", " ");
@@ -13,15 +20,48 @@ function segmentLabel(segment: string): string {
 function roleBadgeClass(role: string): string {
   if (role === "admin") return "bg-navy/10 text-navy ring-1 ring-navy/20";
   if (role === "resort_owner") return "bg-clOcean/10 text-clOcean ring-1 ring-clOcean/20";
+  if (role === "marketing") return "bg-violet-50 text-violet-900 ring-1 ring-violet-200/80";
   return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80";
 }
 
 type DashboardTopbarProps = { onOpenMenu: () => void };
+type OwnerSubscriptionInfo = {
+  status: string | null;
+  plan: string | null;
+  endsAt: string | null;
+};
+
+type PlanDuration = 1 | 3 | 6 | 12;
+type PlanOffer = { duration: PlanDuration; monthlyRate: number; billingType: "Monthly" | "Upfront"; bonusMonths: number };
+
+const STANDARD_OFFERS: PlanOffer[] = [
+  { duration: 1, monthlyRate: 2300, billingType: "Monthly", bonusMonths: 0 },
+  { duration: 3, monthlyRate: 2000, billingType: "Upfront", bonusMonths: 0 },
+  { duration: 6, monthlyRate: 1900, billingType: "Upfront", bonusMonths: 0 },
+  { duration: 12, monthlyRate: 1800, billingType: "Upfront", bonusMonths: 0 },
+];
+
+const REFERRAL_OFFERS: PlanOffer[] = [
+  { duration: 1, monthlyRate: 2000, billingType: "Monthly", bonusMonths: 1 },
+  { duration: 3, monthlyRate: 1800, billingType: "Upfront", bonusMonths: 1 },
+  { duration: 6, monthlyRate: 1700, billingType: "Upfront", bonusMonths: 1 },
+  { duration: 12, monthlyRate: 1500, billingType: "Upfront", bonusMonths: 1 },
+];
 
 export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { pushToast } = useToast();
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
+  const [applyingReferral, setApplyingReferral] = useState(false);
+  const [subscribingNow, setSubscribingNow] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<OwnerSubscriptionInfo | null>(null);
+  const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
   const crumbs = pathname.split("/").filter(Boolean).slice(1);
   const initials =
     user?.name
@@ -33,6 +73,127 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
 
   const leaf = crumbs.length ? segmentLabel(crumbs[crumbs.length - 1]!) : "Dashboard";
   const roleLabel = formatRoleLabel(user?.role);
+  const isSubscribedOwner =
+    user?.role === "resort_owner" && (subscriptionInfo?.status ?? "").toLowerCase() === "active";
+  const ownerStatusLabel = (subscriptionInfo?.status ?? "pending_payment").replaceAll("_", " ");
+  const formattedEndDate = subscriptionInfo?.endsAt
+    ? new Date(subscriptionInfo.endsAt).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
+    : "Not available";
+  const usingReferralOffer = Boolean(appliedReferralCode);
+  const selectedOffer =
+    (usingReferralOffer ? REFERRAL_OFFERS : STANDARD_OFFERS).find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0];
+  const totalCharge = selectedOffer.monthlyRate * selectedOffer.duration;
+  const effectiveMonths = selectedOffer.duration + selectedOffer.bonusMonths;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user || user.role !== "resort_owner") {
+      setSubscriptionInfo(null);
+      return;
+    }
+
+    const loadSubscription = () => {
+      void getOwnerLandingPage()
+        .then((landing) => {
+          if (cancelled) return;
+          setSubscriptionInfo({
+            status: landing.subscription_status ?? null,
+            plan: landing.subscription_plan ?? null,
+            endsAt: landing.subscription_end_at ?? null,
+          });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSubscriptionInfo(null);
+        });
+    };
+
+    loadSubscription();
+
+    const onRefresh = () => loadSubscription();
+    window.addEventListener("subscription:refresh", onRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("subscription:refresh", onRefresh);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!showSubscribeModal) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowSubscribeModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showSubscribeModal]);
+
+  const applyReferral = async () => {
+    const normalized = referralCode.trim().toUpperCase();
+    if (!normalized) {
+      pushToast({ title: "Referral code required", description: "Enter a referral code first.", tone: "warning" });
+      return;
+    }
+    setApplyingReferral(true);
+    try {
+      const landing = await getOwnerLandingPage();
+      const result = await validateReferralCode(normalized, landing.resort_id);
+      if (!result.valid) {
+        pushToast({
+          title: "Referral code not accepted",
+          description: result.message,
+          tone: "error",
+        });
+        return;
+      }
+      setAppliedReferralCode(result.code);
+      pushToast({
+        title: "Referral code applied",
+        description: `Verified with ${result.marketer_name}. Referral pricing and bonus month are now enabled.`,
+        tone: "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Unable to verify code",
+        description: parseApiErrorMessage(err, "Check your connection and try again."),
+        tone: "error",
+      });
+    } finally {
+      setApplyingReferral(false);
+    }
+  };
+
+  const subscribeNow = async () => {
+    if (!user || user.role !== "resort_owner") return;
+    setSubscribingNow(true);
+    setShowSubscribeModal(false);
+    try {
+      const ownerLanding = await getOwnerLandingPage();
+      const resortId = ownerLanding.resort_id;
+      const result = await createSubscriptionInvoice(
+        resortId,
+        false,
+        undefined,
+        appliedReferralCode ?? undefined,
+        "monthly",
+        undefined,
+        selectedDuration,
+        typeof window !== "undefined" ? window.location.origin : undefined,
+      );
+      window.location.href = result.invoice_url;
+    } catch (err) {
+      pushToast({
+        title: "Unable to start payment",
+        description: parseApiErrorMessage(err, "Please try again."),
+        tone: "error",
+      });
+      setSubscribingNow(false);
+    }
+  };
 
   return (
     <header className="dash-topbar sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 px-4 lg:px-6">
@@ -83,6 +244,69 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
         {user ? (
           <>
+            {user.role === "resort_owner" ? (
+              <>
+                {!isSubscribedOwner ? (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowSubscribeModal(true)}
+                      className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-xl bg-gradient-to-r from-primaryBlue via-[#2d6de8] to-slateBlue px-4 py-2 font-dash text-dash-xs font-bold text-white shadow-[0_2px_12px_rgba(37,99,235,0.40)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(37,99,235,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue/50 focus-visible:ring-offset-2 active:translate-y-0"
+                    >
+                      <span className="pointer-events-none absolute inset-0 -translate-x-full skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                      <span className="relative">Subscribe now</span>
+                    </button>
+
+                    <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[9px] font-black leading-none text-white shadow-sm ring-2 ring-white">
+                        !
+                      </span>
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isSubscribedOwner) {
+                        setShowSubscriptionDetails((prev) => !prev);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 font-dash text-dash-xs font-bold uppercase tracking-wide shadow-soft-sm ${
+                      isSubscribedOwner
+                        ? "border border-emerald-300/80 bg-emerald-50 text-emerald-700"
+                        : "border border-amber-300/80 bg-amber-50 text-amber-700"
+                    }`}
+                    aria-expanded={isSubscribedOwner ? showSubscriptionDetails : undefined}
+                    aria-haspopup={isSubscribedOwner ? "dialog" : undefined}
+                  >
+                    <Crown size={14} />
+                    {isSubscribedOwner ? "Status: Premium (active)" : `Status: ${ownerStatusLabel}`}
+                    {isSubscribedOwner ? (
+                      <ChevronDown
+                        size={14}
+                        className={showSubscriptionDetails ? "rotate-180 transition-transform" : "transition-transform"}
+                      />
+                    ) : null}
+                  </button>
+
+                  {isSubscribedOwner && showSubscriptionDetails ? (
+                    <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-72 rounded-xl border border-softBorder bg-white p-3 shadow-card">
+                      <p className="font-dash text-[11px] font-bold uppercase tracking-wide text-zinc-500">Subscription details</p>
+                      <p className="mt-1 text-sm font-semibold text-navy">
+                        Plan: {(subscriptionInfo?.plan ?? "basic").toUpperCase()}
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-700">Expires: {formattedEndDate}</p>
+                      <p className="mt-2 text-[11px] text-zinc-500">
+                        Recurring billing is enabled. A new invoice is generated automatically each cycle before due date.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
             <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-gradient-to-b from-white to-softCard/90 py-1 pl-1 pr-2 shadow-card">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-navy to-primaryBlue text-dash-xs font-bold text-white shadow-soft-sm">
                 {initials}
@@ -113,6 +337,163 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
           </>
         ) : null}
       </div>
+
+      {mounted && showSubscribeModal
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/55 p-4 backdrop-blur-[2px]"
+          onClick={() => setShowSubscribeModal(false)}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-3xl border border-skyBlue/20 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.35)]"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Standard subscription details"
+          >
+            <div className="relative overflow-hidden border-b border-softBorder/70 bg-gradient-to-r from-navy via-primaryBlue to-slateBlue px-6 pb-4 pt-4 text-white">
+              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+              <div className="absolute -left-10 -bottom-10 h-28 w-28 rounded-full bg-skyBlue/30 blur-2xl" />
+              <button
+                type="button"
+                onClick={() => setShowSubscribeModal(false)}
+                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                aria-label="Close subscription modal"
+              >
+                <X size={16} />
+              </button>
+              <div className="relative">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/90">
+                  <Sparkles size={12} />
+                  Subscription Offer
+                </span>
+                <h2 className="mt-2 font-dash text-xl font-semibold">Best for direct resort onboarding</h2>
+                <p className="mt-1 text-sm text-white/85">Launch faster with one complete monthly package.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <div className="rounded-2xl border border-skyBlue/20 bg-gradient-to-b from-skyBlue/5 to-white p-5">
+                <p className="inline-flex items-center gap-1.5 font-dash text-base font-semibold text-navy">
+                  <WalletCards size={15} className="text-primaryBlue" />
+                  Standard Subscription
+                </p>
+                <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-zinc-600">
+                  <CalendarDays size={14} className="text-zinc-500" />
+                  Choose your plan duration (3 rooms included)
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {STANDARD_OFFERS.map((offer) => {
+                    const active = selectedDuration === offer.duration;
+                    return (
+                      <button
+                        key={`duration-${offer.duration}`}
+                        type="button"
+                        onClick={() => setSelectedDuration(offer.duration)}
+                        className={`rounded-xl border px-2 py-2 text-left transition ${
+                          active
+                            ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/30"
+                            : "border-softBorder bg-white hover:border-primaryBlue/35"
+                        }`}
+                      >
+                        <p className="inline-flex items-center gap-1 text-xs font-bold text-navy">
+                          <CalendarDays size={12} className={active ? "text-primaryBlue" : "text-zinc-500"} />
+                          {offer.duration} month{offer.duration > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-[11px] text-zinc-500">{offer.billingType}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex flex-wrap items-end gap-x-2 gap-y-1">
+                  <p className="inline-flex items-end gap-2 text-4xl font-black leading-none tracking-tight text-zinc-950">
+                    <WalletCards size={22} className="mb-1 text-primaryBlue" />
+                    ₱{selectedOffer.monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="pb-1 text-xs font-medium lowercase text-zinc-500">monthly rate</p>
+                </div>
+                <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-zinc-500">
+                  <Crown size={13} className="text-primaryBlue" />
+                  Total due now: <span className="font-semibold text-navy">₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </p>
+                {selectedOffer.bonusMonths > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">
+                    Referral bonus applied: +{selectedOffer.bonusMonths} month (effective {effectiveMonths} months access).
+                  </p>
+                ) : null}
+                {appliedReferralCode ? (
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">Referral applied: {appliedReferralCode}</p>
+                ) : null}
+              </div>
+
+              <ul className="grid gap-2.5 text-sm text-zinc-700 sm:grid-cols-2">
+                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Booking Management System</li>
+                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Payment System (Gcash or credit cards)</li>
+                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />5 pictures per room allowed</li>
+                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Full room description</li>
+                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Real time room availability</li>
+                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Tech Support 8am-4pm Mon-Fri</li>
+              </ul>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                Build trust with guests and start accepting online bookings in one setup. VAT is added at checkout by final invoice computation.
+              </div>
+
+              <div>
+                <label htmlFor="subscribe-referral-code" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                  <Tag size={13} className="text-primaryBlue" />
+                  Referral code (optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="subscribe-referral-code"
+                    value={referralCode}
+                    onChange={(e) => {
+                      setReferralCode(e.target.value.toUpperCase());
+                      if (!e.target.value.trim()) setAppliedReferralCode(null);
+                    }}
+                    className="dash-input"
+                    placeholder="Enter referral code"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void applyReferral()}
+                    disabled={applyingReferral}
+                    className="inline-flex min-w-[92px] items-center justify-center rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60"
+                  >
+                    {applyingReferral ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSubscribeModal(false);
+                    setReferralCode("");
+                    setAppliedReferralCode(null);
+                  }}
+                  className="rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Maybe later
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void subscribeNow()}
+                  disabled={subscribingNow}
+                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-primaryBlue to-slateBlue px-4 py-2 text-sm font-semibold text-white shadow-soft-sm transition-[transform,filter] hover:-translate-y-px hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {subscribingNow ? <Loader2 size={14} className="animate-spin" /> : "Subscribe now"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+          ,
+          document.body,
+        )
+        : null}
     </header>
   );
 }

@@ -12,6 +12,10 @@ class TenantMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if (str_starts_with($request->path(), 'api/v1/webhooks/')) {
+            return $next($request);
+        }
+
         $host = $request->getHost();
         $segments = explode('.', $host);
         $subdomain = $segments[0] ?? null;

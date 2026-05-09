@@ -16,21 +16,20 @@ class SubscriptionController extends Controller
 
     public function refresh(Request $request, Resort $resort)
     {
-        $validated = $request->validate([
-            // accept new frontend plan slugs: basic, premium, vip, standard
-            'plan' => ['nullable', 'in:basic,premium,standard,vip'],
-        ]);
-
-        // map frontend plan slugs to internal plan identifiers as needed
-        $plan = $validated['plan'] ?? 'standard';
-        // normalize synonyms: basic/premium map to 'standard' pricing group vs vip
-        if (in_array($plan, ['basic', 'premium', 'standard'], true)) {
-            $internalPlan = $plan; // keep specific plan name for reporting, service will handle pricing
-        } else {
-            $internalPlan = $plan; // vip
+        $user = $request->user();
+        if (! $user) {
+            abort(401);
+        }
+        if ($user->role !== 'admin' && (int) $user->tenant_id !== (int) $resort->tenant_id) {
+            abort(403, 'You are not allowed to access this resource.');
         }
 
-        $subscription = $this->service->refreshForResort($resort, $internalPlan);
+        $validated = $request->validate([
+            'plan' => ['nullable', 'in:basic'],
+        ]);
+
+        $plan = 'basic';
+        $subscription = $this->service->refreshForResort($resort, $plan);
         return $this->successResponse($subscription, 'Subscription refreshed');
     }
 

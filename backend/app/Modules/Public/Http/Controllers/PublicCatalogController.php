@@ -9,10 +9,19 @@ use App\Models\Resort;
 use App\Models\Room;
 use App\Models\RoomAvailability;
 use App\Models\Tenant;
+use App\Services\LandingReadinessService;
+use App\Shared\Traits\ApiResponseTrait;
 
 class PublicCatalogController extends Controller
 {
     use ApiResponseTrait;
+
+    private LandingReadinessService $readiness;
+
+    public function __construct()
+    {
+        $this->readiness = new LandingReadinessService();
+    }
 
     public function resorts()
     {
@@ -75,7 +84,7 @@ class PublicCatalogController extends Controller
         ], 'Resort detail fetched');
     }
 
-    /** Look up a resort by its tenant's subdomain slug (for per-resort subdomain websites). */
+    /** Look up a resort by its tenant's subdomain slug (marketing catalog — no subscription gate). */
     public function resortBySlug(string $slug)
     {
         $tenant = Tenant::withoutGlobalScopes()
@@ -110,10 +119,63 @@ class PublicCatalogController extends Controller
         ], 'Resort detail by slug fetched');
     }
 
+    /** Subdomain landing page payload — requires complete profile/readiness. */
+    public function landingBySlug(string $slug)
+    {
+        $tenant = Tenant::withoutGlobalScopes()
+            ->where('subdomain', $slug)
+            ->first();
+
+        if (! $tenant) {
+            return $this->errorResponse('Resort not found.', null, 404);
+        }
+
+        $resort = Resort::withoutGlobalScopes()
+            ->with(['subscription', 'rooms.images'])
+            ->where('tenant_id', $tenant->id)
+            ->where('is_publicly_listed', true)
+            ->first();
+
+        if (! $resort) {
+            return $this->errorResponse('Resort is not publicly listed.', null, 404);
+        }
+
+        // Check landing readiness
+        $check = $this->readiness->check($resort);
+        if (! $check['is_ready']) {
+            return $this->errorResponse(
+                'This resort\'s landing page is not yet fully set up.',
+                ['code' => 'landing_incomplete', 'missing_fields' => $check['missing_fields']],
+                503
+            );
+        }
+
+        $owner   = $this->readiness->resolveOwner($resort);
+        $payload = $this->readiness->computePayload($resort, $owner);
+
+        return $this->successResponse([
+            'id'            => $resort->id,
+            'slug'          => $slug,
+            'tenantId'      => $tenant->id,
+            'name'          => $resort->name,
+            'description'   => $resort->description,
+            'address'       => $resort->address,
+            'contactNumber' => $resort->contact_number,
+            'logoUrl'       => $resort->logo_url,
+            'isVip'         => (bool) $resort->is_vip,
+            'hero'          => $payload['hero'],
+            'about'         => $payload['about'],
+            'rooms'         => $payload['rooms'],
+            'gallery'       => $payload['gallery'],
+            'footer'        => $payload['footer'],
+            'map'           => $payload['map'],
+        ], 'Resort landing page fetched');
+    }
+
     public function checkAvailability(Room $room)
     {
-        if ($room->status !== 'active') {
-            return $this->errorResponse('Room is not publicly available', ['room' => ['not_publicly_available']], 404);
+        if ($guard = $this->validateRoomPublicBookable($room)) {
+            return $guard;
         }
 
         $checkIn  = request()->string('check_in_date')->value();
@@ -163,8 +225,8 @@ class PublicCatalogController extends Controller
 
     public function room(Room $room)
     {
-        if ($room->status !== 'active') {
-            return $this->errorResponse('Room is not publicly available', ['room' => ['not_publicly_available']], 404);
+        if ($guard = $this->validateRoomPublicBookable($room)) {
+            return $guard;
         }
 
         $room->load(['resort', 'images']);
@@ -212,5 +274,25 @@ class PublicCatalogController extends Controller
                 'amenities' => $room->amenities ?? [],
                 'status'    => $room->status,
             ]);
+    }
+
+    private function validateRoomPublicBookable(Room $room): ?\Illuminate\Http\JsonResponse
+    {
+        if ($room->status !== 'active') {
+            return $this->errorResponse('Room is not publicly available', ['room' => ['not_publicly_available']], 404);
+        }
+
+        $resort = Resort::withoutGlobalScopes()
+            ->with('subscription')
+            ->find($room->resort_id);
+        if (! $resort || ! $resort->is_publicly_listed) {
+            return $this->errorResponse('Resort is not publicly listed.', ['room' => ['not_publicly_available']], 404);
+        }
+
+        if (! $resort->subscription || $resort->subscription->status !== 'active') {
+            return $this->errorResponse('Resort subscription is not active.', ['room' => ['subscription_inactive']], 403);
+        }
+
+        return null;
     }
 }

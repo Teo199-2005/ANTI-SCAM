@@ -38,12 +38,27 @@ return [
     'xendit' => [
         'secret_key' => env('XENDIT_SECRET_KEY'),
         'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
+        // true (default), absolute path to cacert.pem, or false (local dev only — not production)
+        'http_verify' => env('XENDIT_HTTP_VERIFY', true),
+        // explicit local-only testing switch: auto-mark invoices as paid without real gateway
+        'allow_mock_paid' => env('XENDIT_ALLOW_MOCK_PAID', false),
+        // if true, forbidden key (403) can also use local mock flow (still local-only)
+        'local_mock_on_forbidden' => env('XENDIT_LOCAL_MOCK_ON_FORBIDDEN', false),
     ],
 
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL').'/auth/google/callback'),
+    ],
+
+    'mail_brand' => [
+        'logo_url' => env('MAIL_BRAND_LOGO_URL', ''),
+        'support_email' => env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS')),
+        'trademark_line' => env(
+            'MAIL_TRADEMARK_LINE',
+            'Anti-Scam PH is a product and service operated by The Rising 2 Brothers OPC.'
+        ),
     ],
 
 ];

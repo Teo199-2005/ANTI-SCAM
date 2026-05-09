@@ -32,5 +32,8 @@ export async function GET(req: NextRequest) {
   }
 
   const payload = await backendRes.json();
-  return NextResponse.json({ success: true, data: payload.data ?? payload });
+  // Normalise to { user: AuthUser } so AuthContext.refreshUser can read data.data.user
+  // (The login BFF wraps the user the same way; /auth/me backend returns the bare user in data)
+  const userPayload = payload.data ?? payload;
+  return NextResponse.json({ success: true, data: { user: userPayload } });
 }

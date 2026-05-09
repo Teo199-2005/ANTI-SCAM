@@ -2,11 +2,16 @@
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
 import { useToast } from "@/components/shared/ToastProvider";
-import { adminOnboard } from "@/lib/api/admin";
+import { adminOnboard, AssignableOwner, getAssignableOwners, uploadResortLogo } from "@/lib/api/admin";
 import { getResort, updateResort } from "@/lib/api/resort";
 import { Building2, Globe, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const BACKEND_ORIGIN = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1").replace(
+  /\/api\/v1\/?$/,
+  "",
+);
 
 type FormState = {
   tenant_name: string;
@@ -16,7 +21,8 @@ type FormState = {
   contact_number: string;
   logo_url: string;
   description: string;
-  plan: "standard" | "vip";
+  plan: "basic";
+  owner_user_id: string;
   is_publicly_listed: boolean;
 };
 
@@ -28,7 +34,8 @@ const initial: FormState = {
   contact_number: "",
   logo_url: "",
   description: "",
-  plan: "standard",
+  plan: "basic",
+  owner_user_id: "",
   is_publicly_listed: true,
 };
 
@@ -40,7 +47,11 @@ export default function AdminOnboardPage() {
   const isEditMode = Number.isFinite(editResortId) && (editResortId ?? 0) > 0;
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const [owners, setOwners] = useState<AssignableOwner[]>([]);
+  const [loadingOwners, setLoadingOwners] = useState(false);
+  const [ownerLoadError, setOwnerLoadError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +74,7 @@ export default function AdminOnboardPage() {
           contact_number: resort.contact_number ?? "",
           logo_url: resort.logo_url ?? "",
           description: resort.description ?? "",
-          plan: resort.subscription?.plan === "vip" ? "vip" : "standard",
+          plan: "basic",
           is_publicly_listed: Boolean(resort.is_publicly_listed),
         }));
       } catch (err) {
@@ -74,6 +85,28 @@ export default function AdminOnboardPage() {
     };
     void hydrate();
   }, [editResortId, isEditMode]);
+
+  useEffect(() => {
+    if (isEditMode) return;
+    void fetchOwners();
+  }, [isEditMode]);
+
+  const fetchOwners = async () => {
+    setLoadingOwners(true);
+    setOwnerLoadError(null);
+    try {
+      const data = await getAssignableOwners();
+      setOwners(data);
+      if (data.length === 0) {
+        setOwnerLoadError("No unassigned resort owner accounts found.");
+      }
+    } catch {
+      setOwners([]);
+      setOwnerLoadError("Unable to load resort owner accounts. Please retry.");
+    } finally {
+      setLoadingOwners(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,6 +133,7 @@ export default function AdminOnboardPage() {
           logo_url: form.logo_url.trim() || undefined,
           description: form.description.trim() || undefined,
           plan: form.plan,
+          owner_user_id: Number(form.owner_user_id),
           is_publicly_listed: form.is_publicly_listed,
         });
       }
@@ -123,6 +157,27 @@ export default function AdminOnboardPage() {
       setSaving(false);
     }
   };
+
+  const onLogoSelected = async (file: File | null) => {
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const logoUrl = await uploadResortLogo(file);
+      update("logo_url", logoUrl);
+      pushToast({ title: "Logo uploaded", tone: "success" });
+    } catch (err: unknown) {
+      const msg = parseApiErrorMessage(err, "Logo upload failed.");
+      pushToast({ title: "Upload failed", description: msg, tone: "error" });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const previewSrc = form.logo_url.trim()
+    ? form.logo_url.trim().startsWith("/storage/")
+      ? `${BACKEND_ORIGIN}${form.logo_url.trim()}`
+      : form.logo_url.trim()
+    : "";
 
   return (
     <div className="space-y-6">
@@ -215,14 +270,45 @@ export default function AdminOnboardPage() {
           {!isEditMode ? (
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Subscription plan *</label>
+            <input className="dash-input" value="Standard plan set (durations selected by owner at checkout)" readOnly />
+            <div className="mt-2 rounded-xl border border-softBorder bg-softGray/40 p-3 text-xs text-zinc-600">
+              <p className="font-semibold text-navy">Current pricing model:</p>
+              <p className="mt-1">Standard: 1M ₱2,300/mo, 3M ₱2,000/mo, 6M ₱1,900/mo, 12M ₱1,800/mo (+VAT).</p>
+              <p className="mt-1">Referral: 1M ₱2,000/mo, 3M ₱1,800/mo, 6M ₱1,700/mo, 12M ₱1,500/mo (+VAT) with +1 bonus month.</p>
+              <p className="mt-1">Owners choose duration and apply referral in the Subscribe modal.</p>
+            </div>
+          </div>
+          ) : null}
+
+          {/* Resort owner account */}
+          {!isEditMode ? (
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Resort owner account *</label>
             <select
               className="dash-input"
-              value={form.plan}
-              onChange={(e) => update("plan", e.target.value as "standard" | "vip")}
+              required
+              disabled={loadingOwners || Boolean(ownerLoadError)}
+              value={form.owner_user_id}
+              onChange={(e) => update("owner_user_id", e.target.value)}
             >
-              <option value="standard">Standard — ₱1,000/mo + ₱300/extra room</option>
-              <option value="vip">VIP — ₱2,000/mo + ₱400/extra room + badge</option>
+              <option value="">Select resort owner account</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={String(owner.id)}>
+                  {owner.name} ({owner.email})
+                </option>
+              ))}
             </select>
+            <p className="mt-1 text-xs text-zinc-500">
+              Only unassigned resort owner accounts are shown.
+            </p>
+            {ownerLoadError ? (
+              <div className="mt-2 flex items-center gap-2">
+                <p className="text-xs text-rose-600">{ownerLoadError}</p>
+                <button type="button" className="dash-btn-sm" onClick={() => void fetchOwners()}>
+                  Retry
+                </button>
+              </div>
+            ) : null}
           </div>
           ) : null}
 
@@ -242,27 +328,27 @@ export default function AdminOnboardPage() {
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Contact number</label>
             <input
               className="dash-input"
-              placeholder="+63 917 123 4567"
+              placeholder="0917-874-4889"
               value={form.contact_number}
               onChange={(e) => update("contact_number", e.target.value)}
             />
           </div>
 
-          {/* Resort logo / image URL */}
+          {/* Resort logo upload */}
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600">
-              Resort logo / image URL{" "}
-              <span className="font-normal text-zinc-400">(shown on resort cards and profile)</span>
+              Resort logo image{" "}
+              <span className="font-normal text-zinc-400">(click to upload)</span>
             </label>
-            <div className="relative">
-              <ImageIcon size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <div className="relative space-y-2">
+              <ImageIcon size={14} className="pointer-events-none absolute left-3 top-[14px] text-zinc-400" />
               <input
                 className="dash-input pl-9"
-                type="url"
-                placeholder="https://example.com/resort-logo.jpg"
-                value={form.logo_url}
-                onChange={(e) => update("logo_url", e.target.value)}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => void onLogoSelected(e.target.files?.[0] ?? null)}
               />
+              {uploadingLogo ? <p className="text-xs text-zinc-500">Uploading image...</p> : null}
             </div>
           </div>
 
@@ -273,13 +359,13 @@ export default function AdminOnboardPage() {
               {form.logo_url.trim() ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={form.logo_url}
+                  src={previewSrc}
                   alt="Resort logo preview"
                   className="h-28 w-full rounded-xl border border-softBorder object-cover sm:h-36"
                 />
               ) : (
                 <div className="flex h-28 w-full items-center justify-center rounded-xl border border-dashed border-softBorder bg-white/60 text-sm text-zinc-500 sm:h-36">
-                  Add a logo/image URL to preview the resort branding.
+                  Upload a logo to preview the resort branding.
                 </div>
               )}
             </div>
@@ -312,7 +398,11 @@ export default function AdminOnboardPage() {
 
           {/* Submit */}
           <div className="sm:col-span-2">
-            <button type="submit" disabled={saving} className="dash-btn-primary px-8 py-3 disabled:opacity-60">
+            <button
+              type="submit"
+              disabled={saving || (!isEditMode && (loadingOwners || Boolean(ownerLoadError)))}
+              className="dash-btn-primary px-8 py-3 disabled:opacity-60"
+            >
               {saving ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 size={14} className="animate-spin" /> {isEditMode ? "Saving changes…" : "Creating resort…"}

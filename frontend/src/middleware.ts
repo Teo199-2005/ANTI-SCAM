@@ -2,13 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Production apex domain (no protocol), e.g. anti-scamph.com.
- * Required for `{tenant}.anti-scamph.com` → `/resorts/{tenant}` routing.
+ * Required for `{tenant}.anti-scamph.com` → `/stay/{tenant}` routing (dedicated landing; avoids /resorts/[id] catalog collision).
  * If unset, only `*.localhost` is treated as tenant hosts (local dev).
  */
 const ROOT_DOMAIN_CONFIG = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase() ?? "";
 
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
+  const pathname = request.nextUrl.pathname;
+
+  // Dashboard, auth API, and BFF must never be rewritten to /stay/{tenant}/...
+  // (otherwise e.g. tenant.localhost/dashboard/resort → 404 after payment redirect).
+  if (
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next")
+  ) {
+    return NextResponse.next();
+  }
 
   // Strip port for comparison
   const hostname = host.split(":")[0].toLowerCase();
@@ -43,8 +54,9 @@ export function middleware(request: NextRequest) {
   }
 
   const url = request.nextUrl.clone();
-  const originalPath = url.pathname === "/" ? "" : url.pathname;
-  url.pathname = `/resorts/${subdomain}${originalPath}`;
+  const originalPath = pathname === "/" ? "" : pathname;
+  // Use /stay/... so we do not collide with (marketing)/resorts/[id] (catalog resort pages).
+  url.pathname = `/stay/${subdomain}${originalPath}`;
   return NextResponse.rewrite(url);
 }
 

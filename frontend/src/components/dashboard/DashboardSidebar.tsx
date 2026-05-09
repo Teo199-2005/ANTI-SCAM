@@ -10,6 +10,7 @@ import {
   CreditCard,
   FileText,
   LayoutDashboard,
+  Link2,
   ListChecks,
   LogOut,
   MessageSquare,
@@ -44,6 +45,7 @@ const adminGroups: NavGroup[] = [
     label: "Main",
     items: [
       { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+      { href: "/dashboard/admin/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
   {
@@ -72,7 +74,13 @@ const marketingGroups: NavGroup[] = [
     label: "Marketing",
     items: [
       { href: "/dashboard/marketing", label: "Overview", icon: TrendingUp, exact: true },
+      { href: "/dashboard/marketing/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/dashboard/marketing/referrals", label: "Referrals & links", icon: Link2 },
     ],
+  },
+  {
+    label: "Account",
+    items: [{ href: "/dashboard/marketing/profile", label: "Profile", icon: Settings }],
   },
 ];
 
@@ -112,7 +120,6 @@ const resortOwnerGroups: NavGroup[] = [
   {
     label: "Account",
     items: [
-      { href: "/dashboard/resort/subscription", label: "Subscription", icon: CreditCard },
       { href: "/dashboard/resort/profile", label: "Profile", icon: Settings },
     ],
   },

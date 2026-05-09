@@ -2,8 +2,8 @@
 
 import DashCard from "@/components/dash/DashCard";
 import { useToast } from "@/components/shared/ToastProvider";
-import { getSystemSettings, updateSystemSettings, SystemSetting } from "@/lib/api/admin";
-import { Loader2, Settings } from "lucide-react";
+import { getSystemSettings, sendAdminMailTest, updateSystemSettings, SystemSetting } from "@/lib/api/admin";
+import { Loader2, Mail, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function SystemSettingsPage() {
@@ -12,6 +12,8 @@ export default function SystemSettingsPage() {
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sendingMailTest, setSendingMailTest] = useState(false);
+  const [mailTestTo, setMailTestTo] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,6 +53,32 @@ export default function SystemSettingsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendMailTest = async () => {
+    const to = mailTestTo.trim();
+    if (!to) {
+      pushToast({ title: "Recipient required", description: "Enter an email address.", tone: "warning" });
+      return;
+    }
+    setSendingMailTest(true);
+    try {
+      const result = await sendAdminMailTest(to);
+      pushToast({
+        title: "Mail test sent",
+        description: `Email accepted for delivery. Email log #${result.email_log_id}.`,
+        tone: "success",
+      });
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      pushToast({
+        title: "Mail test failed",
+        description: err?.response?.data?.message ?? "Could not send test email.",
+        tone: "error",
+      });
+    } finally {
+      setSendingMailTest(false);
     }
   };
 
@@ -106,6 +134,40 @@ export default function SystemSettingsPage() {
             disabled={saving || Object.keys(edited).length === 0}
           >
             {saving ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Saving…</span> : "Save settings"}
+          </button>
+        </div>
+      </DashCard>
+
+      <DashCard className="p-6">
+        <h2 className="mb-2 inline-flex items-center gap-2 font-dash text-lg font-semibold text-navy">
+          <Mail size={18} className="text-skyBlue" />
+          SMTP / Brevo Mail Test
+        </h2>
+        <p className="mb-4 text-sm text-zinc-600">
+          Send a test email using your current backend mail configuration and write a row to <code>email_logs</code>.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            className="dash-input sm:max-w-sm"
+            type="email"
+            placeholder="you@example.com"
+            value={mailTestTo}
+            onChange={(e) => setMailTestTo(e.target.value)}
+          />
+          <button
+            type="button"
+            className="dash-btn-primary px-5 py-2.5 disabled:opacity-60"
+            onClick={handleSendMailTest}
+            disabled={sendingMailTest}
+          >
+            {sendingMailTest ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" />
+                Sending…
+              </span>
+            ) : (
+              "Send test email"
+            )}
           </button>
         </div>
       </DashCard>

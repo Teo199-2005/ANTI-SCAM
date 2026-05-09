@@ -132,32 +132,27 @@ export default function AboutPage() {
 
         <SectionDivider icon={Target} />
 
-        {/* ── Mission / Vision / Values ──────────────────────────────── */}
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-clOcean via-clTeal to-slateBlue shadow-[0_32px_80px_-40px_rgba(13,30,66,0.75)] ring-1 ring-inset ring-white/10">
+        {/* ── Mission / Vision / Values (minimal) ─────────────────────── */}
+        <section className="overflow-hidden rounded-3xl border border-clSeafoam/60 bg-white shadow-cl-card">
           <div className="p-7 md:p-10">
-            <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-white/80">
-              Principles
-            </span>
+            <span className="cl-section-eyebrow mb-4 inline-flex">Principles</span>
             <SectionHeading
               title="Mission, Vision & Values"
               subtitle="The principles behind every product decision, booking flow, and hospitality experience we shape."
-              dark
             />
-            <div className="mt-4 grid gap-5 sm:grid-cols-3">
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
               {pillars.map((pillar) => (
-                <div
+                <article
                   key={pillar.title}
-                  className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/8 backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-white/12"
+                  className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-5 transition-colors duration-200 hover:border-zinc-300 hover:bg-white"
                 >
-                  <div className={`h-0.5 w-full bg-gradient-to-r ${pillar.stripe}`} />
-                  <div className="p-6">
-                    <div className={`inline-flex rounded-xl border p-3 ${pillar.iconStyle} transition-transform duration-300 group-hover:scale-110`}>
-                      <pillar.icon size={18} />
-                    </div>
-                    <h3 className="mt-4 font-heading text-xl text-white">{pillar.title}</h3>
-                    <p className="mt-3 text-sm leading-7 text-white/70">{pillar.description}</p>
+                  <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-2 text-zinc-600 shadow-sm">
+                    <pillar.icon size={16} />
                   </div>
-                </div>
+                  <h3 className="mt-3 font-heading text-xl text-clOcean">{pillar.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-zinc-600">{pillar.description}</p>
+                </article>
               ))}
             </div>
           </div>
