@@ -75,7 +75,8 @@ export async function deleteResort(id: number | string) {
 export async function ownerOnboardResort(payload: {
   tenant_name: string;
   resort_name: string;
-  subdomain: string;
+  /** Omit to let the API derive a unique subdomain from the tenant name. */
+  subdomain?: string;
   address?: string;
   contact_number?: string;
   logo_url?: string;
