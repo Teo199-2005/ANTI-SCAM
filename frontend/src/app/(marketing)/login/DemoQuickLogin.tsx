@@ -25,11 +25,9 @@ function useLocalhostDemo(): boolean {
 function useDemoPanelEnabled(): { showPanel: boolean; localhostDemo: boolean } {
   const localhostDemo = useLocalhostDemo();
   const vercelPreview = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
+  // Production deploys (e.g. VPS): never show demo UI. Local: next dev, localhost, Vercel preview only.
   const showPanel =
-    process.env.NODE_ENV === "development" ||
-    process.env.NEXT_PUBLIC_SHOW_DEMO_QUICK_LOGIN === "true" ||
-    vercelPreview ||
-    localhostDemo;
+    process.env.NODE_ENV === "development" || vercelPreview || localhostDemo;
   return { showPanel, localhostDemo };
 }
 
@@ -66,29 +64,8 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
     }
   };
 
-  /** Live production apex: demos off unless flagged at build time. */
   if (!showPanel) {
-    if (process.env.NODE_ENV !== "production") return null;
-    const hint = (
-      <div
-        className={`pointer-events-auto rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/95 px-4 py-3 text-center text-[11px] leading-relaxed text-zinc-600 shadow-xl backdrop-blur-sm ${
-          variant === "floating"
-            ? `fixed bottom-[max(1rem,env(safe-area-inset-bottom,0px))] right-[max(1rem,env(safe-area-inset-right,0px))] ${FLOAT_Z} max-w-[min(100vw-2rem,18rem)]`
-            : "mt-6"
-        }`}
-      >
-        <strong className="text-zinc-800">Demo accounts</strong> are hidden on this public host. To show them: run{" "}
-        <code className="rounded bg-white px-1 font-mono text-zinc-800">npx next dev</code>, use{" "}
-        <code className="rounded bg-white px-1 font-mono text-zinc-800">localhost</code>, a{" "}
-        <strong className="text-zinc-800">Vercel preview</strong> deploy, or set{" "}
-        <code className="rounded bg-white px-1 font-mono text-zinc-800">NEXT_PUBLIC_SHOW_DEMO_QUICK_LOGIN=true</code>{" "}
-        and rebuild.
-      </div>
-    );
-    if (variant === "floating" && bodyMounted && typeof document !== "undefined") {
-      return createPortal(hint, document.body);
-    }
-    return hint;
+    return null;
   }
 
   const outerClass =
@@ -120,10 +97,7 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
             <strong className="text-zinc-800">Tap a role</strong> to fill the form, sign you in, and open the dashboard.
             Password for all:{" "}
             <code className="rounded bg-zinc-100 px-1 font-mono text-zinc-800">password</code>
-            {process.env.NODE_ENV === "production" &&
-            (localhostDemo ||
-              process.env.NEXT_PUBLIC_SHOW_DEMO_QUICK_LOGIN === "true" ||
-              process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") ? (
+            {process.env.NODE_ENV === "production" && (localhostDemo || process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") ? (
               <span className="block pt-1 text-[11px] font-normal text-amber-800">
                 Demo logins on this build — use only for testing; production apex should turn demos off.
               </span>
@@ -176,10 +150,8 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
                       "O"
                     ) : acc.id === "marketing" ? (
                       "M"
-                    ) : acc.id === "client" ? (
-                      "G"
                     ) : (
-                      "U"
+                      acc.label.charAt(0).toUpperCase()
                     )}
                   </span>
 
