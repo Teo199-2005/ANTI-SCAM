@@ -4,6 +4,7 @@ namespace App\Modules\Audit\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Support\SafeSort;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 
@@ -18,8 +19,16 @@ class AuditLogController extends Controller
         $entityType = $request->string('entityType')->value();
         $userId     = $request->integer('userId');
 
-        $query = AuditLog::withoutGlobalScopes()
-            ->orderByDesc('created_at');
+        $query = AuditLog::withoutGlobalScopes();
+
+        SafeSort::apply(
+            $query,
+            $request->string('sort_by')->value(),
+            $request->string('sort_dir')->value(),
+            ['created_at', 'action', 'entity_type', 'entity_id', 'id'],
+            'created_at',
+            'desc'
+        );
 
         if ($action) {
             $query->where('action', 'like', "%{$action}%");

@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { verifyRoomAvailability, lockRoom, submitReservation } from "@/lib/booking/bookingService";
 import { CalendarDays, CreditCard, DoorOpen, MessageSquareWarning } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { sanitizeNumericIdInput } from "@/lib/inputRestrictions";
 
 const fieldClass =
   "w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 pl-10 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/15";
@@ -68,11 +69,13 @@ export default function BookingEngine() {
                 />
                 <input
                   value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
+                  onChange={(e) => setRoomId(sanitizeNumericIdInput(e.target.value))}
                   placeholder="Room ID"
                   className={fieldClass}
                   aria-label="Room ID"
                   autoComplete="off"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                 />
               </div>
               <div className="relative">

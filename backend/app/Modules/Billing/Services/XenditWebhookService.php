@@ -2,10 +2,10 @@
 
 namespace App\Modules\Billing\Services;
 
-use App\Modules\Audit\Services\AuditLogService;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Models\XenditWebhookEvent;
+use App\Modules\Audit\Services\AuditLogService;
 use App\Services\EmailNotificationService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -35,9 +35,9 @@ class XenditWebhookService
     public function handleInvoicePaid(array $payload): ?Reservation
     {
         return DB::transaction(function () use ($payload) {
-            $eventId   = (string) (Arr::get($payload, 'id') ?? Arr::get($payload, 'external_id') ?? '');
+            $eventId = (string) (Arr::get($payload, 'id') ?? Arr::get($payload, 'external_id') ?? '');
             $invoiceId = Arr::get($payload, 'id');
-            $status    = Arr::get($payload, 'status');
+            $status = Arr::get($payload, 'status');
             $eventType = Arr::get($payload, 'event');
 
             if ($eventId === '' || ! $invoiceId || ! $status) {
@@ -54,9 +54,9 @@ class XenditWebhookService
             }
 
             XenditWebhookEvent::create([
-                'event_id'     => $eventId,
-                'event_type'   => $eventType,
-                'invoice_id'   => $invoiceId,
+                'event_id' => $eventId,
+                'event_type' => $eventType,
+                'invoice_id' => $invoiceId,
                 'processed_at' => now(),
             ]);
 
@@ -70,6 +70,10 @@ class XenditWebhookService
             }
 
             if ($eventType === 'invoice.paid' && $status === 'PAID') {
+                if ($reservation->xendit_payment_status === 'paid' && $reservation->status === 'confirmed') {
+                    return $reservation->refresh();
+                }
+
                 // Auto-create guest account if the reservation has no linked user
                 if (! $reservation->client_id) {
                     $guestUser = $this->ensureGuestAccount($payload, $reservation);
@@ -81,9 +85,9 @@ class XenditWebhookService
                 $oldValues = $reservation->only(['status', 'xendit_payment_status', 'client_id']);
                 $reservation->update([
                     'xendit_payment_status' => 'paid',
-                    'status'                => 'confirmed',
-                    'client_id'             => $reservation->client_id,
-                    'reserved_at'           => now(),
+                    'status' => 'confirmed',
+                    'client_id' => $reservation->client_id,
+                    'reserved_at' => now(),
                 ]);
 
                 $this->audits->log(
@@ -102,10 +106,15 @@ class XenditWebhookService
                 });
 
             } elseif (in_array($status, ['EXPIRED', 'FAILED'], true)) {
+                if ($reservation->status === 'expired'
+                    && in_array((string) $reservation->xendit_payment_status, ['expired', 'failed'], true)) {
+                    return $reservation->refresh();
+                }
+
                 $oldValues = $reservation->only(['status', 'xendit_payment_status']);
                 $reservation->update([
                     'xendit_payment_status' => strtolower($status),
-                    'status'                => 'expired',
+                    'status' => 'expired',
                 ]);
 
                 $this->audits->log(
@@ -146,10 +155,10 @@ class XenditWebhookService
             ?? 'Guest';
 
         $user = User::create([
-            'name'              => $name,
-            'email'             => $email,
-            'password'          => bcrypt(Str::random(24)),
-            'role'              => 'client',
+            'name' => $name,
+            'email' => $email,
+            'password' => bcrypt(Str::random(24)),
+            'role' => 'client',
             'email_verified_at' => now(),
         ]);
 

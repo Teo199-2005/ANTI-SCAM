@@ -20,6 +20,7 @@ class UpdateRoomRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:120'],
             'code' => ['nullable', 'string', 'max:40'],
             'capacity' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'units' => ['sometimes', 'integer', 'min:1', 'max:99'],
             'base_price' => ['sometimes', 'numeric', 'min:0'],
             'amenities' => ['nullable', 'array'],
             'amenities.*' => ['string', 'max:80'],

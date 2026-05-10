@@ -129,7 +129,7 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
                 dark ? "text-white" : "text-zinc-900"
               }`}
             >
-              The Rising 2 Brothers
+              The Rising 2 Brothers OPC
             </p>
           </div>
         </div>

@@ -9,6 +9,7 @@ use App\Modules\Reservations\Http\Requests\StoreReservationRequest;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
 use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Reservation;
+use App\Support\SafeSort;
 use App\Shared\Traits\ApiResponseTrait;
 use RuntimeException;
 
@@ -42,13 +43,14 @@ class ReservationController extends Controller
 
         $user    = auth()->user();
         $query   = Reservation::withoutGlobalScopes()
-            ->with(['resort:id,name,address', 'room:id,name'])
-            ->latest();
+            ->with(['resort:id,name,address', 'room:id,name']);
         $status  = request()->string('status')->value();
         $dateFrom = request()->string('dateFrom')->value();
         $dateTo  = request()->string('dateTo')->value();
         $search  = request()->string('search')->value();
         $perPage = (int) request()->integer('perPage', 10);
+        $sortBy  = request()->string('sort_by')->value();
+        $sortDir = request()->string('sort_dir')->value();
 
         if ($status) {
             $query->where('status', $status);
@@ -76,6 +78,15 @@ class ReservationController extends Controller
         if (! in_array($user->role, ['admin'], true)) {
             $query->where('tenant_id', $user->tenant_id);
         }
+
+        SafeSort::apply(
+            $query,
+            $sortBy,
+            $sortDir,
+            ['reference_no', 'status', 'check_in_date', 'check_out_date', 'created_at', 'guest_count', 'total_amount'],
+            'created_at',
+            'desc'
+        );
 
         $reservations = ReservationResource::collection($query->paginate($perPage));
 

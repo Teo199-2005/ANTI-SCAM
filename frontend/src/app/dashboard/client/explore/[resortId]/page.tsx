@@ -191,6 +191,9 @@ export default function ResortExplorePage({ params }: { params: Promise<{ resort
                   <Users size={14} /> Up to {room.capacity} guests
                 </p>
                 <p className="mt-2 text-sm font-semibold text-navy">From ₱{Number(room.basePrice).toLocaleString()} / night</p>
+                {room.units && room.units > 1 ? (
+                  <p className="mt-0.5 text-xs text-zinc-500">{room.units} bookable units (same room type)</p>
+                ) : null}
                 {room.amenities?.length ? (
                   <p className="mt-2 line-clamp-2 text-xs text-zinc-500">{room.amenities.slice(0, 4).join(" · ")}</p>
                 ) : null}

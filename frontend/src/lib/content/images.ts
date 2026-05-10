@@ -1,10 +1,8 @@
 /**
  * Marketing imagery paths / URLs.
  *
- * Landing hero: full-bleed PNG `coverphoto.png` — **1536 × 1024 px** (3∶2).
- * Hero section uses this exact aspect ratio (no overlay UI; artwork includes all messaging).
+ * Landing hero bitmap: `public/coverphoto.png` (imported in `HeroSection` for true dimensions & mobile layout).
  */
-export const HERO_BANNER_INTRINSIC = { width: 1536, height: 1024, aspect: 1536 / 1024 } as const;
 
 /** Visionaries — Charles Andrew Santiago (`CEO.png`), intrinsic **1254 × 1254** px (1∶1). */
 export const VISIONARY_CEO_INTRINSIC = { width: 1254, height: 1254 } as const;

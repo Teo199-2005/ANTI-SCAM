@@ -33,10 +33,18 @@ class RoomImageController extends Controller
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ]);
 
+        $files = $request->file('images');
+        $existing = $room->images()->count();
+        if ($existing + count($files) > 5) {
+            return $this->errorResponse('A maximum of 5 images per room is allowed. Remove some photos first.', [
+                'images' => ['This room already has '.$existing.' image(s); you can add at most '.(5 - $existing).' more.'],
+            ], 422);
+        }
+
         $tenantId = TenantContext::tenantId() ?? $request->user()?->tenant_id;
 
         $created = [];
-        foreach ($request->file('images') as $file) {
+        foreach ($files as $file) {
             $path      = $file->store("rooms/{$room->id}", 'public');
             $isPrimary = $room->images()->count() === 0 && count($created) === 0;
 

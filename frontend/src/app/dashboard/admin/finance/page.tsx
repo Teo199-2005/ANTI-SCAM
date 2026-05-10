@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
 import {
   getAdminCommissionReleases,
   getAdminFinanceCommissions,
@@ -42,6 +43,10 @@ function fmtPhp(n: number | string | null | undefined) {
   if (Number.isNaN(v)) return "PHP 0.00";
   return `PHP ${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+/** ≥16px on phones avoids iOS input zoom on native selects */
+const financeSelectCls =
+  "ml-1 rounded-lg border border-softBorder bg-white px-2 py-2 text-base md:text-sm [touch-action:manipulation]";
 
 function StatusBadge({ status }: { status: string }) {
   const s = status?.toLowerCase() ?? "";
@@ -189,7 +194,7 @@ export default function AdminFinancePage() {
       <div className="flex gap-2">
         <button
           type="button"
-          className="dash-btn-sm inline-flex items-center gap-1 disabled:opacity-40"
+          className="dash-btn-sm inline-flex min-h-11 items-center gap-1 disabled:opacity-40 [touch-action:manipulation] md:min-h-0"
           disabled={page <= 1}
           onClick={onPrev}
         >
@@ -197,7 +202,7 @@ export default function AdminFinancePage() {
         </button>
         <button
           type="button"
-          className="dash-btn-sm inline-flex items-center gap-1 disabled:opacity-40"
+          className="dash-btn-sm inline-flex min-h-11 items-center gap-1 disabled:opacity-40 [touch-action:manipulation] md:min-h-0"
           disabled={page >= lastPage}
           onClick={onNext}
         >
@@ -251,7 +256,7 @@ export default function AdminFinancePage() {
       {tab === "overview" && (
         <div className="space-y-4">
           {loading || !overview ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="h-28 animate-pulse rounded-2xl bg-softGray" />
               ))}
@@ -266,49 +271,51 @@ export default function AdminFinancePage() {
                   gross vs net paid.
                 </p>
               </DashCard>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Subscription in (paid)</p>
-                  <p className="mt-2 text-2xl font-bold text-emerald-700">{fmtPhp(overview.subscription_inflows_paid)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{overview.counts.subscription_invoices_paid} paid invoices</p>
+              <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Subscription in (paid)</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-emerald-700 sm:mt-2 sm:text-2xl">{fmtPhp(overview.subscription_inflows_paid)}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">{overview.counts.subscription_invoices_paid} paid invoices</p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Subscription in (pending)</p>
-                  <p className="mt-2 text-2xl font-bold text-amber-700">{fmtPhp(overview.subscription_inflows_pending)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{overview.counts.subscription_invoices_unpaid} unpaid / open</p>
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Subscription in (pending)</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-amber-700 sm:mt-2 sm:text-2xl">{fmtPhp(overview.subscription_inflows_pending)}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">{overview.counts.subscription_invoices_unpaid} unpaid / open</p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Guest bookings paid</p>
-                  <p className="mt-2 text-2xl font-bold text-navy">{fmtPhp(overview.guest_booking_paid_total)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{overview.counts.reservations_paid} paid reservations</p>
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Guest bookings paid</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-navy sm:mt-2 sm:text-2xl">{fmtPhp(overview.guest_booking_paid_total)}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">{overview.counts.reservations_paid} paid reservations</p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Commissions (gross pending)</p>
-                  <p className="mt-2 text-2xl font-bold text-violet-800">{fmtPhp(overview.commission_gross_pending)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{overview.counts.commissions_pending} rows</p>
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Commissions (gross pending)</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-violet-800 sm:mt-2 sm:text-2xl">{fmtPhp(overview.commission_gross_pending)}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">{overview.counts.commissions_pending} rows</p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Commissions (gross released)</p>
-                  <p className="mt-2 text-2xl font-bold text-zinc-800">{fmtPhp(overview.commission_gross_released)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{overview.counts.commissions_released} rows</p>
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Commissions (gross released)</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-zinc-800 sm:mt-2 sm:text-2xl">{fmtPhp(overview.commission_gross_released)}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">{overview.counts.commissions_released} rows</p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Net paid to marketers</p>
-                  <p className="mt-2 text-2xl font-bold text-sky-800">{fmtPhp(overview.commission_net_paid_to_marketers)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">Sum of commission release amounts</p>
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Net paid to marketers</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-sky-800 sm:mt-2 sm:text-2xl">{fmtPhp(overview.commission_net_paid_to_marketers)}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">Sum of commission release amounts</p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Withheld (succeeded batches)</p>
-                  <p className="mt-2 text-2xl font-bold text-rose-800">{fmtPhp(overview.withheld_on_succeeded_batches)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Withheld (succeeded batches)</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-rose-800 sm:mt-2 sm:text-2xl">{fmtPhp(overview.withheld_on_succeeded_batches)}</p>
+                  <p className="mt-1 text-[10px] leading-snug text-zinc-500 sm:text-xs">
                     Gross {fmtPhp(overview.payout_batches_succeeded_gross)} → net {fmtPhp(overview.payout_batches_succeeded_net)}
                   </p>
                 </DashCard>
-                <DashCard className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Payout batches</p>
-                  <p className="mt-2 text-2xl font-bold text-navy">{overview.counts.payout_batches_total}</p>
-                  <p className="mt-1 text-xs text-zinc-500">All statuses (see Withholding tab)</p>
+                <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
+                  <p className="text-[10px] font-bold uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">Payout batches</p>
+                  <p className="mt-1.5 break-words text-xl font-bold text-navy sm:mt-2 sm:text-2xl">{overview.counts.payout_batches_total}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">All statuses (see Withholding tab)</p>
                 </DashCard>
+                </div>
               </div>
             </>
           )}
@@ -321,7 +328,7 @@ export default function AdminFinancePage() {
             <label className="text-xs font-semibold text-zinc-600">
               Type{" "}
               <select
-                className="ml-1 rounded-lg border border-softBorder bg-white px-2 py-1 text-sm"
+                className={financeSelectCls}
                 value={ledgerType}
                 onChange={(e) => {
                   setLedgerType(e.target.value as typeof ledgerType);
@@ -363,8 +370,9 @@ export default function AdminFinancePage() {
                   />
                 ))}
               </div>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="dash-table">
+              <div className="hidden md:block">
+                <DashTableScrollRegion label="Payment ledger table">
+                  <table className="dash-table min-w-[720px]">
                   <thead>
                     <tr>
                       <th>Type</th>
@@ -392,6 +400,7 @@ export default function AdminFinancePage() {
                     ))}
                   </tbody>
                 </table>
+                </DashTableScrollRegion>
               </div>
               <Paginate
                 page={ledgerPage}
@@ -408,13 +417,13 @@ export default function AdminFinancePage() {
       {tab === "commissions" && (
         <DashCard className="overflow-hidden p-0">
           {commSummary && (
-            <div className="grid gap-3 border-b border-softBorder p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl bg-softGray/50 px-3 py-2">
+            <div className="grid grid-cols-2 gap-3 border-b border-softBorder p-4">
+              <div className="rounded-xl border border-softBorder/80 bg-softGray/50 px-3 py-2">
                 <p className="text-[10px] font-bold uppercase text-zinc-500">Pending rows</p>
                 <p className="text-lg font-bold text-navy">{commSummary.pending_count}</p>
                 <p className="text-xs text-zinc-600">{fmtPhp(commSummary.pending_gross)} gross</p>
               </div>
-              <div className="rounded-xl bg-softGray/50 px-3 py-2">
+              <div className="rounded-xl border border-softBorder/80 bg-softGray/50 px-3 py-2">
                 <p className="text-[10px] font-bold uppercase text-zinc-500">Released rows</p>
                 <p className="text-lg font-bold text-navy">{commSummary.released_count}</p>
                 <p className="text-xs text-zinc-600">{fmtPhp(commSummary.released_gross)} gross</p>
@@ -425,7 +434,7 @@ export default function AdminFinancePage() {
             <label className="text-xs font-semibold text-zinc-600">
               Status{" "}
               <select
-                className="ml-1 rounded-lg border border-softBorder bg-white px-2 py-1 text-sm"
+                className={financeSelectCls}
                 value={commStatus}
                 onChange={(e) => {
                   setCommStatus(e.target.value);
@@ -446,8 +455,35 @@ export default function AdminFinancePage() {
             <p className="px-6 py-10 text-center text-sm text-zinc-500">No commissions.</p>
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="dash-table">
+              <div className="md:hidden space-y-3 p-4">
+                {commRows.map((c) => (
+                  <DashMobileTableCard
+                    key={c.id}
+                    title={<span className="font-mono text-sm text-navy">Commission #{c.id}</span>}
+                    fields={[
+                      { label: "Marketer", value: c.marketer?.name ?? String(c.marketer_id) },
+                      { label: "Resort", value: c.resort?.name ?? String(c.resort_id) },
+                      { label: "Period", value: <span className="font-mono text-xs">{c.period}</span> },
+                      { label: "Gross", value: fmtPhp(c.commission_amount) },
+                      { label: "Status", value: <StatusBadge status={c.status} /> },
+                      {
+                        label: "Payout batch",
+                        value:
+                          c.payout_batch != null ? (
+                            <span className="break-all font-mono text-xs">
+                              {c.payout_batch.reference_id} ({c.payout_batch.status})
+                            </span>
+                          ) : (
+                            "—"
+                          ),
+                      },
+                    ]}
+                  />
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <DashTableScrollRegion label="Commissions table">
+                  <table className="dash-table min-w-[960px]">
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -483,6 +519,7 @@ export default function AdminFinancePage() {
                     ))}
                   </tbody>
                 </table>
+                </DashTableScrollRegion>
               </div>
               <Paginate
                 page={commPage}
@@ -499,16 +536,16 @@ export default function AdminFinancePage() {
       {tab === "withholding" && (
         <DashCard className="overflow-hidden p-0">
           {batchSummary && (
-            <div className="grid gap-3 border-b border-softBorder p-4 sm:grid-cols-3">
-              <div className="rounded-xl bg-emerald-50/80 px-3 py-2 ring-1 ring-emerald-100">
+            <div className="grid grid-cols-2 gap-3 border-b border-softBorder p-4 lg:grid-cols-3">
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 ring-1 ring-emerald-100">
                 <p className="text-[10px] font-bold uppercase text-emerald-800">Succeeded gross</p>
                 <p className="text-lg font-bold text-emerald-900">{fmtPhp(batchSummary.succeeded_gross)}</p>
               </div>
-              <div className="rounded-xl bg-sky-50/80 px-3 py-2 ring-1 ring-sky-100">
+              <div className="rounded-xl border border-sky-200/80 bg-sky-50/80 px-3 py-2 ring-1 ring-sky-100">
                 <p className="text-[10px] font-bold uppercase text-sky-800">Net disbursed</p>
                 <p className="text-lg font-bold text-sky-900">{fmtPhp(batchSummary.succeeded_net)}</p>
               </div>
-              <div className="rounded-xl bg-rose-50/80 px-3 py-2 ring-1 ring-rose-100">
+              <div className="rounded-xl border border-rose-200/80 bg-rose-50/80 px-3 py-2 ring-1 ring-rose-100">
                 <p className="text-[10px] font-bold uppercase text-rose-800">Withheld</p>
                 <p className="text-lg font-bold text-rose-900">{fmtPhp(batchSummary.succeeded_withheld)}</p>
               </div>
@@ -518,7 +555,7 @@ export default function AdminFinancePage() {
             <label className="text-xs font-semibold text-zinc-600">
               Batch status{" "}
               <select
-                className="ml-1 rounded-lg border border-softBorder bg-white px-2 py-1 text-sm"
+                className={financeSelectCls}
                 value={batchStatus}
                 onChange={(e) => {
                   setBatchStatus(e.target.value);
@@ -541,8 +578,29 @@ export default function AdminFinancePage() {
             <p className="px-6 py-10 text-center text-sm text-zinc-500">No payout batches yet.</p>
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="dash-table">
+              <div className="md:hidden space-y-3 p-4">
+                {batchRows.map((b) => (
+                  <DashMobileTableCard
+                    key={b.id}
+                    title={<span className="font-mono text-sm text-navy">Batch #{b.id}</span>}
+                    fields={[
+                      { label: "Marketer", value: b.marketer?.name ?? String(b.marketer_id) },
+                      { label: "Period", value: <span className="font-mono text-xs">{b.run_period}</span> },
+                      { label: "Status", value: <StatusBadge status={b.status} /> },
+                      { label: "Gross", value: fmtPhp(b.gross_commissions) },
+                      { label: "Net out", value: fmtPhp(b.net_disbursed) },
+                      { label: "Withheld", value: fmtPhp(b.withheld) },
+                      {
+                        label: "Xendit",
+                        value: <span className="break-all font-mono text-xs">{b.xendit_payout_id ?? "—"}</span>,
+                      },
+                    ]}
+                  />
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <DashTableScrollRegion label="Withholding and payout batches table">
+                  <table className="dash-table min-w-[1000px]">
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -572,6 +630,7 @@ export default function AdminFinancePage() {
                     ))}
                   </tbody>
                 </table>
+                </DashTableScrollRegion>
               </div>
               <Paginate
                 page={batchPage}
@@ -595,8 +654,27 @@ export default function AdminFinancePage() {
             <p className="px-6 py-10 text-center text-sm text-zinc-500">No commission releases recorded.</p>
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="dash-table">
+              <div className="md:hidden space-y-3 p-4">
+                {relRows.map((r) => (
+                  <DashMobileTableCard
+                    key={r.id}
+                    title={fmtPhp(r.amount)}
+                    fields={[
+                      { label: "Released", value: new Date(r.released_at).toLocaleString() },
+                      { label: "Source", value: <span className="capitalize">{r.release_source}</span> },
+                      { label: "Marketer", value: r.commission?.marketer?.name ?? "—" },
+                      { label: "Resort", value: r.commission?.resort?.name ?? "—" },
+                      {
+                        label: "Batch ref",
+                        value: <span className="font-mono text-xs">{r.payout_batch?.reference_id ?? "—"}</span>,
+                      },
+                    ]}
+                  />
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <DashTableScrollRegion label="Commission release log table">
+                  <table className="dash-table min-w-[880px]">
                   <thead>
                     <tr>
                       <th>Released</th>
@@ -620,6 +698,7 @@ export default function AdminFinancePage() {
                     ))}
                   </tbody>
                 </table>
+                </DashTableScrollRegion>
               </div>
               <Paginate
                 page={relPage}

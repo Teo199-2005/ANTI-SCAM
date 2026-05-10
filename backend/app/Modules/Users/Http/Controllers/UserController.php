@@ -23,7 +23,12 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $collection = UserResource::collection(
-            $this->service->list((int) $request->integer('perPage', 10), $request->string('search')->value())
+            $this->service->list(
+                (int) $request->integer('perPage', 10),
+                $request->string('search')->value(),
+                $request->string('sort_by')->value(),
+                $request->string('sort_dir')->value(),
+            )
         );
 
         return $this->successResponse($collection, 'Users fetched');

@@ -10,10 +10,11 @@
  * This prevents token theft via XSS because JavaScript has no access to rs_session cookie.
  */
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { laravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 
 // ── Public catalog client (no auth required) ──────────────────────────────────
 // Direct calls to the Laravel backend for unauthenticated data.
-const RAW_BACKEND = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+const RAW_BACKEND = laravelApiV1BaseUrl();
 
 export const publicClient = axios.create({
   baseURL: RAW_BACKEND,

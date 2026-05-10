@@ -9,6 +9,7 @@ import {
   StoredClientReview,
 } from "@/lib/client/reviews";
 import { apiClient } from "@/lib/api/client";
+import { sanitizeLongText } from "@/lib/inputRestrictions";
 import { Loader2, Star } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -192,7 +193,7 @@ export default function ClientReviewsPage() {
                             className="dash-input min-h-[100px] w-full"
                             placeholder="Tell others about your stay…"
                             value={comment}
-                            onChange={(e) => setComment(e.target.value)}
+                            onChange={(e) => setComment(sanitizeLongText(e.target.value))}
                           />
                           <div className="flex gap-2">
                             <button type="button" disabled={saving} onClick={submitReview} className="dash-btn-primary">

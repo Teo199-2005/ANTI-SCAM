@@ -59,7 +59,7 @@ class ReservationService
                 throw new RuntimeException('Selected room does not belong to the chosen resort.');
             }
 
-            $hasConflict = Reservation::query()
+            $overlapCount = Reservation::query()
                 ->where('tenant_id', $tenantId)
                 ->where('room_id', $lock->room_id)
                 ->whereIn('status', ['pending_payment', 'confirmed'])
@@ -73,9 +73,11 @@ class ReservationService
                         });
                 })
                 ->lockForUpdate()
-                ->exists();
+                ->count();
 
-            if ($hasConflict) {
+            $units = max(1, (int) ($room->units ?? 1));
+
+            if ($overlapCount >= $units) {
                 $lock->update(['status' => 'released']);
                 throw new RuntimeException('Room was booked by another transaction. Please choose another date.');
             }

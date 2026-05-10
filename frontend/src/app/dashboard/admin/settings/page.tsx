@@ -1,8 +1,14 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { getSystemSettings, sendAdminMailTest, updateSystemSettings, SystemSetting } from "@/lib/api/admin";
+import {
+  sanitizeEmailTyping,
+  sanitizeIntegerDigitsOnly,
+  sanitizeLongText,
+} from "@/lib/inputRestrictions";
 import { Loader2, Mail, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -118,7 +124,14 @@ export default function SystemSettingsPage() {
                       className="dash-input"
                       type={s.type === "integer" ? "number" : "text"}
                       value={edited[s.key] ?? s.value}
-                      onChange={(e) => handleChange(s.key, e.target.value)}
+                      onChange={(e) =>
+                        handleChange(
+                          s.key,
+                          s.type === "integer"
+                            ? sanitizeIntegerDigitsOnly(e.target.value, 12)
+                            : sanitizeLongText(e.target.value, 8000),
+                        )
+                      }
                     />
                   )}
                 </div>
@@ -138,6 +151,18 @@ export default function SystemSettingsPage() {
         </div>
       </DashCard>
 
+      <ChangePasswordCard
+        idPrefix="admin-settings"
+        title="Reset password"
+        description={
+          <>
+            Change the password for whoever is signed in on this browser. Requirements: at least 8 characters, uppercase,
+            lowercase, and a number (same rules as registration).
+          </>
+        }
+        successHint="Your platform login password was changed. Other sessions were signed out."
+      />
+
       <DashCard className="p-6">
         <h2 className="mb-2 inline-flex items-center gap-2 font-dash text-lg font-semibold text-navy">
           <Mail size={18} className="text-skyBlue" />
@@ -152,7 +177,9 @@ export default function SystemSettingsPage() {
             type="email"
             placeholder="you@example.com"
             value={mailTestTo}
-            onChange={(e) => setMailTestTo(e.target.value)}
+            onChange={(e) =>
+              setMailTestTo(sanitizeEmailTyping(e.target.value).toLowerCase())
+            }
           />
           <button
             type="button"

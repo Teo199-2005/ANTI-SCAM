@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   Hash,
   Image as ImageIcon,
+  Layers,
   Loader2,
   ScrollText,
   Star,
@@ -15,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/components/shared/ToastProvider";
+import { sanitizeLongText, sanitizeRoomCodeInput, sanitizeRoomNameInput } from "@/lib/inputRestrictions";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -23,6 +25,8 @@ export type RoomFormValues = {
   name: string;
   code: string;
   capacity: number;
+  /** Identical bookable units (parallel bookings for overlapping dates). */
+  units: number;
   base_price: number;
   bed_count: number;
   bed_type: string;
@@ -39,17 +43,22 @@ type RoomImage = {
   original_name: string;
 };
 
+type Tab = "details" | "images";
+
 type RoomModalProps = {
   open: boolean;
   title: string;
   initialValues: RoomFormValues;
   loading: boolean;
+  /** Set after the room row is created so the Photos tab can upload images (API requires a room id). */
   roomId?: number;
+  /** When the modal opens or after save, which tab to show (e.g. switch to photos after create). */
+  initialActiveTab?: Tab;
+  /** Label for the details form submit button (e.g. after create vs first save). */
+  detailsSubmitLabel?: string;
   onClose: () => void;
   onSave: (values: RoomFormValues) => Promise<void>;
 };
-
-type Tab = "details" | "images";
 
 const INCLUSION_OPTIONS = [
   "WiFi",
@@ -66,7 +75,17 @@ const INCLUSION_OPTIONS = [
   "Room Service",
 ];
 
-export default function RoomModal({ open, title, initialValues, loading, roomId, onClose, onSave }: RoomModalProps) {
+export default function RoomModal({
+  open,
+  title,
+  initialValues,
+  loading,
+  roomId,
+  initialActiveTab = "details",
+  detailsSubmitLabel = "Save & continue to photos",
+  onClose,
+  onSave,
+}: RoomModalProps) {
   const [form, setForm] = useState<RoomFormValues>(initialValues);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -76,12 +95,30 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
   const [uploading, setUploading] = useState(false);
   const [deletingImg, setDeletingImg] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const prevOpenRef = useRef(false);
+  const prevRoomIdForTabRef = useRef<number | undefined>(undefined);
   const { pushToast } = useToast();
 
   useEffect(() => {
-    setForm(initialValues);
-    setTab("details");
-  }, [initialValues, open]);
+    if (open && !prevOpenRef.current) {
+      setForm(initialValues);
+      setTab(initialActiveTab);
+      setImages([]);
+    }
+    prevOpenRef.current = open;
+  }, [open, initialValues, initialActiveTab]);
+
+  useEffect(() => {
+    if (!open) {
+      prevRoomIdForTabRef.current = undefined;
+      return;
+    }
+    const before = prevRoomIdForTabRef.current;
+    prevRoomIdForTabRef.current = roomId;
+    if (before === undefined && roomId !== undefined && initialActiveTab === "images") {
+      setTab("images");
+    }
+  }, [open, roomId, initialActiveTab]);
 
   useEffect(() => {
     if (open) {
@@ -194,7 +231,14 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
   if (!open || !mounted) return null;
 
   const updateField = <K extends keyof RoomFormValues>(key: K, value: RoomFormValues[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    let next = value;
+    if (key === "name" && typeof value === "string") next = sanitizeRoomNameInput(value) as RoomFormValues[K];
+    if (key === "code" && typeof value === "string") next = sanitizeRoomCodeInput(value) as RoomFormValues[K];
+    if (key === "bed_type" && typeof value === "string") {
+      next = sanitizeRoomNameInput(value, 80) as RoomFormValues[K];
+    }
+    if (key === "rules" && typeof value === "string") next = sanitizeLongText(value) as RoomFormValues[K];
+    setForm((prev) => ({ ...prev, [key]: next }));
   };
 
   const inputWrap =
@@ -202,23 +246,23 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
   const iconCls =
     "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-skyBlue";
   const inputCls =
-    "h-11 w-full rounded-xl border-0 bg-transparent pl-10 pr-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none";
+    "h-11 w-full rounded-xl border-0 bg-transparent pl-10 pr-3 text-base text-zinc-800 placeholder:text-zinc-400 focus:outline-none md:text-sm";
   const fieldLabelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-zinc-500";
 
   return createPortal(
     <div
       role="presentation"
-      className={`fixed inset-0 z-[120] flex items-end justify-center p-0 transition-all duration-200 md:items-center md:p-4 ${visible ? "bg-zinc-900/55 backdrop-blur-md" : "bg-zinc-900/0"}`}
+      className={`fixed inset-0 z-[120] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-y-contain p-0 transition-all duration-200 motion-reduce:transition-none md:items-center md:p-4 ${visible ? "bg-zinc-900/55 backdrop-blur-md" : "bg-zinc-900/0"}`}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className={`flex max-h-[min(88dvh,900px)] w-full max-w-2xl flex-col overflow-hidden border border-white/45 bg-white/90 shadow-float backdrop-blur-xl backdrop-saturate-150 transition-all duration-200 max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl max-md:border-x-0 max-md:border-b-0 md:max-h-[min(90vh,800px)] md:rounded-2xl md:border ${visible ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-4 opacity-0 md:translate-y-0 md:scale-95"}`}
+        className={`box-border flex max-h-[min(88dvh,900px)] w-full min-w-0 max-w-2xl flex-col overflow-hidden border border-white/45 bg-white/90 shadow-float backdrop-blur-xl backdrop-saturate-150 transition-all duration-200 motion-reduce:transform-none motion-reduce:transition-none max-md:max-w-full max-md:rounded-b-none max-md:rounded-t-2xl max-md:border-x-0 max-md:border-b-0 md:max-h-[min(90vh,800px)] md:rounded-2xl md:border ${visible ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-4 opacity-0 md:translate-y-0 md:scale-95"}`}
       >
         {/* Modal header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-zinc-200/80 px-6 py-4 max-md:pt-[max(1rem,env(safe-area-inset-top))]">
-          <h3 className="min-w-0 font-dash text-xl text-navy">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-200/80 px-4 py-3 max-md:pt-[max(0.75rem,env(safe-area-inset-top))] md:px-6 md:py-4">
+          <h3 className="min-w-0 pr-2 font-dash text-base font-semibold leading-snug text-navy md:pr-0 md:text-xl">{title}</h3>
           <button
             type="button"
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-white/50 bg-white/60 text-zinc-500 transition hover:bg-white hover:text-navy md:h-9 md:w-9 md:min-h-0 md:min-w-0"
@@ -229,22 +273,22 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
           </button>
         </div>
 
-        {/* Tab bar — only show when editing (roomId exists) */}
+        {/* Tabs: Photos appears after the room is saved (room id required for uploads). */}
         {roomId ? (
-          <div className="flex shrink-0 overflow-x-auto overflow-y-hidden border-b border-zinc-200/80 px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex shrink-0 overflow-x-auto overflow-y-hidden border-b border-zinc-200/80 px-4 [-ms-overflow-style:none] [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden">
             <div className="flex min-w-min whitespace-nowrap">
             {(["details", "images"] as Tab[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
-                className={`shrink-0 px-4 py-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+                className={`shrink-0 px-3 py-2 text-xs font-medium capitalize transition-colors border-b-2 -mb-px md:px-4 md:py-3 md:text-sm ${
                   tab === t
                     ? "border-skyBlue text-skyBlue"
                     : "border-transparent text-zinc-500 hover:text-navy"
                 }`}
               >
-                {t === "images" ? <span className="inline-flex items-center gap-1.5"><ImageIcon size={13} />Photos</span> : "Details"}
+                {t === "images" ? <span className="inline-flex items-center gap-1.5"><ImageIcon size={13} />Photos (up to 5)</span> : "Details"}
               </button>
             ))}
             </div>
@@ -254,7 +298,7 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
         {/* Details tab */}
         {tab === "details" && (
           <form
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:space-y-3 md:p-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
             onSubmit={(e) => {
               e.preventDefault();
               void onSave(form);
@@ -287,7 +331,7 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
                 </label>
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <div>
                 <p className={fieldLabelCls}>Capacity</p>
                 <label className={inputWrap}>
@@ -303,6 +347,26 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
                     required
                   />
                 </label>
+              </div>
+              <div>
+                <p className={fieldLabelCls}>Units</p>
+                <label className={inputWrap}>
+                  <Layers size={15} className={iconCls} />
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={1}
+                    max={99}
+                    title="How many identical rooms of this type can be booked on the same dates"
+                    placeholder="e.g. 1"
+                    value={form.units}
+                    onChange={(e) => updateField("units", Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+                    required
+                  />
+                </label>
+                <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+                  Parallel bookings for overlapping dates (same room type).
+                </p>
               </div>
               <div>
                 <p className={fieldLabelCls}>Base price</p>
@@ -429,7 +493,7 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
                 disabled={loading}
                 className="inline-flex items-center justify-center rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-50"
               >
-                {loading ? "Saving…" : "Save room"}
+                {loading ? "Saving…" : detailsSubmitLabel}
               </button>
             </div>
           </form>
@@ -437,7 +501,13 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
 
         {/* Images tab */}
         {tab === "images" && roomId && (
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:space-y-4 md:p-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <p className="rounded-xl border border-skyBlue/25 bg-sky-50/90 px-3 py-2 text-xs leading-relaxed text-sky-950 md:px-4 md:py-3 md:text-sm">
+              These photos appear on your{" "}
+              <strong className="font-semibold">public resort landing</strong> (subdomain page) and when guests{" "}
+              <strong className="font-semibold">explore rooms</strong> for your property. Up to <strong>5</strong> images
+              per room.
+            </p>
             {/* Upload area */}
             <div
               className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-softBorder bg-softGray py-8 transition hover:border-skyBlue hover:bg-metalFace"
@@ -509,7 +579,9 @@ export default function RoomModal({ open, title, initialValues, loading, roomId,
             )}
 
             <div className="flex justify-end pt-2 max-md:w-full [&_button]:max-md:w-full">
-              <button type="button" onClick={onClose} className="dash-btn-sm px-4 py-2">Close</button>
+              <button type="button" onClick={onClose} className="dash-btn-primary px-5 py-2">
+                Done
+              </button>
             </div>
           </div>
         )}

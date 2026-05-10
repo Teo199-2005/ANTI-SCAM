@@ -129,8 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshUser]);
 
+  const loginLockRef = useRef(false);
+
   const login = useCallback(
     async (email: string, password: string) => {
+      if (loginLockRef.current) {
+        throw new Error("Sign-in already in progress. Please wait.");
+      }
+      loginLockRef.current = true;
       bumpAuthEpoch();
       try {
         const { data } = await authClient.post<AuthEnvelope>("/login", { email, password });
@@ -142,6 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         setLoading(false);
         throw new Error(parseApiErrorMessage(err, "Login failed."));
+      } finally {
+        loginLockRef.current = false;
       }
     },
     [bumpAuthEpoch],

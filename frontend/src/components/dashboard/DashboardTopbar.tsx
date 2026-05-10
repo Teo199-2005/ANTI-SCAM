@@ -7,6 +7,7 @@ import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { validateReferralCode } from "@/lib/api/referral";
 import type { ReadinessPayload } from "@/lib/api/referral";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { sanitizeReferralCodeInput } from "@/lib/inputRestrictions";
 import { formatRoleLabel } from "@/lib/utils";
 import { AlertCircle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
 import Link from "next/link";
@@ -75,7 +76,6 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       .slice(0, 2)
       .toUpperCase() ?? "?";
 
-  const leaf = crumbs.length ? segmentLabel(crumbs[crumbs.length - 1]!) : "Dashboard";
   const roleLabel = formatRoleLabel(user?.role);
   const isSubscribedOwner =
     user?.role === "resort_owner" && (subscriptionInfo?.status ?? "").toLowerCase() === "active";
@@ -212,20 +212,21 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   };
 
   return (
-    <header className="dash-topbar sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 px-4 lg:px-6">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="dash-topbar sticky top-0 z-30 flex h-16 min-w-0 max-w-full shrink-0 items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6 max-md:h-auto max-md:min-h-[3.25rem] max-md:py-2 max-md:pt-[max(0.35rem,env(safe-area-inset-top))] max-md:border-b max-md:border-white/65 max-md:bg-gradient-to-b max-md:from-white/92 max-md:via-softCard/96 max-md:to-metalFace/92 max-md:shadow-[0_6px_22px_-8px_rgba(13,30,66,0.18)] max-md:backdrop-blur-md">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-softBorder bg-white/90 text-zinc-500 shadow-soft-sm transition-[transform,color,background-color,border-color,box-shadow] duration-150 hover:border-navy/20 hover:bg-navy/5 hover:text-navy active:scale-[0.96] md:hidden"
+          className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-xl border border-softBorder bg-white/90 text-zinc-500 shadow-soft-sm transition-[transform,color,background-color,border-color,box-shadow] duration-150 hover:border-navy/20 hover:bg-navy/5 hover:text-navy active:scale-[0.96] [touch-action:manipulation] md:hidden md:h-9 md:w-9 md:min-h-0 md:min-w-0"
           onClick={onOpenMenu}
           aria-label="Open navigation"
         >
           <Menu size={16} />
         </button>
 
-        <div className="min-w-0">
-          <p className="truncate font-dash text-dash-sm font-semibold capitalize text-navy md:hidden">{leaf}</p>
-          <nav aria-label="Breadcrumb" className="hidden items-center gap-1 font-dash text-dash-xs text-zinc-500 md:flex">
+        <nav
+          aria-label="Breadcrumb"
+          className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto font-dash text-dash-xs text-zinc-500 [-ms-overflow-style:none] [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
+        >
             <Link
               href="/dashboard"
               className="inline-flex items-center rounded-lg border border-transparent px-2 py-1 transition-colors hover:border-navy/15 hover:bg-navy/5 hover:text-navy"
@@ -253,8 +254,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                 </span>
               );
             })}
-          </nav>
-        </div>
+        </nav>
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
@@ -267,10 +267,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     <button
                       type="button"
                       onClick={() => setShowSubscribeModal(true)}
-                      className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-xl bg-gradient-to-r from-primaryBlue via-[#2d6de8] to-slateBlue px-4 py-2 font-dash text-dash-xs font-bold text-white shadow-[0_2px_12px_rgba(37,99,235,0.40)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(37,99,235,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue/50 focus-visible:ring-offset-2 active:translate-y-0"
+                      className="group relative inline-flex max-w-[9.5rem] items-center justify-center gap-1 overflow-hidden rounded-xl bg-gradient-to-r from-primaryBlue via-[#2d6de8] to-slateBlue px-3 py-2 font-dash text-[10px] font-bold leading-tight text-white shadow-[0_2px_12px_rgba(37,99,235,0.40)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(37,99,235,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue/50 focus-visible:ring-offset-2 active:translate-y-0 sm:max-w-none sm:px-4 sm:text-dash-xs"
                     >
                       <span className="pointer-events-none absolute inset-0 -translate-x-full skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                      <span className="relative">Subscribe now</span>
+                      <span className="relative sm:hidden">Subscribe</span>
+                      <span className="relative hidden sm:inline">Subscribe now</span>
                     </button>
 
                     <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center">
@@ -290,7 +291,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         setShowSubscriptionDetails((prev) => !prev);
                       }
                     }}
-                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 font-dash text-dash-xs font-bold uppercase tracking-wide shadow-soft-sm ${
+                    className={`inline-flex max-w-[10rem] items-center gap-1.5 rounded-xl px-2 py-1.5 font-dash text-[10px] font-bold uppercase leading-tight tracking-wide shadow-soft-sm sm:max-w-none sm:gap-2 sm:px-3 sm:py-2 sm:text-dash-xs ${
                       isSubscribedOwner
                         ? "border border-emerald-300/80 bg-emerald-50 text-emerald-700"
                         : "border border-amber-300/80 bg-amber-50 text-amber-700"
@@ -298,8 +299,18 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     aria-expanded={isSubscribedOwner ? showSubscriptionDetails : undefined}
                     aria-haspopup={isSubscribedOwner ? "dialog" : undefined}
                   >
-                    <Crown size={14} />
-                    {isSubscribedOwner ? "Status: Premium (active)" : `Status: ${ownerStatusLabel}`}
+                    <Crown size={14} className="shrink-0 max-sm:h-3.5 max-sm:w-3.5" />
+                    {isSubscribedOwner ? (
+                      <>
+                        <span className="truncate sm:hidden">Premium</span>
+                        <span className="hidden sm:inline">Status: Premium (active)</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="truncate sm:hidden">{ownerStatusLabel}</span>
+                        <span className="hidden sm:inline">Status: {ownerStatusLabel}</span>
+                      </>
+                    )}
                     {isSubscribedOwner ? (
                       <ChevronDown
                         size={14}
@@ -323,8 +334,8 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                 </div>
               </>
             ) : null}
-            <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-gradient-to-b from-white to-softCard/90 py-1 pl-1 pr-2 shadow-card">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-navy to-primaryBlue text-dash-xs font-bold text-white shadow-soft-sm">
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/70 bg-gradient-to-b from-white to-softCard/90 py-1 pl-1 pr-1.5 shadow-card sm:gap-2 sm:pr-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-navy to-primaryBlue text-[10px] font-bold text-white shadow-soft-sm sm:h-8 sm:w-8 sm:text-dash-xs">
                 {initials}
               </span>
               <div className="hidden min-w-0 max-w-[140px] sm:block">
@@ -344,7 +355,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   router.replace("/");
                 });
               }}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-softBorder bg-white/95 px-3 py-2 font-dash text-dash-xs font-semibold text-navy shadow-soft-sm transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-navy/30 hover:bg-navy/5 hover:text-navy hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/30 focus-visible:ring-offset-2"
+              className="inline-flex min-h-9 min-w-9 items-center justify-center gap-1.5 rounded-xl border border-softBorder bg-white/95 px-2 py-2 font-dash text-dash-xs font-semibold text-navy shadow-soft-sm transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-navy/30 hover:bg-navy/5 hover:text-navy hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/30 focus-visible:ring-offset-2 sm:min-h-0 sm:min-w-0 sm:px-3"
               aria-label="Log out"
             >
               <LogOut size={14} strokeWidth={2} />
@@ -357,48 +368,54 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       {mounted && showSubscribeModal
         ? createPortal(
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/55 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[70] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-y-contain bg-navy/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
           onClick={() => setShowSubscribeModal(false)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-3xl border border-skyBlue/20 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.35)]"
+            className="box-border w-full min-w-0 max-w-lg overflow-hidden rounded-t-2xl border border-skyBlue/20 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.35)] sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-label="Standard subscription details"
           >
-            <div className="relative overflow-hidden border-b border-softBorder/70 bg-gradient-to-r from-navy via-primaryBlue to-slateBlue px-6 pb-4 pt-4 text-white">
-              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
-              <div className="absolute -left-10 -bottom-10 h-28 w-28 rounded-full bg-skyBlue/30 blur-2xl" />
-              <button
-                type="button"
-                onClick={() => setShowSubscribeModal(false)}
-                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-                aria-label="Close subscription modal"
-              >
-                <X size={16} />
-              </button>
-              <div className="relative">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/90">
-                  <Sparkles size={12} />
-                  Subscription Offer
-                </span>
-                <h2 className="mt-2 font-dash text-xl font-semibold">Best for direct resort onboarding</h2>
-                <p className="mt-1 text-sm text-white/85">Launch faster with one complete monthly package.</p>
+            <div className="relative overflow-hidden border-b border-softBorder/70 bg-gradient-to-r from-navy via-primaryBlue to-slateBlue px-4 pb-3 pt-3 text-white sm:px-6 sm:pb-4 sm:pt-4">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+              <div className="pointer-events-none absolute -left-10 -bottom-10 h-28 w-28 rounded-full bg-skyBlue/30 blur-2xl" />
+              <div className="relative z-10 flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white/90 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[10px]">
+                    <Sparkles size={11} className="shrink-0 sm:h-3 sm:w-3" aria-hidden />
+                    Subscription Offer
+                  </span>
+                  <h2 className="mt-1.5 font-dash text-base font-semibold leading-snug sm:mt-2 sm:text-xl">
+                    Best for direct resort onboarding
+                  </h2>
+                  <p className="mt-1 text-xs leading-snug text-white/85 sm:text-sm">
+                    Launch faster with one complete monthly package.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSubscribeModal(false)}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/90 transition-colors hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
+                  aria-label="Close subscription modal"
+                >
+                  <X size={16} strokeWidth={2} className="shrink-0" />
+                </button>
               </div>
             </div>
 
-            <div className="space-y-4 p-6">
-              <div className="rounded-2xl border border-skyBlue/20 bg-gradient-to-b from-skyBlue/5 to-white p-5">
-                <p className="inline-flex items-center gap-1.5 font-dash text-base font-semibold text-navy">
-                  <WalletCards size={15} className="text-primaryBlue" />
+            <div className="max-h-[min(78dvh,720px)] space-y-3 overflow-y-auto p-4 sm:max-h-none sm:space-y-4 sm:p-6">
+              <div className="rounded-xl border border-skyBlue/20 bg-gradient-to-b from-skyBlue/5 to-white p-3 sm:rounded-2xl sm:p-5">
+                <p className="inline-flex items-center gap-1.5 font-dash text-sm font-semibold text-navy sm:text-base">
+                  <WalletCards size={14} className="shrink-0 text-primaryBlue sm:h-[15px] sm:w-[15px]" />
                   Standard Subscription
                 </p>
-                <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-zinc-600">
-                  <CalendarDays size={14} className="text-zinc-500" />
+                <p className="mt-1 inline-flex items-start gap-1.5 text-[11px] leading-snug text-zinc-600 sm:items-center sm:text-sm">
+                  <CalendarDays size={13} className="mt-0.5 shrink-0 text-zinc-500 sm:mt-0 sm:h-[14px] sm:w-[14px]" />
                   Choose your plan duration (3 rooms included)
                 </p>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:mt-3 sm:gap-2 md:grid-cols-4">
                   {STANDARD_OFFERS.map((offer) => {
                     const active = selectedDuration === offer.duration;
                     return (
@@ -406,81 +423,111 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         key={`duration-${offer.duration}`}
                         type="button"
                         onClick={() => setSelectedDuration(offer.duration)}
-                        className={`rounded-xl border px-2 py-2 text-left transition ${
+                        className={`flex flex-col items-start gap-0.5 rounded-lg border px-2 py-1.5 text-left transition sm:rounded-xl sm:px-2 sm:py-2 ${
                           active
                             ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/30"
                             : "border-softBorder bg-white hover:border-primaryBlue/35"
                         }`}
                       >
-                        <p className="inline-flex items-center gap-1 text-xs font-bold text-navy">
-                          <CalendarDays size={12} className={active ? "text-primaryBlue" : "text-zinc-500"} />
-                          {offer.duration} month{offer.duration > 1 ? "s" : ""}
-                        </p>
-                        <p className="text-[11px] text-zinc-500">{offer.billingType}</p>
+                        <span className="flex items-center gap-1 font-dash text-[11px] font-bold leading-tight text-navy sm:text-xs">
+                          <CalendarDays size={11} className={`shrink-0 sm:h-3 sm:w-3 ${active ? "text-primaryBlue" : "text-zinc-500"}`} />
+                          <span className="min-w-0">
+                            {offer.duration} month{offer.duration > 1 ? "s" : ""}
+                          </span>
+                        </span>
+                        <span className="w-full text-[10px] leading-tight text-zinc-500 sm:text-[11px]">
+                          {offer.billingType}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
-                <div className="mt-4 flex flex-wrap items-end gap-x-2 gap-y-1">
-                  <p className="inline-flex items-end gap-2 text-4xl font-black leading-none tracking-tight text-zinc-950">
-                    <WalletCards size={22} className="mb-1 text-primaryBlue" />
+                <div className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-0.5 sm:mt-4">
+                  <p className="inline-flex items-center gap-1.5 text-2xl font-black leading-none tracking-tight text-zinc-950 sm:items-end sm:gap-2 sm:text-4xl">
+                    <WalletCards size={18} className="shrink-0 text-primaryBlue sm:mb-1 sm:h-[22px] sm:w-[22px]" />
                     ₱{selectedOffer.monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="pb-1 text-xs font-medium lowercase text-zinc-500">/ month (standard rate)</p>
+                  <p className="pb-0.5 text-[10px] font-medium lowercase leading-none text-zinc-500 sm:pb-1 sm:text-xs">
+                    / month (standard rate)
+                  </p>
                 </div>
-                <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-zinc-500">
-                  <Crown size={13} className="text-primaryBlue" />
-                  Total due now:{" "}
-                  <span className="font-semibold text-navy">
-                    ₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    {isFirstMonthFree ? ` (${selectedDuration - 1} of ${selectedDuration} months billed)` : ""}
+                <p className="mt-1.5 inline-flex flex-wrap items-center gap-1 text-[10px] text-zinc-500 sm:mt-2 sm:gap-1.5 sm:text-xs">
+                  <Crown size={12} className="shrink-0 text-primaryBlue sm:h-[13px] sm:w-[13px]" />
+                  <span>
+                    Total due now:{" "}
+                    <span className="font-semibold text-navy">
+                      ₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {isFirstMonthFree ? ` (${selectedDuration - 1} of ${selectedDuration} months billed)` : ""}
+                    </span>
                   </span>
                 </p>
                 {isFirstMonthFree ? (
-                  <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                    <Gift size={13} />
+                  <p className="mt-1 inline-flex items-start gap-1 text-[10px] font-semibold leading-snug text-emerald-700 sm:items-center sm:gap-1.5 sm:text-xs">
+                    <Gift size={12} className="mt-0.5 shrink-0 sm:mt-0 sm:h-[13px] sm:w-[13px]" />
                     First month free via referral — you get {selectedDuration} months of access.
                   </p>
                 ) : null}
               </div>
 
-              <ul className="grid gap-2.5 text-sm text-zinc-700 sm:grid-cols-2">
-                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Booking Management System</li>
-                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Payment System (Gcash or credit cards)</li>
-                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />5 pictures per room allowed</li>
-                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Full room description</li>
-                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Real time room availability</li>
-                <li className="inline-flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />Tech Support 8am-4pm Mon-Fri</li>
+              <ul className="grid gap-1.5 text-[11px] leading-snug text-zinc-700 sm:gap-2.5 sm:text-sm md:grid-cols-2">
+                <li className="flex items-start gap-1.5 sm:gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                  Booking Management System
+                </li>
+                <li className="flex items-start gap-1.5 sm:gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                  Payment System (Gcash or credit cards)
+                </li>
+                <li className="flex items-start gap-1.5 sm:gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                  5 pictures per room allowed
+                </li>
+                <li className="flex items-start gap-1.5 sm:gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                  Full room description
+                </li>
+                <li className="flex items-start gap-1.5 sm:gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                  Real time room availability
+                </li>
+                <li className="flex items-start gap-1.5 sm:gap-2">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                  Tech Support 8am-4pm Mon-Fri
+                </li>
               </ul>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-medium leading-snug text-amber-800 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
                 Build trust with guests and start accepting online bookings in one setup. VAT is added at checkout by final invoice computation.
               </div>
 
               <div>
-                <label htmlFor="subscribe-referral-code" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                  <Tag size={13} className="text-primaryBlue" />
+                <label
+                  htmlFor="subscribe-referral-code"
+                  className="mb-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase leading-snug tracking-wide text-zinc-600 sm:mb-1.5 sm:gap-1.5 sm:text-xs"
+                >
+                  <Tag size={12} className="shrink-0 text-primaryBlue sm:h-[13px] sm:w-[13px]" />
                   Referral code (optional — unlocks 1st month free)
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                   <input
                     id="subscribe-referral-code"
                     value={referralCode}
                     onChange={(e) => {
-                      setReferralCode(e.target.value.toUpperCase());
-                      if (!e.target.value.trim()) {
+                      const v = sanitizeReferralCodeInput(e.target.value);
+                      setReferralCode(v);
+                      if (!v.trim()) {
                         setAppliedReferralCode(null);
                         setReferralReadiness(null);
                       }
                     }}
-                    className="dash-input"
+                    className="dash-input min-h-11 flex-1 sm:min-h-0"
                     placeholder="e.g. SANTOS1234"
                   />
                   <button
                     type="button"
                     onClick={() => void applyReferral()}
                     disabled={applyingReferral}
-                    className="inline-flex min-w-[92px] items-center justify-center rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60"
+                    className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl border border-softBorder bg-white px-4 text-xs font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60 sm:min-h-0 sm:w-auto sm:min-w-[92px] sm:self-stretch sm:py-2 sm:text-sm"
                   >
                     {applyingReferral ? <Loader2 size={14} className="animate-spin" /> : "Verify"}
                   </button>
@@ -516,7 +563,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                 ) : null}
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <div className="flex flex-col-reverse gap-2 pt-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -525,7 +572,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     setAppliedReferralCode(null);
                     setReferralReadiness(null);
                   }}
-                  className="rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                  className="min-h-10 w-full rounded-xl border border-softBorder bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:px-4 sm:text-sm"
                 >
                   Maybe later
                 </button>
@@ -533,7 +580,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   type="button"
                   onClick={() => void subscribeNow()}
                   disabled={subscribingNow}
-                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-primaryBlue to-slateBlue px-4 py-2 text-sm font-semibold text-white shadow-soft-sm transition-[transform,filter] hover:-translate-y-px hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-gradient-to-r from-primaryBlue to-slateBlue px-3 py-2 text-xs font-semibold text-white shadow-soft-sm transition-[transform,filter] hover:-translate-y-px hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto sm:px-4 sm:text-sm"
                 >
                   {subscribingNow ? <Loader2 size={14} className="animate-spin" /> : "Subscribe now"}
                 </button>

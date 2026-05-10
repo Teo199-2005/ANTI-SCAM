@@ -3,6 +3,8 @@
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
+import SortableTh from "@/components/shared/SortableTh";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import {
   DashTableActionsCell,
   DashTableActionsHead,
@@ -16,7 +18,18 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { ResortItem } from "@/lib/api/resort";
 import { triggerSubscriptionInvoice } from "@/lib/api/subscription";
 import { CreditCard, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/tableSortPagination";
+import { useEffect, useMemo, useState } from "react";
+
+const SORT_FIRST: Record<string, SortDir> = {
+  name: "asc",
+  plan: "asc",
+  rooms: "desc",
+  monthly_fee: "desc",
+  status: "asc",
+  latest_invoice: "asc",
+  next_due: "asc",
+};
 
 const statusBadge: Record<string, string> = {
   active:          "dash-badge-emerald",
@@ -35,6 +48,10 @@ export default function AdminSubscriptionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmRefresh, setConfirmRefresh] = useState<ResortItem | null>(null);
   const [confirmTrigger, setConfirmTrigger] = useState<ResortItem | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
+  const [sortBy, setSortBy] = useState<string>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const { pushToast } = useToast();
 
   const load = async () => {
@@ -84,6 +101,65 @@ export default function AdminSubscriptionsPage() {
     void load();
   }, []);
 
+  const sortedResorts = useMemo(() => {
+    const copy = [...resorts];
+    copy.sort((a, b) => {
+      const subA = a.subscription;
+      const subB = b.subscription;
+      switch (sortBy) {
+        case "name":
+          return compareNullable(a.name, b.name, sortDir);
+        case "plan":
+          return compareNullable(subA?.plan ?? "", subB?.plan ?? "", sortDir);
+        case "rooms":
+          return compareNullable(subA?.active_room_count ?? 0, subB?.active_room_count ?? 0, sortDir);
+        case "monthly_fee":
+          return compareNullable(
+            subA ? Number(subA.total_monthly_fee) : null,
+            subB ? Number(subB.total_monthly_fee) : null,
+            sortDir,
+          );
+        case "status":
+          return compareNullable(subA?.status ?? "", subB?.status ?? "", sortDir);
+        case "latest_invoice":
+          return compareNullable(latestInvoiceStatus[a.id] ?? "", latestInvoiceStatus[b.id] ?? "", sortDir);
+        case "next_due":
+          return compareNullable(subA?.next_due_date ?? "", subB?.next_due_date ?? "", sortDir);
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [resorts, sortBy, sortDir, latestInvoiceStatus]);
+
+  const { slice: pageResorts, meta: pageMeta } = useMemo(
+    () => paginateLocal(sortedResorts, page, perPage),
+    [sortedResorts, page, perPage],
+  );
+
+  const onSort = (key: string) => {
+    const n = nextSort(key, sortBy, sortDir, SORT_FIRST[key] ?? "asc");
+    setSortBy(n.key);
+    setSortDir(n.dir);
+    setPage(1);
+  };
+
+  const paginationFooter =
+    sortedResorts.length > 0 ? (
+      <TablePaginationBar
+        page={pageMeta.current_page}
+        lastPage={pageMeta.last_page}
+        total={pageMeta.total}
+        perPage={perPage}
+        onPerPageChange={(pp) => {
+          setPerPage(pp);
+          setPage(1);
+        }}
+        onPageChange={setPage}
+        disabled={loading}
+      />
+    ) : null;
+
   const refreshSub = async (resort: ResortItem) => {
     setRefreshing(resort.id);
     try {
@@ -113,11 +189,11 @@ export default function AdminSubscriptionsPage() {
           <DashMobileTableSkeleton rows={5} />
         ) : error ? (
           <div className="dash-alert-error">{error}</div>
-        ) : resorts.length === 0 ? (
+        ) : sortedResorts.length === 0 ? (
           <div className="rounded-2xl border border-softBorder bg-softCard p-8 text-center text-sm text-zinc-600">No resorts found.</div>
         ) : (
           <div className="space-y-3">
-            {resorts.map((resort) => {
+            {pageResorts.map((resort) => {
               const sub = resort.subscription;
               return (
                 <DashMobileTableCard
@@ -172,25 +248,34 @@ export default function AdminSubscriptionsPage() {
             })}
           </div>
         )}
+        {paginationFooter ? <div className="dash-table-wrap overflow-hidden rounded-2xl">{paginationFooter}</div> : null}
       </div>
 
       <div className="hidden md:block">
         <DataTable
+          footer={paginationFooter ?? undefined}
           headers={
             <>
-              <th>Resort</th>
-              <th>Plan</th>
-              <th>Rooms</th>
-              <th>Monthly fee</th>
-              <th>Status</th>
-              <th>Latest invoice</th>
-              <th>Next due</th>
+              <SortableTh label="Resort" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Plan" sortKey="plan" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Rooms" sortKey="rooms" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Monthly fee" sortKey="monthly_fee" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Status" sortKey="status" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Latest invoice" sortKey="latest_invoice" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Next due" sortKey="next_due" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <DashTableActionsHead srOnly>Row actions</DashTableActionsHead>
             </>
           }
         >
-          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={8}>
-            {resorts.map((resort) => {
+          <AsyncStatePanel
+            loading={loading}
+            error={error}
+            isEmpty={sortedResorts.length === 0}
+            emptyText="No resorts found."
+            withinTable
+            colSpan={8}
+          >
+            {pageResorts.map((resort) => {
               const sub = resort.subscription;
               return (
                 <tr key={resort.id} className="group">

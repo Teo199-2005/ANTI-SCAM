@@ -3,6 +3,7 @@
 import OwnerValuePropsStrip from "@/components/home/OwnerValuePropsStrip";
 import PageContainer from "@/components/layout/PageContainer";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { BedDouble, MapPin, PhoneCall, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -49,7 +50,7 @@ export default function BrowseResortsPage() {
               className="glass-field pl-9"
               placeholder="Search by name or location…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <button type="submit" className="cl-btn-primary">

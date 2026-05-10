@@ -21,6 +21,7 @@ import {
   TrendingUp,
   XCircle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const MONTHS = [
@@ -51,21 +52,28 @@ function StatBadge({
   sub,
   color = "text-navy",
   icon,
+  className,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   color?: string;
   icon?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <DashCard className="p-5">
-      <div className="flex items-start justify-between">
-        <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
-        {icon && <span className="opacity-60">{icon}</span>}
+    <DashCard
+      className={cn(
+        "border-softBorderStrong/75 p-4 shadow-sm sm:p-5",
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] uppercase leading-tight tracking-wide text-zinc-500 sm:text-xs">{label}</p>
+        {icon && <span className="shrink-0 opacity-60">{icon}</span>}
       </div>
-      <p className={`mt-2 text-3xl font-bold ${color}`}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-zinc-400">{sub}</p>}
+      <p className={cn("mt-1.5 break-words text-2xl font-bold sm:mt-2 sm:text-3xl", color)}>{value}</p>
+      {sub && <p className="mt-1 text-[10px] leading-snug text-zinc-400 sm:text-xs">{sub}</p>}
     </DashCard>
   );
 }
@@ -146,7 +154,7 @@ export default function AdminAnalyticsPage() {
             <span className="rounded-full bg-skyBlue px-2 py-0.5 text-[10px] font-bold text-white">Active</span>
           )}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {/* Resort */}
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-500">Resort</label>
@@ -256,8 +264,9 @@ export default function AdminAnalyticsPage() {
 
       {!loading && !error && data && (
         <>
-          {/* ── KPI Cards ── */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* ── KPI Cards (2×2 phone → row on xl) ── */}
+          <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
             <StatBadge
               label="Total Revenue"
               value={`₱${Number(summary?.totalRevenue ?? 0).toLocaleString()}`}
@@ -286,54 +295,57 @@ export default function AdminAnalyticsPage() {
               color={(summary?.confirmationRate ?? 0) >= 70 ? "text-emerald-700" : "text-amber-600"}
               icon={<CheckCircle2 size={18} className="text-emerald-500" />}
             />
+            </div>
           </div>
 
-          {/* ── Rate indicators row ── */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <DashCard className="p-4">
+          {/* ── Rate indicators (2×2 phone → row on xl) ── */}
+          <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <DashCard className="border-softBorderStrong/75 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span className="text-xs font-medium text-zinc-600">Confirmed</span>
+                <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
+                <span className="text-[11px] font-medium leading-tight text-zinc-600 sm:text-xs">Confirmed</span>
               </div>
-              <p className="mt-2 text-2xl font-bold text-emerald-700">{summary?.confirmedCount ?? 0}</p>
+              <p className="mt-1.5 text-xl font-bold text-emerald-700 sm:mt-2 sm:text-2xl">{summary?.confirmedCount ?? 0}</p>
               <div className="mt-2 h-1.5 w-full rounded-full bg-softGray">
                 <div className="h-1.5 rounded-full bg-emerald-500 transition-all"
                   style={{ width: `${pct(summary?.confirmedCount ?? 0, summary?.totalCount ?? 0)}%` }} />
               </div>
             </DashCard>
-            <DashCard className="p-4">
+            <DashCard className="border-softBorderStrong/75 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-2">
-                <Activity size={16} className="text-amber-500" />
-                <span className="text-xs font-medium text-zinc-600">Pending Payment</span>
+                <Activity size={16} className="shrink-0 text-amber-500" />
+                <span className="text-[11px] font-medium leading-tight text-zinc-600 sm:text-xs">Pending Payment</span>
               </div>
-              <p className="mt-2 text-2xl font-bold text-amber-600">{summary?.pendingCount ?? 0}</p>
+              <p className="mt-1.5 text-xl font-bold text-amber-600 sm:mt-2 sm:text-2xl">{summary?.pendingCount ?? 0}</p>
               <div className="mt-2 h-1.5 w-full rounded-full bg-softGray">
                 <div className="h-1.5 rounded-full bg-amber-400 transition-all"
                   style={{ width: `${pct(summary?.pendingCount ?? 0, summary?.totalCount ?? 0)}%` }} />
               </div>
             </DashCard>
-            <DashCard className="p-4">
+            <DashCard className="border-softBorderStrong/75 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-2">
-                <XCircle size={16} className="text-rose-500" />
-                <span className="text-xs font-medium text-zinc-600">Cancelled</span>
+                <XCircle size={16} className="shrink-0 text-rose-500" />
+                <span className="text-[11px] font-medium leading-tight text-zinc-600 sm:text-xs">Cancelled</span>
               </div>
-              <p className="mt-2 text-2xl font-bold text-rose-600">{summary?.cancelledCount ?? 0}</p>
+              <p className="mt-1.5 text-xl font-bold text-rose-600 sm:mt-2 sm:text-2xl">{summary?.cancelledCount ?? 0}</p>
               <div className="mt-2 h-1.5 w-full rounded-full bg-softGray">
                 <div className="h-1.5 rounded-full bg-rose-500 transition-all"
                   style={{ width: `${pct(summary?.cancelledCount ?? 0, summary?.totalCount ?? 0)}%` }} />
               </div>
             </DashCard>
-            <DashCard className="p-4">
+            <DashCard className="border-softBorderStrong/75 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-2">
-                <TrendingDown size={16} className="text-rose-400" />
-                <span className="text-xs font-medium text-zinc-600">Cancellation Rate</span>
+                <TrendingDown size={16} className="shrink-0 text-rose-400" />
+                <span className="text-[11px] font-medium leading-tight text-zinc-600 sm:text-xs">Cancellation Rate</span>
               </div>
-              <p className="mt-2 text-2xl font-bold text-rose-500">{summary?.cancellationRate ?? 0}%</p>
+              <p className="mt-1.5 text-xl font-bold text-rose-500 sm:mt-2 sm:text-2xl">{summary?.cancellationRate ?? 0}%</p>
               <div className="mt-2 h-1.5 w-full rounded-full bg-softGray">
                 <div className="h-1.5 rounded-full bg-rose-400 transition-all"
                   style={{ width: `${summary?.cancellationRate ?? 0}%` }} />
               </div>
             </DashCard>
+            </div>
           </div>
 
           {/* ── Monthly chart (clean dual-bar style) ── */}

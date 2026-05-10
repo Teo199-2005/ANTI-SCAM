@@ -62,8 +62,17 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     if (!reservation) return;
     try {
       const invoice = await createPaymentInvoice(reservation.id);
-      // Redirect to invoice URL
-      window.location.href = invoice.invoice_url;
+      if (invoice.already_confirmed) {
+        pushToast({ title: "Payment recorded", description: "Your booking is confirmed.", tone: "success" });
+        const data = await getReservation(id);
+        setReservation(data);
+        return;
+      }
+      if (invoice.invoice_url) {
+        window.location.href = invoice.invoice_url;
+        return;
+      }
+      pushToast({ title: "Checkout unavailable", description: "No payment URL returned. Try again or contact support.", tone: "error" });
     } catch (err) {
       pushToast({ title: "Failed to create invoice", description: err instanceof Error ? err.message : String(err), tone: "error" });
     }

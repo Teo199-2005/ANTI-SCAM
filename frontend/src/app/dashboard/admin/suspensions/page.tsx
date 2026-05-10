@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
 import { getSuspensionList, SuspensionItem } from "@/lib/api/admin";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,17 +45,18 @@ export default function SuspensionsPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {["all", "grace_period", "suspended"].map((f) => (
           <button
             key={f}
+            type="button"
             onClick={() => setFilter(f)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${filter === f ? "bg-navy text-white" : "border border-softBorder bg-softCard text-zinc-600 hover:bg-softGray"}`}
+            className={`min-h-11 rounded-xl px-4 py-2 text-sm font-semibold transition [touch-action:manipulation] md:min-h-0 ${filter === f ? "bg-navy text-white" : "border border-softBorder bg-softCard text-zinc-600 hover:bg-softGray"}`}
           >
             {f === "all" ? "All" : f === "grace_period" ? "Grace Period" : "Suspended"}
           </button>
         ))}
-        <span className="ml-auto self-center text-xs text-zinc-400">{total} result{total !== 1 ? "s" : ""}</span>
+        <span className="w-full text-xs text-zinc-400 sm:ml-auto sm:w-auto sm:text-right">{total} result{total !== 1 ? "s" : ""}</span>
       </div>
 
       <DashCard className="overflow-hidden p-0">
@@ -93,8 +95,9 @@ export default function SuspensionsPage() {
                 />
               ))}
             </div>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="dash-table">
+            <div className="hidden md:block">
+              <DashTableScrollRegion label="Suspensions and grace periods table">
+              <table className="dash-table min-w-[720px]">
                 <thead>
                   <tr>
                     <th>Resort</th>
@@ -126,6 +129,7 @@ export default function SuspensionsPage() {
                   ))}
                 </tbody>
               </table>
+              </DashTableScrollRegion>
             </div>
           </>
         )}

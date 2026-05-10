@@ -10,9 +10,9 @@ class UserService
 {
     public function __construct(private readonly UserRepositoryInterface $users) {}
 
-    public function list(int $perPage = 10, ?string $search = null): LengthAwarePaginator
+    public function list(int $perPage = 10, ?string $search = null, ?string $sortBy = null, ?string $sortDir = null): LengthAwarePaginator
     {
-        return $this->users->paginate($perPage, $search);
+        return $this->users->paginate($perPage, $search, $sortBy, $sortDir);
     }
 
     public function find(int $id): User

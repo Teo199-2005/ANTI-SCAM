@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\MarketerPayoutBatch;
-use App\Models\Resort;
+use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Shared\Traits\ApiResponseTrait;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +29,123 @@ class MarketingController extends Controller
             ->paginate(20);
 
         return $this->successResponse($marketers, 'Marketers fetched');
+    }
+
+    /**
+     * Admin: per-marketer funnel + commission snapshot.
+     * "New client" = distinct resort with a paid subscription invoice (excludes room-addon-only lines) attributed to the marketer.
+     */
+    public function marketersMonitoring(Request $request)
+    {
+        $search = $request->string('search')->trim()->toString();
+
+        $marketerQuery = User::query()->where('role', 'marketing');
+        if ($search !== '') {
+            $like = '%'.$search.'%';
+            $marketerQuery->where(function ($q) use ($like): void {
+                $q->where('name', 'like', $like)
+                    ->orWhere('email', 'like', $like)
+                    ->orWhere('referral_code', 'like', $like);
+            });
+        }
+
+        $marketers = $marketerQuery->withCount('assignedResorts')->orderBy('name')->get();
+
+        $conversionSub = DB::table('subscription_invoices')
+            ->select('marketer_id', 'resort_id', DB::raw('MIN(paid_at) as first_paid'))
+            ->where('status', 'paid')
+            ->whereNotNull('paid_at')
+            ->whereNotNull('marketer_id')
+            ->whereNotNull('resort_id')
+            ->where(function ($q): void {
+                $q->whereNull('plan')->orWhere('plan', 'not like', '%_room_addon%');
+            })
+            ->groupBy('marketer_id', 'resort_id');
+
+        $referralStats = DB::query()
+            ->fromSub($conversionSub, 'conv')
+            ->selectRaw('marketer_id, COUNT(*) as referred_resorts_count, MAX(first_paid) as last_new_referred_resort_at')
+            ->groupBy('marketer_id')
+            ->get()
+            ->keyBy('marketer_id');
+
+        $activityStats = SubscriptionInvoice::query()
+            ->selectRaw('marketer_id, MAX(paid_at) as last_any_referral_payment_at, COALESCE(SUM(amount), 0) as total_referred_subscription_php')
+            ->where('status', 'paid')
+            ->whereNotNull('paid_at')
+            ->whereNotNull('marketer_id')
+            ->groupBy('marketer_id')
+            ->get()
+            ->keyBy('marketer_id');
+
+        $commissionStats = Commission::query()
+            ->selectRaw(
+                'marketer_id,
+                SUM(CASE WHEN status = \'pending\' THEN commission_amount ELSE 0 END) as pending_commission,
+                SUM(CASE WHEN status = \'released\' THEN commission_amount ELSE 0 END) as released_commission_gross,
+                SUM(commission_amount) as total_commission_gross'
+            )
+            ->groupBy('marketer_id')
+            ->get()
+            ->keyBy('marketer_id');
+
+        $now = Carbon::now();
+
+        $rows = [];
+        foreach ($marketers as $m) {
+            $ref = $referralStats->get($m->id);
+            $act = $activityStats->get($m->id);
+            $com = $commissionStats->get($m->id);
+
+            $referredCount = $ref ? (int) $ref->referred_resorts_count : 0;
+            $lastNewRaw = $ref?->last_new_referred_resort_at ?? null;
+            $lastNewAt = $lastNewRaw ? Carbon::parse($lastNewRaw) : null;
+
+            $monthsSinceNew = null;
+            if ($lastNewAt !== null) {
+                $monthsSinceNew = max(0, (int) $lastNewAt->diffInMonths($now));
+            }
+
+            // Sort: longest idle first; never converted (no referred resort yet) sorts to top as highest attention.
+            $sortIdle = $monthsSinceNew !== null ? $monthsSinceNew : 10_000;
+
+            $rows[] = [
+                'id' => $m->id,
+                'name' => $m->name,
+                'email' => $m->email,
+                'referral_code' => $m->referral_code,
+                'joined_at' => $m->created_at?->toIso8601String(),
+                'assigned_resorts_count' => (int) $m->assigned_resorts_count,
+                'referred_resorts_count' => $referredCount,
+                'last_new_referred_resort_at' => $lastNewAt?->toIso8601String(),
+                'months_since_last_new_referred_resort' => $monthsSinceNew,
+                'last_any_referral_payment_at' => isset($act->last_any_referral_payment_at)
+                    ? Carbon::parse($act->last_any_referral_payment_at)->toIso8601String()
+                    : null,
+                'total_referred_subscription_php' => $act ? round((float) $act->total_referred_subscription_php, 2) : 0.0,
+                'commission_pending_php' => $com ? round((float) $com->pending_commission, 2) : 0.0,
+                'commission_released_gross_php' => $com ? round((float) $com->released_commission_gross, 2) : 0.0,
+                'commission_total_gross_php' => $com ? round((float) $com->total_commission_gross, 2) : 0.0,
+                '_sort_idle' => $sortIdle,
+            ];
+        }
+
+        usort($rows, function (array $a, array $b): int {
+            return $b['_sort_idle'] <=> $a['_sort_idle'];
+        });
+
+        foreach ($rows as &$r) {
+            unset($r['_sort_idle']);
+        }
+        unset($r);
+
+        return $this->successResponse([
+            'rows' => $rows,
+            'meta' => [
+                'generated_at' => $now->toIso8601String(),
+                'new_client_definition' => 'Distinct resort with first qualifying paid subscription invoice (status=paid, not a room-addon plan) where marketer_id matches.',
+            ],
+        ], 'Marketing monitoring snapshot');
     }
 
     /** Assign a resort to a marketer. */

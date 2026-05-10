@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import { apiClient } from "@/lib/api/client";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { AlertTriangle, ChevronLeft, MessageSquare, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -63,7 +64,7 @@ export default function StaffNotesPage() {
             className="dash-input pl-9"
             placeholder="Search notes or reference…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
           />
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700">

@@ -1,38 +1,74 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import DataTable from "@/components/shared/DataTable";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import {
   DashTableActionsCell,
   DashTableActionsHead,
   DashTableActionsInner,
 } from "@/components/shared/DashTableActions";
+import SortableTh from "@/components/shared/SortableTh";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { apiClient } from "@/lib/api/client";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { CalendarDays, ChevronLeft, MessageSquare, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
 type Reservation = {
   id: number;
-  reference_no: string;
+  referenceNo: string;
   status: string;
-  check_in_date: string;
-  check_out_date: string;
-  guest_count: number;
-  total_amount: number;
-  reservation_fee: number;
+  checkInDate: string;
+  checkOutDate: string;
+  guestCount: number;
+  totalAmount: number;
+  reservationFee: number;
 };
 
-type ApiEnvelope<T> = { success: boolean; data: { data: T[] } };
+type PaginatedEnvelope = {
+  success: boolean;
+  data: { data: Record<string, unknown>[]; meta?: LaravelTableMeta };
+};
+
+const SORT_FIRST: Record<string, SortDir> = {
+  reference_no: "asc",
+  check_in_date: "desc",
+  check_out_date: "desc",
+  guest_count: "desc",
+  total_amount: "desc",
+  status: "asc",
+  created_at: "desc",
+};
+
+function num(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeReservation(raw: Record<string, unknown>): Reservation {
+  return {
+    id: Number(raw.id),
+    referenceNo: String(raw.referenceNo ?? raw.reference_no ?? ""),
+    status: String(raw.status ?? ""),
+    checkInDate: String(raw.checkInDate ?? raw.check_in_date ?? ""),
+    checkOutDate: String(raw.checkOutDate ?? raw.check_out_date ?? ""),
+    guestCount: num(raw.guestCount ?? raw.guest_count),
+    totalAmount: num(raw.totalAmount ?? raw.total_amount),
+    reservationFee: num(raw.reservationFee ?? raw.reservation_fee),
+  };
+}
 
 const statusBadge: Record<string, string> = {
-  confirmed:       "dash-badge-emerald",
+  confirmed: "dash-badge-emerald",
   pending_payment: "dash-badge-amber",
-  cancelled:       "dash-badge-rose",
-  expired:         "dash-badge-slate",
-  no_show:         "dash-badge-rose",
-  completed:       "dash-badge-navy",
+  cancelled: "dash-badge-rose",
+  expired: "dash-badge-slate",
+  no_show: "dash-badge-rose",
+  completed: "dash-badge-navy",
 };
 
 export default function StaffReservationsPage() {
@@ -40,31 +76,84 @@ export default function StaffReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<LaravelTableMeta | null>(null);
+  const [perPage, setPerPage] = useState(15);
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const load = async (q = "") => {
+  const load = async (q: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await apiClient.get<ApiEnvelope<Reservation>>("/reservations", {
-        params: { perPage: 50, search: q || undefined },
+      const { data } = await apiClient.get<PaginatedEnvelope>("/reservations", {
+        params: {
+          search: q || undefined,
+          perPage: pp,
+          page: pg,
+          sort_by: sb,
+          sort_dir: sd,
+        },
       });
-      setReservations(data.data?.data ?? []);
+      const payload = data.data;
+      const rawList = payload?.data ?? [];
+      setReservations(rawList.map((r) => normalizeReservation(r as Record<string, unknown>)));
+      setMeta(extractLaravelMeta(payload));
     } catch (err: unknown) {
       setReservations([]);
+      setMeta(null);
       setError(parseApiErrorMessage(err, "Failed to load reservations."));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load("", 1, perPage, sortBy, sortDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const lastPage = meta?.last_page ?? 1;
+  const total = meta?.total ?? reservations.length;
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setSearch(query);
-    void load(query);
+    setAppliedSearch(query);
+    setPage(1);
+    void load(query, 1, perPage, sortBy, sortDir);
   };
+
+  const onSort = (key: string) => {
+    const n = nextSort(key, sortBy, sortDir, SORT_FIRST[key] ?? "asc");
+    setSortBy(n.key);
+    setSortDir(n.dir);
+    setPage(1);
+    void load(appliedSearch, 1, perPage, n.key, n.dir);
+  };
+
+  const onPageChange = (p: number) => {
+    setPage(p);
+    void load(appliedSearch, p, perPage, sortBy, sortDir);
+  };
+
+  const onPerPageChange = (pp: number) => {
+    setPerPage(pp);
+    setPage(1);
+    void load(appliedSearch, 1, pp, sortBy, sortDir);
+  };
+
+  const paginationFooter = !error && (
+    <TablePaginationBar
+      page={page}
+      lastPage={lastPage}
+      total={total}
+      perPage={perPage}
+      onPerPageChange={onPerPageChange}
+      onPageChange={onPageChange}
+      disabled={loading}
+    />
+  );
 
   return (
     <div className="space-y-6">
@@ -87,22 +176,30 @@ export default function StaffReservationsPage() {
             className="dash-input pl-9"
             placeholder="Search reference…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
           />
         </div>
-        <button type="submit" className="dash-btn-primary shrink-0">Search</button>
+        <button type="submit" className="dash-btn-primary shrink-0">
+          Search
+        </button>
       </form>
 
       <DashCard className="overflow-hidden p-0">
         {loading ? (
           <>
-            <div className="md:hidden p-4"><DashMobileTableSkeleton rows={5} /></div>
-            <div className="hidden md:block space-y-2 p-4">{[1,2,3,4,5].map(i=><div key={i} className="h-12 animate-pulse rounded-xl bg-softGray"/>)}</div>
+            <div className="p-4 md:hidden">
+              <DashMobileTableSkeleton rows={5} />
+            </div>
+            <div className="hidden space-y-2 p-4 md:block">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded-xl bg-softGray" />
+              ))}
+            </div>
           </>
         ) : error ? (
           <div className="px-6 py-8 text-center">
             <p className="text-sm text-rose-700">{error}</p>
-            <button type="button" className="dash-btn-sm mt-3" onClick={() => void load(search)}>
+            <button type="button" className="dash-btn-sm mt-3" onClick={() => void load(appliedSearch, page, perPage, sortBy, sortDir)}>
               Retry
             </button>
           </div>
@@ -110,19 +207,21 @@ export default function StaffReservationsPage() {
           <p className="px-6 py-10 text-center text-sm text-zinc-500">No reservations found.</p>
         ) : (
           <>
-            <div className="md:hidden space-y-3 p-4">
+            <div className="space-y-3 p-4 md:hidden">
               {reservations.map((r) => (
                 <DashMobileTableCard
                   key={r.id}
-                  title={<span className="font-mono text-sm">{r.reference_no}</span>}
+                  title={<span className="font-mono text-sm">{r.referenceNo}</span>}
                   fields={[
-                    { label: "Check-in", value: r.check_in_date },
-                    { label: "Check-out", value: r.check_out_date },
-                    { label: "Guests", value: r.guest_count },
-                    { label: "Total", value: `₱${Number(r.total_amount).toLocaleString()}` },
+                    { label: "Check-in", value: r.checkInDate },
+                    { label: "Check-out", value: r.checkOutDate },
+                    { label: "Guests", value: r.guestCount },
+                    { label: "Total", value: `₱${Number(r.totalAmount).toLocaleString()}` },
                     {
                       label: "Status",
-                      value: <span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_", " ")}</span>,
+                      value: (
+                        <span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_", " ")}</span>
+                      ),
                     },
                   ]}
                   actions={
@@ -132,29 +231,34 @@ export default function StaffReservationsPage() {
                   }
                 />
               ))}
+              {paginationFooter ? <div className="dash-table-wrap overflow-hidden rounded-2xl">{paginationFooter}</div> : null}
             </div>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="dash-table">
-                <thead>
-                  <tr>
-                    <th>Reference</th>
-                    <th>Check-in</th>
-                    <th>Check-out</th>
-                    <th>Guests</th>
-                    <th>Total</th>
-                    <th>Status</th>
+            <div className="hidden md:block">
+              <DataTable
+                footer={paginationFooter}
+                headers={
+                  <>
+                    <SortableTh label="Reference" sortKey="reference_no" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+                    <SortableTh label="Check-in" sortKey="check_in_date" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+                    <SortableTh label="Check-out" sortKey="check_out_date" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+                    <SortableTh label="Guests" sortKey="guest_count" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+                    <SortableTh label="Total" sortKey="total_amount" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+                    <SortableTh label="Status" sortKey="status" activeKey={sortBy} direction={sortDir} onSort={onSort} />
                     <DashTableActionsHead>Action</DashTableActionsHead>
-                  </tr>
-                </thead>
-                <tbody>
+                  </>
+                }
+              >
+                <>
                   {reservations.map((r) => (
                     <tr key={r.id}>
-                      <td className="font-mono text-xs font-semibold text-navy">{r.reference_no}</td>
-                      <td className="text-zinc-600">{r.check_in_date}</td>
-                      <td className="text-zinc-600">{r.check_out_date}</td>
-                      <td className="text-zinc-600">{r.guest_count}</td>
-                      <td className="font-medium text-emerald-700">₱{Number(r.total_amount).toLocaleString()}</td>
-                      <td><span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_"," ")}</span></td>
+                      <td className="font-mono text-xs font-semibold text-navy">{r.referenceNo}</td>
+                      <td className="text-zinc-600">{r.checkInDate}</td>
+                      <td className="text-zinc-600">{r.checkOutDate}</td>
+                      <td className="text-zinc-600">{r.guestCount}</td>
+                      <td className="font-medium text-emerald-700">₱{Number(r.totalAmount).toLocaleString()}</td>
+                      <td>
+                        <span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_", " ")}</span>
+                      </td>
                       <DashTableActionsCell>
                         <DashTableActionsInner>
                           <Link href={`/dashboard/staff/reservations/${r.id}`} className="dash-btn-sm">
@@ -164,8 +268,8 @@ export default function StaffReservationsPage() {
                       </DashTableActionsCell>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                </>
+              </DataTable>
             </div>
           </>
         )}

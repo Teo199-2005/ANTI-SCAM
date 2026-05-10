@@ -2,6 +2,7 @@
 
 namespace App\Modules\Users\Http\Requests;
 
+use App\Support\PlatformPasswordRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +20,7 @@ class UpdateUserRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:120'],
             'email' => ['sometimes', 'email', 'max:190', Rule::unique('users', 'email')->ignore($userId)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => PlatformPasswordRules::optionalWithConfirmation(),
             'role' => ['sometimes', 'in:user,client,admin,resort_owner,marketing,admin_staff'],
         ];
     }

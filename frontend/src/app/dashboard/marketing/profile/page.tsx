@@ -1,5 +1,6 @@
 "use client";
 
+import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
@@ -9,12 +10,9 @@ import {
   Camera,
   CheckCircle2,
   Circle,
-  Eye,
-  EyeOff,
   FileUp,
   IdCard,
   Loader2,
-  Lock,
   Mail,
   MapPin,
   Phone,
@@ -22,6 +20,14 @@ import {
   User,
   Wallet,
 } from "lucide-react";
+import {
+  sanitizeAddressLine,
+  sanitizeEmailTyping,
+  sanitizeGovIdNumberInput,
+  sanitizePersonName,
+  sanitizePhilippinesMobileInput,
+  sanitizeTinTyping,
+} from "@/lib/inputRestrictions";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -40,14 +46,6 @@ export default function MarketingProfilePage() {
   const [mailingAddress, setMailingAddress] = useState(user?.marketer_mailing_address ?? "");
   const [tin, setTin] = useState("");
   const [saving, setSaving] = useState(false);
-
-  // Password change
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [savingPw, setSavingPw] = useState(false);
 
   // Avatar
   const avatarRef = useRef<HTMLInputElement>(null);
@@ -272,39 +270,6 @@ export default function MarketingProfilePage() {
     }
   };
 
-  const onChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      pushToast({ title: "Passwords don’t match", description: "New password and confirmation must be identical.", tone: "warning" });
-      return;
-    }
-    if (newPassword.length < 8) {
-      pushToast({ title: "Password too short", description: "Use at least 8 characters.", tone: "warning" });
-      return;
-    }
-    setSavingPw(true);
-    try {
-      await apiClient.post("/auth/password", {
-        current_password: currentPassword,
-        password: newPassword,
-        password_confirmation: confirmPassword,
-      });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      pushToast({ title: "Password updated", description: "You can use your new password next time you sign in.", tone: "success" });
-    } catch (error: unknown) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      pushToast({
-        title: "Couldn’t change password",
-        description: axiosErr?.response?.data?.message ?? "Check your current password and try again.",
-        tone: "error",
-      });
-    } finally {
-      setSavingPw(false);
-    }
-  };
-
   const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -450,7 +415,14 @@ export default function MarketingProfilePage() {
               <label htmlFor="marketing-profile-name" className="mb-1.5 block text-xs font-semibold text-zinc-600">Full name</label>
               <div className="relative">
                 <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input id="marketing-profile-name" className="dash-input pl-9" value={name} onChange={(e) => setName(e.target.value)} required />
+                <input
+                  id="marketing-profile-name"
+                  className="dash-input pl-9"
+                  value={name}
+                  onChange={(e) => setName(sanitizePersonName(e.target.value))}
+                  autoComplete="name"
+                  required
+                />
               </div>
             </div>
 
@@ -458,7 +430,15 @@ export default function MarketingProfilePage() {
               <label htmlFor="marketing-profile-email" className="mb-1.5 block text-xs font-semibold text-zinc-600">Email</label>
               <div className="relative">
                 <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input id="marketing-profile-email" className="dash-input pl-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <input
+                  id="marketing-profile-email"
+                  className="dash-input pl-9"
+                  type="email"
+                  inputMode="email"
+                  value={email}
+                  onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
+                  required
+                />
               </div>
             </div>
 
@@ -470,11 +450,12 @@ export default function MarketingProfilePage() {
                   id="marketing-profile-phone"
                   className="dash-input pl-9"
                   type="tel"
-                  inputMode="tel"
+                  inputMode="numeric"
                   autoComplete="tel"
                   placeholder="09xxxxxxxxx"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(sanitizePhilippinesMobileInput(e.target.value))}
+                  pattern="[0-9]*"
                 />
               </div>
               <p className="mt-1 text-[11px] text-zinc-500">Primary contact number (may differ from your GCash wallet number).</p>
@@ -489,7 +470,7 @@ export default function MarketingProfilePage() {
                   className="dash-input min-h-[88px] resize-y pl-9"
                   placeholder="House / street, barangay, city, province, postal code"
                   value={mailingAddress}
-                  onChange={(e) => setMailingAddress(e.target.value)}
+                  onChange={(e) => setMailingAddress(sanitizeAddressLine(e.target.value, 500))}
                   rows={3}
                 />
               </div>
@@ -506,7 +487,8 @@ export default function MarketingProfilePage() {
                 autoComplete="off"
                 placeholder="9–12 digits (BIR TIN)"
                 value={tin}
-                onChange={(e) => setTin(e.target.value)}
+                onChange={(e) => setTin(sanitizeTinTyping(e.target.value))}
+                pattern="[0-9]*"
               />
               {user?.marketer_tin_masked ? (
                 <p className="mt-1 text-[11px] text-zinc-500">
@@ -579,7 +561,7 @@ export default function MarketingProfilePage() {
                 autoComplete="off"
                 placeholder={govPlaceholder}
                 value={govIdNumber}
-                onChange={(e) => setGovIdNumber(e.target.value)}
+                onChange={(e) => setGovIdNumber(sanitizeGovIdNumberInput(e.target.value))}
               />
               {user?.marketer_gov_id_number_masked ? (
                 <p className="mt-1 text-[11px] text-zinc-500">
@@ -701,7 +683,8 @@ export default function MarketingProfilePage() {
                 autoComplete="off"
                 placeholder={user?.gcash_masked_number ? "Enter full number to replace on file" : "09xxxxxxxxx"}
                 value={gcashNumber}
-                onChange={(e) => setGcashNumber(e.target.value)}
+                onChange={(e) => setGcashNumber(sanitizePhilippinesMobileInput(e.target.value))}
+                pattern="[0-9]*"
               />
               <p className="mt-1 text-[11px] text-zinc-500">Philippines format 09xxxxxxxxx. Leave blank to only update the name on file.</p>
             </div>
@@ -715,7 +698,7 @@ export default function MarketingProfilePage() {
                 autoComplete="name"
                 placeholder="Name on GCash"
                 value={gcashHolder}
-                onChange={(e) => setGcashHolder(e.target.value)}
+                onChange={(e) => setGcashHolder(sanitizePersonName(e.target.value, 120))}
               />
             </div>
             <div className="md:col-span-2">
@@ -733,91 +716,15 @@ export default function MarketingProfilePage() {
         </form>
       </div>
 
-      {/* Password change */}
-      <div className="dash-card p-6">
-        <h2 className="mb-4 font-dash text-lg text-navy">Change password</h2>
-        <form className="space-y-4" onSubmit={onChangePassword}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="current-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">Current password</label>
-              <div className="relative">
-                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  id="current-password"
-                  className="dash-input pl-9 pr-10"
-                  type={showCurrent ? "text" : "password"}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrent((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
-                  aria-label={showCurrent ? "Hide password" : "Show password"}
-                >
-                  {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="new-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">New password</label>
-              <div className="relative">
-                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  id="new-password"
-                  className="dash-input pl-9 pr-10"
-                  type={showNew ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNew((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
-                  aria-label={showNew ? "Hide password" : "Show password"}
-                >
-                  {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="md:col-span-2">
-              <label htmlFor="confirm-password" className="mb-1.5 block text-xs font-semibold text-zinc-600">Confirm new password</label>
-              <div className="relative">
-                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  id="confirm-password"
-                  className="dash-input pl-9"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  minLength={8}
-                />
-              </div>
-            </div>
-
-            <div className="md:col-span-2">
-              <button type="submit" disabled={savingPw} className="dash-btn-primary disabled:opacity-60">
-                {savingPw ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" /> Updating…
-                  </span>
-                ) : (
-                  "Update password"
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
+      <ChangePasswordCard
+        idPrefix="marketing-profile"
+        description={
+          <>
+            Update your marketing partner login password. Use at least 8 characters with uppercase, lowercase, and a number.
+            Other sessions will be signed out.
+          </>
+        }
+      />
     </div>
   );
 }

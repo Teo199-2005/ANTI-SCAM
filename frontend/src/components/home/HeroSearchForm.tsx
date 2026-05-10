@@ -1,6 +1,7 @@
 "use client";
 
 import Button from "@/components/ui/Button";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { CalendarDays, MapPin, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -48,7 +49,7 @@ export default function HeroSearchForm() {
           data-lpignore="true"
           data-form-type="other"
           value={destination}
-          onChange={(e) => setDestination(e.target.value)}
+          onChange={(e) => setDestination(sanitizeSearchQuery(e.target.value))}
         />
       </div>
 

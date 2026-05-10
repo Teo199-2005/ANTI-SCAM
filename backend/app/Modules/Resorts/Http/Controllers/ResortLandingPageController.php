@@ -81,9 +81,9 @@ class ResortLandingPageController extends Controller
         }
 
         // Delete old background image if stored locally
-        if ($resort->background_image_url && str_starts_with($resort->background_image_url, '/storage/')) {
-            $oldPath = str_replace('/storage/', 'public/', $resort->background_image_url);
-            Storage::delete($oldPath);
+        if ($resort->background_image_url && str_starts_with((string) $resort->background_image_url, '/storage/')) {
+            $relative = substr((string) $resort->background_image_url, strlen('/storage/'));
+            Storage::disk('public')->delete($relative);
         }
 
         $path = $request->file('image')->store('resort-backgrounds', 'public');

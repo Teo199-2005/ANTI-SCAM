@@ -22,7 +22,7 @@ export default function DashCard({
   return (
     <div
       className={cn(
-        "rounded-2xl",
+        "min-w-0 rounded-2xl",
         flat
           ? "border border-softBorderStrong/80 bg-softGray shadow-none"
           : "border border-white/55 bg-gradient-to-b from-softCard via-softCard to-metalFace shadow-metallic-panel",

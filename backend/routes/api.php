@@ -44,9 +44,11 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/auth/marketing-gov-id-options', [AuthController::class, 'marketingGovIdOptions']);
 
     // ---------- Webhooks (no auth, verified by token header) ----------
-    Route::post('/webhooks/xendit/invoice', [XenditWebhookController::class, 'invoice']);
-    Route::post('/webhooks/xendit/subscription-invoice', [SubscriptionWebhookController::class, 'invoice']);
-    Route::post('/webhooks/xendit/payout', [XenditPayoutWebhookController::class, 'payout']);
+    Route::middleware('throttle:webhooks')->group(function (): void {
+        Route::post('/webhooks/xendit/invoice', [XenditWebhookController::class, 'invoice']);
+        Route::post('/webhooks/xendit/subscription-invoice', [SubscriptionWebhookController::class, 'invoice']);
+        Route::post('/webhooks/xendit/payout', [XenditPayoutWebhookController::class, 'payout']);
+    });
 
     // ---------- Auth (rate limited) ----------
     // 10 attempts per minute for login (brute-force protection).
@@ -73,7 +75,9 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/public/rooms/{room}/availability', [PublicCatalogController::class, 'checkAvailability']);
 
     // Discount code validation (public, called from checkout)
-    Route::post('/public/discount-codes/validate', [DiscountCodeController::class, 'validateCode']);
+    Route::middleware('throttle:public-forms')->group(function (): void {
+        Route::post('/public/discount-codes/validate', [DiscountCodeController::class, 'validateCode']);
+    });
 
     Route::middleware('throttle:30,1')->group(function (): void {
         Route::post('/public/referrals/validate', [ReferralValidationController::class, 'validateCode']);
@@ -89,8 +93,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/auth/password', [AuthController::class, 'changePassword']);
         Route::post('/auth/avatar', [AuthController::class, 'updateAvatar']);
         Route::post('/auth/marketing-gov-id-document', [AuthController::class, 'uploadMarketingGovIdDocument']);
-        Route::post('/auth/email-otp/send', [AuthController::class, 'sendEmailVerificationOtp']);
-        Route::post('/auth/email-otp/verify', [AuthController::class, 'verifyEmailVerificationOtp']);
+        Route::middleware('throttle:8,1')->group(function (): void {
+            Route::post('/auth/email-otp/send', [AuthController::class, 'sendEmailVerificationOtp']);
+            Route::post('/auth/email-otp/verify', [AuthController::class, 'verifyEmailVerificationOtp']);
+        });
 
         Route::get('/notifications', [ClientNotificationController::class, 'index']);
         Route::post('/notifications/mark-all-read', [ClientNotificationController::class, 'markAllRead']);
@@ -146,6 +152,7 @@ Route::prefix('v1')->group(function (): void {
 
             // Marketing management
             Route::get('/admin/marketers', [MarketingController::class, 'marketers']);
+            Route::get('/admin/marketers/monitoring', [MarketingController::class, 'marketersMonitoring']);
             Route::post('/admin/marketers/assign', [MarketingController::class, 'assign']);
             Route::post('/admin/marketers/unassign', [MarketingController::class, 'unassign']);
             Route::post('/admin/commissions/{commission}/release', [MarketingController::class, 'release']);
@@ -160,16 +167,18 @@ Route::prefix('v1')->group(function (): void {
         // Resort guests
         Route::get('/resort/guests', [ResortGuestController::class, 'index']);
 
-        // Booking
-        Route::post('/booking-locks', [BookingLockController::class, 'store']);
+        // Booking (abuse-sensitive: locks + checkout)
+        Route::middleware('throttle:booking-actions')->group(function (): void {
+            Route::post('/booking-locks', [BookingLockController::class, 'store']);
+            Route::post('/reservations', [ReservationController::class, 'store']);
+            Route::post('/reservations/{reservation}/invoice', [XenditInvoiceController::class, 'create']);
+        });
 
         // Reservations
         Route::get('/reservations', [ReservationController::class, 'index']);
         Route::get('/reservations/{reservation}', [ReservationController::class, 'show']);
-        Route::post('/reservations', [ReservationController::class, 'store']);
         Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel']);
         Route::post('/reservations/{reservation}/admin-override', [ReservationController::class, 'adminOverride']);
-        Route::post('/reservations/{reservation}/invoice', [XenditInvoiceController::class, 'create']);
 
         // Subscriptions
         Route::middleware('role:resort_owner,admin')->group(function (): void {

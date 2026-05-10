@@ -111,7 +111,7 @@ export default function DashModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-zinc-900/45 p-0 motion-safe:transition-opacity motion-safe:duration-150 md:items-center md:p-4"
+      className="fixed inset-0 z-[100] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-y-contain bg-zinc-900/45 p-0 motion-safe:transition-opacity motion-safe:duration-150 motion-reduce:transition-none md:items-center md:p-4"
       role="presentation"
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -124,20 +124,25 @@ export default function DashModal({
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
         className={cn(
-          "w-full max-w-2xl overflow-y-auto border border-white/55 bg-gradient-to-b from-softCard to-metalFace shadow-metallic-panel outline-none ring-1 ring-black/[0.04] motion-safe:transition-transform motion-safe:duration-200 motion-reduce:transition-none",
-          "max-h-[min(88dvh,900px)] max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl max-md:border-x-0 max-md:border-b-0 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]",
+          "box-border w-full min-w-0 max-w-2xl overflow-y-auto border border-white/55 bg-gradient-to-b from-softCard to-metalFace shadow-metallic-panel outline-none ring-1 ring-black/[0.04] motion-safe:transition-transform motion-safe:duration-200 motion-reduce:transform-none motion-reduce:transition-none",
+          "max-h-[min(88dvh,900px)] max-md:max-w-full max-md:rounded-b-none max-md:rounded-t-2xl max-md:border-x-0 max-md:border-b-0 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]",
           "md:max-h-[min(90vh,720px)] md:rounded-2xl md:pb-0",
           className
         )}
         tabIndex={-1}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-softBorder px-dash-6 py-dash-4">
-          <div className="min-w-0">
-            <div id={titleId} role="heading" aria-level={2} className="font-dash text-dash-xl font-semibold text-navy">
+        <div className="flex items-start justify-between gap-3 border-b border-softBorder px-4 py-3 md:gap-4 md:px-dash-6 md:py-dash-4">
+          <div className="min-w-0 pr-2 md:pr-0">
+            <div
+              id={titleId}
+              role="heading"
+              aria-level={2}
+              className="font-dash text-base font-semibold leading-snug text-navy md:text-dash-xl"
+            >
               {title}
             </div>
             {description ? (
-              <p id={descId} className="mt-1 text-dash-sm text-zinc-600">
+              <p id={descId} className="mt-1 text-xs leading-snug text-zinc-600 md:text-dash-sm">
                 {description}
               </p>
             ) : null}
@@ -151,7 +156,7 @@ export default function DashModal({
             <X size={16} strokeWidth={2} />
           </button>
         </div>
-        <div className={cn(padded && "px-dash-6 pb-dash-6 pt-dash-4")}>{children}</div>
+        <div className={cn(padded && "px-4 pb-4 pt-3 md:px-dash-6 md:pb-dash-6 md:pt-dash-4")}>{children}</div>
       </div>
     </div>
   , document.body);

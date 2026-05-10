@@ -42,6 +42,7 @@ type RoomItem = {
   name: string;
   code: string | null;
   capacity: number;
+  units?: number;
   base_price: string;
   amenities: string[];
   rules: string | null;
@@ -66,6 +67,9 @@ export default function ResortRoomsPage() {
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<RoomItem | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  /** After POST /rooms succeeds, we keep the modal open with this id for the Photos tab. */
+  const [createRoomId, setCreateRoomId] = useState<number | null>(null);
+  const [createModalTab, setCreateModalTab] = useState<"details" | "images">("details");
   const [createSaving, setCreateSaving] = useState(false);
   const [payingForRoomSlot, setPayingForRoomSlot] = useState(false);
   const [roomAddonOpen, setRoomAddonOpen] = useState(false);
@@ -82,7 +86,9 @@ export default function ResortRoomsPage() {
       setResort(first ?? null);
       if (!first) {
         setRooms([]);
-        setError("No resort is assigned to this account yet.");
+        setError(
+          "no_resort_workspace",
+        );
         return;
       }
 
@@ -145,18 +151,41 @@ export default function ResortRoomsPage() {
     try {
       const normalizedInclusions = Array.from(new Set(values.inclusions));
       const normalizedAmenities = Array.from(new Set(values.amenities.filter(Boolean)));
+      const amenities = [
+        `BED_COUNT:${values.bed_count}`,
+        `BED_TYPE:${values.bed_type}`,
+        ...normalizedInclusions,
+        ...normalizedAmenities,
+      ];
+
+      if (createRoomId != null) {
+        await apiClient.put<ApiEnvelope<RoomItem>>(`/rooms/${createRoomId}`, {
+          name: values.name,
+          code: values.code || null,
+          capacity: values.capacity,
+          units: values.units,
+          base_price: values.base_price,
+          amenities,
+          rules: values.rules || null,
+          status: values.status,
+        });
+        pushToast({ title: "Room updated", description: "Details saved.", tone: "success" });
+        try {
+          await load();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+
       const response = await apiClient.post<ApiEnvelope<RoomItem>>("/rooms", {
         resort_id: values.resort_id,
         name: values.name,
         code: values.code || null,
         capacity: values.capacity,
+        units: values.units,
         base_price: values.base_price,
-        amenities: [
-          `BED_COUNT:${values.bed_count}`,
-          `BED_TYPE:${values.bed_type}`,
-          ...normalizedInclusions,
-          ...normalizedAmenities,
-        ],
+        amenities,
         rules: values.rules || null,
         status: values.status,
       });
@@ -165,12 +194,22 @@ export default function ResortRoomsPage() {
         setRooms((prev) => [created, ...prev.filter((r) => r.id !== created.id)]);
         setError(null);
       }
-      pushToast({
-        title: "Room saved",
-        description: `${values.name} is now in your room list.`,
-        tone: "success",
-      });
-      setCreateOpen(false);
+      if (created?.id) {
+        setCreateRoomId(created.id);
+        setCreateModalTab("images");
+        pushToast({
+          title: "Room saved",
+          description: "Add up to 5 photos for your landing page and guest views, then close when finished.",
+          tone: "success",
+        });
+      } else {
+        pushToast({
+          title: "Room saved",
+          description: `${values.name} is now in your room list.`,
+          tone: "success",
+        });
+        setCreateOpen(false);
+      }
       try {
         await load();
       } catch {
@@ -290,18 +329,24 @@ export default function ResortRoomsPage() {
                 type="button"
                 className="dash-btn-primary inline-flex items-center gap-2 opacity-50"
                 disabled
+                aria-label="Included room limit reached"
               >
                 <Plus size={15} />
-                Add room
+                Add
               </button>
             ) : (
               <button
                 type="button"
                 className="dash-btn-primary inline-flex items-center gap-2"
-                onClick={() => setCreateOpen(true)}
+                aria-label="Add new room"
+                onClick={() => {
+                  setCreateRoomId(null);
+                  setCreateModalTab("details");
+                  setCreateOpen(true);
+                }}
               >
                 <Plus size={15} />
-                Add room
+                Add
               </button>
             )}
             {activeRoomsCount >= includedRooms ? (
@@ -322,7 +367,20 @@ export default function ResortRoomsPage() {
             ) : null}
           </div>
         </div>
-        {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
+        {error === "no_resort_workspace" ? (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-semibold text-amber-950">No resort property yet</p>
+            <p className="mt-1 leading-relaxed text-amber-900/95">
+              Go to{" "}
+              <Link href="/dashboard/resort/profile" className="font-semibold text-amber-950 underline underline-offset-2 hover:text-amber-800">
+                Resort profile
+              </Link>{" "}
+              and complete <strong>Create my resort workspace</strong> (tenant + first resort). Then return here to add rooms.
+            </p>
+          </div>
+        ) : error ? (
+          <p className="mt-3 text-sm text-rose-700">{error}</p>
+        ) : null}
       </div>
 
       <div className="md:hidden">
@@ -344,6 +402,7 @@ export default function ResortRoomsPage() {
                 fields={[
                   { label: "Code", value: room.code || "—" },
                   { label: "Capacity", value: String(room.capacity) },
+                  { label: "Units", value: String(room.units ?? 1) },
                   { label: "Base price", value: `₱${Number(room.base_price).toLocaleString()}` },
                   {
                     label: "Status",
@@ -382,12 +441,13 @@ export default function ResortRoomsPage() {
       <div className="hidden md:block">
         <div className="dash-table-wrap">
           <div className="overflow-x-auto">
-            <table className="dash-table min-w-[760px]">
+            <table className="dash-table min-w-[820px]">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Code</th>
                   <th>Capacity</th>
+                  <th>Units</th>
                   <th>Base price</th>
                   <th>Status</th>
                   <DashTableActionsHead />
@@ -404,6 +464,7 @@ export default function ResortRoomsPage() {
                     </td>
                     <td className="text-zinc-600">{room.code || "—"}</td>
                     <td className="text-zinc-700">{room.capacity}</td>
+                    <td className="text-zinc-700 tabular-nums">{room.units ?? 1}</td>
                     <td className="text-zinc-700">₱{Number(room.base_price).toLocaleString()}</td>
                     <td>
                       <span className={roomStatusClass[room.status] ?? "dash-badge-slate"}>{room.status}</span>
@@ -438,7 +499,7 @@ export default function ResortRoomsPage() {
                 ))}
                 {rooms.length === 0 ? (
                   <tr>
-                    <td className="py-8 text-center text-zinc-600" colSpan={6}>
+                    <td className="py-8 text-center text-zinc-600" colSpan={7}>
                       No rooms found. Create your first room to begin accepting reservations.
                     </td>
                   </tr>
@@ -462,10 +523,16 @@ export default function ResortRoomsPage() {
       />
       <RoomModal
         open={createOpen}
-        title="Add room"
+        title="Add"
         loading={createSaving}
+        roomId={createRoomId ?? undefined}
+        initialActiveTab={createModalTab}
+        detailsSubmitLabel={createRoomId ? "Save changes" : "Save & continue to photos"}
         onClose={() => {
-          if (!createSaving) setCreateOpen(false);
+          if (createSaving) return;
+          setCreateOpen(false);
+          setCreateRoomId(null);
+          setCreateModalTab("details");
         }}
         onSave={onCreateRoom}
         initialValues={{
@@ -473,6 +540,7 @@ export default function ResortRoomsPage() {
           name: "",
           code: "",
           capacity: 1,
+          units: 1,
           base_price: 0,
           bed_count: 1,
           bed_type: "Double",

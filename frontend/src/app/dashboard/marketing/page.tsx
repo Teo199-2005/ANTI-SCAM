@@ -116,12 +116,6 @@ export default function MarketingDashboardPage() {
           >
             Profile
           </Link>
-          <Link
-            href="/dashboard/marketing/referrals"
-            className="dash-btn-sm justify-center border-primaryBlue/20 bg-primaryBlue text-white hover:bg-primaryBlueDark sm:inline-flex"
-          >
-            Open toolkit
-          </Link>
         </div>
       </DashCard>
 

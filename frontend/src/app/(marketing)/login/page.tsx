@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Eye, EyeOff, LogIn, Mail, Shield } from "lucide-react";
+import { sanitizeEmailTyping } from "@/lib/inputRestrictions";
 import DemoQuickLogin from "./DemoQuickLogin";
 
 /** Login card — roomier than the compact auth card used on register/forgot. */
@@ -16,7 +17,7 @@ const loginCardClass =
   "rounded-3xl border border-zinc-200/75 bg-white/95 p-7 shadow-[0_26px_52px_-22px_rgba(13,30,66,0.18),0_0_0_1px_rgba(255,255,255,0.82)_inset] backdrop-blur-xl sm:p-9 md:p-10";
 
 const authInput =
-  "w-full rounded-xl border border-zinc-200/80 bg-sky-50/35 px-4 py-3 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25";
+  "w-full rounded-xl border border-zinc-200/80 bg-sky-50/35 px-4 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25 md:text-sm";
 
 function LoginFallback() {
   return (
@@ -139,7 +140,8 @@ function LoginPageContent() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                inputMode="email"
+                onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
                 placeholder="you@example.com"
               />
             </div>

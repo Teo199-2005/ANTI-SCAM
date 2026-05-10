@@ -3,13 +3,20 @@
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DataTable from "@/components/shared/DataTable";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
-import { getAuditLogs, AuditLog } from "@/lib/api/admin";
+import SortableTh from "@/components/shared/SortableTh";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
+import { AuditLog, getAuditLogs } from "@/lib/api/admin";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { ChevronDown, ChevronUp, FileText, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Paginated = {
-  data: AuditLog[];
-  meta?: { current_page: number; last_page: number; total: number };
+const SORT_FIRST: Record<string, SortDir> = {
+  created_at: "desc",
+  action: "asc",
+  entity_type: "asc",
+  entity_id: "desc",
+  id: "desc",
 };
 
 export default function AuditLogsPage() {
@@ -17,25 +24,33 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
+  const [appliedAction, setAppliedAction] = useState("");
+  const [appliedEntity, setAppliedEntity] = useState("");
   const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
+  const [meta, setMeta] = useState<LaravelTableMeta | null>(null);
+  const [perPage, setPerPage] = useState(25);
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [error, setError] = useState<string | null>(null);
   const [openLogId, setOpenLogId] = useState<number | null>(null);
 
-  const load = async (a: string, e: string, pg: number) => {
+  const load = async (a: string, e: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
     try {
-      const data: Paginated = await getAuditLogs({
+      const data = await getAuditLogs({
         action: a || undefined,
         entityType: e || undefined,
         page: pg,
-        perPage: 25,
+        perPage: pp,
+        sort_by: sb,
+        sort_dir: sd,
       });
       setLogs(data.data ?? []);
-      setLastPage(data.meta?.last_page ?? 1);
+      setMeta(extractLaravelMeta(data));
       setError(null);
-    } catch (err) {
+    } catch {
       setLogs([]);
+      setMeta(null);
       setError("Failed to load audit logs.");
     } finally {
       setLoading(false);
@@ -43,14 +58,51 @@ export default function AuditLogsPage() {
   };
 
   useEffect(() => {
-    void load("", "", 1);
+    void load("", "", 1, perPage, sortBy, sortDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const lastPage = meta?.last_page ?? 1;
+  const total = meta?.total ?? logs.length;
 
   const onFilter = (e: React.FormEvent) => {
     e.preventDefault();
+    setAppliedAction(actionFilter);
+    setAppliedEntity(entityFilter);
     setPage(1);
-    void load(actionFilter, entityFilter, 1);
+    void load(actionFilter, entityFilter, 1, perPage, sortBy, sortDir);
   };
+
+  const onSort = (key: string) => {
+    const n = nextSort(key, sortBy, sortDir, SORT_FIRST[key] ?? "asc");
+    setSortBy(n.key);
+    setSortDir(n.dir);
+    setPage(1);
+    void load(appliedAction, appliedEntity, 1, perPage, n.key, n.dir);
+  };
+
+  const onPageChange = (p: number) => {
+    setPage(p);
+    void load(appliedAction, appliedEntity, p, perPage, sortBy, sortDir);
+  };
+
+  const onPerPageChange = (pp: number) => {
+    setPerPage(pp);
+    setPage(1);
+    void load(appliedAction, appliedEntity, 1, pp, sortBy, sortDir);
+  };
+
+  const paginationFooter = !error && (
+    <TablePaginationBar
+      page={page}
+      lastPage={lastPage}
+      total={total}
+      perPage={perPage}
+      onPerPageChange={onPerPageChange}
+      onPageChange={onPageChange}
+      disabled={loading}
+    />
+  );
 
   return (
     <div className="space-y-6">
@@ -68,7 +120,7 @@ export default function AuditLogsPage() {
               className="dash-input pl-9"
               placeholder="Filter by action…"
               value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
+              onChange={(e) => setActionFilter(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <select className="dash-input min-w-[160px]" value={entityFilter} onChange={(e) => setEntityFilter(e.target.value)}>
@@ -98,9 +150,7 @@ export default function AuditLogsPage() {
             {logs.map((log) => {
               const expanded = openLogId === log.id;
               const metaStr =
-                log.metadata && Object.keys(log.metadata).length
-                  ? JSON.stringify(log.metadata)
-                  : "";
+                log.metadata && Object.keys(log.metadata).length ? JSON.stringify(log.metadata) : "";
               return (
                 <DashMobileTableCard
                   key={log.id}
@@ -134,7 +184,10 @@ export default function AuditLogsPage() {
                             ) : null}
                           </p>
                           {metaStr ? (
-                            <p className="break-all font-mono text-[11px] text-zinc-600">{metaStr.slice(0, 280)}{metaStr.length > 280 ? "…" : ""}</p>
+                            <p className="break-all font-mono text-[11px] text-zinc-600">
+                              {metaStr.slice(0, 280)}
+                              {metaStr.length > 280 ? "…" : ""}
+                            </p>
                           ) : null}
                         </div>
                       ) : null}
@@ -145,16 +198,18 @@ export default function AuditLogsPage() {
             })}
           </div>
         )}
+        {paginationFooter ? <div className="dash-table-wrap overflow-hidden rounded-2xl">{paginationFooter}</div> : null}
       </div>
 
       <div className="hidden md:block">
         <DataTable
+          footer={paginationFooter}
           headers={
             <>
-              <th>Timestamp</th>
-              <th>Action</th>
-              <th>Entity</th>
-              <th>Entity ID</th>
+              <SortableTh label="Timestamp" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Action" sortKey="action" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Entity" sortKey="entity_type" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Entity ID" sortKey="entity_id" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <th>User ID</th>
             </>
           }
@@ -174,29 +229,6 @@ export default function AuditLogsPage() {
           </AsyncStatePanel>
         </DataTable>
       </div>
-
-      {lastPage > 1 ? (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            disabled={page <= 1}
-            onClick={() => { const next = page - 1; setPage(next); void load(actionFilter, entityFilter, next); }}
-            className="dash-btn-sm disabled:opacity-40"
-          >
-            ← Prev
-          </button>
-          <span className="text-sm text-zinc-600">
-            Page {page} of {lastPage}
-          </span>
-          <button
-            disabled={page >= lastPage}
-            onClick={() => { const next = page + 1; setPage(next); void load(actionFilter, entityFilter, next); }}
-            className="dash-btn-sm disabled:opacity-40"
-          >
-            Next →
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
-

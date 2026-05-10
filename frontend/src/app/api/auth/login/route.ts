@@ -1,7 +1,16 @@
+import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
+import { shouldAttachLoginProxyDiagnostics } from "@/lib/isLocalDevRequest";
 import { NextRequest, NextResponse } from "next/server";
 import { sessionCookieSecure } from "../sessionCookieSecure";
 
-const BACKEND = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+const BACKEND = serverLaravelApiV1BaseUrl();
+
+function loginDevHint(req: NextRequest): { devHint: string } | Record<string, never> {
+  if (!shouldAttachLoginProxyDiagnostics(req)) return {};
+  return {
+    devHint: `BFF → ${BACKEND}/auth/login. If email/password are correct but login fails, the API database may have no demo users: run (from backend/) php artisan db:seed --class=DemoLoginAccountsSeeder. Point the BFF at your API with LARAVEL_API_BASE_URL in frontend/.env.local (e.g. http://127.0.0.1:8000/api/v1).`,
+  };
+}
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -19,19 +28,33 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
   } catch {
-    return NextResponse.json({ success: false, message: "API unreachable. Try again." }, { status: 502 });
+    return NextResponse.json(
+      { success: false, message: "API unreachable. Try again.", ...loginDevHint(req) },
+      { status: 502 },
+    );
   }
 
   const payload = (await backendRes.json()) as {
-    success: boolean;
+    success?: boolean;
     message?: string;
+    errors?: Record<string, string[]>;
     data?: { token: string; user: unknown };
   };
 
+  const firstValidation =
+    payload.errors && typeof payload.errors === "object"
+      ? (Object.values(payload.errors).find((v) => Array.isArray(v) && v[0]) as string[] | undefined)?.[0]
+      : undefined;
+
   if (!backendRes.ok || !payload.success || !payload.data?.token) {
     return NextResponse.json(
-      { success: false, message: payload.message ?? "Invalid credentials." },
-      { status: backendRes.status || 401 },
+      {
+        success: false,
+        message: firstValidation ?? payload.message ?? "Invalid credentials.",
+        ...(payload.errors ? { errors: payload.errors } : {}),
+        ...loginDevHint(req),
+      },
+      { status: backendRes.status >= 400 ? backendRes.status : 422 },
     );
   }
 

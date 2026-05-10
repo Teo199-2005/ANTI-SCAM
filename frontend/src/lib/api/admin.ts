@@ -80,9 +80,11 @@ export async function getAuditLogs(params?: {
   userId?: number;
   perPage?: number;
   page?: number;
+  sort_by?: string;
+  sort_dir?: string;
 }): Promise<Paginated<AuditLog>> {
   const { data } = await apiClient.get<ApiEnvelope<Paginated<AuditLog>>>("/admin/audit-logs", {
-    params
+    params,
   });
   return data.data;
 }
@@ -426,6 +428,43 @@ export async function getAdminCommissionReleases(params?: {
     { params },
   );
   return normalizeLaravelPaginated<CommissionReleaseRow>(data.data);
+}
+
+export type AdminMarketerMonitorRow = {
+  id: number;
+  name: string;
+  email: string;
+  referral_code: string | null;
+  joined_at: string | null;
+  assigned_resorts_count: number;
+  referred_resorts_count: number;
+  last_new_referred_resort_at: string | null;
+  months_since_last_new_referred_resort: number | null;
+  last_any_referral_payment_at: string | null;
+  total_referred_subscription_php: number;
+  commission_pending_php: number;
+  commission_released_gross_php: number;
+  commission_total_gross_php: number;
+};
+
+export type AdminMarketerMonitoringPayload = {
+  rows: AdminMarketerMonitorRow[];
+  meta: { generated_at: string; new_client_definition: string };
+};
+
+export async function getAdminMarketersMonitoring(search?: string): Promise<AdminMarketerMonitoringPayload> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminMarketerMonitoringPayload>>("/admin/marketers/monitoring", {
+    params: search?.trim() ? { search: search.trim() } : undefined,
+  });
+  const raw = data.data;
+  return {
+    rows: Array.isArray(raw?.rows) ? raw.rows : [],
+    meta: {
+      generated_at: typeof raw?.meta?.generated_at === "string" ? raw.meta.generated_at : "",
+      new_client_definition:
+        typeof raw?.meta?.new_client_definition === "string" ? raw.meta.new_client_definition : "",
+    },
+  };
 }
 
 export async function getAdminAnalytics(filters?: AnalyticsFilters): Promise<AdminAnalytics> {

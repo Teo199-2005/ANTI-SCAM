@@ -25,6 +25,7 @@ class RoomFactory extends Factory
             'name' => fake()->randomElement(['Deluxe Suite', 'Ocean View', 'Garden Villa', 'Family Loft']).' '.fake()->numberBetween(1, 40),
             'code' => $suffix,
             'capacity' => $capacity,
+            'units' => 1,
             'base_price' => fake()->randomFloat(2, 1800, 12500),
             'amenities' => fake()->randomElements(['WiFi', 'TV', 'Mini Bar', 'Pool Access', 'Balcony', 'Breakfast'], fake()->numberBetween(2, 5)),
             'rules' => fake()->sentence(10),

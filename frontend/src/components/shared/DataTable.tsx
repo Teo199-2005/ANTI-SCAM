@@ -10,6 +10,10 @@ type DataTableProps = {
   caption?: string;
   /** Main row + detail/expand row pairs — corrects action-column zebra striping */
   splitBodyRows?: boolean;
+  /** Sticky footer inside the table chrome (e.g. pagination bar) */
+  footer?: ReactNode;
+  /** Accessible name for the horizontal scroll region (narrow viewports). */
+  scrollRegionLabel?: string;
 };
 
 export default function DataTable({
@@ -18,6 +22,8 @@ export default function DataTable({
   minWidthClass = "min-w-[640px]",
   caption,
   splitBodyRows = false,
+  footer,
+  scrollRegionLabel = "Data table — swipe sideways to see all columns",
 }: DataTableProps) {
   return (
     <div className="dash-table-wrap">
@@ -26,7 +32,11 @@ export default function DataTable({
           <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">{caption}</p>
         </div>
       ) : null}
-      <div className="overflow-x-auto">
+      <div
+        className="dash-table-scroll-region overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]"
+        role="region"
+        aria-label={scrollRegionLabel}
+      >
         <table className={cn("dash-table", minWidthClass, splitBodyRows && "dash-table--split-pairs")}>
           <thead>
             <tr>{headers}</tr>
@@ -34,6 +44,7 @@ export default function DataTable({
           <tbody>{children}</tbody>
         </table>
       </div>
+      {footer}
     </div>
   );
 }

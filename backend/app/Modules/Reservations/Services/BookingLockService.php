@@ -3,8 +3,8 @@
 namespace App\Modules\Reservations\Services;
 
 use App\Models\BookingLock;
-use App\Models\Reservation;
-use App\Models\RoomAvailability;
+use App\Models\Room;
+use App\Services\RoomOccupancyService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -27,46 +27,22 @@ class BookingLockService
                 ->where('expires_at', '<', now())
                 ->update(['status' => 'released']);
 
-            // Date-range conflict closure (reused across three checks)
-            $dateConflict = function ($query) use ($checkIn, $checkOut): void {
-                $query->where(function ($q) use ($checkIn, $checkOut): void {
-                    $q->whereBetween('check_in_date', [$checkIn, $checkOut])
-                        ->orWhereBetween('check_out_date', [$checkIn, $checkOut])
-                        ->orWhere(function ($inner) use ($checkIn, $checkOut): void {
-                            $inner->where('check_in_date', '<=', $checkIn)
-                                  ->where('check_out_date', '>=', $checkOut);
-                        });
-                });
-            };
-
-            // 1. Confirmed / pending reservation conflict
-            $hasReservationConflict = Reservation::query()
+            $room = Room::withoutGlobalScopes()
+                ->where('id', $roomId)
                 ->where('tenant_id', $tenantId)
-                ->where('room_id', $roomId)
-                ->whereIn('status', ['pending_payment', 'confirmed'])
-                ->tap($dateConflict)
                 ->lockForUpdate()
-                ->exists();
+                ->first();
+            if (! $room) {
+                throw new RuntimeException('Room is invalid for this booking.');
+            }
 
-            // 2. Active booking lock conflict
-            $hasLockConflict = BookingLock::query()
-                ->where('tenant_id', $tenantId)
-                ->where('room_id', $roomId)
-                ->where('status', 'locked')
-                ->where('expires_at', '>', now())
-                ->tap($dateConflict)
-                ->lockForUpdate()
-                ->exists();
+            $units = max(1, (int) ($room->units ?? 1));
 
-            // 3. Admin-blocked availability window conflict
-            $hasAvailabilityBlock = RoomAvailability::query()
-                ->where('room_id', $roomId)
-                ->where('is_available', false)
-                ->tap($dateConflict)
-                ->lockForUpdate()
-                ->exists();
+            $resCount = RoomOccupancyService::overlappingReservationCount($tenantId, $roomId, $checkIn, $checkOut);
+            $lockCount = RoomOccupancyService::overlappingActiveLockCount($tenantId, $roomId, $checkIn, $checkOut);
+            $hasBlock = RoomOccupancyService::hasBlockedAvailabilityWindow($roomId, $checkIn, $checkOut);
 
-            if ($hasReservationConflict || $hasLockConflict || $hasAvailabilityBlock) {
+            if ($hasBlock || ($resCount + $lockCount) >= $units) {
                 throw new RuntimeException('Room is unavailable for the selected date range.');
             }
 

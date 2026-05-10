@@ -11,12 +11,12 @@ use App\Services\PasswordResetOtpService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\GcashAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
+use App\Support\PlatformPasswordRules;
 use App\Support\UserProfilePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -42,11 +42,7 @@ class AuthController extends Controller
             'business_name' => ['nullable', 'string', 'max:190'],
             'role_intent' => ['nullable', 'in:resort_owner,client'],
             'accept_terms' => ['required', 'accepted'],
-            'password' => [
-                'required',
-                'confirmed',
-                Password::min(8)->mixedCase()->numbers()->uncompromised(),
-            ],
+            'password' => PlatformPasswordRules::requiredWithConfirmation(),
         ]);
 
         $roleIntent = $validated['role_intent'] ?? 'resort_owner';
@@ -135,11 +131,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'email'],
             'otp' => ['required', 'digits:6'],
-            'password' => [
-                'required',
-                'confirmed',
-                Password::min(8)->mixedCase()->numbers()->uncompromised(),
-            ],
+            'password' => PlatformPasswordRules::requiredWithConfirmation(),
         ]);
 
         $result = $this->passwordResetOtpService->verifyAndResetPassword(
@@ -401,22 +393,19 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        $request->validate([
+        $validated = $request->validate([
             'current_password' => ['required', 'string'],
-            'password' => [
-                'required',
-                'confirmed',
-                Password::min(8)->mixedCase()->numbers()->uncompromised(),
-            ],
+            'password' => PlatformPasswordRules::requiredWithConfirmation(),
         ]);
 
-        if (! Hash::check($request->current_password, $user->password)) {
+        if (! Hash::check($validated['current_password'], $user->getAuthPassword())) {
             throw ValidationException::withMessages([
                 'current_password' => ['The current password is incorrect.'],
             ]);
         }
 
-        $user->update(['password' => Hash::make($request->password)]);
+        // Assign plaintext — User model uses `password` => `hashed` cast (single bcrypt layer).
+        $user->forceFill(['password' => $validated['password']])->save();
 
         // Revoke all other tokens so existing sessions are invalidated after a password change.
         $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();

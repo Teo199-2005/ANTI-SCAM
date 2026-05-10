@@ -11,6 +11,7 @@ import {
 } from "@/components/shared/DashTableActions";
 import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
+import { sanitizeLongText } from "@/lib/inputRestrictions";
 import { CalendarDays, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -148,7 +149,12 @@ export default function RoomCalendarPage() {
           <option value="maintenance">maintenance</option>
           <option value="available">available</option>
         </select>
-        <input className="dash-input" placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <input
+          className="dash-input"
+          placeholder="Reason (optional)"
+          value={reason}
+          onChange={(e) => setReason(sanitizeLongText(e.target.value, 500))}
+        />
         <button type="submit" disabled={saving} className="dash-btn-primary disabled:opacity-50">
           {saving ? "Saving…" : "Save date range"}
         </button>

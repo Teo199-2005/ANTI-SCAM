@@ -13,6 +13,7 @@ use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -216,6 +217,30 @@ class AdminOnboardController extends Controller
             abort(403, 'Only resort owner accounts can upload logos here.');
         }
 
-        return $this->uploadLogo($request);
+        $request->validate([
+            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()
+            ->where('tenant_id', $user->tenant_id)
+            ->first();
+
+        if (! $resort) {
+            return $this->errorResponse('No resort found for this account.', null, 404);
+        }
+
+        if ($resort->logo_url && str_starts_with((string) $resort->logo_url, '/storage/')) {
+            $relative = substr((string) $resort->logo_url, strlen('/storage/'));
+            Storage::disk('public')->delete($relative);
+        }
+
+        $path = $request->file('logo')->store('resort-logos', 'public');
+        $logoUrl = '/storage/'.$path;
+
+        $resort->update(['logo_url' => $logoUrl]);
+
+        return $this->successResponse([
+            'logo_url' => $logoUrl,
+        ], 'Resort logo uploaded');
     }
 }

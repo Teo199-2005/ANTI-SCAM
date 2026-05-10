@@ -9,6 +9,7 @@ import { sendEmailVerificationOtp, verifyEmailVerificationOtp } from "@/lib/api/
 import { AlertCircle, ArrowLeft, CheckCircle2, LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { sanitizeOtpInput } from "@/lib/inputRestrictions";
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 const OTP_RESEND_COOLDOWN_SECONDS = 30;
@@ -262,14 +263,14 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/30 bg-white/95 p-1">
                       <Image
                         src="/rising2brothers.png"
-                        alt="The Rising 2 Brothers"
+                        alt="The Rising 2 Brothers OPC"
                         width={30}
                         height={30}
                         className="h-6 w-6 object-contain"
                         unoptimized
                       />
                     </span>
-                    <span className="text-sm font-medium text-white">The Rising 2 Brothers</span>
+                    <span className="text-sm font-medium text-white">The Rising 2 Brothers OPC</span>
                   </div>
                 </div>
               </div>
@@ -313,7 +314,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
                 <input
                   id="email-otp-input"
                   value={otp}
-                  onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={(event) => setOtp(sanitizeOtpInput(event.target.value))}
                   inputMode="numeric"
                   pattern="\d{6}"
                   autoComplete="one-time-code"
@@ -370,19 +371,22 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     <div className="dash-shell flex min-h-screen">
       <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex min-h-screen flex-1 flex-col md:pl-[264px]">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col md:pl-[264px]">
         <DashboardTopbar onOpenMenu={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-8 lg:py-8">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto px-4 py-6 lg:px-8 lg:py-8">
           <div className="dash-shell-main">{children}</div>
         </main>
-        <footer className="border-t border-softBorder/70 bg-white/65 px-4 py-3 backdrop-blur-sm lg:px-8">
-          <div className="dash-shell-main flex items-start justify-center sm:justify-end">
-            <PoweredByMark
-              compact
-              tone="dark"
-              showOperatorLogo={false}
-              version={process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0"}
-            />
+        <footer className="relative border-t border-white/55 bg-gradient-to-b from-white/92 via-softGray/35 to-metalFace/75 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] backdrop-blur-md lg:px-8 lg:pb-3 lg:pt-3">
+          <div className="dash-shell-main">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/70 bg-white/55 px-4 py-4 shadow-[0_8px_24px_-12px_rgba(13,30,66,0.12)] sm:flex-row sm:justify-end sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none">
+              <PoweredByMark
+                compact
+                tone="dark"
+                variant="stack"
+                showOperatorLogo={false}
+                version={process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0"}
+              />
+            </div>
           </div>
         </footer>
       </div>

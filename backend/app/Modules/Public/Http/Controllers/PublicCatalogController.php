@@ -3,13 +3,11 @@
 namespace App\Modules\Public\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\BookingLock;
-use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Room;
-use App\Models\RoomAvailability;
 use App\Models\Tenant;
 use App\Services\LandingReadinessService;
+use App\Services\RoomOccupancyService;
 use App\Shared\Traits\ApiResponseTrait;
 
 class PublicCatalogController extends Controller
@@ -185,36 +183,14 @@ class PublicCatalogController extends Controller
             return $this->errorResponse('check_in_date and check_out_date are required.', null, 422);
         }
 
-        $dateConflict = fn ($query) => $query
-            ->where(function ($q) use ($checkIn, $checkOut): void {
-                $q->whereBetween('check_in_date', [$checkIn, $checkOut])
-                    ->orWhereBetween('check_out_date', [$checkIn, $checkOut])
-                    ->orWhere(function ($inner) use ($checkIn, $checkOut): void {
-                        $inner->where('check_in_date', '<=', $checkIn)
-                            ->where('check_out_date', '>=', $checkOut);
-                    });
-            });
+        $tenantId = (int) $room->tenant_id;
+        $units = max(1, (int) ($room->units ?? 1));
 
-        $hasReservation = Reservation::withoutGlobalScopes()
-            ->where('room_id', $room->id)
-            ->whereIn('status', ['pending_payment', 'confirmed'])
-            ->tap($dateConflict)
-            ->exists();
+        $resCount = RoomOccupancyService::overlappingReservationCount($tenantId, (int) $room->id, $checkIn, $checkOut);
+        $lockCount = RoomOccupancyService::overlappingActiveLockCount($tenantId, (int) $room->id, $checkIn, $checkOut);
+        $hasBlock = RoomOccupancyService::hasBlockedAvailabilityWindow((int) $room->id, $checkIn, $checkOut);
 
-        $hasLock = BookingLock::withoutGlobalScopes()
-            ->where('room_id', $room->id)
-            ->where('status', 'locked')
-            ->where('expires_at', '>', now())
-            ->tap($dateConflict)
-            ->exists();
-
-        $hasBlock = RoomAvailability::withoutGlobalScopes()
-            ->where('room_id', $room->id)
-            ->where('is_available', false)
-            ->tap($dateConflict)
-            ->exists();
-
-        $isAvailable = ! $hasReservation && ! $hasLock && ! $hasBlock;
+        $isAvailable = ! $hasBlock && ($resCount + $lockCount) < $units;
 
         return $this->successResponse([
             'available'      => $isAvailable,
@@ -243,6 +219,7 @@ class PublicCatalogController extends Controller
             'name'      => $room->name,
             'code'      => $room->code,
             'capacity'  => $room->capacity,
+            'units'     => max(1, (int) ($room->units ?? 1)),
             'basePrice' => $room->base_price,
             'amenities' => $room->amenities ?? [],
             'rules'     => $room->rules,
@@ -270,6 +247,7 @@ class PublicCatalogController extends Controller
                 'name'      => $room->name,
                 'code'      => $room->code,
                 'capacity'  => $room->capacity,
+                'units'     => max(1, (int) ($room->units ?? 1)),
                 'basePrice' => $room->base_price,
                 'amenities' => $room->amenities ?? [],
                 'status'    => $room->status,

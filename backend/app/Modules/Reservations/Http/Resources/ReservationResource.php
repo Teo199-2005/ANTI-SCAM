@@ -23,6 +23,7 @@ class ReservationResource extends JsonResource
             'status' => $this->status,
             'xenditPaymentStatus' => $this->xendit_payment_status,
             'xenditInvoiceId' => $this->xendit_invoice_id,
+            'createdAt' => $this->created_at?->toISOString(),
             'reservedAt' => $this->reserved_at?->toISOString(),
             'cancelledAt' => $this->cancelled_at?->toISOString(),
             'cancellationReason' => $this->cancellation_reason,

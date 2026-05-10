@@ -25,6 +25,7 @@ class StoreRoomRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'code' => ['nullable', 'string', 'max:40'],
             'capacity' => ['required', 'integer', 'min:1', 'max:50'],
+            'units' => ['sometimes', 'integer', 'min:1', 'max:99'],
             'base_price' => ['required', 'numeric', 'min:0'],
             'amenities' => ['nullable', 'array'],
             'amenities.*' => ['string', 'max:80'],

@@ -2,14 +2,16 @@
 
 namespace App\Services;
 
+use App\Jobs\SendTransactionalEmailJob;
 use App\Legal\PlatformTerms;
 use App\Models\EmailLog;
 use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Subscription;
 use App\Models\User;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Request;
+use Illuminate\Support\Str;
 
 class EmailNotificationService
 {
@@ -28,21 +30,18 @@ class EmailNotificationService
             .'</p>'
             .PlatformTerms::toEmailHtml();
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Terms & Conditions',
+            $bodyHtml,
+            'Your copy of the agreement is attached in this email.'
+        );
+
+        $this->queueMail(
             'terms_accepted',
             $user->email,
+            $user->name,
             'Anti-Scam PH — Terms & Conditions confirmation',
-            function () use ($user, $bodyHtml): void {
-                Mail::send([], [], function ($m) use ($user, $bodyHtml): void {
-                    $m->to($user->email, $user->name)
-                        ->subject('Anti-Scam PH — Terms & Conditions confirmation')
-                        ->html($this->templateService->render(
-                            'Terms & Conditions',
-                            $bodyHtml,
-                            'Your copy of the agreement is attached in this email.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['user_id' => $user->id, 'terms_version' => PlatformTerms::version()],
             $user->tenant_id
         );
@@ -56,21 +55,18 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Booking confirmed',
+            $this->bookingConfirmationHtml($reservation),
+            'Your booking has been confirmed.'
+        );
+
+        $this->queueMail(
             'booking_confirmation',
             $user->email,
+            $user->name,
             'Booking Confirmed – '.$reservation->reference_no,
-            function () use ($reservation, $user): void {
-                Mail::send([], [], function ($m) use ($reservation, $user): void {
-                    $m->to($user->email, $user->name)
-                        ->subject('Booking Confirmed – '.$reservation->reference_no)
-                        ->html($this->templateService->render(
-                            'Booking confirmed',
-                            $this->bookingConfirmationHtml($reservation),
-                            'Your booking has been confirmed.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['reservation_id' => $reservation->id],
             $reservation->tenant_id
         );
@@ -84,21 +80,18 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Payment receipt',
+            $this->paymentReceiptHtml($reservation),
+            'Your reservation fee receipt is here.'
+        );
+
+        $this->queueMail(
             'payment_receipt',
             $user->email,
+            $user->name,
             'Payment Receipt – '.$reservation->reference_no,
-            function () use ($reservation, $user): void {
-                Mail::send([], [], function ($m) use ($reservation, $user): void {
-                    $m->to($user->email, $user->name)
-                        ->subject('Payment Receipt – '.$reservation->reference_no)
-                        ->html($this->templateService->render(
-                            'Payment receipt',
-                            $this->paymentReceiptHtml($reservation),
-                            'Your reservation fee receipt is here.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['reservation_id' => $reservation->id],
             $reservation->tenant_id
         );
@@ -110,9 +103,8 @@ class EmailNotificationService
         $resort = $reservation->resort;
         if (! $resort?->contact_number) {
             return;
-        } // use contact email if available
+        }
 
-        // Resort notification uses a platform admin email or resort owner email
         $resortOwner = User::withoutGlobalScopes()
             ->where('tenant_id', $resort->tenant_id)
             ->where('role', 'resort_owner')
@@ -122,21 +114,18 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'New booking received',
+            $this->newBookingResortHtml($reservation),
+            'A new booking is confirmed for your resort.'
+        );
+
+        $this->queueMail(
             'new_booking_resort',
             $resortOwner->email,
+            $resortOwner->name,
             'New Booking Received – '.$reservation->reference_no,
-            function () use ($reservation, $resortOwner): void {
-                Mail::send([], [], function ($m) use ($reservation, $resortOwner): void {
-                    $m->to($resortOwner->email, $resortOwner->name)
-                        ->subject('New Booking – '.$reservation->reference_no)
-                        ->html($this->templateService->render(
-                            'New booking received',
-                            $this->newBookingResortHtml($reservation),
-                            'A new booking is confirmed for your resort.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['reservation_id' => $reservation->id],
             $reservation->tenant_id
         );
@@ -154,21 +143,18 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Subscription payment due',
+            $this->subscriptionDueHtml($subscription),
+            'Your subscription payment due reminder.'
+        );
+
+        $this->queueMail(
             'subscription_due',
             $owner->email,
+            $owner->name,
             'Subscription Payment Due – '.$subscription->resort?->name,
-            function () use ($subscription, $owner): void {
-                Mail::send([], [], function ($m) use ($subscription, $owner): void {
-                    $m->to($owner->email, $owner->name)
-                        ->subject('Subscription Payment Due')
-                        ->html($this->templateService->render(
-                            'Subscription payment due',
-                            $this->subscriptionDueHtml($subscription),
-                            'Your subscription payment due reminder.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['subscription_id' => $subscription->id],
             $subscription->tenant_id
         );
@@ -186,21 +172,18 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Subscription renewed',
+            $this->subscriptionRenewalHtml($subscription),
+            'Your subscription has been renewed successfully.'
+        );
+
+        $this->queueMail(
             'subscription_renewal_confirmation',
             $owner->email,
+            $owner->name,
             'Subscription Renewed – '.$subscription->resort?->name,
-            function () use ($subscription, $owner): void {
-                Mail::send([], [], function ($m) use ($subscription, $owner): void {
-                    $m->to($owner->email, $owner->name)
-                        ->subject('Subscription Renewed')
-                        ->html($this->templateService->render(
-                            'Subscription renewed',
-                            $this->subscriptionRenewalHtml($subscription),
-                            'Your subscription has been renewed successfully.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['subscription_id' => $subscription->id],
             $subscription->tenant_id
         );
@@ -218,21 +201,18 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Grace period alert',
+            $this->gracePeriodHtml($subscription),
+            'Action required to avoid suspension.'
+        );
+
+        $this->queueMail(
             'grace_period_alert',
             $owner->email,
+            $owner->name,
             'Action Required: Subscription Grace Period – '.$subscription->resort?->name,
-            function () use ($subscription, $owner): void {
-                Mail::send([], [], function ($m) use ($subscription, $owner): void {
-                    $m->to($owner->email)
-                        ->subject('Subscription Grace Period Alert')
-                        ->html($this->templateService->render(
-                            'Grace period alert',
-                            $this->gracePeriodHtml($subscription),
-                            'Action required to avoid suspension.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['subscription_id' => $subscription->id],
             $subscription->tenant_id
         );
@@ -250,57 +230,71 @@ class EmailNotificationService
             return;
         }
 
-        $this->dispatch(
+        $fullHtml = $this->templateService->render(
+            'Resort listing suspended',
+            $this->suspensionHtml($resort),
+            'Your resort listing has been suspended.'
+        );
+
+        $this->queueMail(
             'resort_suspended',
             $owner->email,
+            $owner->name,
             'Your resort listing has been suspended – '.$resort->name,
-            function () use ($resort, $owner): void {
-                Mail::send([], [], function ($m) use ($resort, $owner): void {
-                    $m->to($owner->email)
-                        ->subject('Resort Listing Suspended')
-                        ->html($this->templateService->render(
-                            'Resort listing suspended',
-                            $this->suspensionHtml($resort),
-                            'Your resort listing has been suspended.'
-                        ));
-                });
-            },
+            $fullHtml,
             ['resort_id' => $resort->id],
             $resort->tenant_id
         );
     }
 
-    // ──────────────────────────────────────────────────────────────────
-    // Dispatcher: wraps send in try/catch and writes EmailLog
-    // ──────────────────────────────────────────────────────────────────
-
-    private function dispatch(
+    private function queueMail(
         string $type,
         string $toEmail,
+        ?string $toName,
         string $subject,
-        callable $sender,
+        string $fullHtml,
         array $metadata = [],
-        ?int $tenantId = null
+        ?int $tenantId = null,
     ): void {
+        $correlationHeader = Request::header('X-Correlation-Id');
+        $correlationId = is_string($correlationHeader) && Str::isUuid($correlationHeader)
+            ? $correlationHeader
+            : Str::uuid()->toString();
+
+        $meta = array_merge($metadata, ['correlation_id' => $correlationId]);
+
         $log = EmailLog::create([
             'tenant_id' => $tenantId,
             'type' => $type,
             'to_email' => $toEmail,
+            'to_name' => $toName,
             'subject' => $subject,
             'status' => 'queued',
-            'metadata' => $metadata,
+            'metadata' => $meta,
+            'html_body' => $fullHtml,
+            'correlation_id' => $correlationId,
         ]);
 
-        try {
-            $sender();
-            $log->update(['status' => 'sent', 'sent_at' => now()]);
-        } catch (Throwable $e) {
-            $log->update(['status' => 'failed', 'error' => $e->getMessage()]);
+        if (! config('mail.queue_transactional', true)) {
+            Bus::dispatchSync(new SendTransactionalEmailJob($log->id));
+
+            return;
         }
+
+        // When the queue connection is `sync`, run immediately so HTTP tests and local dev
+        // see final `email_logs` state. For Redis/database workers, defer until after commit
+        // so workers never read a row that rolled back with the HTTP transaction.
+        if (config('queue.default') === 'sync') {
+            Bus::dispatchSync(new SendTransactionalEmailJob($log->id));
+
+            return;
+        }
+
+        SendTransactionalEmailJob::dispatch($log->id)->afterCommit();
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // Email HTML templates (inline – swap for proper Blade views later)
+    // Email HTML fragments (inline – can migrate to Blade partials later)
     // ──────────────────────────────────────────────────────────────────
 
     private function bookingConfirmationHtml(Reservation $r): string

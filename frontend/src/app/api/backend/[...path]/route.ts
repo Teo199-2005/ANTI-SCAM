@@ -5,21 +5,34 @@
  * This keeps the auth token exclusively server-side (httpOnly cookie) while allowing
  * the React SPA to make authenticated requests without ever touching the token directly.
  */
+import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1").replace(/\/$/, "");
+const BACKEND = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 async function proxy(req: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const { path } = await context.params;
+  const resolved = await context.params;
+  const rawPath = resolved?.path;
+  const segments = Array.isArray(rawPath) ? rawPath : rawPath != null ? [String(rawPath)] : [];
+  if (segments.length === 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Missing API path after /api/backend (e.g. /api/backend/rooms).",
+      },
+      { status: 400 },
+    );
+  }
+
   const token = req.cookies.get("rs_session")?.value;
 
   if (!token) {
     return NextResponse.json({ success: false, message: "Not authenticated." }, { status: 401 });
   }
 
-  const targetPath = `/${path.join("/")}`;
+  const targetPath = `/${segments.join("/")}`;
   const search = req.nextUrl.searchParams.toString();
   const targetUrl = `${BACKEND}${targetPath}${search ? `?${search}` : ""}`;
 

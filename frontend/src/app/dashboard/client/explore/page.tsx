@@ -3,6 +3,7 @@
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import { getFavoriteResortIds, toggleFavoriteResortId } from "@/lib/client/favorites";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { Building2, Heart, MapPin, Search } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -72,7 +73,7 @@ export default function ExplorePage() {
               className="dash-input pl-9"
               placeholder="Search by name or location…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearch(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <button type="submit" className="dash-btn-primary shrink-0">

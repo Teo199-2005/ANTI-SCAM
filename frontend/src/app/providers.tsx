@@ -1,16 +1,19 @@
 "use client";
 
-import { LegalDocumentModalsProvider } from "@/contexts/LegalDocumentModalsContext";
+import AppErrorBoundary from "@/components/shared/AppErrorBoundary";
 import { ToastProvider } from "@/components/shared/ToastProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LegalDocumentModalsProvider } from "@/contexts/LegalDocumentModalsContext";
 import type { ReactNode } from "react";
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <AuthProvider>
-      <LegalDocumentModalsProvider>
-        <ToastProvider>{children}</ToastProvider>
-      </LegalDocumentModalsProvider>
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <LegalDocumentModalsProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </LegalDocumentModalsProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   );
 }

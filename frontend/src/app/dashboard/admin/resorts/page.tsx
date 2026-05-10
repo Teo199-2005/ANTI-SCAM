@@ -11,10 +11,20 @@ import {
   DashTableActionsInner,
 } from "@/components/shared/DashTableActions";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import SortableTh from "@/components/shared/SortableTh";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BadgeCheck, Building2, Crown, Globe, PenLine, Search, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
+
+const SORT_FIRST: Record<string, SortDir> = {
+  name: "asc",
+  address: "asc",
+  created_at: "desc",
+};
 
 const subBadge = (status: string) => {
   if (status === "active") return "dash-badge-emerald";
@@ -32,16 +42,29 @@ export default function AdminResortsPage() {
   const [toggling, setToggling] = useState<number | null>(null);
   const [togglingVip, setTogglingVip] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<LaravelTableMeta | null>(null);
+  const [perPage, setPerPage] = useState(15);
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const { pushToast } = useToast();
 
-  const load = async (s: string) => {
+  const load = async (s: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
     try {
-      const res = await listResorts({ search: s, perPage: 50 });
+      const res = await listResorts({
+        search: s || undefined,
+        perPage: pp,
+        page: pg,
+        sort_by: sb,
+        sort_dir: sd,
+      });
       setResorts(res.data ?? []);
+      setMeta(extractLaravelMeta(res));
       setError(null);
     } catch (err) {
       setResorts([]);
+      setMeta(null);
       setError("Failed to load resorts.");
     } finally {
       setLoading(false);
@@ -49,14 +72,50 @@ export default function AdminResortsPage() {
   };
 
   useEffect(() => {
-    void load("");
+    void load("", 1, perPage, sortBy, sortDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const lastPage = meta?.last_page ?? 1;
+  const total = meta?.total ?? resorts.length;
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(query);
-    void load(query);
+    setPage(1);
+    void load(query, 1, perPage, sortBy, sortDir);
   };
+
+  const onSort = (key: string) => {
+    const n = nextSort(key, sortBy, sortDir, SORT_FIRST[key] ?? "asc");
+    setSortBy(n.key);
+    setSortDir(n.dir);
+    setPage(1);
+    void load(search, 1, perPage, n.key, n.dir);
+  };
+
+  const onPageChange = (p: number) => {
+    setPage(p);
+    void load(search, p, perPage, sortBy, sortDir);
+  };
+
+  const onPerPageChange = (pp: number) => {
+    setPerPage(pp);
+    setPage(1);
+    void load(search, 1, pp, sortBy, sortDir);
+  };
+
+  const paginationFooter = !error && (
+    <TablePaginationBar
+      page={page}
+      lastPage={lastPage}
+      total={total}
+      perPage={perPage}
+      onPerPageChange={onPerPageChange}
+      onPageChange={onPageChange}
+      disabled={loading}
+    />
+  );
 
   const toggleListed = async (resort: ResortItem) => {
     setToggling(resort.id);
@@ -157,7 +216,7 @@ export default function AdminResortsPage() {
               className="dash-input pl-9"
               placeholder="Search by name…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <button type="submit" className="dash-btn-primary shrink-0">
@@ -228,15 +287,18 @@ export default function AdminResortsPage() {
             ))}
           </div>
         )}
+        {paginationFooter ? <div className="dash-table-wrap overflow-hidden rounded-2xl">{paginationFooter}</div> : null}
       </div>
 
       {/* Desktop: wide table */}
       <div className="hidden md:block">
         <DataTable
+          footer={paginationFooter}
           headers={
             <>
-              <th>Name</th>
-              <th>Address</th>
+              <SortableTh label="Name" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Address" sortKey="address" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Added" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <th>Subscription</th>
               <th>Listed</th>
               <th>VIP</th>
@@ -244,11 +306,14 @@ export default function AdminResortsPage() {
             </>
           }
         >
-          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={6}>
+          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={7}>
             {resorts.map((resort) => (
               <tr key={resort.id} className="group">
                 <td className="font-semibold text-navy">{resort.name}</td>
                 <td className="text-zinc-600">{resort.address ?? "—"}</td>
+                <td className="text-xs text-zinc-500 whitespace-nowrap">
+                  {resort.created_at ? new Date(resort.created_at).toLocaleDateString() : "—"}
+                </td>
                 <td>{subscriptionCell(resort)}</td>
                 <td>
                   <button

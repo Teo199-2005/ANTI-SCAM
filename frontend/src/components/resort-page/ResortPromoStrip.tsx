@@ -2,7 +2,7 @@
 
 const promoItems = [
   "Anti-Scam PH Verified Stays",
-  "Powered by: The Rising 2 Brothers",
+  "Powered by: The Rising 2 Brothers OPC",
   "anti-scamph.com",
   "Secure Platform Fee Protection",
   "Trusted Resort Booking Platform",
@@ -23,7 +23,7 @@ function PromoRow() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/rising2brothers.png"
-            alt="The Rising 2 Brothers"
+            alt="The Rising 2 Brothers OPC"
             className="h-[18px] w-[18px] rounded-sm border border-black/10 bg-white object-contain p-[1px]"
             loading="lazy"
           />

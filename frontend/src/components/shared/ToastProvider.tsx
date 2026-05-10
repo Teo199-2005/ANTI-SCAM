@@ -72,16 +72,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed left-4 right-4 top-4 z-[220] flex max-w-none flex-col gap-3 pt-[env(safe-area-inset-top)] sm:left-auto sm:right-4 sm:top-4 sm:max-w-sm sm:pt-0">
+      <div
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[220] flex max-w-none flex-col gap-3 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:inset-x-auto sm:bottom-auto sm:left-auto sm:right-4 sm:top-4 sm:max-w-sm sm:px-0 sm:pb-0 sm:pt-[max(0.5rem,env(safe-area-inset-top))]"
+        aria-label="Notifications"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
             role="status"
             aria-live="polite"
-            className={`pointer-events-auto overflow-hidden rounded-2xl p-4 font-dash backdrop-blur-md transition-all duration-300 motion-reduce:transition-none ${toneClass(toast.tone)} ${
+            className={`dash-toast-item pointer-events-auto overflow-hidden rounded-2xl p-4 font-dash backdrop-blur-md transition-all duration-300 motion-reduce:transition-none ${toneClass(toast.tone)} ${
               toast.visible
                 ? "translate-x-0 translate-y-0 opacity-100"
-                : "-translate-y-2 translate-x-3 opacity-0 sm:translate-x-4"
+                : "translate-y-3 opacity-0 max-sm:translate-x-0 sm:-translate-y-2 sm:translate-x-4"
             }`}
           >
             <div className="flex gap-3">
@@ -95,7 +98,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => removeToast(toast.id)}
-                className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-current/50 transition hover:bg-black/[0.06] hover:text-current"
+                className="-mr-1 -mt-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-current/50 transition [touch-action:manipulation] hover:bg-black/[0.06] hover:text-current sm:h-8 sm:min-h-0 sm:min-w-0 sm:w-8"
                 aria-label="Dismiss notification"
               >
                 <X size={15} strokeWidth={2} />

@@ -158,6 +158,8 @@ body {
   min-height: 100vh;
   background-color: #fafafa;
   background-image: url("https://www.transparenttextures.com/patterns/dark-matter.png");
+  /* Prevent wide tables/grids from shifting the whole shell sideways on narrow viewports */
+  overflow-x: hidden;
   @apply font-dash text-zinc-800;
 }
 /* Dashboard forbids Playfair — shell forces Jakarta for any stray .font-heading */
@@ -189,8 +191,9 @@ body {
 
 /* ── Inputs ──────────────────────────────────────────────────── */
 .dash-input {
-  @apply w-full rounded-xl border border-softBorderStrong bg-gradient-to-b from-white to-softGray/80 px-4 py-2.5 font-dash text-dash-sm
-         text-zinc-900 outline-none transition
+  /* 16px on narrow viewports avoids iOS Safari focus-zoom; compact md+ dashboard scale */
+  @apply w-full rounded-xl border border-softBorderStrong bg-gradient-to-b from-white to-softGray/80 px-4 py-2.5 font-dash text-base
+         text-zinc-900 outline-none transition md:text-dash-sm
          placeholder:text-zinc-400 shadow-[inset_0_2px_3px_rgba(15,23,42,0.05)]
          focus:border-primaryBlue focus:ring-2 focus:ring-primaryBlue/20
          disabled:cursor-not-allowed disabled:opacity-60;
@@ -282,6 +285,20 @@ body {
   border-right: none;
 }
 
+button.dash-sortable-th {
+  background: transparent;
+  border: none;
+  padding: 0.15rem 0.1rem;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: theme("borderRadius.md");
+}
+button.dash-sortable-th:focus-visible {
+  outline: 2px solid theme("colors.amber.200");
+  outline-offset: 2px;
+}
+
 .dash-table td {
   @apply px-5 py-3.5 text-zinc-700;
   border-bottom: 1px solid theme("colors.dsBorderCell");
@@ -343,67 +360,77 @@ body {
   @apply inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-[transform,background-color,color,box-shadow] duration-150 active:scale-[0.96] md:h-9 md:w-9 md:min-h-0 md:min-w-0;
 }
 
-/* Table action buttons: icon-only look when icon is present */
+/*
+ * Table actions with SVG: touch / coarse pointer keeps visible label text + ≥44px targets.
+ * Fine pointer + hover (mouse): compact icon-only cells + hover/focus tooltips.
+ */
 .dash-table-actions-cell .dash-btn-sm:has(svg),
 .dash-table-actions-cell a.dash-btn-sm:has(svg) {
-  @apply inline-flex h-9 w-9 min-h-9 min-w-9 items-center justify-center rounded-lg border-softBorder bg-white/90 p-0 text-navy;
-  font-size: 0;
-  line-height: 0;
+  @apply inline-flex min-h-11 w-auto min-w-0 items-center justify-center gap-2 rounded-lg border border-softBorder bg-white/90 px-3 py-2 font-dash text-dash-xs font-semibold text-navy [touch-action:manipulation];
 }
 .dash-table-actions-cell .dash-btn-sm:has(svg) svg,
 .dash-table-actions-cell a.dash-btn-sm:has(svg) svg {
   width: 16px;
   height: 16px;
   stroke-width: 2.45;
+  flex-shrink: 0;
 }
 
-.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label],
-.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label] {
-  position: relative;
-}
-.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]::after,
-.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]::after {
-  content: attr(data-action-label);
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  opacity: 0;
-  transform: translateY(4px);
-  pointer-events: none;
-  white-space: nowrap;
-  min-width: max-content;
-  z-index: 20;
-  @apply rounded-lg bg-navy px-3 py-1.5 font-dash text-xs font-semibold text-white shadow-[0_8px_20px_rgba(13,30,66,0.30)] transition-all duration-150;
-}
-.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]:hover::after,
-.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]:hover::after,
-.dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]:focus-visible::after,
-.dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]:focus-visible::after {
-  opacity: 1;
-  transform: translateY(0);
-}
+@media (hover: hover) and (pointer: fine) {
+  .dash-table-actions-cell .dash-btn-sm:has(svg),
+  .dash-table-actions-cell a.dash-btn-sm:has(svg) {
+    @apply h-9 w-9 min-h-9 min-w-9 gap-0 p-0;
+    font-size: 0;
+    line-height: 0;
+  }
 
-/* Reuse styled tooltip for standalone icon action buttons */
-.dash-action-icon[data-action-label] {
-  position: relative;
-}
-.dash-action-icon[data-action-label]::after {
-  content: attr(data-action-label);
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  opacity: 0;
-  transform: translateY(4px);
-  pointer-events: none;
-  white-space: nowrap;
-  min-width: max-content;
-  z-index: 20;
-  @apply rounded-lg bg-navy px-3 py-1.5 font-dash text-xs font-semibold text-white shadow-[0_8px_20px_rgba(13,30,66,0.30)] transition-all duration-150;
-}
-.dash-action-icon[data-action-label]:hover::after,
-.dash-action-icon[data-action-label]:focus-visible::after {
-  opacity: 1;
-  transform: translateY(0);
+  .dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label],
+  .dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label] {
+    position: relative;
+  }
+  .dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]::after,
+  .dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]::after {
+    content: attr(data-action-label);
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    white-space: nowrap;
+    min-width: max-content;
+    z-index: 20;
+    @apply rounded-lg bg-navy px-3 py-1.5 font-dash text-xs font-semibold text-white shadow-[0_8px_20px_rgba(13,30,66,0.30)] transition-all duration-150;
+  }
+  .dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]:hover::after,
+  .dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]:hover::after,
+  .dash-table-actions-cell .dash-btn-sm:has(svg)[data-action-label]:focus-visible::after,
+  .dash-table-actions-cell a.dash-btn-sm:has(svg)[data-action-label]:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .dash-action-icon[data-action-label] {
+    position: relative;
+  }
+  .dash-action-icon[data-action-label]::after {
+    content: attr(data-action-label);
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    white-space: nowrap;
+    min-width: max-content;
+    z-index: 20;
+    @apply rounded-lg bg-navy px-3 py-1.5 font-dash text-xs font-semibold text-white shadow-[0_8px_20px_rgba(13,30,66,0.30)] transition-all duration-150;
+  }
+  .dash-action-icon[data-action-label]:hover::after,
+  .dash-action-icon[data-action-label]:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Zebra + hover: action cell matches row (explicit rules; split-pairs = main/detail row pairs) */
@@ -461,7 +488,7 @@ body {
 }
 /* Guest / resort CTA: navy → primary crimson */
 .dash-hero-banner-cta {
-  @apply rounded-2xl bg-gradient-to-br from-navy via-primaryBlue to-primaryBlueDark p-6 text-white shadow-dash-hero ring-1 ring-inset ring-white/15;
+  @apply max-w-full min-w-0 rounded-2xl bg-gradient-to-br from-navy via-primaryBlue to-primaryBlueDark p-6 text-white shadow-dash-hero ring-1 ring-inset ring-white/15;
 }
 /* Staff: toned-down navy sweep */
 .dash-hero-banner-staff {
@@ -542,6 +569,12 @@ body {
   @apply max-w-full whitespace-normal text-left leading-snug;
 }
 
+/* Mobile card actions — 44px-ish tap targets; grid from DashMobileTableCard footer */
+.dash-mobile-table-card__actions .dash-btn-sm,
+.dash-mobile-table-card__actions a.dash-btn-sm {
+  @apply min-h-11 justify-center [touch-action:manipulation] md:min-h-9;
+}
+
 /* ── Inset panels ────────────────────────────────────────────── */
 .dash-inset {
   @apply rounded-xl border border-slate-300/40 bg-gradient-to-b from-softGray to-softGray/90 p-3 font-dash text-dash-sm text-zinc-700 shadow-[inset_0_2px_4px_rgba(15,23,42,0.055)];
@@ -577,7 +610,8 @@ body {
 }
 
 .dash-shell-main {
-  @apply mx-auto w-full max-w-[1440px];
+  /* min-w-0 lets flex children shrink so inner grids/tables scroll instead of overflowing */
+  @apply mx-auto min-w-0 w-full max-w-[1440px];
 }
 
 /* ── Progress ring track ─────────────────────────────────────── */
@@ -735,6 +769,13 @@ body {
 
 .dash-toast--info {
   @apply border-sky-300/70 bg-gradient-to-br from-sky-50 via-white to-sky-50/70 text-sky-950 ring-sky-200/50 shadow-card;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-toast-item {
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 @keyframes app-loading-spin {

@@ -1,0 +1,32 @@
+# Shared infrastructure for local/staging: MySQL + Redis.
+# Run from repo root: docker compose -f deploy/docker-compose.infra.yml up -d
+# Point backend .env at DB_HOST=127.0.0.1, REDIS_HOST=127.0.0.1 (published ports below).
+#
+# Production: use managed RDS / Cloud SQL + ElastiCache (or equivalent); do not rely on this file alone.
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devroot}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-resort_saas}
+      MYSQL_USER: ${MYSQL_USER:-resort}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-resort}
+    ports:
+      - "${MYSQL_PUBLISH_PORT:-33060}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PUBLISH_PORT:-63790}:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mysql_data:
+  redis_data:

@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { cn, formatRoleLabel } from "@/lib/utils";
 import {
+  Activity,
   AlertTriangle,
   BarChart3,
   Building2,
@@ -54,6 +55,7 @@ const adminGroups: NavGroup[] = [
     items: [
       { href: "/dashboard/admin/resorts",       label: "Resorts",       icon: Building2 },
       { href: "/dashboard/admin/users",          label: "Users",         icon: Users },
+      { href: "/dashboard/admin/marketing-monitor", label: "Marketing partners", icon: Activity },
       { href: "/dashboard/admin/reservations",   label: "Reservations",  icon: CalendarDays },
       { href: "/dashboard/admin/subscriptions",  label: "Subscriptions", icon: CreditCard },
       { href: "/dashboard/admin/finance",       label: "Finance & payouts", icon: Landmark },
@@ -94,6 +96,10 @@ const staffGroups: NavGroup[] = [
       { href: "/dashboard/staff/reservations", label: "Reservations", icon: CalendarDays },
       { href: "/dashboard/staff/notes", label: "My Notes", icon: MessageSquare },
     ],
+  },
+  {
+    label: "Account",
+    items: [{ href: "/dashboard/staff/profile", label: "Profile", icon: Settings }],
   },
 ];
 
@@ -218,7 +224,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
           <button
             type="button"
             onClick={onClose}
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white/70 backdrop-blur-md transition hover:bg-white/20 hover:text-white md:hidden"
+            className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white/70 backdrop-blur-md transition hover:bg-white/20 hover:text-white [touch-action:manipulation] md:hidden md:h-8 md:w-8 md:min-h-0 md:min-w-0"
             aria-label="Close sidebar"
           >
             <X size={16} />

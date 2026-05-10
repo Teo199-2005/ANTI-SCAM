@@ -17,6 +17,7 @@ class Room extends Model
         'name',
         'code',
         'capacity',
+        'units',
         'base_price',
         'amenities',
         'rules',
@@ -28,6 +29,7 @@ class Room extends Model
         return [
             'base_price' => 'decimal:2',
             'amenities' => 'array',
+            'units' => 'integer',
         ];
     }
 

@@ -1,25 +1,68 @@
 import type { MetadataRoute } from "next";
+import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { siteUrl } from "@/lib/site";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const base = siteUrl();
-  const paths: Array<{ path: string; changeFrequency: MetadataRoute.Sitemap[0]["changeFrequency"]; priority: number }> = [
-    { path: "", changeFrequency: "weekly", priority: 1 },
-    { path: "/about", changeFrequency: "monthly", priority: 0.8 },
-    { path: "/contact", changeFrequency: "monthly", priority: 0.8 },
-    { path: "/blogs", changeFrequency: "weekly", priority: 0.75 },
-    { path: "/booking", changeFrequency: "monthly", priority: 0.7 },
-    { path: "/resorts", changeFrequency: "daily", priority: 0.85 },
-    { path: "/login", changeFrequency: "yearly", priority: 0.3 },
-    { path: "/register", changeFrequency: "yearly", priority: 0.5 },
-    { path: "/forgot-password", changeFrequency: "yearly", priority: 0.2 },
-  ];
+type PaginatedResorts = {
+  data?: { id: number }[];
+  last_page?: number;
+};
 
-  const now = new Date();
-  return paths.map(({ path, changeFrequency, priority }) => ({
+async function fetchResortIds(): Promise<number[]> {
+  const api = serverLaravelApiV1BaseUrl();
+  const ids: number[] = [];
+  let page = 1;
+  let lastPage = 1;
+
+  try {
+    do {
+      const res = await fetch(`${api}/public/resorts?perPage=100&page=${page}`, {
+        headers: { Accept: "application/json" },
+        next: { revalidate: 300 },
+      });
+      if (!res.ok) {
+        break;
+      }
+      const json: { data?: PaginatedResorts } = await res.json();
+      const payload = json.data;
+      const rows = Array.isArray(payload?.data) ? payload.data : [];
+      for (const row of rows) {
+        ids.push(row.id);
+      }
+      lastPage = typeof payload?.last_page === "number" ? payload.last_page : 1;
+      page += 1;
+    } while (page <= lastPage);
+  } catch {
+    /* build still succeeds with static routes only */
+  }
+
+  return ids;
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const base = siteUrl();
+  const lastMod = new Date();
+
+  const staticRoutes: MetadataRoute.Sitemap = [
+    "",
+    "/resorts",
+    "/about",
+    "/contact",
+    "/login",
+    "/register",
+  ].map((path) => ({
     url: `${base}${path}`,
-    lastModified: now,
-    changeFrequency,
-    priority,
+    lastModified: lastMod,
+    changeFrequency: path === "/resorts" ? "daily" : "weekly",
+    priority: path === "" ? 1 : 0.7,
   }));
+
+  const ids = await fetchResortIds();
+  const resortRoutes: MetadataRoute.Sitemap = ids.map((id) => ({
+    url: `${base}/resorts/${id}`,
+    lastModified: lastMod,
+    changeFrequency: "weekly" as const,
+    priority: 0.8,
+  }));
+
+  return [...staticRoutes, ...resortRoutes];
 }

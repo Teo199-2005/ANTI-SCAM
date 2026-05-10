@@ -6,10 +6,13 @@ import { useHydrated } from "@/hooks/useHydrated";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
+import { sanitizeEmailTyping, sanitizeOtpInput } from "@/lib/inputRestrictions";
+import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import { ArrowLeft, Eye, EyeOff, KeyRound, Mail, Shield } from "lucide-react";
 
 const authInput =
-  "w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20";
+  "w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 md:text-sm";
 
 type Step = "email" | "reset";
 
@@ -65,6 +68,14 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    if (!passwordPolicyMet(getPasswordPolicyChecks(password))) {
+      setError("Password does not meet minimum security requirements.");
+      return;
+    }
+    if (password !== passwordConfirmation) {
+      setError("Passwords do not match.");
+      return;
+    }
     setPending(true);
     try {
       const res = await fetch("/api/auth/forgot-password/reset", {
@@ -153,7 +164,7 @@ export default function ForgotPasswordPage() {
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
                   placeholder="you@example.com"
                 />
               </div>
@@ -176,7 +187,7 @@ export default function ForgotPasswordPage() {
                 required
                 maxLength={6}
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) => setOtp(sanitizeOtpInput(e.target.value))}
                 placeholder="000000"
               />
             </div>
@@ -195,6 +206,7 @@ export default function ForgotPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min 8 characters"
+                  aria-describedby="forgot-password-hint forgot-password-meter"
                 />
                 {hydrated ? (
                   <button
@@ -210,6 +222,9 @@ export default function ForgotPasswordPage() {
                   <span className="pointer-events-none absolute right-3 top-1/2 h-6 w-6 -translate-y-1/2" aria-hidden />
                 )}
               </div>
+              <p id="forgot-password-hint" className="mt-1 text-xs text-zinc-500">
+                At least 8 characters with uppercase, lowercase, and a number.
+              </p>
             </div>
             <div>
               <label htmlFor="forgot-password-2" className="mb-1.5 block text-xs font-semibold text-zinc-700">
@@ -242,9 +257,11 @@ export default function ForgotPasswordPage() {
                 )}
               </div>
             </div>
-            <p className="text-xs text-zinc-500">
-              Use at least 8 characters with uppercase, lowercase, and a number.
-            </p>
+            <PasswordRequirementsMeter
+              password={password}
+              confirmation={passwordConfirmation}
+              id="forgot-password-meter"
+            />
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
               <button
                 type="button"

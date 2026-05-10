@@ -37,7 +37,11 @@ export default function PaymentFailedPage() {
           </div>
           <h1 className="mt-5 font-heading text-4xl text-zinc-900">Payment Unsuccessful</h1>
           <p className="mt-3 text-zinc-600">
-            We were unable to process your payment. Your room lock has expired. Please try booking again.
+            We could not complete the payment on Xendit. If your booking is still awaiting payment, open{" "}
+            <Link href="/dashboard/client/bookings" className="font-semibold text-navy underline">
+              My bookings
+            </Link>{" "}
+            and use <strong>Pay now</strong> to resume or refresh checkout.
           </p>
 
           {loadingRes ? (
@@ -61,9 +65,15 @@ export default function PaymentFailedPage() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
+            <Link
+              href="/dashboard/client/bookings"
+              className="glass-inline-btn justify-center text-navy"
+            >
+              My bookings
+            </Link>
             <Link href="/resorts" className="glass-inline-btn justify-center text-navy">
               <ArrowLeft size={15} />
-              Browse Resorts Again
+              Browse resorts
             </Link>
             <Link
               href="/"

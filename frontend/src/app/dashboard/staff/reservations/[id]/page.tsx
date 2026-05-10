@@ -3,6 +3,7 @@
 import DashCard from "@/components/dash/DashCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
+import { sanitizeLongText } from "@/lib/inputRestrictions";
 import { AlertTriangle, ChevronLeft, Loader2, MessageSquare, Send } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
@@ -137,7 +138,7 @@ export default function StaffReservationDetailPage({ params }: { params: Promise
             {reservation.status.replaceAll("_", " ")}
           </span>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3 text-sm">
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:gap-3 md:grid-cols-3">
           {[
             { label: "Check-in",   value: reservation.check_in_date },
             { label: "Check-out",  value: reservation.check_out_date },
@@ -146,7 +147,7 @@ export default function StaffReservationDetailPage({ params }: { params: Promise
             { label: "Total",      value: `₱${Number(reservation.total_amount).toLocaleString()}` },
             { label: "Balance due", value: `₱${(Number(reservation.total_amount) - Number(reservation.reservation_fee)).toLocaleString()}` },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl bg-softGray p-3">
+            <div key={label} className="rounded-xl border border-softBorder/80 bg-softGray/80 p-3">
               <p className="text-xs text-zinc-400">{label}</p>
               <p className="font-semibold text-navy">{value}</p>
             </div>
@@ -165,7 +166,7 @@ export default function StaffReservationDetailPage({ params }: { params: Promise
             className="dash-input min-h-[100px] resize-none"
             placeholder="Add a support note, customer complaint, or follow-up action…"
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => setNote(sanitizeLongText(e.target.value))}
             required
           />
           <div className="flex items-center justify-between gap-3">

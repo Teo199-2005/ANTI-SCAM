@@ -26,7 +26,9 @@ class ResortController extends Controller
             $this->service->list(
                 $request->user(),
                 (int) $request->integer('perPage', 10),
-                $request->string('search')->value()
+                $request->string('search')->value(),
+                $request->string('sort_by')->value(),
+                $request->string('sort_dir')->value(),
             )
         );
 

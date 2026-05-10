@@ -7,7 +7,8 @@ import PageContainer from "./PageContainer";
 import Logo from "./Logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { useEffect, useRef, useState } from "react";
 
 const navLinks = [
   { href: "/",        label: "Home"    },
@@ -21,6 +22,8 @@ export default function Navbar() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const drawerPanelRef = useRef<HTMLElement | null>(null);
+  useFocusTrap(drawerOpen, drawerPanelRef);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -29,6 +32,15 @@ export default function Navbar() {
   useEffect(() => {
     document.body.style.overflow = drawerOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
 
   // Subtle shadow on scroll
@@ -121,7 +133,7 @@ export default function Navbar() {
                 type="button"
                 aria-label="Open menu"
                 onClick={() => setDrawerOpen(true)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-clSeafoam bg-white/50 text-clOcean shadow-sm backdrop-blur-md transition hover:bg-clSeafoam/70 lg:hidden"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-clSeafoam bg-white/50 text-clOcean shadow-sm backdrop-blur-md transition hover:bg-clSeafoam/70 [touch-action:manipulation] lg:hidden"
               >
                 <Menu size={18} />
               </button>
@@ -144,8 +156,9 @@ export default function Navbar() {
 
         {/* Panel */}
         <aside
+          ref={drawerPanelRef}
           className={cn(
-            "fixed right-0 top-0 z-50 flex h-full w-72 flex-col border-l border-clSeafoam/50 bg-clSand/95 p-6 backdrop-blur-2xl transition-transform duration-200 ease-in-out lg:hidden",
+            "fixed right-0 top-0 z-50 flex h-full w-72 flex-col border-l border-clSeafoam/50 bg-clSand/95 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] backdrop-blur-2xl transition-transform duration-200 ease-in-out motion-reduce:transition-none lg:hidden",
             drawerOpen ? "translate-x-0" : "translate-x-full"
           )}
           aria-modal="true"
@@ -163,7 +176,7 @@ export default function Navbar() {
               type="button"
               aria-label="Close menu"
               onClick={() => setDrawerOpen(false)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-clSeafoam bg-white/60 text-clOcean backdrop-blur-md hover:bg-clSeafoam/70"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-clSeafoam bg-white/60 text-clOcean backdrop-blur-md [touch-action:manipulation] hover:bg-clSeafoam/70 sm:min-h-10 sm:min-w-10"
             >
               <X size={16} />
             </button>

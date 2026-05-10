@@ -27,6 +27,8 @@ export type ResortItem = {
   background_image_url?: string | null;
   representative_name?: string | null;
   representative_contact_number?: string | null;
+  cancellation_policy?: string | null;
+  amenities?: string[] | null;
   is_publicly_listed: boolean;
   is_vip?: boolean;
   rooms_count?: number;
@@ -40,7 +42,13 @@ export type PaginatedResult<T> = {
   meta?: Record<string, unknown>;
 };
 
-export async function listResorts(params?: { search?: string; perPage?: number; page?: number }) {
+export async function listResorts(params?: {
+  search?: string;
+  perPage?: number;
+  page?: number;
+  sort_by?: string;
+  sort_dir?: string;
+}) {
   const { data } = await apiClient.get<
     ApiEnvelope<ResortItem[] | { data: ResortItem[]; meta?: Record<string, unknown> }>
   >("/resorts", { params });

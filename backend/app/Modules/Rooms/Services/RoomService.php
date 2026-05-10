@@ -2,19 +2,22 @@
 
 namespace App\Modules\Rooms\Services;
 
-use App\Models\Room;
 use App\Models\Resort;
+use App\Models\Room;
+use App\Models\RoomAvailability;
 use App\Models\Subscription;
 use App\Modules\Subscriptions\Services\SubscriptionService;
-use Illuminate\Validation\ValidationException;
-use App\Models\RoomAvailability;
+use App\Services\RoomOccupancyService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class RoomService
 {
-    public function __construct(private readonly \App\Modules\Subscriptions\Services\SubscriptionService $subscriptions) {}
+    public function __construct(private readonly SubscriptionService $subscriptions) {}
+
     public function list(int $perPage = 10, ?string $search = null, ?string $status = null, ?int $resortId = null): LengthAwarePaginator
     {
         $query = Room::query()->latest();
@@ -39,6 +42,8 @@ class RoomService
 
     public function create(array $payload): Room
     {
+        $payload['units'] = isset($payload['units']) ? max(1, min(99, (int) $payload['units'])) : 1;
+
         // enforce subscription active room limits for the resort
         $resortId = $payload['resort_id'] ?? null;
         if ($resortId) {
@@ -73,8 +78,83 @@ class RoomService
 
     public function update(Room $room, array $payload): Room
     {
-        $room->update($payload);
-        return $room->refresh();
+        return DB::transaction(function () use ($room, $payload) {
+            if (array_key_exists('units', $payload)) {
+                $incomingUnits = max(1, min(99, (int) $payload['units']));
+                $currentUnits = max(1, (int) ($room->units ?? 1));
+                if ($incomingUnits < $currentUnits) {
+                    $depth = RoomOccupancyService::maxConcurrentReservationDepth((int) $room->id);
+                    if ($incomingUnits < $depth) {
+                        throw ValidationException::withMessages([
+                            'units' => ["Overlapping bookings require at least {$depth} unit(s). Lower the total units after those bookings complete."],
+                        ]);
+                    }
+                }
+            }
+
+            $room->fill($payload);
+            $room->save();
+
+            if ($room->status === 'active') {
+                $this->reconcileActiveRoomCap((int) $room->resort_id, (int) $room->id);
+            }
+
+            return $room->refresh();
+        });
+    }
+
+    /**
+     * When active room rows exceed subscription included_rooms, deactivate extras while keeping this room (plus others by stable id order).
+     */
+    private function reconcileActiveRoomCap(int $resortId, int $preferredRoomId): void
+    {
+        $included = $this->resolveIncludedRooms($resortId);
+        if ($included >= 1_000_000) {
+            return;
+        }
+
+        $activeIds = Room::query()
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->pluck('id');
+
+        if ($activeIds->count() <= $included) {
+            return;
+        }
+
+        $keep = collect([(int) $preferredRoomId]);
+        foreach ($activeIds as $rid) {
+            if ($keep->count() >= $included) {
+                break;
+            }
+            $rid = (int) $rid;
+            if ($keep->contains($rid)) {
+                continue;
+            }
+            $keep->push($rid);
+        }
+
+        Room::query()
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->whereNotIn('id', $keep->unique()->values()->all())
+            ->update(['status' => 'inactive']);
+    }
+
+    private function resolveIncludedRooms(int $resortId): int
+    {
+        $subscription = Subscription::query()->where('resort_id', $resortId)->first();
+        $included = $subscription?->included_rooms;
+
+        if ($included === null) {
+            $plan = $subscription?->plan ?? 'basic';
+            $activeCount = Room::query()->where('resort_id', $resortId)->where('status', 'active')->count();
+            $pricing = $this->subscriptions->calculateMonthlyBilling($plan, $activeCount);
+            $included = $pricing['included_rooms'] ?? PHP_INT_MAX;
+        }
+
+        return (int) $included;
     }
 
     public function delete(Room $room): void

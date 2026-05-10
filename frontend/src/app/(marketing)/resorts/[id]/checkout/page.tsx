@@ -18,6 +18,13 @@ import {
 import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
+import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
+import {
+  sanitizeEmailTyping,
+  sanitizeIntegerDigitsOnly,
+  sanitizePersonName,
+} from "@/lib/inputRestrictions";
+import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import Link from "next/link";
 
 type Step = "auth" | "confirm" | "paying";
@@ -88,6 +95,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
       setAuthError("Please accept the Terms & Conditions and Privacy Policy to continue.");
       return;
     }
+    if (authMode === "register" && !passwordPolicyMet(getPasswordPolicyChecks(password))) {
+      setAuthError("Password does not meet minimum security requirements.");
+      return;
+    }
     setAuthPending(true);
     try {
       if (authMode === "register") {
@@ -140,9 +151,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
       });
       const reservation = resRes.data?.data ?? resRes.data;
 
-      // 3. Create Xendit invoice → redirect
+      // 3. Create Xendit invoice → redirect (idempotent: may resume pending checkout or sync PAID)
       const invoice = await createPaymentInvoice(reservation.id);
       redirecting.current = true;
+      if (invoice.already_confirmed) {
+        window.location.href = `/payment/success?reservation_id=${reservation.id}&ref=${encodeURIComponent(String(reservation.reference_no ?? ""))}`;
+        return;
+      }
+      if (!invoice.invoice_url) {
+        throw new Error("No checkout URL returned from payment service.");
+      }
       window.location.href = invoice.invoice_url;
     } catch (err: unknown) {
       const msg = err instanceof Error
@@ -215,7 +233,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                         required
                         placeholder="Maria Santos"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e) => setName(sanitizePersonName(e.target.value))}
                       />
                     </div>
                   </div>
@@ -230,7 +248,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                       required
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) =>
+                        setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())
+                      }
                     />
                   </div>
                 </div>
@@ -244,7 +264,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                     placeholder={authMode === "register" ? "At least 8 characters" : "••••••••"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    aria-describedby={authMode === "register" ? "checkout-password-meter" : undefined}
                   />
+                  {authMode === "register" ? (
+                    <PasswordRequirementsMeter className="mt-2" password={password} id="checkout-password-meter" />
+                  ) : null}
                 </div>
                 {authMode === "register" ? (
                   <label className="flex items-start gap-2 rounded-xl border border-white/50 bg-white/20 px-3 py-2.5 text-xs text-zinc-700">
@@ -302,7 +326,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                   min={1}
                   max={room?.capacity ?? 10}
                   value={guestCount}
-                  onChange={(e) => setGuestCount(Number(e.target.value))}
+                  onChange={(e) => {
+                    const cap = room?.capacity ?? 10;
+                    const d = sanitizeIntegerDigitsOnly(e.target.value, 3);
+                    if (d === "") {
+                      setGuestCount(1);
+                      return;
+                    }
+                    const n = parseInt(d, 10);
+                    if (!Number.isFinite(n)) return;
+                    setGuestCount(Math.min(cap, Math.max(1, n)));
+                  }}
                 />
                 {room ? (
                   <p className="mt-1 text-xs text-zinc-500">Max capacity: {room.capacity} guests</p>

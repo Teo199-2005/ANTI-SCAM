@@ -1,7 +1,8 @@
+import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 import { sessionCookieSecure } from "../sessionCookieSecure";
 
-const BACKEND = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+const BACKEND = serverLaravelApiV1BaseUrl();
 
 export async function POST(req: NextRequest) {
   const token = req.cookies.get("rs_session")?.value;

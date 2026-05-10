@@ -8,8 +8,12 @@ import {
   DashTableActionsInner,
 } from "@/components/shared/DashTableActions";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import SortableTh from "@/components/shared/SortableTh";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { BadgeCheck, CalendarDays, Clock, Search, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -23,23 +27,29 @@ type Reservation = {
   reservationFee: number;
   totalAmount: number;
   xenditPaymentStatus: string;
+  createdAt?: string;
 };
 
 type PaginatedEnvelope = {
   success: boolean;
-  data: {
-    data: Reservation[];
-    meta?: { current_page: number; last_page: number; total: number };
-  };
+  data: Reservation[] | { data: Reservation[]; meta?: LaravelTableMeta };
+};
+
+const SORT_FIRST: Record<string, SortDir> = {
+  reference_no: "asc",
+  check_in_date: "desc",
+  check_out_date: "desc",
+  status: "asc",
+  created_at: "desc",
 };
 
 const statusBadge: Record<string, string> = {
-  confirmed:       "dash-badge-emerald",
+  confirmed: "dash-badge-emerald",
   pending_payment: "dash-badge-amber",
-  cancelled:       "dash-badge-rose",
-  expired:         "dash-badge-slate",
-  no_show:         "dash-badge-rose",
-  completed:       "dash-badge-navy",
+  cancelled: "dash-badge-rose",
+  expired: "dash-badge-slate",
+  no_show: "dash-badge-rose",
+  completed: "dash-badge-navy",
 };
 
 export default function BookingHistoryPage() {
@@ -48,19 +58,35 @@ export default function BookingHistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedStatus, setAppliedStatus] = useState("");
   const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
+  const [meta, setMeta] = useState<LaravelTableMeta | null>(null);
+  const [perPage, setPerPage] = useState(10);
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const load = async (q: string, st: string, pg: number) => {
+  const load = async (q: string, st: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
     setError(null);
     try {
       const { data } = await apiClient.get<PaginatedEnvelope>("/reservations", {
-        params: { search: q || undefined, status: st || undefined, perPage: 10, page: pg },
+        params: {
+          search: q || undefined,
+          status: st || undefined,
+          perPage: pp,
+          page: pg,
+          sort_by: sb,
+          sort_dir: sd,
+        },
       });
-      setReservations(data.data?.data ?? []);
-      setLastPage(data.data?.meta?.last_page ?? 1);
+      const payload = data.data;
+      const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      setReservations(rows);
+      setMeta(extractLaravelMeta(payload));
     } catch (err) {
+      setReservations([]);
+      setMeta(null);
       setError(parseApiErrorMessage(err, "Failed to load bookings."));
     } finally {
       setLoading(false);
@@ -68,15 +94,51 @@ export default function BookingHistoryPage() {
   };
 
   useEffect(() => {
-    void load(search, statusFilter, page);
+    void load("", "", 1, perPage, sortBy, sortDir);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, []);
+
+  const lastPage = meta?.last_page ?? 1;
+  const total = meta?.total ?? reservations.length;
 
   const onFilter = (e: React.FormEvent) => {
     e.preventDefault();
+    setAppliedSearch(search);
+    setAppliedStatus(statusFilter);
     setPage(1);
-    void load(search, statusFilter, 1);
+    void load(search, statusFilter, 1, perPage, sortBy, sortDir);
   };
+
+  const onSort = (key: string) => {
+    const n = nextSort(key, sortBy, sortDir, SORT_FIRST[key] ?? "asc");
+    setSortBy(n.key);
+    setSortDir(n.dir);
+    setPage(1);
+    void load(appliedSearch, appliedStatus, 1, perPage, n.key, n.dir);
+  };
+
+  const onPageChange = (p: number) => {
+    setPage(p);
+    void load(appliedSearch, appliedStatus, p, perPage, sortBy, sortDir);
+  };
+
+  const onPerPageChange = (pp: number) => {
+    setPerPage(pp);
+    setPage(1);
+    void load(appliedSearch, appliedStatus, 1, pp, sortBy, sortDir);
+  };
+
+  const paginationFooter = !error && (
+    <TablePaginationBar
+      page={page}
+      lastPage={lastPage}
+      total={total}
+      perPage={perPage}
+      onPerPageChange={onPerPageChange}
+      onPageChange={onPageChange}
+      disabled={loading}
+    />
+  );
 
   return (
     <div className="space-y-6">
@@ -91,7 +153,7 @@ export default function BookingHistoryPage() {
               className="dash-input pl-9"
               placeholder="Search by reference…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearch(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <select
@@ -171,16 +233,20 @@ export default function BookingHistoryPage() {
             ))}
           </div>
         )}
+        {paginationFooter ? <div className="dash-table-wrap overflow-hidden rounded-2xl">{paginationFooter}</div> : null}
       </div>
 
       <div className="hidden md:block">
         <DataTable
+          footer={paginationFooter}
           headers={
             <>
-              <th>Reference</th>
-              <th>Dates</th>
+              <SortableTh label="Reference" sortKey="reference_no" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Check-in" sortKey="check_in_date" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Check-out" sortKey="check_out_date" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <th>Fee</th>
-              <th>Status</th>
+              <SortableTh label="Status" sortKey="status" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Booked" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <DashTableActionsHead srOnly>Booking actions</DashTableActionsHead>
             </>
           }
@@ -198,17 +264,13 @@ export default function BookingHistoryPage() {
               </span>
             }
             withinTable
-            colSpan={5}
+            colSpan={7}
           >
             {reservations.map((r) => (
               <tr key={r.id} className="group transition-colors duration-150 hover:bg-softGray/60">
                 <td className="font-mono font-semibold text-navy">{r.referenceNo}</td>
-                <td className="text-zinc-600">
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarDays size={12} className="text-skyBlue/80" />
-                    {r.checkInDate} → {r.checkOutDate}
-                  </span>
-                </td>
+                <td className="text-zinc-600">{r.checkInDate}</td>
+                <td className="text-zinc-600">{r.checkOutDate}</td>
                 <td className="text-zinc-700">₱{Number(r.reservationFee).toLocaleString()}</td>
                 <td>
                   <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
@@ -222,6 +284,9 @@ export default function BookingHistoryPage() {
                     {r.status.replaceAll("_", " ")}
                   </span>
                 </td>
+                <td className="text-xs text-zinc-500">
+                  {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
+                </td>
                 <DashTableActionsCell>
                   <DashTableActionsInner>
                     <Link href={`/dashboard/client/bookings/${r.id}`} className="dash-btn-sm">
@@ -234,22 +299,6 @@ export default function BookingHistoryPage() {
           </AsyncStatePanel>
         </DataTable>
       </div>
-
-
-      {lastPage > 1 ? (
-        <div className="flex items-center justify-center gap-3">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="dash-btn-sm disabled:opacity-40">
-            ← Prev
-          </button>
-          <span className="text-sm text-zinc-600">
-            Page {page} of {lastPage}
-          </span>
-          <button disabled={page >= lastPage} onClick={() => setPage((p) => p + 1)} className="dash-btn-sm disabled:opacity-40">
-            Next →
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
-

@@ -5,11 +5,18 @@ import { apiClient } from "@/lib/api/client";
 import { listResorts } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
+  sanitizeAmenityListTyping,
+  sanitizeLongText,
+  sanitizeRoomCodeInput,
+  sanitizeRoomNameInput,
+} from "@/lib/inputRestrictions";
+import {
   AlignLeft,
   ArrowLeft,
   CircleDollarSign,
   Hash,
   Image as ImageIcon,
+  Layers,
   ScrollText,
   UserRound,
 } from "lucide-react";
@@ -28,6 +35,7 @@ type FormState = {
   name: string;
   code: string;
   capacity: number;
+  units: number;
   base_price: number;
   bed_count: number;
   bed_type: string;
@@ -84,6 +92,7 @@ const initialForm: FormState = {
   name: "",
   code: "",
   capacity: 1,
+  units: 1,
   base_price: 0,
   bed_count: 1,
   bed_type: "Double",
@@ -137,6 +146,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
             name: room.name ?? "",
             code: room.code ?? "",
             capacity: Number(room.capacity ?? 1),
+            units: Math.max(1, Math.min(99, Number(room.units ?? 1))),
             base_price: Number(room.base_price ?? 0),
             bed_count: parsedAmenities.bedCount,
             bed_type: parsedAmenities.bedType,
@@ -156,8 +166,14 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
     void load();
   }, [mode, roomId]);
 
-  const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    let next = value;
+    if (key === "name" && typeof value === "string") next = sanitizeRoomNameInput(value) as FormState[K];
+    if (key === "code" && typeof value === "string") next = sanitizeRoomCodeInput(value) as FormState[K];
+    if (key === "bed_type" && typeof value === "string") next = sanitizeRoomNameInput(value, 80) as FormState[K];
+    if (key === "rules" && typeof value === "string") next = sanitizeLongText(value) as FormState[K];
+    setForm((prev) => ({ ...prev, [key]: next }));
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +187,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
         name: form.name,
         code: form.code || null,
         capacity: form.capacity,
+        units: form.units,
         base_price: form.base_price,
         amenities: [
           `BED_COUNT:${form.bed_count}`,
@@ -213,7 +230,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="dash-page-title">{mode === "create" ? "Add room" : "Edit room"}</h1>
+          <h1 className="dash-page-title">{mode === "create" ? "Add" : "Edit room"}</h1>
           <p className="dash-page-sub">Fill in room details, pricing, and operating status.</p>
         </div>
         <Link href="/dashboard/resort/rooms" className="dash-btn-sm inline-flex items-center gap-2">
@@ -236,10 +253,24 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
           </label>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3">
           <label className={inputWrap}>
             <UserRound size={15} className={iconCls} />
             <input className={inputCls} type="number" min={1} max={50} placeholder="Capacity" value={form.capacity} onChange={(e) => update("capacity", Number(e.target.value))} required />
+          </label>
+          <label className={inputWrap}>
+            <Layers size={15} className={iconCls} />
+            <input
+              className={inputCls}
+              type="number"
+              min={1}
+              max={99}
+              placeholder="Units"
+              title="Identical bookable units (parallel overlapping bookings)"
+              value={form.units}
+              onChange={(e) => update("units", Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+              required
+            />
           </label>
           <label className={inputWrap}>
             <CircleDollarSign size={15} className={iconCls} />
@@ -317,7 +348,15 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
             className={inputCls}
             placeholder="Other amenities (comma separated)"
             value={form.amenities.join(", ")}
-            onChange={(e) => update("amenities", e.target.value.split(",").map((i) => i.trim()).filter(Boolean))}
+            onChange={(e) =>
+              update(
+                "amenities",
+                sanitizeAmenityListTyping(e.target.value)
+                  .split(",")
+                  .map((i) => i.trim())
+                  .filter(Boolean),
+              )
+            }
           />
         </label>
 

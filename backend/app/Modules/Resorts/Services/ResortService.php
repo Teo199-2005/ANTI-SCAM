@@ -4,18 +4,18 @@ namespace App\Modules\Resorts\Services;
 
 use App\Models\Resort;
 use App\Models\User;
+use App\Support\SafeSort;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class ResortService
 {
-    public function list(User $user, int $perPage = 10, ?string $search = null): LengthAwarePaginator
+    public function list(User $user, int $perPage = 10, ?string $search = null, ?string $sortBy = null, ?string $sortDir = null): LengthAwarePaginator
     {
         $query = Resort::query()
             ->with('subscription')
-            ->withCount('rooms')
-            ->latest();
+            ->withCount('rooms');
 
         if ($search) {
             $query->where(function (Builder $inner) use ($search): void {
@@ -28,6 +28,8 @@ class ResortService
         if ($user->role !== 'admin') {
             $query->where('tenant_id', $user->tenant_id);
         }
+
+        SafeSort::apply($query, $sortBy, $sortDir, ['name', 'created_at', 'address'], 'created_at', 'desc');
 
         return $query->paginate($perPage);
     }
@@ -51,7 +53,19 @@ class ResortService
         // but omitted keys do NOT overwrite existing values. The old `??` pattern would silently
         // overwrite existing data with the PHP null produced by a missing array key.
         $changes = [];
-        foreach (['name', 'description', 'address', 'contact_number', 'logo_url', 'is_publicly_listed'] as $field) {
+        foreach ([
+            'name',
+            'description',
+            'address',
+            'contact_number',
+            'logo_url',
+            'background_image_url',
+            'representative_name',
+            'representative_contact_number',
+            'cancellation_policy',
+            'amenities',
+            'is_publicly_listed',
+        ] as $field) {
             if (array_key_exists($field, $payload)) {
                 $changes[$field] = $payload[$field];
             }

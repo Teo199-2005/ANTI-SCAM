@@ -2,8 +2,10 @@ import { apiClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 
 export type InvoiceResult = {
-  invoice_url: string;
+  invoice_url: string | null;
   invoice_id: string;
+  already_confirmed?: boolean;
+  resumed?: boolean;
 };
 
 /** Create a Xendit invoice for a reservation. Returns the payment URL to redirect the user to. */

@@ -1,6 +1,7 @@
 "use client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
+import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
 import { listResorts, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
@@ -27,6 +28,15 @@ import {
   Waves,
   XCircle,
 } from "lucide-react";
+import {
+  sanitizeAddressLine,
+  sanitizeAmenityListTyping,
+  sanitizeBusinessOrResortName,
+  sanitizeEmailTyping,
+  sanitizeLongText,
+  sanitizePersonName,
+  sanitizePhoneInput,
+} from "@/lib/inputRestrictions";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -260,7 +270,39 @@ export default function ResortProfilePage() {
   }
 
   const onChange = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    let next = value;
+    if (typeof value === "string") {
+      switch (key) {
+        case "name":
+          next = sanitizeBusinessOrResortName(value) as FormState[K];
+          break;
+        case "owner_name":
+        case "representative_name":
+          next = sanitizePersonName(value) as FormState[K];
+          break;
+        case "contact_number":
+        case "owner_contact_number":
+        case "representative_contact_number":
+          next = sanitizePhoneInput(value) as FormState[K];
+          break;
+        case "representative_email":
+          next = sanitizeEmailTyping(value).toLowerCase() as FormState[K];
+          break;
+        case "address":
+          next = sanitizeAddressLine(value) as FormState[K];
+          break;
+        case "description":
+        case "cancellation_policy":
+          next = sanitizeLongText(value) as FormState[K];
+          break;
+        case "amenities":
+          next = sanitizeAmenityListTyping(value) as FormState[K];
+          break;
+        default:
+          break;
+      }
+    }
+    setForm((prev) => (prev ? { ...prev, [key]: next } : prev));
   };
 
   // Compute missing required fields for landing page hint
@@ -313,7 +355,11 @@ export default function ResortProfilePage() {
     try {
       const logoUrl = await uploadOwnerResortLogo(file);
       setForm({ ...form, logo_url: logoUrl });
-      pushToast({ title: "Logo uploaded", description: "Save profile to keep this logo.", tone: "success" });
+      pushToast({
+        title: "Logo uploaded",
+        description: "Saved to your resort. You can still use Save profile for other fields.",
+        tone: "success",
+      });
     } catch (err) {
       pushToast({
         title: "Logo upload failed",
@@ -333,7 +379,11 @@ export default function ResortProfilePage() {
     try {
       const url = await uploadBgImage(file);
       setForm({ ...form, background_image_url: url });
-      pushToast({ title: "Background image uploaded", description: "Profile will update on save.", tone: "success" });
+      pushToast({
+        title: "Background image uploaded",
+        description: "Saved to your resort. Use Save profile for text fields if you changed them.",
+        tone: "success",
+      });
     } catch (err) {
       pushToast({
         title: "Upload failed",
@@ -355,6 +405,7 @@ export default function ResortProfilePage() {
   };
 
   return (
+    <div className="space-y-6">
     <form className="space-y-6" onSubmit={onSubmit}>
       <div className="dash-card p-6 lg:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -708,5 +759,15 @@ export default function ResortProfilePage() {
         ) : null}
       </div>
     </form>
+    <ChangePasswordCard
+      idPrefix="resort-profile"
+      description={
+        <>
+          Update the password for your resort owner login. Use at least 8 characters with uppercase, lowercase, and a number.
+          Other sessions will be signed out.
+        </>
+      }
+    />
+    </div>
   );
 }

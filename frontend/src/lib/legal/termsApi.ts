@@ -1,3 +1,4 @@
+import { laravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import type { ApiEnvelope } from "@/lib/api/types";
 
 export type TermsSection = {
@@ -17,10 +18,8 @@ export type TermsPayload = {
   sections: TermsSection[];
 };
 
-const defaultBase = "http://127.0.0.1:8000/api/v1";
-
 export async function fetchTermsPayload(): Promise<TermsPayload | null> {
-  const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? defaultBase).replace(/\/$/, "");
+  const base = laravelApiV1BaseUrl().replace(/\/$/, "");
   try {
     const res = await fetch(`${base}/legal/terms`, {
       headers: { Accept: "application/json" },

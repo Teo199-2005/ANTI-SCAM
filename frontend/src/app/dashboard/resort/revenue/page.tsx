@@ -326,7 +326,7 @@ export default function ResortRevenuePage() {
           <Filter size={15} className="text-skyBlue" />
           <span className="text-sm font-semibold text-navy">Revenue Filters</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-500">Period</label>
             <select
@@ -419,17 +419,20 @@ export default function ResortRevenuePage() {
 
       {/* KPI grid */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-28 animate-pulse rounded-2xl bg-softCard shadow-card md:h-32" />
           ))}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-4">
           {kpis.map((k) => (
             <div
               key={k.label}
-              className="relative overflow-hidden rounded-2xl bg-softCard p-4 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-5"
+              className="relative overflow-hidden rounded-2xl border border-softBorderStrong/60 bg-softCard p-4 shadow-sm motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-5"
               style={{ boxShadow: shadowKpiTint(k.rgbKey, 0.14) }}
             >
               <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl" style={{ background: k.accent }} />
@@ -448,6 +451,7 @@ export default function ResortRevenuePage() {
               <p className="relative mt-1 line-clamp-2 font-dash text-[9px] leading-snug text-zinc-400 md:text-[10px]">{k.sub}</p>
             </div>
           ))}
+        </div>
         </div>
       )}
 

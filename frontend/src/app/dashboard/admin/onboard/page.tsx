@@ -4,15 +4,21 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
 import { adminOnboard, AssignableOwner, getAssignableOwners, uploadResortLogo } from "@/lib/api/admin";
+import { getLaravelWebOrigin } from "@/lib/api/baseUrl";
 import { getResort, updateResort } from "@/lib/api/resort";
 import { Building2, Globe, Image as ImageIcon, Loader2 } from "lucide-react";
+import {
+  sanitizeAddressLine,
+  sanitizeBusinessOrResortName,
+  sanitizeLongText,
+  sanitizeNumericIdInput,
+  sanitizePhoneInput,
+  sanitizeSubdomainInput,
+} from "@/lib/inputRestrictions";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const BACKEND_ORIGIN = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1").replace(
-  /\/api\/v1\/?$/,
-  "",
-);
+const BACKEND_ORIGIN = getLaravelWebOrigin();
 
 type FormState = {
   tenant_name: string;
@@ -57,8 +63,38 @@ export default function AdminOnboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [acceptAdminTerms, setAcceptAdminTerms] = useState(false);
 
-  const update = (key: keyof FormState, value: string | boolean) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const update = (key: keyof FormState, value: string | boolean) => {
+    let next: string | boolean = value;
+    if (typeof value === "string") {
+      switch (key) {
+        case "tenant_name":
+        case "resort_name":
+          next = sanitizeBusinessOrResortName(value);
+          break;
+        case "subdomain":
+          next = sanitizeSubdomainInput(value);
+          break;
+        case "address":
+          next = sanitizeAddressLine(value);
+          break;
+        case "contact_number":
+          next = sanitizePhoneInput(value);
+          break;
+        case "logo_url":
+          next = sanitizeLongText(value, 2048);
+          break;
+        case "description":
+          next = sanitizeLongText(value);
+          break;
+        case "owner_user_id":
+          next = sanitizeNumericIdInput(value, 12);
+          break;
+        default:
+          break;
+      }
+    }
+    setForm((prev) => ({ ...prev, [key]: next }));
+  };
 
   useEffect(() => {
     if (!isEditMode || !editResortId) return;
@@ -264,7 +300,7 @@ export default function AdminOnboardPage() {
                 placeholder="beachparadise"
                 pattern="[a-z0-9-]+"
                 value={form.subdomain}
-                onChange={(e) => update("subdomain", e.target.value.toLowerCase())}
+                onChange={(e) => update("subdomain", e.target.value)}
               />
             </div>
           </div>

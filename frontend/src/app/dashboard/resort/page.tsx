@@ -196,33 +196,33 @@ export default function ResortOverviewPage() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
 
       {/* ── Hero banner ─────────────────────────────────────── */}
-      <div className="dash-hero-banner-cta flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="dash-hero-banner-cta flex w-full min-w-0 max-w-full flex-col gap-5 max-md:p-5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4 md:p-6">
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-widest text-white/50">Resort Console</p>
           <h1 className="mt-1 font-dash text-2xl font-bold text-white md:text-3xl">
             Resort Overview
           </h1>
-          <p className="mt-1 text-sm text-white/65">
+          <p className="mt-1 text-sm leading-snug text-white/65">
             Monitor your active inventory, new confirmations, and reservation activity.
           </p>
         </div>
-        <div className="dash-filter-bar md:flex-row md:flex-wrap">
-          <div className="dash-hero-glass-panel px-4 py-3 text-center">
-            <p className="text-2xl font-bold text-white">{stats.activeRooms}</p>
-            <p className="text-xs text-white/55">Active rooms</p>
+        <div className="grid w-full min-w-0 max-w-full grid-cols-[repeat(2,minmax(0,1fr))] gap-2 sm:gap-3 md:w-auto md:max-w-md md:gap-3">
+          <div className="dash-hero-glass-panel flex min-h-[4.25rem] min-w-0 flex-col justify-center px-3 py-3 text-center ring-1 ring-inset ring-white/10 sm:min-h-0 sm:px-4">
+            <p className="text-xl font-bold tabular-nums text-white sm:text-2xl">{stats.activeRooms}</p>
+            <p className="mt-0.5 text-[11px] font-medium text-white/65 sm:text-xs">Active rooms</p>
           </div>
-          <div className="dash-hero-glass-panel px-4 py-3 text-center">
-            <p className="text-2xl font-bold text-white">{stats.confirmedToday}</p>
-            <p className="text-xs text-white/55">Confirmed today</p>
+          <div className="dash-hero-glass-panel flex min-h-[4.25rem] min-w-0 flex-col justify-center px-3 py-3 text-center ring-1 ring-inset ring-white/10 sm:min-h-0 sm:px-4">
+            <p className="text-xl font-bold tabular-nums text-white sm:text-2xl">{stats.confirmedToday}</p>
+            <p className="mt-0.5 text-[11px] font-medium text-white/65 sm:text-xs">Confirmed today</p>
           </div>
         </div>
       </div>
 
       {/* ── KPI stat cards (2×2 phone → 4 across md+) ────────── */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
+      <div className="grid min-w-0 grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
         <StatCard compact label="Active rooms"    value={stats.activeRooms}    icon={DoorOpen}       iconTone="sky" />
         <StatCard compact label="Locked bookings" value={stats.lockedBookings} icon={LockKeyhole}    iconTone="amber" />
         <StatCard compact label="Confirmed today" value={stats.confirmedToday} icon={CalendarCheck2} iconTone="emerald" />
@@ -253,7 +253,7 @@ export default function ResortOverviewPage() {
 
       {/* ── Revenue metrics (2×2 phone → 3 across md+) ───────── */}
       {(stats.totalReservationFees !== undefined || stats.totalGrossBookings !== undefined) && (
-        <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-2 gap-3 md:gap-4 md:grid-cols-3">
           {/* Fees collected */}
           <div
             className="relative overflow-hidden rounded-2xl bg-softCard p-4 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-5"
@@ -325,58 +325,62 @@ export default function ResortOverviewPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         {/* ── Booking calendar ──────────────────────────────── */}
-        <DashCard className="overflow-hidden p-0">
-          <div className="border-b border-softBorder px-6 py-4">
+        <DashCard className="min-w-0 overflow-hidden p-0">
+          <div className="border-b border-softBorder px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex items-center gap-2.5">
               <div className="inline-flex rounded-lg bg-primaryBlue/10 p-2">
                 <CalendarDays size={16} className="text-primaryBlue" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="font-dash text-base font-semibold text-navy">Booking calendar</h2>
                 <p className="text-xs text-zinc-400">{monthLabel}</p>
               </div>
             </div>
           </div>
-          <div className="space-y-3 p-4">
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+          <div className="space-y-3 p-3 sm:p-4">
+            <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-400 sm:gap-1 sm:text-[10px]">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <span key={day}>{day}</span>
+                <span key={day} className="min-w-0 truncate px-0.5 py-1">
+                  {day}
+                </span>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-0.5 sm:gap-1">
               {Array.from({ length: firstDayOffset }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-10 rounded-lg bg-transparent" />
+                <div key={`empty-${i}`} className="min-h-11 rounded-xl bg-transparent sm:h-10 sm:rounded-lg" />
               ))}
               {monthDays.map((day) => (
                 <button
                   key={day.key}
                   type="button"
                   onClick={() => setSelectedDate(day.key)}
-                  className={`relative h-10 rounded-lg border text-xs font-medium transition ${
+                  className={`relative min-h-11 min-w-0 rounded-xl border px-0.5 pb-3 text-sm font-semibold [touch-action:manipulation] motion-safe:transition sm:h-10 sm:rounded-lg sm:pb-2 sm:text-xs ${
                     day.reservations.length > 0
-                      ? "border-primaryBlue/40 bg-primaryBlue/10 text-navy hover:bg-primaryBlue/15"
-                      : "border-softBorder bg-white text-zinc-500 hover:bg-softGray/50"
+                      ? "border-primaryBlue/40 bg-primaryBlue/10 text-navy hover:bg-primaryBlue/15 active:bg-primaryBlue/20"
+                      : "border-softBorder bg-white text-zinc-500 hover:bg-softGray/50 active:bg-softGray/70"
                   }`}
                 >
                   {day.day}
                   {day.reservations.length > 0 ? (
                     <span className="absolute bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1">
-                      <span className={`h-1.5 w-1.5 rounded-full ${day.hasConfirmed ? "bg-emerald-500" : "bg-amber-500"}`} />
-                      {day.hasConfirmed && day.hasPending ? <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> : null}
+                      <span className={`h-2 w-2 rounded-full sm:h-1.5 sm:w-1.5 ${day.hasConfirmed ? "bg-emerald-500" : "bg-amber-500"}`} />
+                      {day.hasConfirmed && day.hasPending ? (
+                        <span className="h-2 w-2 rounded-full bg-amber-500 sm:h-1.5 sm:w-1.5" />
+                      ) : null}
                     </span>
                   ) : null}
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <div className="grid grid-cols-1 gap-2 rounded-xl border border-softBorder/90 bg-softGray/35 p-3 sm:flex sm:flex-wrap sm:gap-x-5 sm:gap-y-2 sm:border-transparent sm:bg-transparent sm:p-0">
+              <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white/90 px-3 text-xs font-medium text-zinc-600 shadow-sm ring-1 ring-softBorder/60 sm:min-h-0 sm:bg-transparent sm:px-0 sm:text-[11px] sm:text-zinc-500 sm:shadow-none sm:ring-0">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
                 Confirmed booking
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white/90 px-3 text-xs font-medium text-zinc-600 shadow-sm ring-1 ring-softBorder/60 sm:min-h-0 sm:bg-transparent sm:px-0 sm:text-[11px] sm:text-zinc-500 sm:shadow-none sm:ring-0">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500" />
                 Pending booking
               </span>
             </div>
@@ -384,31 +388,34 @@ export default function ResortOverviewPage() {
         </DashCard>
 
         {/* ── Recent reservations ──────────────────────────────── */}
-        <DashCard className="overflow-hidden p-0">
+        <DashCard className="min-w-0 overflow-hidden p-0">
           {/* Section header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
-            <div className="flex items-center gap-2.5">
+          <div className="flex flex-col gap-3 border-b border-softBorder px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-4">
+            <div className="flex min-w-0 items-center gap-2.5">
               <div className="inline-flex rounded-lg bg-emerald-100 p-2">
                 <ReceiptText size={16} className="text-emerald-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="font-dash text-base font-semibold text-navy">Recent reservations</h2>
                 <p className="text-xs text-zinc-400">Latest booking activity</p>
               </div>
             </div>
-            <Link href="/dashboard/resort/reservations" className="dash-btn-sm">
+            <Link
+              href="/dashboard/resort/reservations"
+              className="dash-btn-sm flex w-full justify-center sm:w-auto sm:flex-initial"
+            >
               View all
             </Link>
           </div>
 
           {stats.recentReservations.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-zinc-500">No reservations yet.</p>
+            <p className="px-4 py-8 text-sm text-zinc-500 sm:px-6">No reservations yet.</p>
           ) : (
             <div className="divide-y divide-softBorder">
               {stats.recentReservations.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 transition-colors hover:bg-dsRowHover"
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 transition-colors hover:bg-dsRowHover sm:px-6"
                 >
                   <div>
                     <p className="font-mono text-xs font-semibold text-navy">{item.reference_no}</p>

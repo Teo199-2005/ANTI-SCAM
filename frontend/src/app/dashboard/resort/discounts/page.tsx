@@ -5,6 +5,11 @@ import { apiClient } from "@/lib/api/client";
 import { listResorts } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
+  sanitizeIntegerDigitsOnly,
+  sanitizeReferralCodeInput,
+  sanitizeUnsignedDecimal,
+} from "@/lib/inputRestrictions";
+import {
   DashTableActionsCell,
   DashTableActionsHead,
   DashTableActionsInner,
@@ -145,8 +150,14 @@ export default function ResortDiscountsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="dash-label">Code</label>
-              <input className="dash-input font-mono uppercase" placeholder="SUMMER20" value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })} required maxLength={32} />
+              <input
+                className="dash-input font-mono uppercase"
+                placeholder="SUMMER20"
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: sanitizeReferralCodeInput(e.target.value) })}
+                required
+                maxLength={32}
+              />
             </div>
             <div>
               <label className="dash-label">Type</label>
@@ -157,13 +168,35 @@ export default function ResortDiscountsPage() {
             </div>
             <div>
               <label className="dash-label">Value</label>
-              <input type="number" className="dash-input" placeholder={form.type === "percentage" ? "e.g. 15" : "e.g. 500"}
-                value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required min={1} />
+              <input
+                type="text"
+                inputMode="decimal"
+                className="dash-input"
+                placeholder={form.type === "percentage" ? "e.g. 15" : "e.g. 500"}
+                value={form.value}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    value:
+                      form.type === "percentage"
+                        ? sanitizeIntegerDigitsOnly(e.target.value, 3)
+                        : sanitizeUnsignedDecimal(e.target.value),
+                  })
+                }
+                required
+              />
             </div>
             <div>
               <label className="dash-label">Max uses (blank = unlimited)</label>
-              <input type="number" className="dash-input" placeholder="Leave blank for unlimited"
-                value={form.max_uses} onChange={(e) => setForm({ ...form, max_uses: e.target.value })} min={1} />
+              <input
+                type="text"
+                inputMode="numeric"
+                className="dash-input"
+                placeholder="Leave blank for unlimited"
+                value={form.max_uses}
+                onChange={(e) => setForm({ ...form, max_uses: sanitizeIntegerDigitsOnly(e.target.value, 7) })}
+                pattern="[0-9]*"
+              />
             </div>
             <div>
               <label className="dash-label">Valid from</label>

@@ -103,6 +103,7 @@ class LandingReadinessService
                 'id' => $room->id,
                 'name' => $room->name,
                 'capacity' => $room->capacity,
+                'units' => max(1, (int) ($room->units ?? 1)),
                 'basePrice' => (float) $room->base_price,
                 'amenities' => $room->amenities ?? [],
                 'rules' => $room->rules,

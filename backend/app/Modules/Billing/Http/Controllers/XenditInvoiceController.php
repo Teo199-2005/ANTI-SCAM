@@ -19,33 +19,20 @@ class XenditInvoiceController extends Controller
     {
         $this->authorize('view', $reservation);
 
-        if ($reservation->status !== 'pending_payment') {
-            return $this->errorResponse(
-                'Reservation is not awaiting payment.',
-                ['reservation' => ['not_payable']],
-                409
-            );
-        }
-
-        if ($reservation->xendit_invoice_id) {
-            return $this->errorResponse(
-                'A payment invoice already exists for this reservation.',
-                ['reservation' => ['invoice_exists']],
-                409
-            );
-        }
-
         try {
-            $result = $this->service->createInvoice($reservation, $request->user());
+            $result = $this->service->resolveGuestCheckoutInvoice($reservation, $request->user());
         } catch (RuntimeException $e) {
-            return $this->errorResponse($e->getMessage(), null, 502);
+            $status = str_contains($e->getMessage(), 'not awaiting payment') ? 409 : 502;
+
+            return $this->errorResponse($e->getMessage(), null, $status);
         }
 
-        $reservation->update(['xendit_invoice_id' => $result['invoice_id']]);
+        $message = match (true) {
+            $result['already_confirmed'] => 'Payment already recorded; reservation confirmed.',
+            $result['resumed'] => 'Resume payment on the existing Xendit checkout.',
+            default => 'Payment invoice ready.',
+        };
 
-        return $this->successResponse([
-            'invoice_url' => $result['invoice_url'],
-            'invoice_id'  => $result['invoice_id'],
-        ], 'Payment invoice created');
+        return $this->successResponse($result, $message);
     }
 }

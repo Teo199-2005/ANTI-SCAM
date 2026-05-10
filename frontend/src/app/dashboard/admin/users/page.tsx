@@ -2,6 +2,8 @@
 
 import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import AdminCreateUserModal from "@/components/dashboard/AdminCreateUserModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
 import {
@@ -11,8 +13,11 @@ import {
 } from "@/components/shared/DashTableActions";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import SortableTh from "@/components/shared/SortableTh";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { useToast } from "@/components/shared/ToastProvider";
-import { Search, Trash2, Users } from "lucide-react";
+import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
+import { Search, Trash2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type User = {
@@ -27,16 +32,23 @@ type User = {
 
 type PaginatedEnvelope = {
   success: boolean;
-  data: User[] | { data: User[]; meta?: { current_page: number; last_page: number; total: number } };
+  data: User[] | { data: User[]; meta?: LaravelTableMeta };
 };
 
 const rolePill: Record<string, string> = {
-  admin:        "dash-badge-rose",
+  admin: "dash-badge-rose",
   resort_owner: "dash-badge-sky",
-  marketing:    "dash-badge-violet",
-  admin_staff:  "dash-badge-orange",
-  user:         "dash-badge-slate",
-  client:       "dash-badge-slate",
+  marketing: "dash-badge-violet",
+  admin_staff: "dash-badge-orange",
+  user: "dash-badge-slate",
+  client: "dash-badge-slate",
+};
+
+const SORT_FIRST: Record<string, SortDir> = {
+  name: "asc",
+  email: "asc",
+  role: "asc",
+  created_at: "desc",
 };
 
 function roleLabel(role: string): string {
@@ -54,26 +66,37 @@ export default function AdminUsersPage() {
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
+  const [meta, setMeta] = useState<LaravelTableMeta | null>(null);
+  const [perPage, setPerPage] = useState(10);
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { pushToast } = useToast();
 
-  const load = async (q: string, pg: number) => {
+  const load = async (q: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
     try {
       const { data } = await apiClient.get<PaginatedEnvelope>("/users", {
-        params: { search: q || undefined, perPage: 20, page: pg },
+        params: {
+          search: q || undefined,
+          perPage: pp,
+          page: pg,
+          sort_by: sb,
+          sort_dir: sd,
+        },
       });
       const payload = data.data;
-      const users = Array.isArray(payload) ? payload : (payload?.data ?? []);
-      const meta = Array.isArray(payload) ? undefined : payload?.meta;
-      setUsers(users);
-      setLastPage(meta?.last_page ?? 1);
+      const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      const m = extractLaravelMeta(payload);
+      setUsers(rows);
+      setMeta(m);
       setError(null);
     } catch (err) {
       setUsers([]);
+      setMeta(null);
       setError(parseApiErrorMessage(err, "Failed to load users."));
     } finally {
       setLoading(false);
@@ -81,29 +104,68 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    void load("", 1);
+    void load("", 1, perPage, sortBy, sortDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const lastPage = meta?.last_page ?? 1;
+  const total = meta?.total ?? users.length;
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setAppliedQuery(query);
     setPage(1);
-    void load(query, 1);
+    void load(query, 1, perPage, sortBy, sortDir);
+  };
+
+  const onSort = (key: string) => {
+    const n = nextSort(key, sortBy, sortDir, SORT_FIRST[key] ?? "asc");
+    setSortBy(n.key);
+    setSortDir(n.dir);
+    setPage(1);
+    void load(appliedQuery, 1, perPage, n.key, n.dir);
+  };
+
+  const onPageChange = (p: number) => {
+    setPage(p);
+    void load(appliedQuery, p, perPage, sortBy, sortDir);
+  };
+
+  const onPerPageChange = (pp: number) => {
+    setPerPage(pp);
+    setPage(1);
+    void load(appliedQuery, 1, pp, sortBy, sortDir);
   };
 
   const onDelete = async (id: number) => {
     setDeleting(id);
     try {
       await apiClient.delete(`/users/${id}`);
-      await load(appliedQuery, page);
+      await load(appliedQuery, page, perPage, sortBy, sortDir);
       pushToast({ title: "User deleted", tone: "success" });
     } catch (err) {
-      pushToast({ title: "Delete failed", description: parseApiErrorMessage(err, "Unable to delete this user right now."), tone: "error" });
+      pushToast({
+        title: "Delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete this user right now."),
+        tone: "error",
+      });
     } finally {
       setDeleting(null);
       setConfirmDelete(null);
     }
   };
+
+  const paginationFooter = !error && (
+    <TablePaginationBar
+      page={page}
+      lastPage={lastPage}
+      total={total}
+      perPage={perPage}
+      onPerPageChange={onPerPageChange}
+      onPageChange={onPageChange}
+      disabled={loading}
+    />
+  );
 
   return (
     <div className="space-y-6">
@@ -121,11 +183,15 @@ export default function AdminUsersPage() {
               className="dash-input pl-9"
               placeholder="Search by name or email…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <button type="submit" className="dash-btn-primary shrink-0">
             Search
+          </button>
+          <button type="button" className="dash-btn-sm inline-flex shrink-0 items-center justify-center gap-1.5" onClick={() => setCreateOpen(true)}>
+            <UserPlus size={14} />
+            Add user
           </button>
         </form>
       </div>
@@ -162,7 +228,8 @@ export default function AdminUsersPage() {
                   },
                   {
                     label: "Joined",
-                    value: u.created_at || u.createdAt ? new Date(u.created_at ?? u.createdAt ?? "").toLocaleDateString() : "—",
+                    value:
+                      u.created_at || u.createdAt ? new Date(u.created_at ?? u.createdAt ?? "").toLocaleDateString() : "—",
                   },
                 ]}
                 actions={
@@ -180,16 +247,18 @@ export default function AdminUsersPage() {
             ))}
           </div>
         )}
+        {paginationFooter ? <div className="dash-table-wrap overflow-hidden rounded-2xl">{paginationFooter}</div> : null}
       </div>
 
       <div className="hidden md:block">
         <DataTable
+          footer={paginationFooter}
           headers={
             <>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Joined</th>
+              <SortableTh label="Name" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Email" sortKey="email" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Role" sortKey="role" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Joined" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <DashTableActionsHead srOnly>Row actions</DashTableActionsHead>
             </>
           }
@@ -218,12 +287,7 @@ export default function AdminUsersPage() {
                 </td>
                 <DashTableActionsCell>
                   <DashTableActionsInner>
-                    <button
-                      type="button"
-                      disabled={deleting === u.id}
-                      onClick={() => setConfirmDelete(u)}
-                      className="dash-btn-danger"
-                    >
+                    <button type="button" disabled={deleting === u.id} onClick={() => setConfirmDelete(u)} className="dash-btn-danger">
                       <Trash2 size={14} />
                       Delete
                     </button>
@@ -235,35 +299,17 @@ export default function AdminUsersPage() {
         </DataTable>
       </div>
 
-      {lastPage > 1 ? (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            disabled={page <= 1}
-            onClick={() => { const next = page - 1; setPage(next); void load(appliedQuery, next); }}
-            className="dash-btn-sm disabled:opacity-40"
-          >
-            ← Prev
-          </button>
-          <span className="text-sm text-zinc-600">
-            Page {page} of {lastPage}
-          </span>
-          <button
-            disabled={page >= lastPage}
-            onClick={() => { const next = page + 1; setPage(next); void load(appliedQuery, next); }}
-            className="dash-btn-sm disabled:opacity-40"
-          >
-            Next →
-          </button>
-        </div>
-      ) : null}
+      <AdminCreateUserModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => void load(appliedQuery, page, perPage, sortBy, sortDir)}
+      />
 
       <ConfirmDialog
         open={Boolean(confirmDelete)}
         title="Delete user?"
         description={
-          confirmDelete
-            ? `Delete ${confirmDelete.name}. This action cannot be undone.`
-            : "This action cannot be undone."
+          confirmDelete ? `Delete ${confirmDelete.name}. This action cannot be undone.` : "This action cannot be undone."
         }
         confirmLabel="Delete"
         tone="danger"
@@ -276,4 +322,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-

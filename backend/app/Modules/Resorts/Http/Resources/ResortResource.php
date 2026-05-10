@@ -20,6 +20,8 @@ class ResortResource extends JsonResource
             'background_image_url' => $this->background_image_url,
             'representative_name' => $this->representative_name,
             'representative_contact_number' => $this->representative_contact_number,
+            'cancellation_policy' => $this->cancellation_policy,
+            'amenities' => $this->amenities ?? [],
             'is_publicly_listed' => (bool) $this->is_publicly_listed,
             'is_vip' => (bool) ($this->is_vip ?? false),
             'rooms_count' => $this->whenCounted('rooms'),

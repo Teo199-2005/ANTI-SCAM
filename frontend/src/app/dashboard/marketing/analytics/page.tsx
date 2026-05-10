@@ -7,7 +7,7 @@ import {
   type MarketingAnalyticsPayload,
   type MarketingMonthlyAnalytics,
 } from "@/lib/api/marketing";
-import { BarChart3, Building2, DollarSign, PieChart, RotateCcw, TrendingUp, Users } from "lucide-react";
+import { BarChart3, Building2, DollarSign, PieChart, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -77,15 +77,6 @@ export default function MarketingAnalyticsPage() {
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={() => void load(year)}
-              disabled={loading}
-              className="dash-btn-sm inline-flex items-center gap-1.5 border-white/40 bg-white/15 text-white hover:bg-white/25 disabled:opacity-50"
-            >
-              <RotateCcw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
           </div>
         </div>
       </div>
@@ -94,35 +85,37 @@ export default function MarketingAnalyticsPage() {
         <div className="dash-alert-error">{error}</div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        <StatCard
-          compact
-          label="Pending commission (YTD)"
-          value={data ? `₱${data.totals.commission_pending_ytd.toLocaleString()}` : "–"}
-          icon={PieChart}
-          iconTone="amber"
-        />
-        <StatCard
-          compact
-          label="Released commission (YTD)"
-          value={data ? `₱${data.totals.commission_released_ytd.toLocaleString()}` : "–"}
-          icon={DollarSign}
-          iconTone="emerald"
-        />
-        <StatCard
-          compact
-          label="Referral checkouts"
-          value={data ? String(data.totals.referral_subscription_count_ytd) : "–"}
-          icon={Users}
-          iconTone="navy"
-        />
-        <StatCard
-          compact
-          label="Referral volume (YTD)"
-          value={data ? `₱${data.totals.referral_subscription_volume_ytd.toLocaleString()}` : "–"}
-          icon={TrendingUp}
-          iconTone="violet"
-        />
+      <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
+          <StatCard
+            compact
+            label="Pending commission (YTD)"
+            value={data ? `₱${data.totals.commission_pending_ytd.toLocaleString()}` : "–"}
+            icon={PieChart}
+            iconTone="amber"
+          />
+          <StatCard
+            compact
+            label="Released commission (YTD)"
+            value={data ? `₱${data.totals.commission_released_ytd.toLocaleString()}` : "–"}
+            icon={DollarSign}
+            iconTone="emerald"
+          />
+          <StatCard
+            compact
+            label="Referral checkouts"
+            value={data ? String(data.totals.referral_subscription_count_ytd) : "–"}
+            icon={Users}
+            iconTone="navy"
+          />
+          <StatCard
+            compact
+            label="Referral volume (YTD)"
+            value={data ? `₱${data.totals.referral_subscription_volume_ytd.toLocaleString()}` : "–"}
+            icon={TrendingUp}
+            iconTone="violet"
+          />
+        </div>
       </div>
 
       <DashCard className="overflow-hidden p-0">

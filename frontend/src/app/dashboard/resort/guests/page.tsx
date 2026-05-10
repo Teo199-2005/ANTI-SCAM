@@ -3,6 +3,7 @@
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import { apiClient } from "@/lib/api/client";
+import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { Download, Mail, Search, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -84,7 +85,7 @@ export default function ResortGuestsPage() {
               className="dash-input pl-9"
               placeholder="Search by name, email, or phone…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
             />
           </div>
           <button type="submit" className="dash-btn-primary shrink-0">Search</button>

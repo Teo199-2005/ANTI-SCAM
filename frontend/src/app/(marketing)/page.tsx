@@ -1,4 +1,5 @@
 import HeroSection from "@/components/home/HeroSection";
+import heroCover from "../../../public/coverphoto.png";
 import type { Metadata } from "next";
 
 const homeTitle = "Anti-Scam PH — Verified resort bookings & scam-aware protection";
@@ -13,7 +14,14 @@ export const metadata: Metadata = {
     title: homeTitle,
     description: homeDescription,
     url: "/",
-    images: [{ url: "/coverphoto.png", width: 1536, height: 1024, alt: "Anti-Scam PH resort booking" }]
+    images: [
+      {
+        url: "/coverphoto.png",
+        width: heroCover.width,
+        height: heroCover.height,
+        alt: "Anti-Scam PH resort booking",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",

@@ -3,18 +3,23 @@
 namespace App\Modules\Users\Repositories;
 
 use App\Models\User;
+use App\Support\SafeSort;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
 
 class EloquentUserRepository implements UserRepositoryInterface
 {
-    public function paginate(int $perPage = 10, ?string $search = null): LengthAwarePaginator
+    public function paginate(int $perPage = 10, ?string $search = null, ?string $sortBy = null, ?string $sortDir = null): LengthAwarePaginator
     {
-        return User::query()
-            ->when($search, fn ($query) => $query->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%"))
-            ->latest()
-            ->paginate($perPage);
+        $query = User::query()
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search): void {
+                $inner->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            }));
+
+        SafeSort::apply($query, $sortBy, $sortDir, ['name', 'email', 'role', 'created_at'], 'created_at', 'desc');
+
+        return $query->paginate($perPage);
     }
 
     public function findOrFail(int $id): User

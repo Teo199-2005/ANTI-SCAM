@@ -1,18 +1,26 @@
 "use client";
 
 import { AuthSplitShell, AUTH_MARKETING_CARD } from "@/components/auth/AuthSplitShell";
+import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHydrated } from "@/hooks/useHydrated";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
+import {
+  sanitizeBusinessOrResortName,
+  sanitizeEmailTyping,
+  sanitizePersonName,
+  sanitizePhilippinesMobileInput,
+} from "@/lib/inputRestrictions";
+import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2, Eye, EyeOff, Mail, Shield, UserPlus, XCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Shield, UserPlus } from "lucide-react";
 
 const authInput =
-  "w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20";
+  "w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 md:text-sm";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -30,19 +38,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const pwdChecks = {
-    length: password.length >= 8,
-    upper: /[A-Z]/.test(password),
-    lower: /[a-z]/.test(password),
-    number: /\d/.test(password),
-    match: password.length > 0 && password === passwordConfirmation,
-  };
-
-  const passedCount = Object.values(pwdChecks).filter(Boolean).length;
-  const strengthLabel = passedCount <= 2 ? "Weak" : passedCount <= 4 ? "Good" : "Strong";
-  const strengthClass =
-    passedCount <= 2 ? "bg-rose-500" : passedCount <= 4 ? "bg-amber-500" : "bg-emerald-500";
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -50,7 +45,7 @@ export default function RegisterPage() {
       setError("Please accept the terms and privacy policy to continue.");
       return;
     }
-    if (!pwdChecks.length || !pwdChecks.upper || !pwdChecks.lower || !pwdChecks.number) {
+    if (!passwordPolicyMet(getPasswordPolicyChecks(password))) {
       setError("Password does not meet minimum security requirements.");
       return;
     }
@@ -129,7 +124,7 @@ export default function RegisterPage() {
               autoComplete="name"
               required
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setName(sanitizePersonName(e.target.value))}
               placeholder="Maria Santos"
             />
           </div>
@@ -146,7 +141,9 @@ export default function RegisterPage() {
                 autoComplete="tel"
                 required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(sanitizePhilippinesMobileInput(e.target.value))}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="09XXXXXXXXX"
               />
             </div>
@@ -159,7 +156,7 @@ export default function RegisterPage() {
                 suppressHydrationWarning
                 className={authInput}
                 value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                onChange={(e) => setBusinessName(sanitizeBusinessOrResortName(e.target.value))}
                 placeholder="Sample Staycation OPC"
               />
             </div>
@@ -179,7 +176,8 @@ export default function RegisterPage() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                inputMode="email"
+                onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
                 placeholder="you@example.com"
               />
             </div>
@@ -201,7 +199,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min 8 chars, mixed case + number"
-                aria-describedby="password-hint"
+                aria-describedby="password-hint register-password-meter"
               />
               {hydrated ? (
                 <button
@@ -220,33 +218,12 @@ export default function RegisterPage() {
             <p id="password-hint" className="mt-1 text-xs text-zinc-500">
               At least 8 characters with uppercase, lowercase, and a number.
             </p>
-            <div className="mt-2 rounded-lg border border-zinc-200/90 bg-zinc-50/90 p-2.5">
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-zinc-700">Strength: {strengthLabel}</p>
-                <span className="shrink-0 text-[11px] text-zinc-500">{passedCount}/5</span>
-              </div>
-              <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-200">
-                <div className={`h-full ${strengthClass}`} style={{ width: `${(passedCount / 5) * 100}%` }} />
-              </div>
-              <ul className="mt-2 grid gap-0.5 text-[11px] text-zinc-600 sm:grid-cols-2">
-                {[
-                  { ok: pwdChecks.length, label: "At least 8 characters" },
-                  { ok: pwdChecks.upper, label: "Contains uppercase letter" },
-                  { ok: pwdChecks.lower, label: "Contains lowercase letter" },
-                  { ok: pwdChecks.number, label: "Contains a number" },
-                  { ok: pwdChecks.match, label: "Passwords match" },
-                ].map((item) => (
-                  <li key={item.label} className="flex items-center gap-1.5">
-                    {item.ok ? (
-                      <CheckCircle2 size={14} className="text-emerald-600" />
-                    ) : (
-                      <XCircle size={14} className="text-zinc-400" />
-                    )}
-                    <span>{item.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <PasswordRequirementsMeter
+              className="mt-2"
+              password={password}
+              confirmation={passwordConfirmation}
+              id="register-password-meter"
+            />
           </div>
 
           <div>

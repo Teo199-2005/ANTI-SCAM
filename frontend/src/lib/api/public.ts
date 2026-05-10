@@ -9,6 +9,8 @@ export type PublicRoom = {
   name: string;
   code: string;
   capacity: number;
+  /** Parallel bookable units for overlapping dates (defaults to 1). */
+  units?: number;
   basePrice: number;
   amenities: string[];
   images?: { id: number; url: string; caption?: string | null }[];

@@ -115,4 +115,15 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Queue transactional notifications
+    |--------------------------------------------------------------------------
+    |
+    | When true, branded transactional mail is dispatched to the queue (non-blocking).
+    | Set false only for constrained environments or emergency debugging.
+    |
+    */
+    'queue_transactional' => (bool) env('MAIL_QUEUE_TRANSACTIONAL', true),
+
 ];

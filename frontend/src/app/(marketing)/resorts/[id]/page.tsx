@@ -1,6 +1,7 @@
 "use client";
 
 import PageContainer from "@/components/layout/PageContainer";
+import ResortJsonLd from "@/components/seo/ResortJsonLd";
 import { getPublicResort, getPublicResortBySlug, PublicResort, PublicRoom } from "@/lib/api/public";
 import { BedDouble, CalendarDays, MapPin, PhoneCall, Users } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +48,7 @@ export default function ResortDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <PageContainer className="section-padding">
+      <ResortJsonLd resort={resort} />
       {/* Hero */}
       <div className="glass-hero-panel mx-auto mb-8 text-center">
         <h1 className="font-heading text-4xl text-zinc-900 md:text-5xl">{resort.name}</h1>

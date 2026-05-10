@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Release expired booking locks and expire stale pending-payment reservations every minute
 Schedule::command('booking:expire-locks')->everyMinute();
+
+// Recover from delayed or missing Xendit callbacks (idempotent with webhook dedupe keys).
+Schedule::command('payments:reconcile-booking-invoices')->everyFiveMinutes();

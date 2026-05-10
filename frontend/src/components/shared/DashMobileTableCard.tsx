@@ -38,7 +38,11 @@ export default function DashMobileTableCard({ title, fields, actions, className 
           </div>
         ))}
       </dl>
-      {actions ? <footer className="mt-2 flex flex-col gap-2 border-t border-softBorder pt-4">{actions}</footer> : null}
+      {actions ? (
+        <footer className="dash-mobile-table-card__actions mt-2 grid gap-2 border-t border-softBorder pt-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]">
+          {actions}
+        </footer>
+      ) : null}
     </article>
   );
 }

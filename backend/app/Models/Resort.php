@@ -22,6 +22,8 @@ class Resort extends Model
         'background_image_url',
         'representative_name',
         'representative_contact_number',
+        'cancellation_policy',
+        'amenities',
         'is_publicly_listed',
         'is_vip',
     ];
@@ -31,6 +33,7 @@ class Resort extends Model
         return [
             'is_publicly_listed' => 'boolean',
             'is_vip'             => 'boolean',
+            'amenities'          => 'array',
         ];
     }
 

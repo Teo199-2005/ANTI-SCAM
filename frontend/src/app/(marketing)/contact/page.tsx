@@ -6,6 +6,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Button from "@/components/ui/Button";
 import OwnerValuePropsStrip from "@/components/home/OwnerValuePropsStrip";
 import { Building2, CheckCircle2, Clock3, Mail, MapPin, MessageSquareMore, PhoneCall } from "lucide-react";
+import { sanitizeEmailTyping, sanitizeLongText, sanitizePersonName } from "@/lib/inputRestrictions";
 import { useState } from "react";
 
 export default function ContactPage() {
@@ -52,15 +53,39 @@ export default function ContactPage() {
           )}
           <div>
             <label htmlFor="contact-name" className="mb-1 block text-xs font-semibold text-zinc-700">Full Name</label>
-            <input id="contact-name" className="glass-field" placeholder="Maria Santos" value={name} onChange={(e) => setName(e.target.value)} required />
+            <input
+              id="contact-name"
+              className="glass-field"
+              placeholder="Maria Santos"
+              value={name}
+              onChange={(e) => setName(sanitizePersonName(e.target.value))}
+              autoComplete="name"
+              required
+            />
           </div>
           <div>
             <label htmlFor="contact-email" className="mb-1 block text-xs font-semibold text-zinc-700">Email Address</label>
-            <input id="contact-email" className="glass-field" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input
+              id="contact-email"
+              className="glass-field"
+              type="email"
+              inputMode="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
+              required
+            />
           </div>
           <div>
             <label htmlFor="contact-message" className="mb-1 block text-xs font-semibold text-zinc-700">Message</label>
-            <textarea id="contact-message" className="glass-field h-32" placeholder="How can we help?" value={message} onChange={(e) => setMessage(e.target.value)} required />
+            <textarea
+              id="contact-message"
+              className="glass-field h-32"
+              placeholder="How can we help?"
+              value={message}
+              onChange={(e) => setMessage(sanitizeLongText(e.target.value, 4000))}
+              required
+            />
           </div>
           <Button type="submit" className="inline-flex items-center gap-2" disabled={pending}>
             <MessageSquareMore size={14} />
