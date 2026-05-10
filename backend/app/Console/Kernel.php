@@ -7,6 +7,8 @@ use App\Console\Commands\EnforceSubscriptionGrace;
 use App\Console\Commands\ExpireBookingLocks;
 use App\Console\Commands\GenerateMonthlyInvoices;
 use App\Console\Commands\ProcessMarketerCommissionPayouts;
+use App\Console\Commands\ReconcileMarketerPayoutBatches;
+use App\Console\Commands\ReportStaleMarketerPayoutBatches;
 use App\Console\Commands\SendTestEmail;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -20,6 +22,8 @@ class Kernel extends ConsoleKernel
         EnforceSubscriptionGrace::class,
         SendTestEmail::class,
         ProcessMarketerCommissionPayouts::class,
+        ReconcileMarketerPayoutBatches::class,
+        ReportStaleMarketerPayoutBatches::class,
     ];
 
     protected function schedule(Schedule $schedule): void
@@ -30,6 +34,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('marketing:process-commission-payouts')
             ->monthlyOn(10, '06:00')
             ->timezone('Asia/Manila');
+        $schedule->command('marketing:report-stale-payout-batches')
+            ->dailyAt('07:30')
+            ->timezone('Asia/Manila');
+        $schedule->command('marketing:reconcile-payout-batches')->hourly();
     }
 
     protected function commands(): void

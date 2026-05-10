@@ -7,6 +7,7 @@ use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\SubscriptionInvoice;
 use App\Services\MarketerCommissionPayoutService;
+use App\Services\MarketerTierService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,10 @@ class MarketingDashboardController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly MarketerCommissionPayoutService $marketerPayouts) {}
+    public function __construct(
+        private readonly MarketerCommissionPayoutService $marketerPayouts,
+        private readonly MarketerTierService $marketerTiers,
+    ) {}
 
     public function stats(Request $request)
     {
@@ -35,6 +39,11 @@ class MarketingDashboardController extends Controller
 
         $resortCount = DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count();
 
+        $convertingResortsCount = $this->marketerTiers->countConvertingResorts($marketerId);
+        $marketerTier = $this->marketerTiers->resolveTier($convertingResortsCount);
+        $tierLadder = $this->marketerTiers->tierLadder();
+        $tierPolicy = $this->marketerTiers->tierPolicySummary();
+
         $user = $request->user();
         $frontend = rtrim((string) config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3000')), '/');
         $code = $user->referral_code;
@@ -53,6 +62,25 @@ class MarketingDashboardController extends Controller
             'releasedCommissionsGross' => (float) $releasedCommissionsGross,
             'payoutWithholdingRate' => $wh,
             'assignedResorts' => $resortCount,
+            'convertingResortsCount' => $convertingResortsCount,
+            'marketerTier' => $marketerTier === null ? null : [
+                'tierKey' => $marketerTier['tier_key'],
+                'label' => $marketerTier['label'],
+                'perPaymentPhp' => $marketerTier['per_payment_php'],
+                'minClients' => $marketerTier['min_clients'],
+                'maxClients' => $marketerTier['max_clients'],
+                'nextTierAt' => $marketerTier['next_tier_at'],
+                'clientsToNextTier' => $marketerTier['clients_to_next_tier'],
+            ],
+            'tierLadder' => array_map(static fn (array $b): array => [
+                'tierKey' => $b['tier_key'],
+                'label' => $b['label'],
+                'minClients' => $b['min_clients'],
+                'maxClients' => $b['max_clients'],
+                'perPaymentPhp' => $b['per_payment_php'],
+                'clientRangeLabel' => $b['client_range_label'],
+            ], $tierLadder),
+            'tierPolicy' => $tierPolicy,
             'referral_code' => $code,
             'referral_share_register_url' => $shareRegister,
             'referral_subscribe_hint' => $subscribeHint,

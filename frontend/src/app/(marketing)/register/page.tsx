@@ -20,7 +20,7 @@ import { useState } from "react";
 import { Eye, EyeOff, Mail, Shield, UserPlus } from "lucide-react";
 
 const authInput =
-  "w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 md:text-sm";
+  "w-full rounded-xl border border-zinc-200/90 bg-white px-3.5 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.875rem] md:rounded-lg md:py-2 md:text-sm";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -76,21 +76,24 @@ export default function RegisterPage() {
   return (
     <AuthSplitShell>
       <div className={AUTH_MARKETING_CARD}>
-        <div className="mb-3 flex gap-3 sm:items-center">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20">
+        <div className="mb-4 flex gap-3 sm:mb-3 sm:items-center">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20 sm:h-10 sm:w-10">
             <UserPlus size={18} strokeWidth={2} />
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Create your account</h1>
-            <p className="mt-0.5 text-sm leading-snug text-zinc-600">
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="font-heading text-[1.35rem] font-semibold leading-tight tracking-tight text-zinc-900 sm:text-2xl">
+              Create your account
+            </h1>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-600 sm:mt-0.5 sm:leading-snug">
               Book resorts and track reservations in one place.
             </p>
           </div>
         </div>
 
+        <div className="max-lg:mb-4 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-3 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
         <a
           href={googleOAuthRedirectUrl()}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200/90 bg-white py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90"
+          className="mb-3 flex w-full min-h-[2.875rem] items-center justify-center gap-2 rounded-xl border border-zinc-200/90 bg-white py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 max-lg:mb-3 max-lg:shadow-md max-lg:shadow-clOcean/10 max-lg:active:scale-[0.99] lg:mb-3 lg:shadow-sm md:rounded-lg md:py-2"
         >
               <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -101,12 +104,16 @@ export default function RegisterPage() {
           Continue with Google
         </a>
 
-        <div className="relative mb-3 text-center text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          <span className="relative z-10 bg-white/95 px-2">or register with email</span>
-          <span className="absolute left-0 right-0 top-1/2 z-0 h-px -translate-y-1/2 bg-zinc-200" />
+        <div className="relative mb-0 text-center text-[11px] font-semibold uppercase tracking-wider text-zinc-500 lg:mb-3">
+          <span className="relative z-10 bg-white px-3 max-lg:rounded-full max-lg:bg-white max-lg:px-3 max-lg:shadow-sm">
+            or register with email
+          </span>
+          <span className="absolute left-0 right-0 top-1/2 z-0 h-px -translate-y-1/2 bg-zinc-200/90" />
+        </div>
         </div>
 
-        <form className="space-y-3" onSubmit={onSubmit}>
+        <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-4 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
+        <form className="space-y-4 md:space-y-3" onSubmit={onSubmit}>
           {error ? (
             <p role="alert" className="rounded-lg border border-red-200/90 bg-red-50 px-3 py-2 text-sm text-red-800">
               {error}
@@ -129,7 +136,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-3">
             <div>
               <label htmlFor="register-phone" className="mb-1.5 block text-xs font-semibold text-zinc-700">
                 Contact number
@@ -258,7 +265,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <label className="flex items-start gap-2 rounded-lg border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-2 text-xs text-zinc-600">
+          <label className="flex items-start gap-3 rounded-xl border border-zinc-200/90 bg-zinc-50/90 px-3 py-3 text-xs leading-relaxed text-zinc-600 max-lg:bg-white/80 md:gap-2 md:rounded-lg md:px-2.5 md:py-2">
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-clOcean focus:ring-clOcean/30"
@@ -275,12 +282,13 @@ export default function RegisterPage() {
 
           <Button
             type="submit"
-            className="w-full justify-center rounded-lg py-2.5 text-sm shadow-md shadow-clOcean/15"
+            className="w-full justify-center rounded-xl py-3.5 text-sm font-semibold shadow-md shadow-clOcean/20 max-lg:min-h-[3rem] md:rounded-lg md:py-2.5"
             disabled={pending || !acceptTerms}
           >
             {pending ? "Creating account…" : "Create account"}
           </Button>
         </form>
+        </div>
 
         <p className="mt-4 text-center text-sm text-zinc-600">
           Already have an account?{" "}
@@ -289,7 +297,7 @@ export default function RegisterPage() {
           </Link>
         </p>
 
-        <div className="mt-4 flex items-center justify-center gap-2 border-t border-zinc-100 pt-3 text-[11px] text-zinc-500">
+        <div className="mt-5 flex items-center justify-center gap-2 border-t border-zinc-100/90 pt-4 text-center text-[11px] leading-snug text-zinc-500 md:mt-4 md:pt-3">
           <Shield size={14} className="shrink-0 text-clOcean/50" aria-hidden />
           <span>Anti-Scam PH · Verified-safe bookings</span>
         </div>

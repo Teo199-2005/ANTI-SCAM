@@ -992,6 +992,71 @@ button.dash-sortable-th:focus-visible {
   .border-sem-info { @apply border-dsInfo; }
 }
 
+/* Referral code verification (resort owner subscribe modal) */
+@keyframes referral-indeterminate-slide {
+  0% {
+    transform: translateX(-130%);
+  }
+  100% {
+    transform: translateX(380%);
+  }
+}
+
+@keyframes referral-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes referral-success-icon {
+  0% {
+    transform: scale(0.35);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.referral-verify-bar-inner {
+  animation: referral-indeterminate-slide 1.2s ease-in-out infinite;
+}
+
+.referral-status-animate {
+  animation: referral-status-in 0.38s ease-out forwards;
+}
+
+.referral-success-icon-animate {
+  animation: referral-success-icon 0.52s cubic-bezier(0.34, 1.45, 0.64, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .referral-verify-bar-inner,
+  .referral-status-animate,
+  .referral-success-icon-animate {
+    animation: none !important;
+  }
+
+  .referral-status-animate {
+    opacity: 1;
+    transform: none;
+  }
+
+  .referral-success-icon-animate {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Hero slider progress bar */
 @keyframes progress-bar {
   from { width: 0%; }

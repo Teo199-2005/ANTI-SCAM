@@ -106,4 +106,50 @@ class AdminFinanceTest extends TestCase
                 'withheld' => 10.0,
             ]);
     }
+
+    public function test_manual_commission_release_records_net_after_withholding(): void
+    {
+        config(['services.marketing_payout.withholding_rate' => 0.10]);
+
+        $tenant = Tenant::create([
+            'name' => 'Rel Tenant',
+            'slug' => 'rel-tenant',
+            'subdomain' => 'rel',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Rel Resort',
+            'is_publicly_listed' => true,
+        ]);
+
+        $marketer = User::factory()->create(['role' => 'marketing']);
+
+        $commission = Commission::query()->create([
+            'marketer_id' => $marketer->id,
+            'resort_id' => $resort->id,
+            'period' => '2026-06',
+            'gross_bookings' => 0,
+            'commission_rate' => 0,
+            'commission_amount' => 100,
+            'status' => 'pending',
+        ]);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $this->postJson("/api/v1/admin/commissions/{$commission->id}/release", [
+            'notes' => 'Test payout',
+        ])->assertSuccessful();
+
+        $this->assertDatabaseHas('commission_releases', [
+            'commission_id' => $commission->id,
+            'amount' => 90,
+            'release_source' => 'manual',
+        ]);
+
+        $commission->refresh();
+        $this->assertSame('released', $commission->status);
+    }
 }

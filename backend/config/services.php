@@ -55,6 +55,59 @@ return [
         'timezone' => env('MARKETING_PAYOUT_TIMEZONE', 'Asia/Manila'),
         /** Fraction withheld from gross commissions before GCash payout (taxes & platform fees), e.g. 0.10 = 10%. */
         'withholding_rate' => (float) env('MARKETING_PAYOUT_WITHHOLDING_RATE', 0.10),
+        /**
+         * Optional safety cap: if set (> 0), skip auto-batching when net payout exceeds this PHP amount
+         * (forces ops to split or review — reduces blast-radius if data is wrong).
+         */
+        'max_net_php_per_batch' => env('MARKETING_PAYOUT_MAX_NET_PHP') !== null && env('MARKETING_PAYOUT_MAX_NET_PHP') !== ''
+            ? (float) env('MARKETING_PAYOUT_MAX_NET_PHP')
+            : null,
+        /** Log warning if batches stay in pending_submit longer than this (hours). */
+        'stale_pending_submit_hours' => (int) env('MARKETING_PAYOUT_STALE_PENDING_HOURS', 72),
+        /** Log warning if submitted batches never complete within this many hours. */
+        'stale_submitted_hours' => (int) env('MARKETING_PAYOUT_STALE_SUBMITTED_HOURS', 168),
+        /**
+         * When true, marketing:reconcile-payout-batches retries idempotent Xendit POST for old pending_submit
+         * rows and polls GET /v2/payouts/{id} for submitted batches (webhook safety net).
+         */
+        'reconcile_poll_enabled' => filter_var(env('MARKETING_PAYOUT_RECONCILE_POLL', true), FILTER_VALIDATE_BOOL),
+        /** Minimum age before retrying Xendit create on a pending_submit batch (avoids racing the monthly job). */
+        'recover_pending_submit_after_minutes' => (int) env('MARKETING_PAYOUT_RECOVER_PENDING_MINUTES', 3),
+        /** Minimum age before polling Xendit for a submitted batch. */
+        'reconcile_submitted_poll_after_minutes' => (int) env('MARKETING_PAYOUT_POLL_SUBMITTED_MINUTES', 30),
+        /**
+         * Hard cap on how many times the reconciler will re-POST a stuck pending_submit batch
+         * to Xendit before flagging it for manual ops review (status stays pending_submit, but
+         * is excluded from auto-retries via last_attempt_error logging). Prevents infinite hammer.
+         */
+        'max_submit_attempts' => (int) env('MARKETING_PAYOUT_MAX_SUBMIT_ATTEMPTS', 8),
+        /**
+         * Exponential backoff base in minutes between retries: wait = base * 2^(attempts-1),
+         * capped at 24h. Skipped when the reconciler runs.
+         */
+        'retry_backoff_base_minutes' => (int) env('MARKETING_PAYOUT_RETRY_BACKOFF_MINUTES', 5),
+        /**
+         * Require marketer to have a government-ID document on file before creating a payout batch.
+         * Defaults FALSE so existing test data and pilots aren't blocked, but should be TRUE in
+         * production to satisfy BSP Circular 1108 and AMLC Tier-1 KYC expectations.
+         */
+        'require_kyc' => filter_var(env('MARKETING_PAYOUT_REQUIRE_KYC', false), FILTER_VALIDATE_BOOL),
+        /**
+         * Require the GCash account-holder name to be similar (>= MARKETING_PAYOUT_NAME_MATCH_THRESHOLD %)
+         * to the marketer's account name. Mitigates money-mule risk where partner routes funds to a
+         * third party. Defaults FALSE for compatibility; set TRUE in production.
+         */
+        'require_name_match' => filter_var(env('MARKETING_PAYOUT_REQUIRE_NAME_MATCH', false), FILTER_VALIDATE_BOOL),
+        'name_match_threshold' => max(0, min(100, (int) env('MARKETING_PAYOUT_NAME_MATCH_THRESHOLD', 70))),
+        /**
+         * If set (>0), payouts whose net amount exceeds this PHP threshold require a manual approval
+         * row before being submitted to Xendit (four-eyes principle). 0 / null disables.
+         */
+        'four_eyes_threshold_php' => env('MARKETING_PAYOUT_FOUR_EYES_PHP') !== null && env('MARKETING_PAYOUT_FOUR_EYES_PHP') !== ''
+            ? (float) env('MARKETING_PAYOUT_FOUR_EYES_PHP')
+            : null,
+        /** When true, the BookingPaymentReconciliationService and similar will alert via Slack on critical mismatches. */
+        'critical_alerts_via_slack' => filter_var(env('MARKETING_PAYOUT_SLACK_ALERTS', false), FILTER_VALIDATE_BOOL),
     ],
 
     'google' => [

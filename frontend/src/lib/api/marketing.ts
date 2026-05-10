@@ -31,6 +31,25 @@ export type MarketingAnalyticsPayload = {
   totals: MarketingAnalyticsTotals;
 };
 
+export type MarketerTierInfo = {
+  tierKey: string;
+  label: string;
+  perPaymentPhp: number;
+  minClients: number;
+  maxClients: number | null;
+  nextTierAt: number | null;
+  clientsToNextTier: number | null;
+};
+
+export type TierLadderEntry = {
+  tierKey: string;
+  label: string;
+  minClients: number;
+  maxClients: number | null;
+  perPaymentPhp: number;
+  clientRangeLabel: string;
+};
+
 export type MarketingStats = {
   totalCommissions: number;
   pendingCommissions: number;
@@ -41,6 +60,11 @@ export type MarketingStats = {
   releasedCommissionsGross: number;
   payoutWithholdingRate: number;
   assignedResorts: number;
+  /** Distinct converting resorts (paid qualifying subscription invoices) */
+  convertingResortsCount: number;
+  marketerTier: MarketerTierInfo | null;
+  tierLadder: TierLadderEntry[];
+  tierPolicy: string;
   referral_code: string | null;
   referral_share_register_url: string | null;
   referral_subscribe_hint: string | null;
@@ -61,6 +85,8 @@ export type Commission = {
   grossBookings: number;
   commissionRate: number;
   commissionAmount: number;
+  marketerTier?: string | null;
+  unitCommissionPhp?: number | null;
   status: "pending" | "released";
   resort: { id: number; name: string } | null;
   releases: CommissionRelease[];
@@ -79,6 +105,42 @@ type Paginated<T> = {
   meta?: { current_page: number; last_page: number; total: number };
 };
 
+function mapMarketerTier(raw: unknown): MarketerTierInfo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const tierKey = (o.tierKey ?? o.tier_key) as string | undefined;
+  if (typeof tierKey !== "string" || tierKey === "") return null;
+  const maxRaw = o.maxClients ?? o.max_clients;
+  const nextRaw = o.nextTierAt ?? o.next_tier_at;
+  const toNextRaw = o.clientsToNextTier ?? o.clients_to_next_tier;
+
+  return {
+    tierKey,
+    label: String(o.label ?? ""),
+    perPaymentPhp: Number(o.perPaymentPhp ?? o.per_payment_php ?? 0),
+    minClients: Number(o.minClients ?? o.min_clients ?? 0),
+    maxClients: maxRaw === null || maxRaw === undefined ? null : Number(maxRaw),
+    nextTierAt: nextRaw === null || nextRaw === undefined ? null : Number(nextRaw),
+    clientsToNextTier: toNextRaw === null || toNextRaw === undefined ? null : Number(toNextRaw),
+  };
+}
+
+function mapTierLadder(raw: unknown): TierLadderEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const o = item as Record<string, unknown>;
+    const maxRaw = o.maxClients ?? o.max_clients;
+    return {
+      tierKey: String(o.tierKey ?? o.tier_key ?? ""),
+      label: String(o.label ?? ""),
+      minClients: Number(o.minClients ?? o.min_clients ?? 0),
+      maxClients: maxRaw === null || maxRaw === undefined ? null : Number(maxRaw),
+      perPaymentPhp: Number(o.perPaymentPhp ?? o.per_payment_php ?? 0),
+      clientRangeLabel: String(o.clientRangeLabel ?? o.client_range_label ?? ""),
+    };
+  });
+}
+
 function mapStats(raw: Record<string, unknown>): MarketingStats {
   return {
     totalCommissions: Number(raw.totalCommissions ?? raw.total_commissions ?? 0),
@@ -88,6 +150,10 @@ function mapStats(raw: Record<string, unknown>): MarketingStats {
     releasedCommissionsGross: Number(raw.releasedCommissionsGross ?? raw.released_commissions_gross ?? 0),
     payoutWithholdingRate: Number(raw.payoutWithholdingRate ?? raw.payout_withholding_rate ?? 0),
     assignedResorts: Number(raw.assignedResorts ?? raw.assigned_resorts ?? 0),
+    convertingResortsCount: Number(raw.convertingResortsCount ?? raw.converting_resorts_count ?? 0),
+    marketerTier: mapMarketerTier(raw.marketerTier ?? raw.marketer_tier),
+    tierLadder: mapTierLadder(raw.tierLadder ?? raw.tier_ladder),
+    tierPolicy: String(raw.tierPolicy ?? raw.tier_policy ?? ""),
     referral_code: (raw.referral_code as string | null) ?? null,
     referral_share_register_url: (raw.referral_share_register_url as string | null) ?? null,
     referral_subscribe_hint: (raw.referral_subscribe_hint as string | null) ?? null,
@@ -114,12 +180,16 @@ export async function getAssignedResorts(): Promise<AssignedResort[]> {
 
 function mapCommission(raw: Record<string, unknown>): Commission {
   const resort = raw.resort as Record<string, unknown> | null | undefined;
+  const tierRaw = raw.marketer_tier ?? raw.marketerTier;
+  const unitRaw = raw.unit_commission_php ?? raw.unitCommissionPhp;
   return {
     id: Number(raw.id),
     period: String(raw.period ?? ""),
     grossBookings: Number(raw.gross_bookings ?? raw.grossBookings ?? 0),
     commissionRate: Number(raw.commission_rate ?? raw.commissionRate ?? 0),
     commissionAmount: Number(raw.commission_amount ?? raw.commissionAmount ?? 0),
+    marketerTier: typeof tierRaw === "string" ? tierRaw : null,
+    unitCommissionPhp: unitRaw === null || unitRaw === undefined ? null : Number(unitRaw),
     status: (raw.status as Commission["status"]) ?? "pending",
     resort: resort && resort.id != null ? { id: Number(resort.id), name: String(resort.name ?? "") } : null,
     releases: (raw.releases as Commission["releases"]) ?? [],

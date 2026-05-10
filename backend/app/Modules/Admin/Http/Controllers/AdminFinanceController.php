@@ -222,7 +222,10 @@ class AdminFinanceController extends Controller
         $page = $q->orderByDesc('marketer_payout_batches.id')->paginate($perPage);
 
         $mapped = $page->through(function (MarketerPayoutBatch $batch): array {
-            $gross = round((float) ($batch->gross_commissions ?? 0), 2);
+            $grossJoined = round((float) ($batch->gross_commissions ?? 0), 2);
+            $gross = $batch->gross_commissions_total !== null
+                ? round((float) $batch->gross_commissions_total, 2)
+                : $grossJoined;
             $net = round((float) $batch->total_amount, 2);
             $withheld = round(max(0, $gross - $net), 2);
 
@@ -243,6 +246,9 @@ class AdminFinanceController extends Controller
                 'submitted_at' => $batch->submitted_at,
                 'completed_at' => $batch->completed_at,
                 'created_at' => $batch->created_at,
+                'withholding_rate_applied' => $batch->withholding_rate_applied !== null
+                    ? round((float) $batch->withholding_rate_applied, 4)
+                    : null,
             ];
         });
 

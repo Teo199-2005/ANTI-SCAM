@@ -93,7 +93,11 @@ class AdminMarketersMonitoringTest extends TestCase
         $res->assertSuccessful()
             ->assertJsonPath('data.rows.0.id', $marketer->id)
             ->assertJsonPath('data.rows.0.referred_resorts_count', 1)
+            ->assertJsonPath('data.rows.0.marketer_tier_key', 'silver')
+            ->assertJsonPath('data.rows.0.per_payment_php', 150)
             ->assertJsonPath('data.rows.0.commission_pending_php', fn ($v) => (float) $v === 250.0)
-            ->assertJsonPath('data.meta.new_client_definition', fn ($v) => is_string($v) && $v !== '');
+            ->assertJsonPath('data.meta.new_client_definition', fn ($v) => is_string($v) && $v !== '')
+            ->assertJsonPath('data.meta.tier_ladder', fn ($v) => is_array($v) && count($v) === 3)
+            ->assertJsonPath('data.meta.tier_policy', fn ($v) => is_string($v) && $v !== '');
     }
 }

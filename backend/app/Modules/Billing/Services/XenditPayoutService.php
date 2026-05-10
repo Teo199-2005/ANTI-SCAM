@@ -107,6 +107,57 @@ class XenditPayoutService
         ];
     }
 
+    /**
+     * GET /v2/payouts/{payout_id} — used when webhooks omit amount or for polling stale batches.
+     *
+     * @return array<string, mixed>|null Decoded JSON body, or null if not found / error.
+     */
+    public function fetchPayoutById(string $payoutId): ?array
+    {
+        if (! $this->isConfigured() || $payoutId === '') {
+            return null;
+        }
+
+        $url = 'https://api.xendit.co/v2/payouts/'.rawurlencode($payoutId);
+
+        try {
+            $response = Http::withBasicAuth($this->secretKey(), '')
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->withOptions(XenditTls::httpClientOptions())
+                ->timeout(45)
+                ->get($url);
+        } catch (ConnectionException $e) {
+            if (app()->isProduction() || ! str_contains($e->getMessage(), 'cURL error 60')) {
+                Log::warning('Xendit payout GET failed', [
+                    'payout_id' => $payoutId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+
+            $response = Http::withBasicAuth($this->secretKey(), '')
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->withOptions(['verify' => false])
+                ->timeout(45)
+                ->get($url);
+        }
+
+        if (! $response->successful()) {
+            Log::warning('Xendit payout GET non-success', [
+                'payout_id' => $payoutId,
+                'status' => $response->status(),
+                'body' => $response->json(),
+            ]);
+
+            return null;
+        }
+
+        $data = $response->json();
+
+        return is_array($data) ? $data : null;
+    }
+
     private function buildGatewayErrorMessage(int $status, mixed $errorBody): string
     {
         $message = is_array($errorBody) ? (string) ($errorBody['message'] ?? '') : '';

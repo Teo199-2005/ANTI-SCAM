@@ -3,6 +3,7 @@
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
+import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import {
   getAdminCommissionReleases,
   getAdminFinanceCommissions,
@@ -268,7 +269,8 @@ export default function AdminFinancePage() {
                 <p className="mt-1">
                   Platform rate: <strong>{overview.withholding_percent_label}</strong> of gross subscription-referral
                   commissions is withheld (taxes &amp; fees) before GCash disbursement. Succeeded batches below show realized
-                  gross vs net paid.
+                  gross vs net paid. Gross per row is credited when subscription invoices pay (tier-based rates); payouts only
+                  sum those booked amounts and apply withholding — they do not recompute tiers.
                 </p>
               </DashCard>
               <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
@@ -464,7 +466,22 @@ export default function AdminFinancePage() {
                       { label: "Marketer", value: c.marketer?.name ?? String(c.marketer_id) },
                       { label: "Resort", value: c.resort?.name ?? String(c.resort_id) },
                       { label: "Period", value: <span className="font-mono text-xs">{c.period}</span> },
-                      { label: "Gross", value: fmtPhp(c.commission_amount) },
+                      {
+                        label: "Tier (last credit)",
+                        value:
+                          c.marketer_tier != null && String(c.marketer_tier).length > 0 ? (
+                            <MarketerTierBadge tierKey={c.marketer_tier} size="sm" />
+                          ) : (
+                            "—"
+                          ),
+                      },
+                      {
+                        label: "Unit / gross",
+                        value:
+                          c.unit_commission_php != null && String(c.unit_commission_php) !== ""
+                            ? `${fmtPhp(String(c.unit_commission_php))} · ${fmtPhp(c.commission_amount)}`
+                            : fmtPhp(c.commission_amount),
+                      },
                       { label: "Status", value: <StatusBadge status={c.status} /> },
                       {
                         label: "Payout batch",
@@ -483,13 +500,14 @@ export default function AdminFinancePage() {
               </div>
               <div className="hidden md:block">
                 <DashTableScrollRegion label="Commissions table">
-                  <table className="dash-table min-w-[960px]">
+                  <table className="dash-table min-w-[1080px]">
                   <thead>
                     <tr>
                       <th>ID</th>
                       <th>Marketer</th>
                       <th>Resort</th>
                       <th>Period</th>
+                      <th>Tier</th>
                       <th>Gross</th>
                       <th>Status</th>
                       <th>Payout batch</th>
@@ -502,7 +520,21 @@ export default function AdminFinancePage() {
                         <td className="text-sm">{c.marketer?.name ?? c.marketer_id}</td>
                         <td className="text-sm">{c.resort?.name ?? c.resort_id}</td>
                         <td className="font-mono text-xs">{c.period}</td>
-                        <td className="font-mono text-sm">{fmtPhp(c.commission_amount)}</td>
+                        <td>
+                          {c.marketer_tier ? (
+                            <MarketerTierBadge tierKey={c.marketer_tier} size="sm" />
+                          ) : (
+                            <span className="text-xs text-zinc-400">—</span>
+                          )}
+                        </td>
+                        <td className="font-mono text-sm">
+                          {fmtPhp(c.commission_amount)}
+                          {c.unit_commission_php != null && String(c.unit_commission_php) !== "" ? (
+                            <span className="ml-1 block text-[11px] font-normal text-zinc-500">
+                              @ {fmtPhp(String(c.unit_commission_php))} / credit
+                            </span>
+                          ) : null}
+                        </td>
                         <td>
                           <StatusBadge status={c.status} />
                         </td>

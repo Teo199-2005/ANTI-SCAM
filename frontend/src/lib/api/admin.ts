@@ -295,6 +295,10 @@ export type FinanceCommissionRow = {
   resort_id: number;
   period: string;
   commission_amount: string;
+  /** Tier key stored on last credit to this row (subscription-referral); optional for legacy rows */
+  marketer_tier?: string | null;
+  /** PHP per credit increment when tier was applied; optional for legacy rows */
+  unit_commission_php?: string | number | null;
   status: string;
   payout_batch_id: number | null;
   marketer?: { id: number; name: string; email: string };
@@ -320,6 +324,8 @@ export type FinanceWithholdingBatchRow = {
   net_disbursed: number;
   withheld: number;
   withholding_rate_effective: number | null;
+  /** Rate stored when batch was created (for audit); may be null on legacy rows */
+  withholding_rate_applied?: number | null;
   xendit_payout_id: string | null;
   failure_message: string | null;
   submitted_at: string | null;
@@ -445,11 +451,30 @@ export type AdminMarketerMonitorRow = {
   commission_pending_php: number;
   commission_released_gross_php: number;
   commission_total_gross_php: number;
+  marketer_tier_key: string | null;
+  marketer_tier_label: string | null;
+  per_payment_php: number | null;
+  next_tier_at: number | null;
+  clients_to_next_tier: number | null;
+};
+
+export type AdminTierLadderRow = {
+  tier_key: string;
+  label: string;
+  min_clients: number;
+  max_clients: number | null;
+  per_payment_php: number;
+  client_range_label: string;
 };
 
 export type AdminMarketerMonitoringPayload = {
   rows: AdminMarketerMonitorRow[];
-  meta: { generated_at: string; new_client_definition: string };
+  meta: {
+    generated_at: string;
+    new_client_definition: string;
+    tier_ladder?: AdminTierLadderRow[];
+    tier_policy?: string;
+  };
 };
 
 export async function getAdminMarketersMonitoring(search?: string): Promise<AdminMarketerMonitoringPayload> {
@@ -457,12 +482,14 @@ export async function getAdminMarketersMonitoring(search?: string): Promise<Admi
     params: search?.trim() ? { search: search.trim() } : undefined,
   });
   const raw = data.data;
+  const meta = raw?.meta && typeof raw.meta === "object" ? (raw.meta as Record<string, unknown>) : {};
   return {
-    rows: Array.isArray(raw?.rows) ? raw.rows : [],
+    rows: Array.isArray(raw?.rows) ? (raw.rows as AdminMarketerMonitorRow[]) : [],
     meta: {
-      generated_at: typeof raw?.meta?.generated_at === "string" ? raw.meta.generated_at : "",
-      new_client_definition:
-        typeof raw?.meta?.new_client_definition === "string" ? raw.meta.new_client_definition : "",
+      generated_at: typeof meta.generated_at === "string" ? meta.generated_at : "",
+      new_client_definition: typeof meta.new_client_definition === "string" ? meta.new_client_definition : "",
+      tier_ladder: Array.isArray(meta.tier_ladder) ? (meta.tier_ladder as AdminTierLadderRow[]) : undefined,
+      tier_policy: typeof meta.tier_policy === "string" ? meta.tier_policy : undefined,
     },
   };
 }

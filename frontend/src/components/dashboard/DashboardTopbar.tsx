@@ -8,8 +8,11 @@ import { validateReferralCode } from "@/lib/api/referral";
 import type { ReadinessPayload } from "@/lib/api/referral";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeReferralCodeInput } from "@/lib/inputRestrictions";
+import { getMarketingStats, type MarketingStats } from "@/lib/api/marketing";
 import { formatRoleLabel } from "@/lib/utils";
-import { AlertCircle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
+import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
+import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
+import { AlertCircle, Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -62,11 +65,16 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const [referralCode, setReferralCode] = useState("");
   const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
   const [referralReadiness, setReferralReadiness] = useState<ReadinessPayload | null>(null);
+  const [appliedMarketerName, setAppliedMarketerName] = useState<string | null>(null);
+  const [referralInlineError, setReferralInlineError] = useState<string | null>(null);
   const [applyingReferral, setApplyingReferral] = useState(false);
   const [subscribingNow, setSubscribingNow] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
   const [subscriptionInfo, setSubscriptionInfo] = useState<OwnerSubscriptionInfo | null>(null);
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
+  const [marketingTierModalOpen, setMarketingTierModalOpen] = useState(false);
+  const [marketingStats, setMarketingStats] = useState<MarketingStats | null>(null);
+  const [marketingStatsLoading, setMarketingStatsLoading] = useState(false);
   const crumbs = pathname.split("/").filter(Boolean).slice(1);
   const initials =
     user?.name
@@ -95,6 +103,28 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== "marketing") {
+      setMarketingStats(null);
+      return;
+    }
+    let cancelled = false;
+    setMarketingStatsLoading(true);
+    void getMarketingStats()
+      .then((s) => {
+        if (!cancelled) setMarketingStats(s);
+      })
+      .catch(() => {
+        if (!cancelled) setMarketingStats(null);
+      })
+      .finally(() => {
+        if (!cancelled) setMarketingStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.role, user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +165,8 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       setReferralCode("");
       setAppliedReferralCode(null);
       setReferralReadiness(null);
+      setAppliedMarketerName(null);
+      setReferralInlineError(null);
       return;
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -150,11 +182,13 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       pushToast({ title: "Referral code required", description: "Enter a referral code first.", tone: "warning" });
       return;
     }
+    setReferralInlineError(null);
     setApplyingReferral(true);
     try {
       const landing = await getOwnerLandingPage();
       const result = await validateReferralCode(normalized, landing.resort_id);
       if (!result.valid) {
+        setReferralInlineError(result.message);
         pushToast({
           title: "Referral code not accepted",
           description: result.message,
@@ -163,6 +197,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         return;
       }
       setAppliedReferralCode(result.code);
+      setAppliedMarketerName(result.marketer_name);
       setReferralReadiness(result.readiness);
       const ready = result.readiness?.is_ready ?? false;
       pushToast({
@@ -173,9 +208,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         tone: ready ? "success" : "warning",
       });
     } catch (err) {
+      const msg = parseApiErrorMessage(err, "Check your connection and try again.");
+      setReferralInlineError(msg);
       pushToast({
         title: "Unable to verify code",
-        description: parseApiErrorMessage(err, "Check your connection and try again."),
+        description: msg,
         tone: "error",
       });
     } finally {
@@ -334,6 +371,38 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                 </div>
               </>
             ) : null}
+
+            {user.role === "marketing" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMarketingTierModalOpen(true)}
+                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-xl border border-violet-200/90 bg-gradient-to-b from-violet-50 to-white px-2.5 py-2 font-dash text-[10px] font-bold uppercase tracking-wide text-violet-950 shadow-soft-sm transition hover:border-violet-300 hover:shadow-card sm:max-w-none sm:gap-2 sm:px-3 sm:text-dash-xs"
+                >
+                  <Award size={15} className="shrink-0 text-violet-600" aria-hidden />
+                  <span className="hidden min-[400px]:inline">Tiers</span>
+                  <MarketerTierBadge
+                    tierKey={marketingStats?.marketerTier?.tierKey}
+                    label={marketingStats?.marketerTier?.label}
+                    size="sm"
+                    showGem={false}
+                    className="hidden sm:inline-flex"
+                  />
+                </button>
+                {mounted ? (
+                  <MarketingTiersInfoModal
+                    open={marketingTierModalOpen}
+                    onClose={() => setMarketingTierModalOpen(false)}
+                    tierLadder={marketingStats?.tierLadder ?? []}
+                    tierPolicy={marketingStats?.tierPolicy ?? ""}
+                    marketerTier={marketingStats?.marketerTier ?? null}
+                    convertingResortsCount={marketingStats?.convertingResortsCount ?? 0}
+                    loading={marketingStatsLoading}
+                  />
+                ) : null}
+              </>
+            ) : null}
+
             <div className="flex items-center gap-1.5 rounded-xl border border-white/70 bg-gradient-to-b from-white to-softCard/90 py-1 pl-1 pr-1.5 shadow-card sm:gap-2 sm:pr-2">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-navy to-primaryBlue text-[10px] font-bold text-white shadow-soft-sm sm:h-8 sm:w-8 sm:text-dash-xs">
                 {initials}
@@ -515,9 +584,16 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     onChange={(e) => {
                       const v = sanitizeReferralCodeInput(e.target.value);
                       setReferralCode(v);
-                      if (!v.trim()) {
+                      setReferralInlineError(null);
+                      const norm = v.trim().toUpperCase();
+                      if (!norm) {
                         setAppliedReferralCode(null);
                         setReferralReadiness(null);
+                        setAppliedMarketerName(null);
+                      } else if (appliedReferralCode && norm !== appliedReferralCode) {
+                        setAppliedReferralCode(null);
+                        setReferralReadiness(null);
+                        setAppliedMarketerName(null);
                       }
                     }}
                     className="dash-input min-h-11 flex-1 sm:min-h-0"
@@ -527,11 +603,97 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     type="button"
                     onClick={() => void applyReferral()}
                     disabled={applyingReferral}
-                    className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl border border-softBorder bg-white px-4 text-xs font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60 sm:min-h-0 sm:w-auto sm:min-w-[92px] sm:self-stretch sm:py-2 sm:text-sm"
+                    className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl border border-softBorder bg-white px-4 text-xs font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60 sm:min-h-0 sm:w-auto sm:min-w-[108px] sm:self-stretch sm:py-2 sm:text-sm"
                   >
-                    {applyingReferral ? <Loader2 size={14} className="animate-spin" /> : "Verify"}
+                    {applyingReferral ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Verifying…</span>
+                      </>
+                    ) : (
+                      "Verify"
+                    )}
                   </button>
                 </div>
+
+                {applyingReferral ? (
+                  <div
+                    className="referral-status-animate mt-2 rounded-xl border border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white px-3 py-2.5 shadow-sm"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+                        <Sparkles size={17} strokeWidth={2} />
+                      </span>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <p className="text-xs font-bold text-sky-950">Verifying referral code</p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-sky-900/80">
+                          Checking with your marketer partner and your resort profile…
+                        </p>
+                        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-sky-200/70">
+                          <div className="referral-verify-bar-inner h-full w-2/5 rounded-full bg-gradient-to-r from-clOcean via-sky-400 to-clOcean opacity-90" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {referralInlineError && !applyingReferral ? (
+                  <div
+                    className="referral-status-animate mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-900 shadow-sm"
+                    role="alert"
+                  >
+                    <p className="inline-flex items-start gap-2 text-xs font-semibold leading-snug">
+                      <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                      <span>{referralInlineError}</span>
+                    </p>
+                  </div>
+                ) : null}
+
+                {appliedReferralCode && appliedMarketerName && !applyingReferral && !referralInlineError ? (
+                  <div
+                    className={`referral-status-animate mt-2 rounded-xl border px-3 py-2.5 shadow-sm ${
+                      referralReadiness?.is_ready
+                        ? "border-emerald-200 bg-emerald-50/95 text-emerald-950"
+                        : "border-amber-200 bg-amber-50/90 text-amber-950"
+                    }`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span
+                        className={`referral-success-icon-animate flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
+                          referralReadiness?.is_ready ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                      >
+                        <CheckCircle2 size={18} strokeWidth={2.25} />
+                      </span>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <p className="text-xs font-bold">Referral applied successfully</p>
+                        <p className="mt-0.5 text-[11px] leading-snug opacity-90">
+                          Partner: <span className="font-semibold">{appliedMarketerName}</span>
+                          {appliedReferralCode ? (
+                            <span className="text-zinc-600">
+                              {" "}
+                              · Code <span className="font-mono font-semibold text-zinc-800">{appliedReferralCode}</span>
+                            </span>
+                          ) : null}
+                        </p>
+                        {referralReadiness?.is_ready ? (
+                          <p className="mt-1 text-[11px] leading-snug text-emerald-900/85">
+                            Your profile looks ready — choose a 3, 6, or 12-month plan for first month free.
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[11px] leading-snug text-amber-900/85">
+                            Finish the profile checklist below to unlock the promo.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Profile readiness checklist shown after code verification */}
                 {appliedReferralCode && referralReadiness && !referralReadiness.is_ready ? (
                   <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
@@ -571,6 +733,8 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     setReferralCode("");
                     setAppliedReferralCode(null);
                     setReferralReadiness(null);
+                    setAppliedMarketerName(null);
+                    setReferralInlineError(null);
                   }}
                   className="min-h-10 w-full rounded-xl border border-softBorder bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:px-4 sm:text-sm"
                 >

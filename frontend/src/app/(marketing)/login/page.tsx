@@ -14,10 +14,13 @@ import DemoQuickLogin from "./DemoQuickLogin";
 
 /** Login card — roomier than the compact auth card used on register/forgot. */
 const loginCardClass =
-  "rounded-3xl border border-zinc-200/75 bg-white/95 p-7 shadow-[0_26px_52px_-22px_rgba(13,30,66,0.18),0_0_0_1px_rgba(255,255,255,0.82)_inset] backdrop-blur-xl sm:p-9 md:p-10";
+  "relative overflow-hidden rounded-3xl border border-zinc-200/75 bg-white/95 p-7 shadow-[0_26px_52px_-22px_rgba(13,30,66,0.18),0_0_0_1px_rgba(255,255,255,0.82)_inset] backdrop-blur-xl sm:p-9 md:p-10 " +
+  "max-lg:rounded-[1.12rem] max-lg:border-zinc-200/70 max-lg:bg-white max-lg:p-6 " +
+  "max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_10px_32px_-22px_rgba(13,30,66,0.14)] " +
+  "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-[1] before:h-[3px] before:bg-gradient-to-r before:from-clOcean before:via-clTeal before:to-sky-400 before:content-[''] before:hidden max-lg:before:block";
 
 const authInput =
-  "w-full rounded-xl border border-zinc-200/80 bg-sky-50/35 px-4 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25 md:text-sm";
+  "w-full rounded-xl border border-zinc-200/80 bg-sky-50/35 px-4 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25 max-lg:min-h-[2.875rem] md:text-sm";
 
 function LoginFallback() {
   return (
@@ -96,9 +99,10 @@ function LoginPageContent() {
           </div>
         </div>
 
+        <div className="max-lg:mb-5 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-3 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
         <a
           href={googleOAuthRedirectUrl()}
-          className="mb-5 flex w-full items-center justify-center gap-2.5 rounded-xl border border-zinc-200/90 bg-white py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90"
+          className="mb-3 flex w-full min-h-[2.875rem] items-center justify-center gap-2.5 rounded-xl border border-zinc-200/90 bg-white py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 max-lg:mb-3 max-lg:shadow-md max-lg:shadow-clOcean/10 max-lg:active:scale-[0.99] lg:mb-5 lg:shadow-sm"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -109,11 +113,13 @@ function LoginPageContent() {
           Continue with Google
         </a>
 
-        <div className="relative mb-5 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-          <span className="relative z-10 bg-white px-3">or use email</span>
+        <div className="relative mb-0 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500 max-lg:mb-0 lg:mb-5">
+          <span className="relative z-10 bg-white px-3 max-lg:rounded-full max-lg:bg-white max-lg:px-3 max-lg:shadow-sm">or use email</span>
           <span className="absolute left-0 right-0 top-1/2 z-0 h-px -translate-y-1/2 bg-zinc-200/90" />
         </div>
+        </div>
 
+        <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-4 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
         <form className="space-y-5" onSubmit={onSubmit}>
           {oauthError === "oauth_failed" ? (
             <p role="alert" className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -190,12 +196,13 @@ function LoginPageContent() {
 
           <Button
             type="submit"
-            className="mt-1 w-full justify-center rounded-xl py-3.5 text-sm font-semibold shadow-md shadow-clOcean/20"
+            className="mt-1 w-full justify-center rounded-xl py-3.5 text-sm font-semibold shadow-md shadow-clOcean/20 max-lg:min-h-[3rem] max-lg:active:scale-[0.99]"
             disabled={pending}
           >
             {pending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
+        </div>
 
         <p className="mt-7 text-center text-sm text-zinc-600">
           No account yet?{" "}

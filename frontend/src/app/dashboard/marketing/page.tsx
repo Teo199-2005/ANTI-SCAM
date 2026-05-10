@@ -5,7 +5,9 @@ import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/share
 import StatCard from "@/components/dashboard/StatCard";
 import { getAssignedResorts, getCommissions, getMarketingStats, getReleaseHistory, AssignedResort, Commission, CommissionRelease, MarketingStats } from "@/lib/api/marketing";
 import { useAuth } from "@/contexts/AuthContext";
-import { BadgeCheck, Building2, Clock, DollarSign, Link2, TrendingUp } from "lucide-react";
+import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
+import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
+import { BadgeCheck, Building2, Clock, DollarSign, Link2, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -21,6 +23,7 @@ export default function MarketingDashboardPage() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [releases, setReleases] = useState<CommissionRelease[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tiersModalOpen, setTiersModalOpen] = useState(false);
 
   const firstName = user?.name?.split(" ")[0] ?? "Partner";
 
@@ -56,11 +59,50 @@ export default function MarketingDashboardPage() {
         <p className="mt-1 max-w-xl font-dash text-dash-sm text-white/80">
           Track assigned resorts and commissions. KPIs below mirror this summary.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <MarketerTierBadge
+            tierKey={stats?.marketerTier?.tierKey}
+            label={stats?.marketerTier?.label}
+            size="md"
+            variant="onDark"
+          />
+          <button
+            type="button"
+            onClick={() => setTiersModalOpen(true)}
+            className="inline-flex items-center rounded-full border border-white/35 bg-white/10 px-3 py-1.5 font-dash text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+          >
+            How tiers work
+          </button>
+        </div>
       </div>
 
+      <MarketingTiersInfoModal
+        open={tiersModalOpen}
+        onClose={() => setTiersModalOpen(false)}
+        tierLadder={stats?.tierLadder ?? []}
+        tierPolicy={stats?.tierPolicy ?? ""}
+        marketerTier={stats?.marketerTier ?? null}
+        convertingResortsCount={stats?.convertingResortsCount ?? 0}
+        loading={loading && !stats}
+      />
+
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
         <StatCard compact label="Assigned resorts"  value={stats?.assignedResorts ?? "–"}                                       icon={Building2}  iconTone="navy" />
+        <StatCard
+          compact
+          label="Converting resorts"
+          value={stats ? stats.convertingResortsCount : "–"}
+          subtitle={
+            stats?.marketerTier
+              ? `${stats.marketerTier.label} · ₱${Number(stats.marketerTier.perPaymentPhp).toLocaleString()} per paid credit`
+              : stats
+                ? "No tier until your first paid referral subscription"
+                : undefined
+          }
+          icon={Users}
+          iconTone="navy"
+        />
         <StatCard compact label="Total commissions" value={stats ? `₱${Number(stats.totalCommissions).toLocaleString()}` : "–"}    icon={TrendingUp}  iconTone="emerald" />
         <StatCard
           compact
@@ -187,7 +229,22 @@ export default function MarketingDashboardPage() {
                     { label: "Resort", value: c.resort?.name ?? "–" },
                     { label: "Gross bookings", value: `₱${Number(c.grossBookings).toLocaleString()}` },
                     { label: "Rate", value: `${(Number(c.commissionRate) * 100).toFixed(1)}%` },
-                    { label: "Commission", value: `₱${Number(c.commissionAmount).toLocaleString()}` },
+                    {
+                      label: "Tier (last credit)",
+                      value:
+                        c.marketerTier != null && String(c.marketerTier).length > 0 ? (
+                          <MarketerTierBadge tierKey={c.marketerTier} size="sm" />
+                        ) : (
+                          "—"
+                        ),
+                    },
+                    {
+                      label: "Unit / total",
+                      value:
+                        c.unitCommissionPhp != null
+                          ? `₱${Number(c.unitCommissionPhp).toLocaleString()} · ₱${Number(c.commissionAmount).toLocaleString()}`
+                          : `₱${Number(c.commissionAmount).toLocaleString()}`,
+                    },
                     {
                       label: "Status",
                       value: <span className={statusBadge[c.status] ?? "dash-badge-slate"}>{c.status}</span>,
@@ -204,6 +261,7 @@ export default function MarketingDashboardPage() {
                     <th>Resort</th>
                     <th>Gross Bookings</th>
                     <th>Rate</th>
+                    <th>Tier</th>
                     <th>Commission</th>
                     <th>Status</th>
                   </tr>
@@ -215,7 +273,21 @@ export default function MarketingDashboardPage() {
                       <td className="font-semibold text-navy">{c.resort?.name ?? "–"}</td>
                       <td>₱{Number(c.grossBookings).toLocaleString()}</td>
                       <td>{(Number(c.commissionRate) * 100).toFixed(1)}%</td>
-                      <td className="font-semibold text-emerald-700">₱{Number(c.commissionAmount).toLocaleString()}</td>
+                      <td>
+                        {c.marketerTier ? (
+                          <MarketerTierBadge tierKey={c.marketerTier} size="sm" />
+                        ) : (
+                          <span className="text-xs text-zinc-400">—</span>
+                        )}
+                      </td>
+                      <td className="font-semibold text-emerald-700">
+                        ₱{Number(c.commissionAmount).toLocaleString()}
+                        {c.unitCommissionPhp != null ? (
+                          <span className="ml-1 text-[11px] font-normal text-zinc-500">
+                            (@ ₱{Number(c.unitCommissionPhp).toLocaleString()})
+                          </span>
+                        ) : null}
+                      </td>
                       <td><span className={statusBadge[c.status] ?? "dash-badge-slate"}>{c.status}</span></td>
                     </tr>
                   ))}

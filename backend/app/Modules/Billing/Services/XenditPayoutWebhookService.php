@@ -3,15 +3,22 @@
 namespace App\Modules\Billing\Services;
 
 use App\Models\Commission;
-use App\Models\CommissionRelease;
 use App\Models\MarketerPayoutBatch;
 use App\Models\XenditWebhookEvent;
+use App\Modules\Audit\Services\AuditLogService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class XenditPayoutWebhookService
 {
-    public function __construct(private readonly XenditWebhookService $signatureVerifier) {}
+    public function __construct(
+        private readonly XenditWebhookService $signatureVerifier,
+        private readonly XenditPayoutService $xenditPayout,
+        private readonly MarketerPayoutSuccessFinalizer $successFinalizer,
+        private readonly ?AuditLogService $audits = null,
+    ) {}
 
     public function verifySignature(string $signature): void
     {
@@ -55,6 +62,102 @@ class XenditPayoutWebhookService
         }
     }
 
+    /**
+     * Poll Xendit for a submitted batch and complete or fail it if the gateway state changed
+     * (safety net when webhooks are delayed or omit fields).
+     */
+    public function reconcileSubmittedBatchFromApi(MarketerPayoutBatch $batch): void
+    {
+        $payoutId = (string) ($batch->xendit_payout_id ?? '');
+        if ($payoutId === '' || ! $this->xenditPayout->isConfigured()) {
+            return;
+        }
+
+        $remote = $this->xenditPayout->fetchPayoutById($payoutId);
+        if (! is_array($remote)) {
+            return;
+        }
+
+        $remoteStatus = strtoupper((string) ($remote['status'] ?? ''));
+
+        DB::transaction(function () use ($batch, $remote, $remoteStatus, $payoutId): void {
+            $fresh = MarketerPayoutBatch::query()->whereKey($batch->id)->lockForUpdate()->first();
+            if (! $fresh || $fresh->status !== MarketerPayoutBatch::STATUS_SUBMITTED) {
+                return;
+            }
+
+            $eventId = 'reconcile-poll-succeeded-'.$fresh->id;
+            if ($remoteStatus === 'SUCCEEDED') {
+                if (XenditWebhookEvent::query()->where('event_id', $eventId)->lockForUpdate()->exists()) {
+                    return;
+                }
+
+                $amount = isset($remote['amount']) ? round((float) $remote['amount'], 2) : null;
+                if ($amount === null) {
+                    Log::info('Xendit poll: SUCCEEDED without amount; using batch total', [
+                        'batch_id' => $fresh->id,
+                        'reference_id' => $fresh->reference_id,
+                    ]);
+                    $amount = round((float) $fresh->total_amount, 2);
+                }
+
+                if (abs($amount - (float) $fresh->total_amount) > 0.009) {
+                    Log::critical('Xendit poll: succeeded amount does not match batch; manual review required', [
+                        'batch_id' => $fresh->id,
+                        'reference_id' => $fresh->reference_id,
+                        'batch_net' => (float) $fresh->total_amount,
+                        'xendit_amount' => $amount,
+                    ]);
+
+                    return;
+                }
+
+                try {
+                    $this->successFinalizer->finalize(
+                        $fresh,
+                        $amount,
+                        $eventId,
+                        'payout.reconciled_poll',
+                        ['id' => $payoutId] + $remote,
+                    );
+                    $this->audit('marketer_payout_batch_succeeded', $fresh->id, ['source' => 'reconcile_poll']);
+                } catch (Throwable $e) {
+                    Log::error('Marketer payout poll finalize failed', [
+                        'batch_id' => $fresh->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $this->markBatchFailed($fresh, 'Poll finalize failed: '.$e->getMessage());
+
+                    XenditWebhookEvent::query()->create([
+                        'event_id' => $eventId.'_rejected',
+                        'event_type' => 'payout.reconciled_poll_rejected',
+                        'invoice_id' => $payoutId,
+                        'processed_at' => now(),
+                    ]);
+                }
+
+                return;
+            }
+
+            if ($remoteStatus === 'FAILED' || $remoteStatus === 'CANCELLED' || $remoteStatus === 'REVERSED') {
+                $pollFailId = 'reconcile-poll-failed-'.$fresh->id.'-'.$remoteStatus;
+                if (XenditWebhookEvent::query()->where('event_id', $pollFailId)->lockForUpdate()->exists()) {
+                    return;
+                }
+
+                $reason = (string) ($remote['failure_code'] ?? $remote['message'] ?? 'Payout '.$remoteStatus.' (via API poll)');
+                $this->markBatchFailed($fresh, $reason);
+
+                XenditWebhookEvent::query()->create([
+                    'event_id' => $pollFailId,
+                    'event_type' => 'payout.reconciled_poll_failed',
+                    'invoice_id' => $payoutId,
+                    'processed_at' => now(),
+                ]);
+            }
+        });
+    }
+
     private function handleSucceeded(string $webhookEventId, string $event, array $data, string $referenceId): void
     {
         DB::transaction(function () use ($webhookEventId, $event, $data, $referenceId): void {
@@ -86,9 +189,21 @@ class XenditPayoutWebhookService
                 return;
             }
 
-            $xenditAmount = isset($data['amount']) ? round((float) $data['amount'], 2) : null;
-            if ($xenditAmount !== null && abs($xenditAmount - (float) $batch->total_amount) > 0.009) {
-                $this->unlockBatch($batch, 'Xendit amount does not match batch total (webhook rejected).');
+            $xenditAmount = $this->resolveVerifiedPayoutAmount($data, $batch);
+
+            if ($xenditAmount === null) {
+                Log::critical('Xendit payout webhook succeeded but amount could not be verified; awaiting poll or manual review', [
+                    'reference_id' => $referenceId,
+                    'batch_id' => $batch->id,
+                    'batch_net' => (float) $batch->total_amount,
+                    'data_id' => $data['id'] ?? null,
+                ]);
+
+                return;
+            }
+
+            if (abs($xenditAmount - (float) $batch->total_amount) > 0.009) {
+                $this->markBatchFailed($batch, 'Xendit amount does not match batch total (webhook rejected).');
 
                 XenditWebhookEvent::query()->create([
                     'event_id' => $webhookEventId,
@@ -100,95 +215,74 @@ class XenditPayoutWebhookService
                 return;
             }
 
-            $items = $batch->items()->with('commission')->lockForUpdate()->get();
-
-            if ($items->isEmpty()) {
-                $this->unlockBatch($batch, 'Batch has no line items; cannot complete payout.');
+            try {
+                $this->successFinalizer->finalize($batch, $xenditAmount, $webhookEventId, $event, $data);
+                $this->audit('marketer_payout_batch_succeeded', $batch->id, ['source' => 'webhook', 'event' => $event]);
+            } catch (Throwable $e) {
+                $this->markBatchFailed($batch, $e->getMessage());
 
                 XenditWebhookEvent::query()->create([
                     'event_id' => $webhookEventId,
-                    'event_type' => $event.'_rejected_empty',
+                    'event_type' => $event.'_rejected_finalize',
                     'invoice_id' => (string) ($data['id'] ?? ''),
                     'processed_at' => now(),
                 ]);
-
-                return;
             }
-
-            foreach ($items as $item) {
-                $commission = $item->commission;
-                if (! $commission || $commission->status !== 'pending') {
-                    $this->unlockBatch($batch, 'Commission state changed before payout completion; unlocked for manual review.');
-
-                    XenditWebhookEvent::query()->create([
-                        'event_id' => $webhookEventId,
-                        'event_type' => $event.'_rejected_state',
-                        'invoice_id' => (string) ($data['id'] ?? ''),
-                        'processed_at' => now(),
-                    ]);
-
-                    return;
-                }
-                $gross = round((float) $commission->commission_amount, 2);
-                $net = round((float) $item->amount, 2);
-                if ($net > $gross + 0.009 || $net < -0.009) {
-                    $this->unlockBatch($batch, 'Payout line exceeds gross commission; unlocked for manual review.');
-
-                    XenditWebhookEvent::query()->create([
-                        'event_id' => $webhookEventId,
-                        'event_type' => $event.'_rejected_drift',
-                        'invoice_id' => (string) ($data['id'] ?? ''),
-                        'processed_at' => now(),
-                    ]);
-
-                    return;
-                }
-            }
-
-            foreach ($items as $item) {
-                $commission = $item->commission;
-                if (! $commission) {
-                    continue;
-                }
-                CommissionRelease::query()->create([
-                    'commission_id' => $commission->id,
-                    'released_by' => null,
-                    'amount' => $item->amount,
-                    'notes' => 'Xendit GCash payout '.$batch->reference_id.' (net after withholding)',
-                    'released_at' => now(),
-                    'release_source' => CommissionRelease::SOURCE_XENDIT,
-                    'payout_batch_id' => $batch->id,
-                ]);
-
-                $commission->update([
-                    'status' => 'released',
-                ]);
-            }
-
-            $batch->update([
-                'status' => MarketerPayoutBatch::STATUS_SUCCEEDED,
-                'xendit_payout_id' => (string) ($data['id'] ?? $batch->xendit_payout_id),
-                'completed_at' => now(),
-                'failure_message' => null,
-            ]);
-
-            XenditWebhookEvent::query()->create([
-                'event_id' => $webhookEventId,
-                'event_type' => $event,
-                'invoice_id' => (string) ($data['id'] ?? ''),
-                'processed_at' => now(),
-            ]);
         });
     }
 
-    private function unlockBatch(MarketerPayoutBatch $batch, string $reason): void
+    /**
+     * Resolve payout amount: webhook body, then GET /v2/payouts/{id}, then batch total only if API reports SUCCEEDED without amount.
+     */
+    private function resolveVerifiedPayoutAmount(array $data, MarketerPayoutBatch $batch): ?float
+    {
+        if (isset($data['amount'])) {
+            return round((float) $data['amount'], 2);
+        }
+
+        $payoutId = (string) ($data['id'] ?? $batch->xendit_payout_id ?? '');
+        if ($payoutId !== '' && $this->xenditPayout->isConfigured()) {
+            $remote = $this->xenditPayout->fetchPayoutById($payoutId);
+            if (is_array($remote) && isset($remote['amount'])) {
+                Log::info('Xendit payout amount resolved via API (webhook omitted amount)', [
+                    'reference_id' => $batch->reference_id,
+                    'batch_id' => $batch->id,
+                    'payout_id' => $payoutId,
+                ]);
+
+                return round((float) $remote['amount'], 2);
+            }
+
+            if (is_array($remote) && strtoupper((string) ($remote['status'] ?? '')) === 'SUCCEEDED') {
+                Log::info('Xendit payout API SUCCEEDED without amount field; using batch total', [
+                    'reference_id' => $batch->reference_id,
+                    'batch_id' => $batch->id,
+                ]);
+
+                return round((float) $batch->total_amount, 2);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Mark a batch as failed while PRESERVING line items as a forensic record.
+     * Items are soft-cancelled (cancelled_at set), commissions are unlocked for future re-batching.
+     */
+    private function markBatchFailed(MarketerPayoutBatch $batch, string $reason): void
     {
         Commission::query()->where('payout_batch_id', $batch->id)->update(['payout_batch_id' => null]);
-        $batch->items()->delete();
+        $batch->items()->whereNull('cancelled_at')->update(['cancelled_at' => now()]);
         $batch->update([
             'status' => MarketerPayoutBatch::STATUS_FAILED,
             'failure_message' => mb_substr($reason, 0, 2000),
             'completed_at' => now(),
+        ]);
+
+        $this->audit('marketer_payout_batch_failed', $batch->id, [
+            'reference_id' => $batch->reference_id,
+            'reason' => mb_substr($reason, 0, 500),
         ]);
     }
 
@@ -220,14 +314,7 @@ class XenditPayoutWebhookService
             }
 
             $reason = (string) ($data['failure_code'] ?? $data['message'] ?? 'Payout failed');
-
-            Commission::query()->where('payout_batch_id', $batch->id)->update(['payout_batch_id' => null]);
-            $batch->items()->delete();
-            $batch->update([
-                'status' => MarketerPayoutBatch::STATUS_FAILED,
-                'failure_message' => mb_substr($reason, 0, 2000),
-                'completed_at' => now(),
-            ]);
+            $this->markBatchFailed($batch, $reason);
 
             XenditWebhookEvent::query()->create([
                 'event_id' => $webhookEventId,
@@ -236,5 +323,17 @@ class XenditPayoutWebhookService
                 'processed_at' => now(),
             ]);
         });
+    }
+
+    private function audit(string $action, int $batchId, ?array $newValues): void
+    {
+        if ($this->audits === null) {
+            return;
+        }
+        try {
+            $this->audits->log($action, 'marketer_payout_batch', $batchId, null, $newValues);
+        } catch (Throwable $e) {
+            Log::warning('Audit log failed for '.$action, ['batch_id' => $batchId, 'error' => $e->getMessage()]);
+        }
     }
 }

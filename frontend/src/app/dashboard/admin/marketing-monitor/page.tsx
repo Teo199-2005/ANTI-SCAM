@@ -6,6 +6,7 @@ import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/share
 import DataTable from "@/components/shared/DataTable";
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
+import MarketerTierBadge, { marketerTierSortRank } from "@/components/dashboard/MarketerTierBadge";
 import {
   getAdminMarketersMonitoring,
   type AdminMarketerMonitorRow,
@@ -28,6 +29,8 @@ const SORT_FIRST: Record<string, SortDir> = {
   commission_pending_php: "desc",
   commission_released_gross_php: "desc",
   commission_total_gross_php: "desc",
+  marketer_tier_key: "desc",
+  per_payment_php: "desc",
 };
 
 function fmtPhp(n: number | null | undefined) {
@@ -97,6 +100,23 @@ export default function AdminMarketingMonitorPage() {
     void load(query);
   };
 
+  const tierCounts = useMemo(() => {
+    let silver = 0;
+    let gold = 0;
+    let platinum = 0;
+    let other = 0;
+    let none = 0;
+    for (const r of rows) {
+      const k = r.marketer_tier_key;
+      if (k === "silver") silver++;
+      else if (k === "gold") gold++;
+      else if (k === "platinum") platinum++;
+      else if (k === "emergency_flat") other++;
+      else none++;
+    }
+    return { silver, gold, platinum, other, none };
+  }, [rows]);
+
   const sortedRows = useMemo(() => {
     const copy = [...rows];
     copy.sort((a, b) => {
@@ -133,6 +153,14 @@ export default function AdminMarketingMonitorPage() {
           return compareNullable(a.commission_released_gross_php, b.commission_released_gross_php, sortDir);
         case "commission_total_gross_php":
           return compareNullable(a.commission_total_gross_php, b.commission_total_gross_php, sortDir);
+        case "marketer_tier_key":
+          return compareNullable(marketerTierSortRank(a.marketer_tier_key), marketerTierSortRank(b.marketer_tier_key), sortDir);
+        case "per_payment_php":
+          return compareNullable(
+            a.per_payment_php ?? -1,
+            b.per_payment_php ?? -1,
+            sortDir,
+          );
         default:
           return 0;
       }
@@ -168,7 +196,7 @@ export default function AdminMarketingMonitorPage() {
       />
     ) : null;
 
-  const colSpan = 9;
+  const colSpan = 10;
 
   return (
     <div className="space-y-6">
@@ -178,8 +206,9 @@ export default function AdminMarketingMonitorPage() {
           Marketing monitor
         </h1>
         <p className="dash-page-sub">
-          Referral conversions, idle time since the last new resort client, paid subscription volume attributed to each
-          marketer, and commission balances. Sorted with the longest idle periods first.
+          Referral conversions, partner tier (by converting resorts), idle time since the last new resort client, paid
+          subscription volume, and commission balances. Tiers set the PHP credited per qualifying paid subscription
+          invoice. Sorted with the longest idle periods first.
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -208,6 +237,23 @@ export default function AdminMarketingMonitorPage() {
         </div>
       </div>
 
+      {rows.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50/95 via-white to-fuchsia-50/80 px-4 py-3 text-xs text-violet-950 shadow-sm">
+          <span className="font-bold uppercase tracking-wide text-violet-900/80">Tier snapshot</span>
+          <MarketerTierBadge tierKey="platinum" label={`Platinum ${tierCounts.platinum}`} size="sm" />
+          <MarketerTierBadge tierKey="gold" label={`Gold ${tierCounts.gold}`} size="sm" />
+          <MarketerTierBadge tierKey="silver" label={`Silver ${tierCounts.silver}`} size="sm" />
+          {tierCounts.other > 0 ? (
+            <MarketerTierBadge tierKey="emergency_flat" label={`Flat rate ${tierCounts.other}`} size="sm" />
+          ) : null}
+          {tierCounts.none > 0 ? (
+            <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+              No tier {tierCounts.none}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {meta?.new_client_definition ? (
         <div className="flex gap-3 rounded-2xl border border-sky-100 bg-sky-50/90 px-4 py-3 text-xs text-sky-950">
           <Info className="mt-0.5 shrink-0 text-sky-700" size={18} />
@@ -218,6 +264,25 @@ export default function AdminMarketingMonitorPage() {
               <p className="mt-2 text-[11px] text-sky-800/70">Snapshot: {fmtDate(meta.generated_at)}</p>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {meta?.tier_ladder && meta.tier_ladder.length > 0 ? (
+        <div className="rounded-2xl border border-softBorder bg-white px-4 py-3 shadow-sm">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Commission tier ladder</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {meta.tier_ladder.map((t) => (
+              <div
+                key={t.tier_key}
+                className="inline-flex items-center gap-2 rounded-xl border border-softBorder bg-softCard/80 px-3 py-2 text-xs"
+              >
+                <MarketerTierBadge tierKey={t.tier_key} label={t.label} size="sm" />
+                <span className="tabular-nums text-zinc-600">{t.client_range_label} resorts</span>
+                <span className="font-semibold tabular-nums text-navy">₱{Number(t.per_payment_php).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          {meta.tier_policy ? <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">{meta.tier_policy}</p> : null}
         </div>
       ) : null}
 
@@ -255,6 +320,19 @@ export default function AdminMarketingMonitorPage() {
                         <span>
                           {r.assigned_resorts_count} assigned · <strong>{r.referred_resorts_count}</strong> referred
                         </span>
+                      ),
+                    },
+                    {
+                      label: "Tier / per paid credit",
+                      value: (
+                        <div className="space-y-1">
+                          <MarketerTierBadge tierKey={r.marketer_tier_key} label={r.marketer_tier_label} size="sm" />
+                          {r.per_payment_php != null ? (
+                            <div className="text-[11px] font-semibold text-navy tabular-nums">
+                              ₱{Number(r.per_payment_php).toLocaleString()} / credit
+                            </div>
+                          ) : null}
+                        </div>
                       ),
                     },
                     {
@@ -298,7 +376,7 @@ export default function AdminMarketingMonitorPage() {
 
         <div className="hidden md:block">
           <DataTable
-            minWidthClass="min-w-[1080px]"
+            minWidthClass="min-w-[1180px]"
             caption={undefined}
             footer={paginationFooter ?? undefined}
             headers={
@@ -321,6 +399,13 @@ export default function AdminMarketingMonitorPage() {
                   onSort={onSort}
                   align="center"
                   className="text-center"
+                />
+                <SortableTh
+                  label="Tier"
+                  sortKey="marketer_tier_key"
+                  activeKey={sortBy}
+                  direction={sortDir}
+                  onSort={onSort}
                 />
                 <SortableTh
                   label="Idle (new client)"
@@ -394,6 +479,21 @@ export default function AdminMarketingMonitorPage() {
                   </td>
                   <td className="text-center tabular-nums">{r.assigned_resorts_count}</td>
                   <td className="text-center tabular-nums font-medium">{r.referred_resorts_count}</td>
+                  <td>
+                    <div className="space-y-1">
+                      <MarketerTierBadge tierKey={r.marketer_tier_key} label={r.marketer_tier_label} size="sm" />
+                      {r.per_payment_php != null ? (
+                        <div className="text-[11px] font-medium tabular-nums text-navy">
+                          ₱{Number(r.per_payment_php).toLocaleString()} / credit
+                        </div>
+                      ) : null}
+                      {r.clients_to_next_tier != null && r.next_tier_at != null && r.clients_to_next_tier > 0 ? (
+                        <div className="text-[10px] text-zinc-500">
+                          +{r.clients_to_next_tier} to tier threshold {r.next_tier_at}
+                        </div>
+                      ) : null}
+                    </div>
+                  </td>
                   <td>
                     <IdleBadge
                       months={r.months_since_last_new_referred_resort}

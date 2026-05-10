@@ -133,6 +133,7 @@ export default function Navbar() {
                 type="button"
                 aria-label="Open menu"
                 onClick={() => setDrawerOpen(true)}
+                suppressHydrationWarning
                 className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-clSeafoam bg-white/50 text-clOcean shadow-sm backdrop-blur-md transition hover:bg-clSeafoam/70 [touch-action:manipulation] lg:hidden"
               >
                 <Menu size={18} />
@@ -176,6 +177,7 @@ export default function Navbar() {
               type="button"
               aria-label="Close menu"
               onClick={() => setDrawerOpen(false)}
+              suppressHydrationWarning
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-clSeafoam bg-white/60 text-clOcean backdrop-blur-md [touch-action:manipulation] hover:bg-clSeafoam/70 sm:min-h-10 sm:min-w-10"
             >
               <X size={16} />

@@ -65,6 +65,43 @@ function RoleIcon({ kind }: { kind: (typeof people)[number]["icon"] }) {
   return <Briefcase size={15} className={cls} />;
 }
 
+function OperatorPoweredBy({ dark }: { dark: boolean }) {
+  return (
+    <div
+      className={`flex w-full max-w-md shrink-0 flex-col items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-5 md:w-auto md:flex-col md:items-end md:justify-start md:px-6 md:py-5 lg:flex-row lg:items-center ${
+        dark ? "border-white/20 bg-white/10" : "border-clSeafoam/80 bg-white/90"
+      }`}
+    >
+      <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24 md:h-28 md:w-28">
+        <Image
+          src="/rising2brothers.png"
+          alt="The Rising 2 Brothers OPC — company logo"
+          fill
+          className="object-contain"
+          sizes="(max-width: 768px) 5rem, 7rem"
+          priority
+        />
+      </div>
+      <div className="text-center sm:text-left md:text-right lg:text-left">
+        <p
+          className={`text-[11px] font-bold uppercase tracking-[0.2em] ${
+            dark ? "text-white/55" : "text-zinc-500"
+          }`}
+        >
+          Powered by
+        </p>
+        <p
+          className={`mt-1 font-heading text-3xl font-semibold leading-tight md:text-4xl ${
+            dark ? "text-white" : "text-zinc-900"
+          }`}
+        >
+          The Rising 2 Brothers OPC
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function VisionariesSection({ dark = false }: { dark?: boolean }) {
   return (
     <section className="section-padding relative overflow-hidden pt-2 md:pt-4">
@@ -76,6 +113,12 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
           <span className="h-64 w-7 rounded-full bg-clCoral shadow-md" />
         </div>
       </div>
+
+      {/* Mobile: operator above Leadership / Visionaries intro */}
+      <div className="mb-6 flex justify-center px-2 md:hidden">
+        <OperatorPoweredBy dark={dark} />
+      </div>
+
       <div className="mb-3 flex justify-center">
         <span className="cl-section-eyebrow">Leadership</span>
       </div>
@@ -98,40 +141,9 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
           </p>
         </div>
 
-        {/* Operator — logo + name sized to pair visually with “The Visionaries” */}
-        <div
-          className={`flex w-full max-w-md shrink-0 flex-col items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-5 md:w-auto md:flex-col md:items-end md:justify-start md:px-6 md:py-5 lg:flex-row lg:items-center ${
-            dark
-              ? "border-white/20 bg-white/10"
-              : "border-clSeafoam/80 bg-white/90"
-          }`}
-        >
-          <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24 md:h-28 md:w-28">
-            <Image
-              src="/rising2brothers.png"
-              alt="The Rising 2 Brothers OPC — company logo"
-              fill
-              className="object-contain"
-              sizes="(max-width: 768px) 5rem, 7rem"
-              priority
-            />
-          </div>
-          <div className="text-center sm:text-left md:text-right lg:text-left">
-            <p
-              className={`text-[11px] font-bold uppercase tracking-[0.2em] ${
-                dark ? "text-white/55" : "text-zinc-500"
-              }`}
-            >
-              Powered by
-            </p>
-            <p
-              className={`mt-1 font-heading text-3xl font-semibold leading-tight md:text-4xl ${
-                dark ? "text-white" : "text-zinc-900"
-              }`}
-            >
-              The Rising 2 Brothers OPC
-            </p>
-          </div>
+        {/* Desktop / tablet: operator beside headline */}
+        <div className="hidden md:flex">
+          <OperatorPoweredBy dark={dark} />
         </div>
       </div>
 

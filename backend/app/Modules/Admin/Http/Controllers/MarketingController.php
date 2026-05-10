@@ -9,6 +9,8 @@ use App\Models\MarketerPayoutBatch;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\MarketerCommissionPayoutService;
+use App\Services\MarketerTierService;
 use App\Shared\Traits\ApiResponseTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -18,7 +20,11 @@ class MarketingController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly AuditLogService $audits) {}
+    public function __construct(
+        private readonly AuditLogService $audits,
+        private readonly MarketerTierService $marketerTiers,
+        private readonly MarketerCommissionPayoutService $marketerPayouts,
+    ) {}
 
     /** List all marketers with their assigned resort count. */
     public function marketers()
@@ -98,6 +104,7 @@ class MarketingController extends Controller
             $com = $commissionStats->get($m->id);
 
             $referredCount = $ref ? (int) $ref->referred_resorts_count : 0;
+            $tierResolved = $this->marketerTiers->resolveTier($referredCount);
             $lastNewRaw = $ref?->last_new_referred_resort_at ?? null;
             $lastNewAt = $lastNewRaw ? Carbon::parse($lastNewRaw) : null;
 
@@ -126,6 +133,11 @@ class MarketingController extends Controller
                 'commission_pending_php' => $com ? round((float) $com->pending_commission, 2) : 0.0,
                 'commission_released_gross_php' => $com ? round((float) $com->released_commission_gross, 2) : 0.0,
                 'commission_total_gross_php' => $com ? round((float) $com->total_commission_gross, 2) : 0.0,
+                'marketer_tier_key' => $tierResolved['tier_key'] ?? null,
+                'marketer_tier_label' => $tierResolved['label'] ?? null,
+                'per_payment_php' => $tierResolved['per_payment_php'] ?? null,
+                'next_tier_at' => $tierResolved['next_tier_at'] ?? null,
+                'clients_to_next_tier' => $tierResolved['clients_to_next_tier'] ?? null,
                 '_sort_idle' => $sortIdle,
             ];
         }
@@ -144,6 +156,8 @@ class MarketingController extends Controller
             'meta' => [
                 'generated_at' => $now->toIso8601String(),
                 'new_client_definition' => 'Distinct resort with first qualifying paid subscription invoice (status=paid, not a room-addon plan) where marketer_id matches.',
+                'tier_ladder' => $this->marketerTiers->tierLadder(),
+                'tier_policy' => $this->marketerTiers->tierPolicySummary(),
             ],
         ], 'Marketing monitoring snapshot');
     }
@@ -206,11 +220,23 @@ class MarketingController extends Controller
         }
 
         DB::transaction(function () use ($commission, $data): void {
+            $gross = round((float) $commission->commission_amount, 2);
+            $rate = $this->marketerPayouts->withholdingRate();
+            $net = round($gross * $this->marketerPayouts->netPayoutFactor(), 2);
+            $userNote = isset($data['notes']) ? trim((string) $data['notes']) : '';
+            $systemNote = sprintf(
+                'Manual release: net ₱%s (gross ₱%s, %s%% platform withholding — same basis as GCash batches).',
+                number_format($net, 2, '.', ''),
+                number_format($gross, 2, '.', ''),
+                number_format($rate * 100, 2, '.', ''),
+            );
+            $notes = $userNote === '' ? $systemNote : $userNote.' | '.$systemNote;
+
             CommissionRelease::create([
                 'commission_id' => $commission->id,
                 'released_by' => auth()->id(),
-                'amount' => $commission->commission_amount,
-                'notes' => $data['notes'] ?? null,
+                'amount' => $net,
+                'notes' => $notes,
                 'released_at' => now(),
                 'release_source' => CommissionRelease::SOURCE_MANUAL,
                 'payout_batch_id' => null,
@@ -218,7 +244,7 @@ class MarketingController extends Controller
 
             $commission->update(['status' => 'released']);
 
-            $this->audits->log('commission_released', 'commission', $commission->id, ['status' => 'pending'], ['status' => 'released']);
+            $this->audits->log('commission_released', 'commission', $commission->id, ['status' => 'pending'], ['status' => 'released', 'amount_net' => $net, 'amount_gross' => $gross]);
         });
 
         return $this->successResponse(null, 'Commission released');

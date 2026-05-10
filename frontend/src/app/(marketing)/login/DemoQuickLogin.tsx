@@ -91,13 +91,18 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
     return null;
   }
 
+  /** Floating widget is portaled; skip SSR + first paint so browser extensions can't inject attrs (e.g. fdprocessedid) before hydrate. */
+  if (variant === "floating" && !bodyMounted) {
+    return null;
+  }
+
   const outerClass =
     variant === "floating"
       ? `pointer-events-auto fixed bottom-[max(1rem,env(safe-area-inset-bottom,0px))] right-[max(1rem,env(safe-area-inset-right,0px))] ${FLOAT_Z} flex max-h-[min(72vh,calc(100dvh-2rem))] w-[min(100vw-2rem,20rem)] flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/95 shadow-[0_20px_50px_-12px_rgba(13,30,66,0.4)] backdrop-blur-2xl backdrop-saturate-150`
       : "w-full rounded-2xl border border-navy/12 bg-gradient-to-b from-sky-50/80 via-white to-white shadow-[0_12px_36px_-20px_rgba(13,30,66,0.2)]";
 
   const panel = (
-    <div className={outerClass} suppressHydrationWarning>
+    <div className={outerClass}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -237,7 +242,7 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
     </div>
   );
 
-  if (variant === "floating" && bodyMounted && typeof document !== "undefined") {
+  if (variant === "floating" && typeof document !== "undefined") {
     return createPortal(panel, document.body);
   }
 

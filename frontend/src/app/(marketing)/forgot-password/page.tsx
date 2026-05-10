@@ -12,7 +12,7 @@ import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStreng
 import { ArrowLeft, Eye, EyeOff, KeyRound, Mail, Shield } from "lucide-react";
 
 const authInput =
-  "w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 md:text-sm";
+  "w-full rounded-xl border border-zinc-200/90 bg-white px-3.5 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.875rem] md:rounded-lg md:py-2 md:text-sm";
 
 type Step = "email" | "reset";
 
@@ -114,19 +114,19 @@ export default function ForgotPasswordPage() {
       <div className={AUTH_MARKETING_CARD}>
         <Link
           href="/login"
-          className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-clOcean hover:text-clOceanHover hover:underline"
+          className="mb-4 inline-flex min-h-[2.5rem] items-center gap-2 rounded-lg px-1 text-sm font-semibold text-clOcean hover:bg-clOcean/5 hover:text-clOceanHover md:mb-3"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} className="shrink-0" />
           Back to sign in
         </Link>
 
-        <div className="mb-3 flex gap-3 sm:items-center">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20">
+        <div className="mb-4 flex gap-3 sm:mb-3 sm:items-center">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20 sm:h-10 sm:w-10">
             <KeyRound size={18} strokeWidth={2} />
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Reset password</h1>
-            <p className="mt-0.5 text-sm leading-snug text-zinc-600">
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="font-heading text-[1.35rem] font-semibold leading-tight tracking-tight text-zinc-900 sm:text-2xl">Reset password</h1>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-600 sm:mt-0.5 sm:leading-snug">
               {step === "email"
                 ? "We’ll email a one-time code to verify it’s you."
                 : "Enter the code and choose a new password."}
@@ -150,7 +150,8 @@ export default function ForgotPasswordPage() {
         {cooldownHint && step === "reset" ? <p className="mb-3 text-xs text-zinc-500">{cooldownHint}</p> : null}
 
         {step === "email" ? (
-          <form className="space-y-3" onSubmit={sendCode}>
+          <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-4 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
+          <form className="space-y-4 md:space-y-3" onSubmit={sendCode}>
             <div>
               <label htmlFor="forgot-email" className="mb-1.5 block text-xs font-semibold text-zinc-700">
                 Email
@@ -169,12 +170,18 @@ export default function ForgotPasswordPage() {
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full justify-center rounded-lg py-2.5 text-sm shadow-md shadow-clOcean/15" disabled={pending}>
+            <Button
+              type="submit"
+              className="w-full justify-center rounded-xl py-3.5 text-sm font-semibold shadow-md shadow-clOcean/20 max-lg:min-h-[3rem] md:rounded-lg md:py-2.5"
+              disabled={pending}
+            >
               {pending ? "Sending…" : "Send reset code"}
             </Button>
           </form>
+          </div>
         ) : (
-          <form className="space-y-3" onSubmit={resetPassword}>
+          <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-4 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
+          <form className="space-y-4 md:space-y-3" onSubmit={resetPassword}>
             <div>
               <label htmlFor="forgot-otp" className="mb-1.5 block text-xs font-semibold text-zinc-700">
                 6-digit code
@@ -262,10 +269,10 @@ export default function ForgotPasswordPage() {
               confirmation={passwordConfirmation}
               id="forgot-password-meter"
             />
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                className="min-h-[2.75rem] rounded-xl border border-zinc-200/90 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 md:min-h-0 md:rounded-lg md:px-3 md:py-2 md:font-medium"
                 disabled={pending}
                 onClick={() => {
                   setStep("email");
@@ -279,16 +286,17 @@ export default function ForgotPasswordPage() {
               </button>
               <Button
                 type="submit"
-                className="w-full justify-center rounded-lg py-2.5 text-sm shadow-md shadow-clOcean/15 sm:w-auto sm:min-w-[180px]"
+                className="w-full justify-center rounded-xl py-3.5 text-sm font-semibold shadow-md shadow-clOcean/20 max-lg:min-h-[3rem] sm:w-auto sm:min-w-[180px] md:rounded-lg md:py-2.5"
                 disabled={pending}
               >
                 {pending ? "Updating…" : "Update password"}
               </Button>
             </div>
           </form>
+          </div>
         )}
 
-        <div className="mt-4 flex items-center justify-center gap-2 border-t border-zinc-100 pt-3 text-[11px] text-zinc-500">
+        <div className="mt-5 flex items-center justify-center gap-2 border-t border-zinc-100/90 pt-4 text-center text-[11px] leading-snug text-zinc-500 md:mt-4 md:pt-3">
           <Shield size={14} className="shrink-0 text-clOcean/50" aria-hidden />
           <span>Anti-Scam PH · Verified-safe bookings</span>
         </div>
