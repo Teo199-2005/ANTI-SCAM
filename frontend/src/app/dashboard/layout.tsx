@@ -5,13 +5,14 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import PoweredByMark from "@/components/branding/PoweredByMark";
 import AppLoadingScreen from "@/components/layout/AppLoadingScreen";
+import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendEmailVerificationOtp, verifyEmailVerificationOtp } from "@/lib/api/emailOtp";
 import { AlertCircle, ArrowLeft, CheckCircle2, LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { sanitizeOtpInput } from "@/lib/inputRestrictions";
-import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const OTP_SEND_TIMEOUT_MS = 15000;
@@ -20,6 +21,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, refreshUser, logout } = useAuth();
+  const { pushToast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [otp, setOtp] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -56,6 +58,48 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       }),
     ]);
   };
+
+  const notifyVerificationEmailSent = useCallback(
+    (payload: { message: string }) => {
+      const m = payload.message;
+      if (/verification code sent/i.test(m)) {
+        pushToast({
+          tone: "success",
+          title: "Verification email sent",
+          description: displayEmail
+            ? `We sent a 6-digit code to ${displayEmail}. Check your inbox and spam folder.`
+            : "We sent a 6-digit code to your email. Check your inbox and spam folder.",
+          durationMs: 5500,
+        });
+        return;
+      }
+      if (/already sent|wait before requesting/i.test(m)) {
+        pushToast({
+          tone: "info",
+          title: "Code already sent",
+          description: m,
+          durationMs: 5000,
+        });
+        return;
+      }
+      if (/processing/i.test(m)) {
+        pushToast({
+          tone: "info",
+          title: "Please wait",
+          description: m,
+          durationMs: 4000,
+        });
+        return;
+      }
+      pushToast({
+        tone: "success",
+        title: "Verification email sent",
+        description: m,
+        durationMs: 5500,
+      });
+    },
+    [displayEmail, pushToast],
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -107,6 +151,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
         setOtpExpiresAt(payload.expires_at);
         setOtpMessage(payload.message);
         applyCooldownFromPayload(payload.cooldown_seconds);
+        notifyVerificationEmailSent(payload);
       })
       .catch((err: unknown) => {
         if (!alive) return;
@@ -122,7 +167,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     return () => {
       alive = false;
     };
-  }, [needsOtpVerification, sendingOtp, otpExpiresAt, autoSendAttempted]);
+  }, [needsOtpVerification, sendingOtp, otpExpiresAt, autoSendAttempted, notifyVerificationEmailSent]);
 
   useEffect(() => {
     if (needsOtpVerification) return;
@@ -160,6 +205,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       setOtpExpiresAt(payload.expires_at);
       setOtpMessage(payload.message);
       applyCooldownFromPayload(payload.cooldown_seconds);
+      notifyVerificationEmailSent(payload);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to send verification code.";
       setOtpError(message);
