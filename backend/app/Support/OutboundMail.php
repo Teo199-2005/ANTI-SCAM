@@ -12,6 +12,12 @@ final class OutboundMail
      */
     public static function isConfiguredForDelivery(): bool
     {
+        // Only enforce this guard in production. Local dev and test environments frequently
+        // use the "log" or "array" drivers on purpose (and our PHPUnit suite expects those).
+        if (! app()->environment('production')) {
+            return true;
+        }
+
         $mailer = (string) config('mail.default', 'log');
 
         return ! in_array($mailer, ['log', 'array'], true);
