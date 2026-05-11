@@ -158,6 +158,8 @@ export const marketing = {
   /** Brand gold — energetic CTA accent */
   coral: "#F5B800",
   coralDark: "#C98A00",
+  /** Navbar wordmark — \"SCAM\" segment (alert red, WCAG on light bg) */
+  scamWordmark: "#E53935",
   /** Light canvas — section backgrounds */
   sand: "#F4F4F9",
   sandMid: "#E8E8F0",

@@ -2,28 +2,30 @@ import heroCover from "../../../public/coverphoto.png";
 import Image from "next/image";
 
 /**
- * Landing hero: full-width `coverphoto.png`. Static import keeps width/height in sync with the file (correct aspect ratio).
- * Mobile: taller minimum viewport + `object-contain` so the whole banner graphic stays visible (no harsh crop).
- * md+: `object-cover` fills the 3∶2 frame like a hero strip.
+ * Landing hero: full-width `coverphoto.png`.
+ * Uses intrinsic layout (`width`/`height` + `w-full h-auto`) instead of `fill` + aspect box
+ * so the bitmap scales with layout width when the browser zoom level or viewport changes.
  */
 export default function HeroSection() {
   const { width, height } = heroCover;
 
   return (
     <section
-      className="relative isolate w-full overflow-hidden bg-clSand max-md:min-h-[min(72svh,36rem)] md:min-h-0"
-      style={{ aspectRatio: `${width} / ${height}` }}
+      className="relative isolate w-full min-w-0 max-w-none shrink-0 overflow-hidden bg-clSand"
       aria-label="Anti-Scam PH resort booking safety campaign"
     >
-      <Image
-        src={heroCover}
-        alt="Anti-Scam PH — automate, protect, and grow your resort. Verified bookings and all-in-one platform for Philippine resorts."
-        fill
-        priority
-        quality={100}
-        sizes="100vw"
-        className="object-contain object-[center_12%] md:object-cover md:object-center"
-      />
+      <div className="box-border w-full max-w-none px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">
+        <Image
+          src={heroCover}
+          alt="Anti-Scam PH — automate, protect, and grow your resort. Verified bookings and all-in-one platform for Philippine resorts."
+          width={width}
+          height={height}
+          priority
+          quality={100}
+          sizes="100vw"
+          className="hero-cover-media block h-auto w-full max-w-none min-w-0 object-contain object-[center_12%] md:object-cover md:object-center"
+        />
+      </div>
     </section>
   );
 }

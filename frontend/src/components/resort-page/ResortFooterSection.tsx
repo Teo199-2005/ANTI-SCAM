@@ -1,3 +1,4 @@
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Link from "next/link";
 import type { LandingComputedFooter } from "@/lib/api/landingPage";
 import PoweredByMark from "@/components/branding/PoweredByMark";
@@ -16,8 +17,9 @@ export function ResortFooterSection({ footer, resortName }: Props) {
     <footer className="border-t border-zinc-200 bg-navy px-6 py-12 text-white">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-center">
-          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80">
-            Anti-Scam PH Verified Landing
+          <span className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80">
+            <BrandWordmark tone="onDark" size="2xs" className="inline" />
+            <span>Verified Landing</span>
           </span>
         </div>
         <div className="mb-8 h-px w-full bg-white/20" />
@@ -82,8 +84,10 @@ export function ResortFooterSection({ footer, resortName }: Props) {
         </div>
 
         <div className="mt-10 flex flex-col items-center gap-2 border-t border-white/20 pt-6 text-center text-xs text-white/40">
-          <p>
-            Anti-Scam PH — anti booking scam of resorts
+          <p className="inline-flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5">
+            <BrandWordmark tone="onDark" size="xs" className="inline" />
+            <span className="text-white/40">—</span>
+            <span>anti booking scam of resorts</span>
           </p>
           <PoweredByMark compact className="opacity-90" />
           <p>

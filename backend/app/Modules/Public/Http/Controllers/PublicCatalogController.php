@@ -5,6 +5,7 @@ namespace App\Modules\Public\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Models\Room;
+use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Tenant;
 use App\Services\LandingReadinessService;
 use App\Services\RoomOccupancyService;
@@ -215,16 +216,17 @@ class PublicCatalogController extends Controller
         ])->values()->all();
 
         return $this->successResponse([
-            'id'        => $room->id,
-            'name'      => $room->name,
-            'code'      => $room->code,
-            'capacity'  => $room->capacity,
-            'units'     => max(1, (int) ($room->units ?? 1)),
-            'basePrice' => $room->base_price,
-            'amenities' => $room->amenities ?? [],
-            'rules'     => $room->rules,
-            'images'    => $images,
-            'resort'    => [
+            'id'             => $room->id,
+            'name'           => $room->name,
+            'code'           => $room->code,
+            'capacity'       => $room->capacity,
+            'units'          => max(1, (int) ($room->units ?? 1)),
+            'basePrice'      => $room->base_price,
+            'reservationFee' => ReservationService::reservationFeeAmount(),
+            'amenities'      => $room->amenities ?? [],
+            'rules'          => $room->rules,
+            'images'         => $images,
+            'resort'         => [
                 'id'            => $room->resort?->id,
                 'name'          => $room->resort?->name,
                 'address'       => $room->resort?->address,

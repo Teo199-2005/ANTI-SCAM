@@ -1,3 +1,4 @@
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Logo from "@/components/layout/Logo";
 import { cn } from "@/lib/utils";
 
@@ -65,9 +66,9 @@ export default function AppLoadingScreen({
           </div>
         </div>
 
-        <p className="mt-8 text-center text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-400">
-          Anti-Scam PH
-        </p>
+        <div className="mt-8 flex justify-center">
+          <BrandWordmark tone="onLight" size="2xs" className="opacity-90" />
+        </div>
       </div>
     </div>
   );

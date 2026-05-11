@@ -93,7 +93,7 @@ export default function ResortDetailPage({ params }: { params: Promise<{ id: str
         <ul className="mt-4 space-y-2 text-sm text-zinc-600">
           <li className="inline-flex items-start gap-2">
             <CalendarDays size={14} className="mt-0.5 text-clTeal" />
-            A non-refundable reservation fee of ₱500 is required to confirm your booking.
+            A non-refundable reservation fee (amount shown at checkout) is required to confirm your booking.
           </li>
           <li className="inline-flex items-start gap-2">
             <CalendarDays size={14} className="mt-0.5 text-clTeal" />

@@ -39,4 +39,14 @@ class ReservationPolicy
     {
         return $user->role === 'admin';
     }
+
+    /** Resort staff: mark confirmed stays as completed or no-show. */
+    public function updateResortLifecycle(User $user, Reservation $reservation): bool
+    {
+        if (! in_array($user->role, ['resort_owner', 'admin_staff'], true)) {
+            return false;
+        }
+
+        return (int) $user->tenant_id === (int) $reservation->tenant_id;
+    }
 }

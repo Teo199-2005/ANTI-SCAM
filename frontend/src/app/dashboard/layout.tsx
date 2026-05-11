@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import PoweredByMark from "@/components/branding/PoweredByMark";
@@ -246,8 +247,10 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
                     priority
                   />
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Anti-Scam PH</p>
-                    <p className="text-lg font-semibold tracking-tight text-white">Secure Email Verification</p>
+                    <div className="text-slate-200">
+                      <BrandWordmark tone="onDark" size="xs" />
+                    </div>
+                    <p className="mt-1 text-lg font-semibold tracking-tight text-white">Secure Email Verification</p>
                   </div>
                 </div>
 
@@ -358,7 +361,8 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
 
               <div className="h-px bg-slate-200" />
               <p className="text-center text-xs text-slate-500">
-                Anti-Scam PH is a product and service operated by The Rising 2 Brothers OPC.
+                <BrandWordmark tone="onLight" size="xs" className="mr-1 inline" /> is a product and service operated by
+                The Rising 2 Brothers OPC.
               </p>
             </section>
           </div>

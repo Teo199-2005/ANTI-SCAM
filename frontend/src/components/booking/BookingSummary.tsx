@@ -1,3 +1,4 @@
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { BedDouble, CalendarDays, Shield } from "lucide-react";
 
 export default function BookingSummary({
@@ -18,7 +19,7 @@ export default function BookingSummary({
           <BedDouble size={20} strokeWidth={2} />
         </span>
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-clOcean">Anti-Scam PH</p>
+          <BrandWordmark tone="onLight" size="xs" className="leading-none" />
           <h3 className="font-heading text-xl font-semibold text-zinc-900">Your reservation snapshot</h3>
         </div>
       </div>
@@ -47,7 +48,9 @@ export default function BookingSummary({
       <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-zinc-500">
         <Shield size={14} className="mt-0.5 shrink-0 text-clOcean/60" aria-hidden />
         <span>
-          Paying here builds a record tied to Anti-Scam PH — never send this fee to a personal account or unofficial
+          Paying here builds a record tied to{" "}
+          <BrandWordmark tone="onLight" size="xs" className="inline" /> — never send this fee to a personal account or
+          unofficial
           link. Balance after confirmation is with the resort directly.
         </span>
       </p>

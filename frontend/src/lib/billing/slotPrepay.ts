@@ -1,12 +1,12 @@
-/** Matches backend XenditSubscriptionInvoiceService: extra_room_fee × (tier / 2300) per month of prepay. */
+/** Matches backend XenditSubscriptionInvoiceService: extra_room_fee × (tier / 2100) per month of prepay. */
 export type SlotPrepayDuration = 1 | 3 | 6 | 12;
 
-const REFERENCE_BASE = 2300;
+const REFERENCE_BASE = 2100;
 const STANDARD_TIER: Record<SlotPrepayDuration, number> = {
-  1: 2300,
-  3: 2000,
-  6: 1900,
-  12: 1800,
+  1: 2100,
+  3: 1900,
+  6: 1700,
+  12: 1500,
 };
 
 export function slotPrepayMonthlyRate(extraRoomFee: number, duration: SlotPrepayDuration): number {

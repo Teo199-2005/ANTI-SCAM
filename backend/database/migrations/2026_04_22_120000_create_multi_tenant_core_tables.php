@@ -97,6 +97,8 @@ return new class extends Migration
                     'confirmed',
                     'cancelled',
                     'expired',
+                    'no_show',
+                    'completed',
                 ])->default('pending_payment');
                 $table->string('xendit_invoice_id')->nullable()->index();
                 $table->enum('xendit_payment_status', [

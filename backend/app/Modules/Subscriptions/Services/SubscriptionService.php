@@ -18,10 +18,10 @@ class SubscriptionService
     {
         // Current base standard plan defaults:
         // - 3 included rooms
-        // - ₱2,300 base (1-month standard)
+        // - ₱2,100 base (1-month standard)
         // - ₱300 per extra active room
         $plan = 'basic';
-        $base = 2300.00;
+        $base = 2100.00;
         $included = 3;
         $extraFee = 300.00;
         $extraRooms = max(0, $roomCount - $included);

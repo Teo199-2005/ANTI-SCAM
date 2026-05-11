@@ -313,7 +313,7 @@ export default function AdminOnboardPage() {
             <input className="dash-input" value="Standard plan set (durations selected by owner at checkout)" readOnly />
             <div className="mt-2 rounded-xl border border-softBorder bg-softGray/40 p-3 text-xs text-zinc-600">
               <p className="font-semibold text-navy">Current pricing model:</p>
-              <p className="mt-1">Standard: 1M ₱2,300/mo, 3M ₱2,000/mo, 6M ₱1,900/mo, 12M ₱1,800/mo (+VAT).</p>
+              <p className="mt-1">Standard: 1M ₱2,100/mo, 3M ₱1,900/mo, 6M ₱1,700/mo, 12M ₱1,500/mo (+VAT).</p>
               <p className="mt-1">Referral promo: owners who enter a valid referral code get their <strong>first month free</strong> on 3, 6, or 12-month plans (same standard rates apply). Requires a complete resort profile (logo, address, contact, background image, and at least one active room with a photo) before the code is accepted.</p>
               <p className="mt-1">Owners choose duration and apply a referral code in the Subscribe modal.</p>
             </div>

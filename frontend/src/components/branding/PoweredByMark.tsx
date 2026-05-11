@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
@@ -51,7 +52,8 @@ export default function PoweredByMark({
         />
       ) : null}
       <span className={cn("max-w-prose", variant === "stack" && "mx-auto sm:mx-0")}>
-        Anti-Scam PH is a product and service operated by{" "}
+        <BrandWordmark tone={tone === "light" ? "onDark" : "onLight"} size="xs" className="mr-1 inline" /> is a product
+        and service operated by{" "}
         <Link
           href="/"
           className={cn(

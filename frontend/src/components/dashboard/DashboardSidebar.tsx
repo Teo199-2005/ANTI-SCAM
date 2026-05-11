@@ -26,6 +26,7 @@ import {
   Webhook,
   X,
 } from "lucide-react";
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "@/components/layout/Logo";
@@ -212,9 +213,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
               className="border-white/20 bg-white/15 shadow-soft-sm backdrop-blur-md"
             />
             <div className="leading-tight">
-              <span className="block font-dash text-sm font-bold tracking-tight text-white transition-colors group-hover:text-white/85">
-                Anti-Scam PH
-              </span>
+              <BrandWordmark tone="onDark" size="sm" className="leading-tight" />
               <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
                 Console
               </span>

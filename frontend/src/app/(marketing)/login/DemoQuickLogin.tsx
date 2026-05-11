@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { demoAccounts } from "@/lib/auth/demoAccounts";
 import { ChevronDown, ChevronUp, FlaskConical, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -116,8 +117,10 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
           <FlaskConical size={14} className="mt-0.5 shrink-0 opacity-90" />
           <span className="flex min-w-0 flex-col gap-0.5 leading-tight">
             <span>Demo accounts</span>
-            <span className="text-[10px] font-semibold normal-case tracking-normal text-white/80">
-              Anti-Scam PH · Console
+            <span className="inline-flex flex-wrap items-center gap-x-1 text-[10px] font-semibold normal-case tracking-normal text-white/80">
+              <BrandWordmark tone="onDark" size="2xs" className="inline" />
+              <span aria-hidden>·</span>
+              <span>Console</span>
             </span>
           </span>
         </span>
@@ -126,8 +129,10 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
 
       {open && (
         <div className={`min-h-0 p-3 ${variant === "floating" ? "overflow-y-auto overscroll-contain" : ""}`}>
-          <p className="mb-2 text-[11px] font-semibold leading-snug text-navy">
-            Anti-Scam PH — anti booking scam of resorts
+          <p className="mb-2 inline-flex flex-wrap items-center gap-x-1 text-[11px] font-semibold leading-snug text-navy">
+            <BrandWordmark tone="onLight" size="xs" className="inline" />
+            <span className="text-zinc-400">—</span>
+            <span>anti booking scam of resorts</span>
           </p>
           <p className="mb-2.5 text-xs leading-relaxed text-zinc-600">
             <strong className="text-zinc-800">Tap a role</strong> to fill the form, sign you in, and open the dashboard.
@@ -230,7 +235,7 @@ export default function DemoQuickLogin({ onLoginAs, variant = "floating" }: Demo
 
           <div className="mt-3 border-t border-zinc-200/90 pt-2.5 text-center text-[10px] leading-snug text-zinc-500">
             <p>
-              Anti-Scam PH is a product and service operated by{" "}
+              <BrandWordmark tone="onLight" size="2xs" className="mr-1 inline" /> is a product and service operated by{" "}
               <span className="font-semibold text-zinc-700">The Rising 2 Brothers OPC</span>.
             </p>
             <p className="mt-1 font-mono text-[10px] text-zinc-400">

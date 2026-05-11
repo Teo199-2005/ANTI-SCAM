@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import DashCard from "@/components/dash/DashCard";
 import { apiClient } from "@/lib/api/client";
 import { BadgeCheck, CalendarDays, CreditCard, Download, Printer } from "lucide-react";
@@ -92,7 +93,9 @@ function ReceiptContent() {
             <BadgeCheck size={24} className="text-emerald-600" />
           </div>
           <h2 className="font-dash text-2xl font-bold text-navy">Booking Confirmed</h2>
-          <p className="mt-1 text-sm text-zinc-500">Anti-Scam PH</p>
+          <div className="mt-1 flex justify-center">
+            <BrandWordmark tone="onLight" size="xs" />
+          </div>
         </div>
 
         {/* Reference */}

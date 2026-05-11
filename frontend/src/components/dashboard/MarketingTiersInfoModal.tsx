@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import type { MarketerTierInfo, TierLadderEntry } from "@/lib/api/marketing";
 import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import { cn } from "@/lib/utils";
@@ -60,9 +61,9 @@ export default function MarketingTiersInfoModal({
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-softBorder bg-gradient-to-r from-navy/95 via-primaryBlue to-slateBlue px-4 py-3 text-white sm:px-5 sm:py-4">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/85">
+            <p className="inline-flex flex-wrap items-center gap-1.5 text-white/85">
               <ShieldCheck size={14} className="shrink-0" aria-hidden />
-              Anti-Scam PH
+              <BrandWordmark tone="onDark" size="2xs" className="leading-none" />
             </p>
             <h2 id="tiers-modal-title" className="mt-1 font-dash text-lg font-bold leading-snug sm:text-xl">
               {title}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { LandingComputedRoom } from "@/lib/api/landingPage";
 import {
   BedDouble,
+  CalendarDays,
   Car,
   Coffee,
   ImageOff,
@@ -47,20 +48,63 @@ function amenityMeta(label: string): { icon: LucideIcon; tone: string } {
   return { icon: ShieldCheck, tone: "text-zinc-700 bg-zinc-50 border-zinc-200/80" };
 }
 
+function todayIsoLocal(): string {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Default 1-night stay starting tomorrow (valid for checkout page). */
+function defaultStayDates(): { checkIn: string; checkOut: string } {
+  const checkIn = addDaysIso(todayIsoLocal(), 1);
+  const checkOut = addDaysIso(checkIn, 1);
+  return { checkIn, checkOut };
+}
+
+function buildCheckoutHref(resortId: number, roomId: number, checkIn: string, checkOut: string): string {
+  const q = new URLSearchParams({
+    roomId: String(roomId),
+    checkIn,
+    checkOut,
+    resortId: String(resortId),
+  });
+  return `/resorts/${resortId}/checkout?${q.toString()}`;
+}
+
+function buildRoomAvailabilityHref(resortId: number, roomId: number, checkIn: string, checkOut: string): string {
+  const q = new URLSearchParams({ checkIn, checkOut });
+  return `/resorts/${resortId}/rooms/${roomId}?${q.toString()}`;
+}
+
 type Props = {
   rooms: LandingComputedRoom[];
-  checkoutHref: string;
+  resortId: number;
 };
 
-export function ResortRoomsSection({ rooms, checkoutHref }: Props) {
+export function ResortRoomsSection({ rooms, resortId }: Props) {
   const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [modalCheckIn, setModalCheckIn] = useState(() => defaultStayDates().checkIn);
+  const [modalCheckOut, setModalCheckOut] = useState(() => defaultStayDates().checkOut);
 
   const selectedMeta = useMemo(
     () => (selectedRoom ? extractRoomMeta(selectedRoom.amenities) : null),
     [selectedRoom],
   );
+
+  const todayStr = useMemo(() => todayIsoLocal(), []);
+  const checkOutMin = modalCheckIn ? addDaysIso(modalCheckIn, 1) : addDaysIso(todayStr, 1);
+  const datesValid =
+    Boolean(modalCheckIn && modalCheckOut) &&
+    modalCheckOut > modalCheckIn &&
+    modalCheckIn >= todayStr;
 
   useEffect(() => {
     setMounted(true);
@@ -69,6 +113,9 @@ export function ResortRoomsSection({ rooms, checkoutHref }: Props) {
   useEffect(() => {
     if (!selectedRoom) return;
     setActiveImage(0);
+    const { checkIn, checkOut } = defaultStayDates();
+    setModalCheckIn(checkIn);
+    setModalCheckOut(checkOut);
     const onEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelectedRoom(null);
     };
@@ -319,15 +366,65 @@ export function ResortRoomsSection({ rooms, checkoutHref }: Props) {
                   </p>
                 </div>
 
+                <div className="mb-4 rounded-xl border border-sky-200/80 bg-sky-50/50 p-3">
+                  <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-900">
+                    <CalendarDays size={14} className="shrink-0" />
+                    Stay dates
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block text-[11px] font-medium text-zinc-600">
+                      Check-in
+                      <input
+                        type="date"
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
+                        min={todayStr}
+                        value={modalCheckIn}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setModalCheckIn(v);
+                          if (!v) return;
+                          const minOut = addDaysIso(v, 1);
+                          setModalCheckOut((prev) => (prev <= v ? minOut : prev));
+                        }}
+                      />
+                    </label>
+                    <label className="block text-[11px] font-medium text-zinc-600">
+                      Check-out
+                      <input
+                        type="date"
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
+                        min={checkOutMin}
+                        value={modalCheckOut}
+                        onChange={(e) => setModalCheckOut(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  {!datesValid ? (
+                    <p className="mt-2 text-[11px] text-amber-800">Choose check-out after check-in (from today onward).</p>
+                  ) : null}
+                </div>
+
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Link
-                    href={checkoutHref}
-                    className="inline-flex items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy/90"
+                    href={
+                      datesValid
+                        ? buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut)
+                        : "#"
+                    }
+                    onClick={(e) => {
+                      if (!datesValid) e.preventDefault();
+                    }}
+                    aria-disabled={!datesValid}
+                    className={`inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold ${
+                      datesValid
+                        ? "bg-navy text-white hover:bg-navy/90"
+                        : "cursor-not-allowed bg-zinc-200 text-zinc-500"
+                    }`}
                   >
                     Book now
                   </Link>
                   <Link
-                    href={checkoutHref}
+                    href={buildRoomAvailabilityHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut)}
                     className="inline-flex items-center justify-center rounded-xl border border-navy/20 bg-white px-4 py-2.5 text-sm font-semibold text-navy hover:bg-zinc-50"
                   >
                     Check availability

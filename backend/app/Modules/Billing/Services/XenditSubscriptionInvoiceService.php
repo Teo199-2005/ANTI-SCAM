@@ -116,7 +116,7 @@ class XenditSubscriptionInvoiceService
                 throw new RuntimeException('Extra room fee is not configured for this subscription.');
             }
             // Same duration discounts as the main subscription (standard tier), applied to per-slot fee.
-            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / 2300.0), 2);
+            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / 2100.0), 2);
             $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
             if ($chargeAmount <= 0) {
                 throw new RuntimeException('Could not compute room add-on amount.');
@@ -448,7 +448,7 @@ class XenditSubscriptionInvoiceService
 
     private function monthlyRate(int $durationMonths): float
     {
-        $standard = [1 => 2300.0, 3 => 2000.0, 6 => 1900.0, 12 => 1800.0];
+        $standard = [1 => 2100.0, 3 => 1900.0, 6 => 1700.0, 12 => 1500.0];
 
         return $standard[$durationMonths] ?? $standard[1];
     }

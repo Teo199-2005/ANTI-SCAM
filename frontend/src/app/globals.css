@@ -79,8 +79,11 @@ body {
          backdrop-blur-2xl backdrop-saturate-150;
 }
 
-/* Full-bleed hero photo — own compositing layer (helps avoid soft edges from nested transforms) */
+/* Full-bleed hero photo — own compositing layer; width/height auto so zoom & resize reflow layout */
 .hero-cover-media {
+  width: 100%;
+  height: auto;
+  max-width: none;
   transform: translateZ(0);
   backface-visibility: hidden;
 }
@@ -880,6 +883,43 @@ button.dash-sortable-th:focus-visible {
 .resort-light-pattern {
   background-color: #fafafa;
   background-image: url("https://www.transparenttextures.com/patterns/flower-trail.png");
+}
+
+/*
+ * Auth page + card textures (login / register / forgot-password).
+ *
+ * Two distinct patterns so the card reads as a visually separate surface
+ * from the surrounding page:
+ *   - `.auth-paper-bg` → grey-sandbag pattern → used on the page shell and
+ *     mobile form sheet (the larger, woven-canvas backdrop).
+ *   - `.auth-card-bg`  → diagonal-striped-brick pattern → used on the
+ *     elevated auth card (smaller, more decorative surface).
+ *
+ * Implemented as real CSS classes instead of Tailwind arbitrary background-
+ * image utilities, because Next.js + Webpack css-loader resolves Tailwind-
+ * JIT-emitted URLs as module imports and fails on /public assets — whereas
+ * a plain CSS url() with an absolute path is left as a runtime URL. Both
+ * textures are self-hosted from /public/textures so there's no third-party
+ * dependency at runtime.
+ *
+ * Wrapped in @layer components so Tailwind utility classes (e.g.
+ * `lg:bg-transparent`) can still override the bg on the same element when
+ * the texture should defer to a parent layer at certain breakpoints.
+ */
+@layer components {
+  .auth-paper-bg {
+    background-color: #ffffff;
+    background-image: url("/textures/grey-sandbag.png");
+    background-repeat: repeat;
+    background-position: left top;
+  }
+
+  .auth-card-bg {
+    background-color: #ffffff;
+    background-image: url("/textures/diagonal-striped-brick.png");
+    background-repeat: repeat;
+    background-position: left top;
+  }
 }
 
 .promo-strip-shell {

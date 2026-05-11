@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthPageBrandTagline } from "@/components/branding/AuthPageBrandTagline";
 import { AuthSplitShell, AUTH_MARKETING_CARD } from "@/components/auth/AuthSplitShell";
 import Button from "@/components/ui/Button";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -9,10 +10,10 @@ import { useState } from "react";
 import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
 import { sanitizeEmailTyping, sanitizeOtpInput } from "@/lib/inputRestrictions";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
-import { ArrowLeft, Eye, EyeOff, KeyRound, Mail, Shield } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Lock, Mail } from "lucide-react";
 
 const authInput =
-  "w-full rounded-xl border border-zinc-200/90 bg-white px-3.5 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.875rem] md:rounded-lg md:py-2 md:text-sm";
+  "w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.875rem] md:rounded-lg md:py-2 md:text-sm";
 
 type Step = "email" | "reset";
 
@@ -186,26 +187,30 @@ export default function ForgotPasswordPage() {
               <label htmlFor="forgot-otp" className="mb-1.5 block text-xs font-semibold text-zinc-700">
                 6-digit code
               </label>
-              <input
-                id="forgot-otp"
-                className={`${authInput} font-mono tracking-[0.35em]`}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                required
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(sanitizeOtpInput(e.target.value))}
-                placeholder="000000"
-              />
+              <div className="relative">
+                <KeyRound size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
+                <input
+                  id="forgot-otp"
+                  className={`${authInput} pl-10 font-mono tracking-[0.35em]`}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(sanitizeOtpInput(e.target.value))}
+                  placeholder="000000"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="forgot-password" className="mb-1.5 block text-xs font-semibold text-zinc-700">
                 New password
               </label>
               <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
                 <input
                   id="forgot-password"
-                  className={`${authInput} ${hydrated ? "pr-11" : "pr-4"}`}
+                  className={`${authInput} pl-10 ${hydrated ? "pr-11" : "pr-4"}`}
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
@@ -238,9 +243,10 @@ export default function ForgotPasswordPage() {
                 Confirm new password
               </label>
               <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
                 <input
                   id="forgot-password-2"
-                  className={`${authInput} ${hydrated ? "pr-11" : "pr-4"}`}
+                  className={`${authInput} pl-10 ${hydrated ? "pr-11" : "pr-4"}`}
                   type={showPassword2 ? "text" : "password"}
                   autoComplete="new-password"
                   required
@@ -296,10 +302,7 @@ export default function ForgotPasswordPage() {
           </div>
         )}
 
-        <div className="mt-5 flex items-center justify-center gap-2 border-t border-zinc-100/90 pt-4 text-center text-[11px] leading-snug text-zinc-500 md:mt-4 md:pt-3">
-          <Shield size={14} className="shrink-0 text-clOcean/50" aria-hidden />
-          <span>Anti-Scam PH · Verified-safe bookings</span>
-        </div>
+        <AuthPageBrandTagline />
       </div>
     </AuthSplitShell>
   );

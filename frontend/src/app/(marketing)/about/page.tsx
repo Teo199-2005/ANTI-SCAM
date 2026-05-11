@@ -1,3 +1,4 @@
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionHeading from "@/components/ui/SectionHeading";
 import VisionariesSection from "@/components/home/VisionariesSection";
@@ -12,7 +13,7 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
 
 function SectionDivider({ icon: Icon }: { icon: FC<LucideProps> }) {
   return (
@@ -36,24 +37,41 @@ const platformHighlights = [
   "Automated inquiry handling",
 ];
 
-const pillars = [
+const pillars: {
+  key: string;
+  icon: FC<LucideProps>;
+  title: ReactNode;
+  description: ReactNode;
+}[] = [
   {
+    key: "mission",
     icon: Target,
     title: "Our mission",
     description:
       "To give Philippine resorts a trusted, modern reservation ecosystem through secure booking technology, operational automation, and verified resort protection — helping businesses grow while guests book with confidence nationwide.",
   },
   {
+    key: "vision",
     icon: Flag,
     title: "Our vision",
     description:
       "To lead as the Philippines’ verified resort network and reservation management platform — setting the standard for trusted bookings, professional operations, and scam-free hospitality.",
   },
   {
+    key: "why-built",
     icon: Lightbulb,
-    title: "Why we built Anti-Scam PH",
-    description:
-      "Fake resort pages, booking scams, reservation conflicts, and manual workflows were costing legitimate operators and guests alike. We built Anti-Scam PH so serious resorts can grow professionally online — and guests can reserve with clearer trust and security.",
+    title: (
+      <>
+        Why we built <BrandWordmark tone="onLight" size="sm" className="inline" />
+      </>
+    ),
+    description: (
+      <>
+        Fake resort pages, booking scams, reservation conflicts, and manual workflows were costing legitimate
+        operators and guests alike. We built <BrandWordmark tone="onLight" size="xs" className="inline" /> so serious
+        resorts can grow professionally online — and guests can reserve with clearer trust and security.
+      </>
+    ),
   },
 ];
 
@@ -73,14 +91,17 @@ export default function AboutPage() {
             {/* Left — brand narrative */}
             <div className="p-7 md:border-r md:border-clSeafoam/50 md:p-10">
               <span className="cl-section-eyebrow mb-4 inline-flex">About us</span>
-              <SectionHeading
-                title="Anti-Scam PH"
-                subtitle="Philippine-based resort verification and reservation management — built for trust, automation, and growth."
-              />
+              <div className="mb-8">
+                <BrandWordmark tone="onLight" size="xl" as="h2" />
+                <p className="mt-2 max-w-2xl text-base text-zinc-600">
+                  Philippine-based resort verification and reservation management — built for trust, automation, and
+                  growth.
+                </p>
+              </div>
               <div className="max-w-2xl space-y-4 text-base leading-8 text-zinc-600">
                 <p>
-                  <strong className="font-semibold text-zinc-800">Anti-Scam PH</strong> is a
-                  Philippine-based resort verification and reservation management platform operated by{" "}
+                  <BrandWordmark tone="onLight" size="sm" className="mr-1 inline" /> is a Philippine-based resort
+                  verification and reservation management platform operated by{" "}
                   <strong className="font-semibold text-zinc-800">The Rising 2 Brothers OPC</strong>,
                   established in 2024.
                 </p>
@@ -161,20 +182,25 @@ export default function AboutPage() {
             <span className="cl-section-eyebrow mb-4 inline-flex">Direction</span>
             <SectionHeading
               title="Mission, vision & purpose"
-              subtitle="What drives Anti-Scam PH — and why we keep building for Philippine resorts and their guests."
+              subtitle={
+                <>
+                  What drives <BrandWordmark tone="onLight" size="sm" className="inline" /> — and why we keep building
+                  for Philippine resorts and their guests.
+                </>
+              }
             />
 
             <div className="mt-5 grid gap-4 lg:grid-cols-3">
               {pillars.map((pillar) => (
                 <article
-                  key={pillar.title}
+                  key={pillar.key}
                   className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-5 transition-colors duration-200 hover:border-zinc-300 hover:bg-white"
                 >
                   <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-2 text-zinc-600 shadow-sm">
                     <pillar.icon size={16} />
                   </div>
                   <h3 className="mt-3 font-heading text-xl text-clOcean">{pillar.title}</h3>
-                  <p className="mt-2 text-sm leading-7 text-zinc-600">{pillar.description}</p>
+                  <div className="mt-2 text-sm leading-7 text-zinc-600">{pillar.description}</div>
                 </article>
               ))}
             </div>
@@ -191,7 +217,8 @@ export default function AboutPage() {
               <span className="cl-section-eyebrow mb-3 inline-flex">Featured</span>
               <h3 className="font-heading text-3xl text-clOcean">Brand Poster</h3>
               <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-500">
-                A visual highlight reinforcing the Anti-Scam PH story and brand feel.
+                A visual highlight reinforcing the{" "}
+                <BrandWordmark tone="onLight" size="xs" className="inline" /> story and brand feel.
               </p>
             </div>
           </div>

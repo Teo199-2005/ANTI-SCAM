@@ -37,13 +37,20 @@ type OwnerSubscriptionInfo = {
 };
 
 type PlanDuration = 1 | 3 | 6 | 12;
-type PlanOffer = { duration: PlanDuration; monthlyRate: number; billingType: "Monthly" | "Upfront" };
+type PlanOffer = {
+  duration: PlanDuration;
+  /** Charged monthly rate for this prepay tier */
+  monthlyRate: number;
+  /** Shown struck through as “was” price */
+  listMonthlyRate: number;
+  billingType: "Monthly" | "Upfront";
+};
 
 const STANDARD_OFFERS: PlanOffer[] = [
-  { duration: 1,  monthlyRate: 2300, billingType: "Monthly" },
-  { duration: 3,  monthlyRate: 2000, billingType: "Upfront" },
-  { duration: 6,  monthlyRate: 1900, billingType: "Upfront" },
-  { duration: 12, monthlyRate: 1800, billingType: "Upfront" },
+  { duration: 1, monthlyRate: 2100, listMonthlyRate: 3000, billingType: "Monthly" },
+  { duration: 3, monthlyRate: 1900, listMonthlyRate: 2700, billingType: "Upfront" },
+  { duration: 6, monthlyRate: 1700, listMonthlyRate: 2500, billingType: "Upfront" },
+  { duration: 12, monthlyRate: 1500, listMonthlyRate: 2300, billingType: "Upfront" },
 ];
 
 const MISSING_FIELD_LABELS: Record<string, string> = {
@@ -507,17 +514,31 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         <span className="w-full text-[10px] leading-tight text-zinc-500 sm:text-[11px]">
                           {offer.billingType}
                         </span>
+                        <span className="mt-0.5 w-full font-dash text-[10px] font-bold tabular-nums leading-tight text-navy sm:text-[11px]">
+                          <span className="text-zinc-400 line-through decoration-zinc-400 decoration-1">
+                            ₱{offer.listMonthlyRate.toLocaleString()}
+                          </span>
+                          <span className="mx-0.5 text-zinc-300">·</span>
+                          <span>₱{offer.monthlyRate.toLocaleString()}/mo</span>
+                        </span>
                       </button>
                     );
                   })}
                 </div>
                 <div className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-0.5 sm:mt-4">
-                  <p className="inline-flex items-center gap-1.5 text-2xl font-black leading-none tracking-tight text-zinc-950 sm:items-end sm:gap-2 sm:text-4xl">
+                  <p className="inline-flex flex-wrap items-end gap-x-2 gap-y-0.5 text-2xl font-black leading-none tracking-tight text-zinc-950 sm:gap-x-2.5 sm:text-4xl">
                     <WalletCards size={18} className="shrink-0 text-primaryBlue sm:mb-1 sm:h-[22px] sm:w-[22px]" />
-                    ₱{selectedOffer.monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <span className="inline-flex flex-wrap items-end gap-x-1.5 sm:gap-x-2">
+                      <span className="text-lg font-bold tabular-nums text-zinc-400 line-through decoration-zinc-400 decoration-2 sm:text-3xl">
+                        ₱{selectedOffer.listMonthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="tabular-nums">
+                        ₱{selectedOffer.monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </span>
                   </p>
                   <p className="pb-0.5 text-[10px] font-medium lowercase leading-none text-zinc-500 sm:pb-1 sm:text-xs">
-                    / month (standard rate)
+                    / month (promo rate)
                   </p>
                 </div>
                 <p className="mt-1.5 inline-flex flex-wrap items-center gap-1 text-[10px] text-zinc-500 sm:mt-2 sm:gap-1.5 sm:text-xs">

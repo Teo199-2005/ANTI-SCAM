@@ -14,7 +14,7 @@ class AdminOverrideReservationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', 'in:pending_payment,confirmed,cancelled,expired'],
+            'status' => ['required', 'in:pending_payment,confirmed,cancelled,expired,no_show,completed'],
             'reason' => ['required', 'string', 'min:8'],
         ];
     }

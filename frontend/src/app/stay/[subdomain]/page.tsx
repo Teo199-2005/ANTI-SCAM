@@ -67,7 +67,6 @@ export default async function StayLandingPage({ params }: Props) {
   }
 
   const r = result.data;
-  const checkoutHref = `/resorts/${r.id}/checkout`;
 
   return (
     <main className="min-h-screen resort-light-pattern">
@@ -124,7 +123,7 @@ export default async function StayLandingPage({ params }: Props) {
       <ResortPromoStrip />
 
       <ScrollReveal className="bg-transparent" direction="down">
-        <ResortRoomsSection rooms={r.rooms} checkoutHref={checkoutHref} />
+        <ResortRoomsSection rooms={r.rooms} resortId={r.id} />
       </ScrollReveal>
 
       {/* Map section */}

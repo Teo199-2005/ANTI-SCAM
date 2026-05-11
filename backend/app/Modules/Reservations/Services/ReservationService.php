@@ -6,6 +6,7 @@ use App\Models\BookingLock;
 use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Room;
+use App\Models\SystemSetting;
 use App\Modules\Audit\Services\AuditLogService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -14,6 +15,17 @@ use RuntimeException;
 class ReservationService
 {
     public function __construct(private readonly AuditLogService $audits) {}
+
+    /** Fixed guest reservation fee (PHP), from `system_settings` or config fallback. */
+    public static function reservationFeeAmount(): float
+    {
+        $raw = SystemSetting::getValue('reservation_fee');
+        if ($raw !== null && is_numeric($raw)) {
+            return max(0, (float) $raw);
+        }
+
+        return max(0, (float) config('reservations.default_reservation_fee', 500));
+    }
 
     public function createFromLock(array $payload): Reservation
     {
@@ -91,7 +103,7 @@ class ReservationService
                 'check_in_date' => $lock->check_in_date->toDateString(),
                 'check_out_date' => $lock->check_out_date->toDateString(),
                 'guest_count' => (int) ($payload['guest_count'] ?? 1),
-                'reservation_fee' => 500.00,
+                'reservation_fee' => self::reservationFeeAmount(),
                 'total_amount' => (float) ($payload['total_amount'] ?? 0),
                 'status' => 'pending_payment',
                 'xendit_payment_status' => 'pending',
@@ -151,9 +163,55 @@ class ReservationService
         return $reservation->refresh();
     }
 
+    public function markCompletedByResort(Reservation $reservation): Reservation
+    {
+        if ($reservation->status !== 'confirmed') {
+            throw new RuntimeException('Only confirmed reservations can be marked as completed.');
+        }
+        if ($reservation->check_in_date->isFuture()) {
+            throw new RuntimeException('Cannot mark completed before the check-in date.');
+        }
+
+        $oldValues = $reservation->only(['status']);
+        $reservation->update(['status' => 'completed']);
+
+        $this->audits->log(
+            'reservation_marked_completed',
+            'reservation',
+            $reservation->id,
+            $oldValues,
+            $reservation->only(['status']),
+        );
+
+        return $reservation->refresh();
+    }
+
+    public function markNoShowByResort(Reservation $reservation): Reservation
+    {
+        if ($reservation->status !== 'confirmed') {
+            throw new RuntimeException('Only confirmed reservations can be marked as no-show.');
+        }
+        if ($reservation->check_in_date->isFuture()) {
+            throw new RuntimeException('Cannot mark no-show before the check-in date.');
+        }
+
+        $oldValues = $reservation->only(['status']);
+        $reservation->update(['status' => 'no_show']);
+
+        $this->audits->log(
+            'reservation_marked_no_show',
+            'reservation',
+            $reservation->id,
+            $oldValues,
+            $reservation->only(['status']),
+        );
+
+        return $reservation->refresh();
+    }
+
     public function adminOverrideStatus(Reservation $reservation, string $status, string $reason): Reservation
     {
-        if (! in_array($status, ['pending_payment', 'confirmed', 'cancelled', 'expired'], true)) {
+        if (! in_array($status, ['pending_payment', 'confirmed', 'cancelled', 'expired', 'no_show', 'completed'], true)) {
             throw new RuntimeException('Invalid override status.');
         }
 

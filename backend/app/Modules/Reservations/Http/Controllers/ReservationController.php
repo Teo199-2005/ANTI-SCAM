@@ -135,4 +135,34 @@ class ReservationController extends Controller
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation override applied');
     }
+
+    public function markCompletedByResort(Reservation $reservation)
+    {
+        $this->authorize('updateResortLifecycle', $reservation);
+
+        try {
+            $reservation = $this->service->markCompletedByResort($reservation);
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_complete']], 409);
+        }
+
+        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+
+        return $this->successResponse(new ReservationResource($reservation), 'Reservation marked completed.');
+    }
+
+    public function markNoShowByResort(Reservation $reservation)
+    {
+        $this->authorize('updateResortLifecycle', $reservation);
+
+        try {
+            $reservation = $this->service->markNoShowByResort($reservation);
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_no_show']], 409);
+        }
+
+        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+
+        return $this->successResponse(new ReservationResource($reservation), 'Reservation marked as no-show.');
+    }
 }

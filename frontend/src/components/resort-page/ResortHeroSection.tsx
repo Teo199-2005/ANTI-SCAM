@@ -1,3 +1,4 @@
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Link from "next/link";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 
@@ -66,8 +67,8 @@ export function ResortHeroSection({
           {ctaLabel}
         </Link>
       </div>
-      <div className="mt-6 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wider text-white/75 backdrop-blur-sm">
-        Anti-Scam PH
+      <div className="mt-6 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 backdrop-blur-sm">
+        <BrandWordmark tone="onDark" size="xs" className="opacity-95" />
       </div>
       <p className="absolute bottom-6 left-0 right-0 text-xs text-white/50">{resortName}</p>
     </section>

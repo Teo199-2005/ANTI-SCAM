@@ -43,6 +43,10 @@ export default function PaymentFailedPage() {
             </Link>{" "}
             and use <strong>Pay now</strong> to resume or refresh checkout.
           </p>
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-950">
+            <strong>Room hold:</strong> checkout starts a short hold on your dates. If payment was not finished in time,
+            the hold may have expired — pick the same room and dates again, then complete payment promptly.
+          </p>
 
           {loadingRes ? (
             <div className="mx-auto mt-5 flex justify-center">

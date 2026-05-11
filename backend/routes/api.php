@@ -178,6 +178,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/reservations', [ReservationController::class, 'index']);
         Route::get('/reservations/{reservation}', [ReservationController::class, 'show']);
         Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel']);
+        Route::post('/reservations/{reservation}/complete', [ReservationController::class, 'markCompletedByResort']);
+        Route::post('/reservations/{reservation}/no-show', [ReservationController::class, 'markNoShowByResort']);
         Route::post('/reservations/{reservation}/admin-override', [ReservationController::class, 'adminOverride']);
 
         // Subscriptions

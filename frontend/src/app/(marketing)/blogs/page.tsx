@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -41,9 +42,16 @@ export default function BlogsPage() {
             <h3 className="font-heading text-xl text-zinc-900">{blog.title}</h3>
             <p className="mt-3 text-zinc-600">{blog.excerpt}</p>
             <div className="mt-4 space-y-1 text-xs text-zinc-500">
-              <p className="inline-flex items-center gap-2">
+              <p className="inline-flex flex-wrap items-center gap-2">
                 <UserRound size={13} />
-                {blog.author}
+                {blog.author === "Anti-Scam PH Editorial" ? (
+                  <span className="inline-flex flex-wrap items-center gap-x-1">
+                    <BrandWordmark tone="onLight" size="2xs" className="inline" />
+                    <span>Editorial</span>
+                  </span>
+                ) : (
+                  blog.author
+                )}
               </p>
               <p className="inline-flex items-center gap-2">
                 <Clock3 size={13} />

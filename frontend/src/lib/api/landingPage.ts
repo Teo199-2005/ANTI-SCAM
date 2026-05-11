@@ -11,6 +11,16 @@ export type LandingMissingField =
   | "background_image"
   | "room_with_image";
 
+/** Human labels — matches backend `LandingReadinessService` keys */
+export const LANDING_MISSING_FIELD_LABELS: Record<LandingMissingField, string> = {
+  resort_name: "Resort name",
+  address: "Address",
+  contact_number: "Contact number",
+  logo: "Resort logo",
+  background_image: "Background/hero image",
+  room_with_image: "At least one active room with a photo",
+};
+
 export type LandingComputedHero = {
   heading: string;
   subheading: string | null;

@@ -62,6 +62,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
     ? Math.max(0, (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)
     : 0;
 
+  const reservationFeePhp = room ? Number(room.reservationFee ?? 500) : 500;
+
   useEffect(() => {
     const load = async () => {
       if (!roomId) {
@@ -362,7 +364,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                 ) : (
                   <span className="inline-flex items-center gap-2">
                     <CreditCard size={15} />
-                    Pay ₱500 Reservation Fee
+                    Pay ₱{reservationFeePhp.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} reservation fee
                   </span>
                 )}
               </button>
@@ -396,7 +398,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                 </div>
                 <div className="flex justify-between font-semibold text-amber-700">
                   <span>Reservation fee (now)</span>
-                  <span>₱500</span>
+                  <span>₱{reservationFeePhp.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-zinc-500">
                   <span>Balance at resort</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthPageBrandTagline } from "@/components/branding/AuthPageBrandTagline";
 import { AuthSplitShell } from "@/components/auth/AuthSplitShell";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,19 +9,26 @@ import { useHydrated } from "@/hooks/useHydrated";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { Eye, EyeOff, LogIn, Mail, Shield } from "lucide-react";
+import { Eye, EyeOff, Lock, LogIn, Mail } from "lucide-react";
 import { sanitizeEmailTyping } from "@/lib/inputRestrictions";
 import DemoQuickLogin from "./DemoQuickLogin";
 
-/** Login card — roomier than the compact auth card used on register/forgot. */
+/**
+ * Login card — roomier than the compact auth card used on register/forgot.
+ * Same diagonal-striped-brick texture as the shared auth card, supplied via
+ * the `.auth-card-bg` component class in globals.css (over an opaque white
+ * base, so the pattern reads as subtle texture rather than a full repaint).
+ * Distinct from `.auth-paper-bg` (grey-sandbag) used on the page shell, so
+ * the card reads as a visually separate surface from the surrounding page.
+ */
 const loginCardClass =
-  "relative overflow-hidden rounded-3xl border border-zinc-200/75 bg-white/95 p-7 shadow-[0_26px_52px_-22px_rgba(13,30,66,0.18),0_0_0_1px_rgba(255,255,255,0.82)_inset] backdrop-blur-xl sm:p-9 md:p-10 " +
-  "max-lg:rounded-[1.12rem] max-lg:border-zinc-200/70 max-lg:bg-white max-lg:p-6 " +
+  "auth-card-bg relative overflow-hidden rounded-3xl border border-zinc-200/75 p-7 shadow-[0_26px_52px_-22px_rgba(13,30,66,0.18),0_0_0_1px_rgba(255,255,255,0.82)_inset] backdrop-blur-xl sm:p-9 md:p-10 " +
+  "max-lg:rounded-[1.12rem] max-lg:border-zinc-200/70 max-lg:p-6 " +
   "max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_10px_32px_-22px_rgba(13,30,66,0.14)] " +
   "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-[1] before:h-[3px] before:bg-gradient-to-r before:from-clOcean before:via-clTeal before:to-sky-400 before:content-[''] before:hidden max-lg:before:block";
 
 const authInput =
-  "w-full rounded-xl border border-zinc-200/80 bg-sky-50/35 px-4 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25 max-lg:min-h-[2.875rem] md:text-sm";
+  "w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:bg-white focus:ring-2 focus:ring-clOcean/25 max-lg:min-h-[2.875rem] md:text-sm";
 
 function LoginFallback() {
   return (
@@ -158,10 +166,11 @@ function LoginPageContent() {
               Password
             </label>
             <div className="relative">
+              <Lock size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-clOcean/50" aria-hidden />
               <input
                 id="login-password"
                 suppressHydrationWarning
-                className={`${authInput} ${hydrated ? "pr-11" : "pr-4"}`}
+                className={`${authInput} pl-11 ${hydrated ? "pr-11" : "pr-4"}`}
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 required
@@ -211,10 +220,7 @@ function LoginPageContent() {
           </Link>
         </p>
 
-        <div className="mt-6 flex items-center justify-center gap-2 border-t border-zinc-100/90 pt-5 text-[11px] text-zinc-500">
-          <Shield size={14} className="shrink-0 text-clOcean/50" aria-hidden />
-          <span>Anti-Scam PH · Verified-safe bookings</span>
-        </div>
+        <AuthPageBrandTagline />
       </div>
     </AuthSplitShell>
     <DemoQuickLogin variant="floating" onLoginAs={onDemoLogin} />

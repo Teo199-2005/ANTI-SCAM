@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Facebook, Instagram, Mail, MapPin, PhoneCall } from "lucide-react";
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Logo from "./Logo";
 import PoweredByMark from "@/components/branding/PoweredByMark";
 import { FooterLegalLinks } from "./FooterLegalLinks";
@@ -58,8 +59,8 @@ export default function Footer() {
           <div className="flex items-center gap-3">
             <Logo size="md" />
             <div>
-              <h2 className="font-heading text-lg font-bold text-white sm:text-xl">Anti-Scam PH</h2>
-              <p className="text-[11px] text-white/65 sm:text-xs">Verify. Check. Protect. · Philippines</p>
+              <BrandWordmark tone="onDark" size="lg" />
+              <p className="mt-1 text-[11px] text-white/65 sm:text-xs">Verify. Check. Protect. · Philippines</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -95,8 +96,9 @@ export default function Footer() {
           <div className="lg:col-span-5">
             <h2 className="text-sm font-medium leading-snug text-white/90 md:text-[15px]">About</h2>
             <p className="mt-2 text-xs leading-relaxed text-white/45 md:text-[13px]">
-              Anti-Scam PH helps Philippine resorts automate reservations, prevent double bookings, and build guest
-              trust through verified booking systems and professional resort management tools.
+              <BrandWordmark tone="onDark" size="xs" className="mr-1 inline" /> helps Philippine resorts automate
+              reservations, prevent double bookings, and build guest trust through verified booking systems and
+              professional resort management tools.
             </p>
             <h3 className="sr-only">Feature highlights</h3>
             <ul className="mt-4 space-y-1 border-t border-white/5 pt-3">
@@ -172,7 +174,11 @@ export default function Footer() {
         {/* Bottom — one tight band */}
         <div className="flex flex-col gap-2 border-t border-white/10 py-4 text-[11px] leading-snug text-white/35 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
           <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1">
-            <span>© {year} Anti-Scam PH. All rights reserved.</span>
+            <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
+              <span>© {year}</span>
+              <BrandWordmark tone="onDark" size="xs" className="inline" />
+              <span>. All rights reserved.</span>
+            </span>
             <span className="hidden text-white/20 sm:inline" aria-hidden>
               |
             </span>

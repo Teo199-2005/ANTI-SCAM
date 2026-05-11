@@ -67,10 +67,13 @@ const config: Config = {
         clSand:       marketing.sand,
         clSandMid:    marketing.sandMid,
         clSeafoam:    marketing.seafoam,
+        clScamWordmark: marketing.scamWordmark,
       },
       fontFamily: {
         /** Marketing only — never use inside .dash-shell */
         heading: ["var(--font-playfair)", "serif"],
+        /** Nav bar brand + menu — Montserrat loaded in root layout */
+        nav: ["var(--font-montserrat)", "var(--font-plus-jakarta)", "system-ui", "sans-serif"],
         body: ["var(--font-inter)", "sans-serif"],
         /** Dashboard + all authenticated product UI */
         dash: ["var(--font-plus-jakarta)", "Plus Jakarta Sans", "sans-serif"],

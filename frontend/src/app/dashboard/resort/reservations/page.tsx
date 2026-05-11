@@ -13,7 +13,8 @@ import {
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { ChevronDown, ChevronUp, Filter, ReceiptText } from "lucide-react";
+import { useToast } from "@/components/shared/ToastProvider";
+import { CheckCircle2, ChevronDown, ChevronUp, Filter, ReceiptText, UserX } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 
 type ReservationRow = {
@@ -48,6 +49,13 @@ const SORT_FIRST: Record<string, SortDir> = {
 function num(raw: unknown): number {
   const n = Number(raw);
   return Number.isFinite(n) ? n : 0;
+}
+
+function canMarkResortLifecycle(status: string, checkInDate: string): boolean {
+  if (status !== "confirmed") return false;
+  const d = checkInDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  return d <= new Date().toISOString().slice(0, 10);
 }
 
 function normalizeReservation(raw: Record<string, unknown>): ReservationRow {
@@ -93,6 +101,8 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function ResortReservationsPage() {
+  const { pushToast } = useToast();
+  const [lifecycleBusyId, setLifecycleBusyId] = useState<number | null>(null);
   const [status, setStatus] = useState("");
   const [appliedStatus, setAppliedStatus] = useState("");
   const [rows, setRows] = useState<ReservationRow[]>([]);
@@ -164,6 +174,23 @@ export default function ResortReservationsPage() {
     void load(appliedStatus, 1, pp, sortBy, sortDir);
   };
 
+  const postLifecycle = async (id: number, path: "complete" | "no-show", okTitle: string) => {
+    setLifecycleBusyId(id);
+    try {
+      await apiClient.post(`/reservations/${id}/${path}`);
+      pushToast({ title: okTitle, description: "Reservation list refreshed.", tone: "success" });
+      await load(appliedStatus, page, perPage, sortBy, sortDir);
+    } catch (err) {
+      pushToast({
+        title: "Update failed",
+        description: parseApiErrorMessage(err, "Could not update reservation."),
+        tone: "error",
+      });
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  };
+
   const paginationFooter = !error && (
     <TablePaginationBar
       page={page}
@@ -183,7 +210,10 @@ export default function ResortReservationsPage() {
           <ReceiptText size={24} className="text-skyBlue" />
           Reservations
         </h1>
-        <p className="dash-page-sub">Track booking status, guest details, and payment states.</p>
+        <p className="dash-page-sub">
+          Track booking status, guest details, and payment states. <strong>pending_payment</strong> includes guests who
+          abandoned Xendit or whose room hold expired — they can retry from their account.
+        </p>
       </div>
 
       <div className="dash-card dash-filter-bar items-stretch p-4 md:items-end">
@@ -218,6 +248,7 @@ export default function ResortReservationsPage() {
           <div className="space-y-3">
             {rows.map((item) => {
               const expanded = openId === item.id;
+              const lifecycle = canMarkResortLifecycle(item.status, item.checkInDate);
               return (
                 <DashMobileTableCard
                   key={item.id}
@@ -263,6 +294,28 @@ export default function ResortReservationsPage() {
                             <span className="font-semibold text-zinc-500">Payment</span>{" "}
                             {item.xenditPaymentStatus ?? "pending"}
                           </p>
+                          {lifecycle ? (
+                            <div className="mt-3 flex flex-col gap-2">
+                              <button
+                                type="button"
+                                disabled={lifecycleBusyId === item.id}
+                                className="dash-btn-sm flex w-full items-center justify-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-900"
+                                onClick={() => void postLifecycle(item.id, "complete", "Marked completed")}
+                              >
+                                <CheckCircle2 size={14} />
+                                {lifecycleBusyId === item.id ? "Updating…" : "Mark stay completed"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={lifecycleBusyId === item.id}
+                                className="dash-btn-sm flex w-full items-center justify-center gap-1.5 border border-rose-200 bg-rose-50 text-rose-900"
+                                onClick={() => void postLifecycle(item.id, "no-show", "Marked no-show")}
+                              >
+                                <UserX size={14} />
+                                {lifecycleBusyId === item.id ? "Updating…" : "Mark guest no-show"}
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </>
@@ -301,6 +354,7 @@ export default function ResortReservationsPage() {
           >
             {rows.map((item) => {
               const expanded = openId === item.id;
+              const lifecycle = canMarkResortLifecycle(item.status, item.checkInDate);
               return (
                 <Fragment key={item.id}>
                   <tr>
@@ -318,6 +372,28 @@ export default function ResortReservationsPage() {
                           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           Details
                         </button>
+                        {lifecycle ? (
+                          <>
+                            <button
+                              type="button"
+                              className="dash-btn-sm border border-emerald-200 bg-emerald-50 text-emerald-900"
+                              disabled={lifecycleBusyId === item.id}
+                              onClick={() => void postLifecycle(item.id, "complete", "Marked completed")}
+                            >
+                              <CheckCircle2 size={14} />
+                              Complete
+                            </button>
+                            <button
+                              type="button"
+                              className="dash-btn-sm border border-rose-200 bg-rose-50 text-rose-900"
+                              disabled={lifecycleBusyId === item.id}
+                              onClick={() => void postLifecycle(item.id, "no-show", "Marked no-show")}
+                            >
+                              <UserX size={14} />
+                              No-show
+                            </button>
+                          </>
+                        ) : null}
                       </DashTableActionsInner>
                     </DashTableActionsCell>
                   </tr>
@@ -342,6 +418,26 @@ export default function ResortReservationsPage() {
                             Payment status:{" "}
                             <span className="font-medium text-zinc-900">{item.xenditPaymentStatus ?? "pending"}</span>
                           </p>
+                          {lifecycle ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="dash-btn-sm border border-emerald-200 bg-emerald-50 text-emerald-900"
+                                disabled={lifecycleBusyId === item.id}
+                                onClick={() => void postLifecycle(item.id, "complete", "Marked completed")}
+                              >
+                                <CheckCircle2 size={14} className="inline" /> Mark stay completed
+                              </button>
+                              <button
+                                type="button"
+                                className="dash-btn-sm border border-rose-200 bg-rose-50 text-rose-900"
+                                disabled={lifecycleBusyId === item.id}
+                                onClick={() => void postLifecycle(item.id, "no-show", "Marked no-show")}
+                              >
+                                <UserX size={14} className="inline" /> Mark guest no-show
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </td>

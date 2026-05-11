@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import OwnerValuePropsStrip from "@/components/home/OwnerValuePropsStrip";
 import PageContainer from "@/components/layout/PageContainer";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
@@ -145,7 +146,9 @@ export default function BrowseResortsPage() {
       <div className="mt-12 rounded-2xl border border-clOceanDeep/20 bg-gradient-to-br from-clOceanDeep via-clOcean/95 to-clTeal/75 p-8 text-center shadow-cl-card backdrop-blur-xl md:p-10">
         <h2 className="font-heading text-2xl font-bold text-white md:text-3xl">Are you a resort owner?</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-white/80 md:text-base">
-          List on Anti-Scam PH: simplify management, look legit to guests, end double bookings, and cut repetitive inquiries.
+          List on{" "}
+          <BrandWordmark tone="onDark" size="sm" className="inline" />: simplify management, look legit to guests, end
+          double bookings, and cut repetitive inquiries.
         </p>
         <div className="mt-6">
           <OwnerValuePropsStrip variant="dark" />

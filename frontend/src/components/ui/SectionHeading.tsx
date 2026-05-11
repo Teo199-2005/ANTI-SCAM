@@ -1,11 +1,13 @@
+import type { ReactNode } from "react";
+
 export default function SectionHeading({
   title,
   subtitle,
   dark = false,
   centered = false,
 }: {
-  title: string;
-  subtitle?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
   dark?: boolean;
   /** When true, title and subtitle are centered; subtitle keeps a max width and is horizontally centered. */
   centered?: boolean;

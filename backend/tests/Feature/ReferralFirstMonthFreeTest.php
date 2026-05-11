@@ -82,11 +82,11 @@ class ReferralFirstMonthFreeTest extends TestCase
             'tenant_id' => $resort->tenant_id,
             'resort_id' => $resort->id,
             'plan' => 'basic',
-            'base_price' => 2300,
+            'base_price' => 2100,
             'included_rooms' => 3,
             'extra_room_fee' => 300,
             'active_room_count' => 0,
-            'total_monthly_fee' => 2300,
+            'total_monthly_fee' => 2100,
             'status' => $status,
             'billing_cycle_start' => now()->startOfMonth()->toDateString(),
             'billing_cycle_end' => now()->endOfMonth()->toDateString(),
@@ -261,10 +261,10 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         $response->assertOk();
 
-        // Standard 3-month rate = ₱2,000/mo; first month free → charge 2 months = ₱4,000
+        // Standard 3-month rate = ₱1,900/mo; first month free → charge 2 months = ₱3,800
         $invoice = SubscriptionInvoice::where('resort_id', $resort->id)->latest('id')->first();
         $this->assertNotNull($invoice);
-        $this->assertEquals(4000.0, (float) $invoice->amount);
+        $this->assertEquals(3800.0, (float) $invoice->amount);
         $this->assertStringContainsString('_m3_fmf', (string) $invoice->plan);
         $this->assertEquals('TESTCODE001', $invoice->referral_code);
     }
@@ -291,10 +291,10 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         $response->assertOk();
 
-        // Standard 12-month rate = ₱1,800/mo; first month free → charge 11 months = ₱19,800
+        // Standard 12-month rate = ₱1,500/mo; first month free → charge 11 months = ₱16,500
         $invoice = SubscriptionInvoice::where('resort_id', $resort->id)->latest('id')->first();
         $this->assertNotNull($invoice);
-        $this->assertEquals(19800.0, (float) $invoice->amount);
+        $this->assertEquals(16500.0, (float) $invoice->amount);
         $this->assertStringContainsString('_m12_fmf', (string) $invoice->plan);
     }
 
@@ -317,10 +317,10 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         $response->assertOk();
 
-        // Standard 12-month rate = ₱1,800/mo × 12 = ₱21,600
+        // Standard 12-month rate = ₱1,500/mo × 12 = ₱18,000
         $invoice = SubscriptionInvoice::where('resort_id', $resort->id)->latest('id')->first();
         $this->assertNotNull($invoice);
-        $this->assertEquals(21600.0, (float) $invoice->amount);
+        $this->assertEquals(18000.0, (float) $invoice->amount);
         $this->assertStringContainsString('_m12_b0', (string) $invoice->plan);
     }
 
@@ -342,7 +342,7 @@ class ReferralFirstMonthFreeTest extends TestCase
             'resort_id' => $resort->id,
             'xendit_invoice_id' => 'mock-fmf-inv-001',
             'xendit_invoice_url' => 'https://checkout.xendit.co/mock',
-            'amount' => 4000.0,
+            'amount' => 3800.0,
             'plan' => 'basic_m3_fmf',
             'referral_code' => 'TESTCODE001',
             'status' => 'pending',

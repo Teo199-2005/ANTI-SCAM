@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { PrivacyDocumentContent } from "@/components/legal/PrivacyDocumentContent";
 import { fetchTermsPayload, type TermsPayload, type TermsSection } from "@/lib/legal/termsApi";
 import { X } from "lucide-react";
@@ -60,7 +61,7 @@ function ModalFrame({
   children,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -95,7 +96,9 @@ function ModalFrame({
             >
               {title}
             </h2>
-            {subtitle ? <p className="mt-1 text-xs leading-snug text-zinc-500 sm:text-sm">{subtitle}</p> : null}
+            {subtitle ? (
+              <div className="mt-1 text-xs leading-snug text-zinc-500 sm:text-sm">{subtitle}</div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -163,7 +166,12 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalFrame
       title="Privacy Policy"
-      subtitle="Anti-Scam PH — operated by The Rising 2 Brothers OPC"
+      subtitle={
+        <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
+          <BrandWordmark tone="onLight" size="xs" className="inline" />
+          <span>— operated by The Rising 2 Brothers OPC</span>
+        </span>
+      }
       onClose={onClose}
     >
       <PrivacyDocumentContent />

@@ -12,6 +12,8 @@ export type PublicRoom = {
   /** Parallel bookable units for overlapping dates (defaults to 1). */
   units?: number;
   basePrice: number;
+  /** Guest reservation fee in PHP (from system settings; present on room detail). */
+  reservationFee?: number;
   amenities: string[];
   images?: { id: number; url: string; caption?: string | null }[];
   rules?: string | null;

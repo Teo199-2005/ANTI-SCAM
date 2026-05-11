@@ -1,11 +1,17 @@
 "use client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
 import { listResorts, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
-import { getOwnerLandingPage, uploadBgImage } from "@/lib/api/landingPage";
+import {
+  getOwnerLandingPage,
+  LANDING_MISSING_FIELD_LABELS,
+  uploadBgImage,
+  type OwnerLandingPageResponse,
+} from "@/lib/api/landingPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import { laravelPublicUrl } from "@/lib/publicAsset";
@@ -58,15 +64,6 @@ type FormState = {
   representative_contact_number: string;
 };
 
-/** Required for the auto-generated landing page */
-const REQUIRED_FOR_LANDING: Array<{ key: keyof FormState; label: string }> = [
-  { key: "name", label: "Resort name" },
-  { key: "address", label: "Address" },
-  { key: "contact_number", label: "Contact number" },
-  { key: "logo_url", label: "Resort logo" },
-  { key: "background_image_url", label: "Background image" },
-];
-
 function RequiredBadge() {
   return <span className="ml-1 text-rose-500">*</span>;
 }
@@ -84,6 +81,8 @@ export default function ResortProfilePage() {
   const [onboardingGate, setOnboardingGate] = useState(false);
   const [acceptOnboardTerms, setAcceptOnboardTerms] = useState(false);
   const [onboardingBusy, setOnboardingBusy] = useState(false);
+  /** Same readiness rules as the public `/stay/{subdomain}` page (includes active room + photo). */
+  const [ownerLanding, setOwnerLanding] = useState<OwnerLandingPageResponse | null>(null);
 
   const publicLink = (() => {
     if (!subdomain || typeof window === "undefined") return "";
@@ -107,24 +106,30 @@ export default function ResortProfilePage() {
           if (user?.role === "resort_owner") {
             setOnboardingGate(true);
             setForm(null);
+            setOwnerLanding(null);
+            setSubdomain(null);
             setError(null);
             setLoading(false);
             return;
           }
           setError("No resort assigned to this account.");
+          setOwnerLanding(null);
+          setSubdomain(null);
           setLoading(false);
           return;
         }
         const raw = first as Record<string, unknown>;
 
         let ownerSubdomain: string | null = null;
+        let landing: OwnerLandingPageResponse | null = null;
         try {
-          const landing = await getOwnerLandingPage();
+          landing = await getOwnerLandingPage();
           ownerSubdomain = landing.subdomain ?? null;
         } catch {
-          // keep null
+          landing = null;
         }
         setSubdomain(ownerSubdomain);
+        setOwnerLanding(landing);
 
         setForm({
           id: first.id,
@@ -147,6 +152,8 @@ export default function ResortProfilePage() {
         });
         setError(null);
       } catch (err) {
+        setOwnerLanding(null);
+        setSubdomain(null);
         setError(parseApiErrorMessage(err, "Unable to load resort profile."));
       } finally {
         setLoading(false);
@@ -179,13 +186,15 @@ export default function ResortProfilePage() {
       }
       const raw = first as Record<string, unknown>;
       let ownerSubdomain: string | null = null;
+      let landing: OwnerLandingPageResponse | null = null;
       try {
-        const landing = await getOwnerLandingPage();
+        landing = await getOwnerLandingPage();
         ownerSubdomain = landing.subdomain ?? null;
       } catch {
-        /* keep null */
+        landing = null;
       }
       setSubdomain(ownerSubdomain);
+      setOwnerLanding(landing);
       setForm({
         id: first.id,
         name: first.name,
@@ -235,8 +244,9 @@ export default function ResortProfilePage() {
           Accept terms to continue
         </h1>
         <p className="mt-2 text-sm text-zinc-600">
-          Before we create your resort workspace, please confirm you have read and agree to the Anti-Scam PH Terms &amp;
-          Conditions. A full copy will be emailed to you for your records.
+          Before we create your resort workspace, please confirm you have read and agree to the{" "}
+          <BrandWordmark tone="onLight" size="xs" className="inline" /> Terms & Conditions. A full copy will be
+          emailed to you for your records.
         </p>
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-softBorder bg-softGray/30 p-4 text-sm text-zinc-700">
           <input
@@ -305,10 +315,20 @@ export default function ResortProfilePage() {
     setForm((prev) => (prev ? { ...prev, [key]: next } : prev));
   };
 
-  // Compute missing required fields for landing page hint
-  const missingLandingFields = REQUIRED_FOR_LANDING.filter((f) => !form[f.key]);
-  const landingReady = missingLandingFields.length === 0;
+  const landingReady = Boolean(ownerLanding?.is_ready);
+  const landingMissingLabels =
+    ownerLanding?.missing_fields?.map((k) => LANDING_MISSING_FIELD_LABELS[k] ?? k) ?? [];
   const emailVerified = Boolean(user?.email_verified_at);
+
+  const refreshOwnerLanding = async () => {
+    try {
+      const landing = await getOwnerLandingPage();
+      setOwnerLanding(landing);
+      setSubdomain(landing.subdomain ?? null);
+    } catch {
+      setOwnerLanding(null);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,6 +355,7 @@ export default function ResortProfilePage() {
         phone: form.owner_contact_number || null,
       });
       await refreshUser();
+      await refreshOwnerLanding();
       pushToast({ title: "Resort profile saved", description: "Your property details were updated.", tone: "success" });
     } catch (err) {
       pushToast({
@@ -355,6 +376,7 @@ export default function ResortProfilePage() {
     try {
       const logoUrl = await uploadOwnerResortLogo(file);
       setForm({ ...form, logo_url: logoUrl });
+      await refreshOwnerLanding();
       pushToast({
         title: "Logo uploaded",
         description: "Saved to your resort. You can still use Save profile for other fields.",
@@ -379,6 +401,7 @@ export default function ResortProfilePage() {
     try {
       const url = await uploadBgImage(file);
       setForm({ ...form, background_image_url: url });
+      await refreshOwnerLanding();
       pushToast({
         title: "Background image uploaded",
         description: "Saved to your resort. Use Save profile for text fields if you changed them.",
@@ -427,21 +450,45 @@ export default function ResortProfilePage() {
         <p className="dash-page-sub">Update your property details. Fields marked <span className="text-rose-500">*</span> are required for your landing page.</p>
       </div>
 
-      {/* Landing page readiness hint */}
-      {!landingReady && (
+      {/* Landing page readiness — matches public API (includes ≥1 active room with a photo). */}
+      {form && ownerLanding === null && !loading && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <span>
-            Your landing page is missing: <strong>{missingLandingFields.map((f) => f.label).join(", ")}</strong>.{" "}
-            Fill these in and save to unlock your public page.
+            Could not load landing checklist from the server. Refresh the page, or open{" "}
+            <Link href="/dashboard/resort/rooms" className="font-semibold underline">
+              Rooms
+            </Link>{" "}
+            and confirm you have at least one <strong>active</strong> room with a <strong>photo</strong> — that is
+            required for the public page.
           </span>
         </div>
       )}
-      {landingReady && (
+      {form && ownerLanding && !landingReady && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Your public landing page is not live yet. Still needed:{" "}
+            <strong>{landingMissingLabels.join(", ")}</strong>.{" "}
+            {ownerLanding.missing_fields?.includes("room_with_image") ? (
+              <>
+                Add photos under{" "}
+                <Link href="/dashboard/resort/rooms" className="font-semibold underline">
+                  Rooms
+                </Link>
+                .
+              </>
+            ) : (
+              "Fill these in and save to unlock your public page."
+            )}
+          </span>
+        </div>
+      )}
+      {form && landingReady && (
         <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <CheckCircle2 size={16} className="shrink-0" />
           <span>
-            Your profile has all required fields for the landing page.{" "}
+            Your public landing page is ready (profile + at least one active room with a photo).{" "}
             {publicLink && (
               <a href={publicLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">
                 View live page <ExternalLink size={12} />
@@ -746,7 +793,7 @@ export default function ResortProfilePage() {
         <button type="submit" disabled={saving} className="dash-btn-primary disabled:opacity-50">
           {saving ? "Saving…" : "Save profile"}
         </button>
-        {publicLink ? (
+        {publicLink && landingReady ? (
           <a
             href={publicLink}
             target="_blank"
@@ -756,6 +803,11 @@ export default function ResortProfilePage() {
             <ExternalLink size={14} />
             View landing page
           </a>
+        ) : publicLink && !landingReady && ownerLanding ? (
+          <span className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-500">
+            <ExternalLink size={14} className="opacity-60" />
+            Public page locked until checklist above is complete
+          </span>
         ) : null}
       </div>
     </form>

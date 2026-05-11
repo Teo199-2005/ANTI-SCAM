@@ -16,7 +16,8 @@ import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { BadgeCheck, CalendarDays, Clock, Search, XCircle } from "lucide-react";
+import { BadgeCheck, CalendarDays, Clock, ExternalLink, Search, XCircle } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Reservation = {
@@ -28,7 +29,26 @@ type Reservation = {
   reservationFee: number;
   xenditPaymentStatus: string;
   createdAt?: string;
+  resortId?: number;
+  resortName?: string;
 };
+
+function normalizeAdminReservation(raw: Record<string, unknown>): Reservation {
+  const resort = raw.resort as Record<string, unknown> | undefined;
+  const resortId = Number(raw.resortId ?? raw.resort_id ?? resort?.id ?? 0) || undefined;
+  return {
+    id: Number(raw.id),
+    referenceNo: String(raw.referenceNo ?? raw.reference_no ?? ""),
+    status: String(raw.status ?? ""),
+    checkInDate: String(raw.checkInDate ?? raw.check_in_date ?? ""),
+    checkOutDate: String(raw.checkOutDate ?? raw.check_out_date ?? ""),
+    reservationFee: Number(raw.reservationFee ?? raw.reservation_fee ?? 0),
+    xenditPaymentStatus: String(raw.xenditPaymentStatus ?? raw.xendit_payment_status ?? ""),
+    createdAt: raw.createdAt != null ? String(raw.createdAt) : raw.created_at != null ? String(raw.created_at) : undefined,
+    resortId,
+    resortName: resort?.name != null ? String(resort.name) : undefined,
+  };
+}
 
 type PaginatedEnvelope = {
   success: boolean;
@@ -84,7 +104,7 @@ export default function AdminReservationsPage() {
       });
       const payload = data.data;
       const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
-      setReservations(rows);
+      setReservations(rows.map((r) => normalizeAdminReservation(r as Record<string, unknown>)));
       setMeta(extractLaravelMeta(payload));
       setError(null);
     } catch (err) {
@@ -134,7 +154,10 @@ export default function AdminReservationsPage() {
   const overrideStatus = async (id: number, status: string) => {
     setOverridingId(id);
     try {
-      await apiClient.post(`/reservations/${id}/admin-override`, { status, reason: "Admin manual override" });
+      await apiClient.post(`/reservations/${id}/admin-override`, {
+        status,
+        reason: `Admin status override to ${status} from reservations console.`,
+      });
       setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
       pushToast({ title: "Reservation updated", tone: "success" });
     } catch {
@@ -205,6 +228,24 @@ export default function AdminReservationsPage() {
                 key={r.id}
                 title={<span className="font-mono text-sm">{r.referenceNo}</span>}
                 fields={[
+                  ...(r.resortId
+                    ? [
+                        {
+                          label: "Resort",
+                          value: (
+                            <Link
+                              href={`/resorts/${r.resortId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 font-semibold text-sky-700 underline"
+                            >
+                              {r.resortName ?? `Resort #${r.resortId}`}
+                              <ExternalLink size={12} />
+                            </Link>
+                          ),
+                        },
+                      ]
+                    : []),
                   {
                     label: "Dates",
                     value: (
@@ -250,6 +291,8 @@ export default function AdminReservationsPage() {
                       <option value="confirmed">confirmed</option>
                       <option value="cancelled">cancelled</option>
                       <option value="expired">expired</option>
+                      <option value="no_show">no_show</option>
+                      <option value="completed">completed</option>
                     </select>
                   </div>
                 }
@@ -267,6 +310,7 @@ export default function AdminReservationsPage() {
           headers={
             <>
               <SortableTh label="Reference" sortKey="reference_no" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Resort</th>
               <SortableTh label="Check-in" sortKey="check_in_date" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <SortableTh label="Check-out" sortKey="check_out_date" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <th>Fee</th>
@@ -282,11 +326,26 @@ export default function AdminReservationsPage() {
             isEmpty={reservations.length === 0}
             emptyText="No reservations found."
             withinTable
-            colSpan={7}
+            colSpan={8}
           >
             {reservations.map((r) => (
               <tr key={r.id}>
                 <td className="font-mono font-semibold text-navy">{r.referenceNo}</td>
+                <td className="max-w-[10rem] truncate text-sm text-zinc-700">
+                  {r.resortId ? (
+                    <Link
+                      href={`/resorts/${r.resortId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-sky-700 underline"
+                    >
+                      <span className="truncate">{r.resortName ?? `#${r.resortId}`}</span>
+                      <ExternalLink size={12} className="shrink-0" />
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className="text-zinc-600">{r.checkInDate}</td>
                 <td className="text-zinc-600">{r.checkOutDate}</td>
                 <td className="text-zinc-700">₱{Number(r.reservationFee).toLocaleString()}</td>
@@ -317,6 +376,8 @@ export default function AdminReservationsPage() {
                       <option value="confirmed">confirmed</option>
                       <option value="cancelled">cancelled</option>
                       <option value="expired">expired</option>
+                      <option value="no_show">no_show</option>
+                      <option value="completed">completed</option>
                     </select>
                   </DashTableActionsInner>
                 </DashTableActionsCell>
