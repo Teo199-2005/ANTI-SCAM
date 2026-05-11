@@ -127,19 +127,6 @@ class SubscriptionInvoiceController extends Controller
                 );
             }
 
-            $assigned = DB::table('marketer_resorts')
-                ->where('marketer_id', $marketer->id)
-                ->where('resort_id', $resort->id)
-                ->exists();
-
-            if (! $assigned) {
-                return $this->errorResponse(
-                    'This referral code is not linked to your resort. Use the code from your assigned marketer.',
-                    ['referral_code' => ['not_assigned']],
-                    422
-                );
-            }
-
             $marketerId = $marketer->id;
 
             // Gate: resort profile must be complete before the first-month-free promo

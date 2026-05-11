@@ -45,20 +45,8 @@ class ReferralValidationController extends Controller
         $readinessPayload = null;
 
         if ($resortId !== null) {
-            $assigned = DB::table('marketer_resorts')
-                ->where('marketer_id', $marketer->id)
-                ->where('resort_id', $resortId)
-                ->exists();
-
-            if (! $assigned) {
-                return $this->successResponse([
-                    'valid' => false,
-                    'message' => 'This referral code is not linked to this resort. Ask your marketer for the correct code.',
-                ], 'Referral check');
-            }
-
-            // Include readiness so the frontend can show a checklist before the owner
-            // proceeds to checkout; enforcement also happens in SubscriptionInvoiceController.
+            // For UX: treat referral code verification as marketer-wide.
+            // The resort/profile readiness gate remains enforced for applying first-month-free.
             $resort = Resort::withoutGlobalScopes()->find($resortId);
             if ($resort) {
                 $readinessPayload = $this->readiness->check($resort);
