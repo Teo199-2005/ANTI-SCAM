@@ -25,21 +25,21 @@ const rawProvinces = listProvinces();
 const rawMuncities = listMuncities();
 
 export const phRegions: PhRegion[] = rawRegions.map((r) => ({
-  code: r.code,
-  name: r.name,
+  code: r.regCode,
+  name: r.regionName,
 }));
 
 export const phProvinces: PhProvince[] = rawProvinces.map((p) => ({
-  code: p.code,
-  name: p.name,
-  regionCode: p.regionCode,
+  code: p.provCode ?? p.psgcCode,
+  name: p.provName,
+  regionCode: p.regCode,
 }));
 
 export const phCitiesAndMunicipalities: PhCityOrMunicipality[] = rawMuncities.map((m) => ({
-  code: m.code,
-  name: m.name,
-  provinceCode: m.provinceCode,
-  regionCode: m.regionCode,
+  code: m.psgcCode,
+  name: m.munCityName,
+  provinceCode: m.provCode,
+  regionCode: m.regCode,
 }));
 
 export function getProvincesForRegion(regionCode: string): PhProvince[] {
