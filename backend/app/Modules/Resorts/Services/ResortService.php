@@ -3,11 +3,12 @@
 namespace App\Modules\Resorts\Services;
 
 use App\Models\Resort;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\SafeSort;
+use App\Support\TenantPublicIdentifier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 
 class ResortService
 {
@@ -71,6 +72,22 @@ class ResortService
             }
         }
 
+        // Keep public /stay/{subdomain} aligned with resort name whenever the profile payload includes `name`
+        // (owner dashboard always sends it on save — fixes legacy subdomains derived from owner name).
+        if (array_key_exists('name', $payload)) {
+            $resort->loadMissing('tenant');
+            $tenant = $resort->tenant;
+            if ($tenant instanceof Tenant) {
+                $idealBase = TenantPublicIdentifier::preferredSubdomainBaseFromResortName($payload['name'], null);
+                if ($tenant->subdomain !== $idealBase) {
+                    $newSub = TenantPublicIdentifier::allocateUniqueSubdomain($idealBase, $tenant->id);
+                    if ($newSub !== $tenant->subdomain) {
+                        $tenant->update(['subdomain' => $newSub, 'slug' => $newSub]);
+                    }
+                }
+            }
+        }
+
         if (! empty($changes)) {
             $resort->update($changes);
         }
@@ -85,9 +102,8 @@ class ResortService
 
     public function generateTenantMetadata(string $name): array
     {
-        $baseSlug = Str::slug($name);
-        $base = $baseSlug !== '' ? $baseSlug : 'resort';
-        $unique = $base.'-'.Str::lower(Str::random(6));
+        $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName($name, null);
+        $unique = TenantPublicIdentifier::allocateUniqueSubdomain($base);
 
         return [
             'slug' => $unique,

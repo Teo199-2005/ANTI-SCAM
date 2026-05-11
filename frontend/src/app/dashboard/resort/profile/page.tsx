@@ -730,6 +730,11 @@ export default function ResortProfilePage() {
             Copy link
           </button>
         </div>
+        <p className="text-xs leading-snug text-zinc-500">
+          The web address is built from your <strong className="font-semibold text-zinc-600">Resort name</strong> (for example, TEO →{" "}
+          <span className="font-mono text-[11px] text-navy">/stay/teo</span>). Change the name above and click <strong className="font-semibold text-zinc-600">Save profile</strong> to
+          update the link. If that short name is already taken, a short random suffix is added automatically.
+        </p>
       </div>
 
       {/* Cancellation policy */}

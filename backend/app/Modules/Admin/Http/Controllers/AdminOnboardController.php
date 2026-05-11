@@ -8,13 +8,13 @@ use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Modules\Subscriptions\Services\SubscriptionService;
+use App\Support\TenantPublicIdentifier;
 use App\Services\EmailNotificationService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AdminOnboardController extends Controller
@@ -44,14 +44,17 @@ class AdminOnboardController extends Controller
         ]);
 
         $payload = DB::transaction(function () use ($validated): array {
-            $seed = Str::slug($validated['tenant_name']);
-            $base = $seed !== '' ? $seed : 'resort';
-            $suffix = Str::lower(Str::random(6));
+            $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName(
+                $validated['resort_name'],
+                $validated['tenant_name'],
+            );
+            $publicKey = $validated['subdomain']
+                ?? TenantPublicIdentifier::allocateUniqueSubdomain($base);
 
             $tenant = Tenant::create([
                 'name' => $validated['tenant_name'],
-                'slug' => $validated['slug'] ?? "{$base}-{$suffix}",
-                'subdomain' => $validated['subdomain'] ?? "{$base}-{$suffix}",
+                'slug' => $validated['slug'] ?? $publicKey,
+                'subdomain' => $publicKey,
                 'status' => 'active',
             ]);
 
@@ -163,14 +166,17 @@ class AdminOnboardController extends Controller
         ]);
 
         $payload = DB::transaction(function () use ($validated, $user): array {
-            $seed = Str::slug($validated['tenant_name']);
-            $base = $seed !== '' ? $seed : 'resort';
-            $suffix = Str::lower(Str::random(6));
+            $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName(
+                $validated['resort_name'],
+                $validated['tenant_name'],
+            );
+            $publicKey = $validated['subdomain']
+                ?? TenantPublicIdentifier::allocateUniqueSubdomain($base);
 
             $tenant = Tenant::create([
                 'name' => $validated['tenant_name'],
-                'slug' => $validated['slug'] ?? "{$base}-{$suffix}",
-                'subdomain' => $validated['subdomain'] ?? "{$base}-{$suffix}",
+                'slug' => $validated['slug'] ?? $publicKey,
+                'subdomain' => $publicKey,
                 'status' => 'active',
             ]);
 
