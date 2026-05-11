@@ -505,7 +505,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         key={`duration-${offer.duration}`}
                         type="button"
                         onClick={() => setSelectedDuration(offer.duration)}
-                        className={`flex flex-col items-start gap-0.5 rounded-lg border px-2 py-1.5 text-left transition sm:rounded-xl sm:px-2 sm:py-2 ${
+                        className={`flex min-w-0 flex-col items-stretch gap-0.5 rounded-lg border px-2 py-1.5 text-left transition sm:rounded-xl sm:px-2 sm:py-2 ${
                           active
                             ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/30"
                             : "border-softBorder bg-white hover:border-primaryBlue/35"
@@ -517,11 +517,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                             {offer.duration} month{offer.duration > 1 ? "s" : ""}
                           </span>
                         </span>
-                        <span className="w-full text-[10px] leading-tight text-zinc-500 sm:text-[11px]">
+                        <span className="min-w-0 w-full break-words whitespace-normal text-[10px] leading-tight text-zinc-500 sm:text-[11px]">
                           {offer.billingType}
                         </span>
-                        <span className="mt-0.5 w-full font-dash text-[10px] font-bold tabular-nums leading-tight text-navy sm:text-[11px]">
-                          <span className="text-zinc-400 line-through decoration-zinc-400 decoration-1">
+                        <span className="mt-0.5 min-w-0 w-full break-words whitespace-normal font-dash text-[10px] font-bold tabular-nums leading-tight text-navy sm:text-[11px]">
+                          <span className="text-zinc-400 line-through decoration-zinc-400 decoration-1 break-words">
                             ₱{offer.listMonthlyRate.toLocaleString()}
                           </span>
                           <span className="mx-0.5 text-zinc-300">·</span>
