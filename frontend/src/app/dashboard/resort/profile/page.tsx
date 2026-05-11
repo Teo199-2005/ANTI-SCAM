@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import { laravelPublicUrl } from "@/lib/publicAsset";
+import { resortPublicLandingPageUrl } from "@/lib/urls/resortPublicLandingUrl";
 import {
   AlertTriangle,
   Building2,
@@ -84,16 +85,8 @@ export default function ResortProfilePage() {
   /** Same readiness rules as the public `/stay/{subdomain}` page (includes active room + photo). */
   const [ownerLanding, setOwnerLanding] = useState<OwnerLandingPageResponse | null>(null);
 
-  const publicLink = (() => {
-    if (!subdomain || typeof window === "undefined") return "";
-    const { protocol, hostname, port } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return `${protocol}//${subdomain}.localhost${port ? `:${port}` : ""}`;
-    }
-    const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim();
-    if (root) return `${protocol}//${subdomain}.${root}`;
-    return `${protocol}//${subdomain}.localhost${port ? `:${port}` : ""}`;
-  })();
+  const publicLink =
+    subdomain && typeof window !== "undefined" ? resortPublicLandingPageUrl(subdomain) : "";
 
   useEffect(() => {
     const load = async () => {

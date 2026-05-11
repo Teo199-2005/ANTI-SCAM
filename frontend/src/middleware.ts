@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Production apex domain (no protocol), e.g. anti-scamph.com.
- * Required for `{tenant}.anti-scamph.com` → `/stay/{tenant}` routing (dedicated landing; avoids /resorts/[id] catalog collision).
+ * When set, `{tenant}.{root}` is rewritten to `/stay/{tenant}` (optional; needs wildcard DNS).
+ * Shareable links use `{apex}/stay/{tenant}` so owners work without `*.{root}` DNS.
  * If unset, only `*.localhost` is treated as tenant hosts (local dev).
  */
 const ROOT_DOMAIN_CONFIG = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase() ?? "";

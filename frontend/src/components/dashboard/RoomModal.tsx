@@ -504,7 +504,7 @@ export default function RoomModal({
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:space-y-4 md:p-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <p className="rounded-xl border border-skyBlue/25 bg-sky-50/90 px-3 py-2 text-xs leading-relaxed text-sky-950 md:px-4 md:py-3 md:text-sm">
               These photos appear on your{" "}
-              <strong className="font-semibold">public resort landing</strong> (subdomain page) and when guests{" "}
+              <strong className="font-semibold">public resort landing</strong> (your /stay/ page) and when guests{" "}
               <strong className="font-semibold">explore rooms</strong> for your property. Up to <strong>5</strong> images
               per room.
             </p>
