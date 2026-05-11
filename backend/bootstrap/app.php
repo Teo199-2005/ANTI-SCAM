@@ -22,6 +22,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // So Laravel uses X-Forwarded-For / X-Real-IP (from Nginx and from the Next.js BFF)
+        // for Request::ip() — required for per-visitor auth rate limits when the BFF proxies to PHP.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO
+                | Request::HEADER_X_FORWARDED_PREFIX
+        );
+
         $middleware->alias([
             'role' => EnsureUserRole::class,
             'tenant' => TenantMiddleware::class,

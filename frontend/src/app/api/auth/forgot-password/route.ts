@@ -1,3 +1,4 @@
+import { authBffJsonHeaders } from "@/lib/api/authBffProxyHeaders";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     backendRes = await fetch(`${BACKEND}/auth/forgot-password`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: authBffJsonHeaders(req),
       body: JSON.stringify(body),
     });
   } catch {
