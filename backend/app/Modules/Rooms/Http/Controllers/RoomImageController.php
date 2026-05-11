@@ -30,7 +30,8 @@ class RoomImageController extends Controller
         $request->validate([
             // enforce max 5 images per room
             'images'   => ['required', 'array', 'min:1', 'max:5'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            // Allow room photos up to ~8 MB each
+            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
         ]);
 
         $files = $request->file('images');

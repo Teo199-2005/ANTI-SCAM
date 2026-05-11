@@ -126,7 +126,8 @@ class AdminOnboardController extends Controller
     public function uploadLogo(Request $request)
     {
         $request->validate([
-            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            // Allow admin-uploaded resort logos up to ~8 MB
+            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
         ]);
 
         $path = $request->file('logo')->store('resort-logos', 'public');
@@ -218,7 +219,8 @@ class AdminOnboardController extends Controller
         }
 
         $request->validate([
-            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            // Allow owner-uploaded resort logos up to ~8 MB
+            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
         ]);
 
         $resort = Resort::withoutGlobalScopes()
