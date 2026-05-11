@@ -150,7 +150,8 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
         if (!alive) return;
         setOtpExpiresAt(payload.expires_at);
         setOtpMessage(payload.message);
-        applyCooldownFromPayload(payload.cooldown_seconds);
+        // Keep Resend usable right after first load; 60s cooldown only after manual resend.
+        setResendCooldown(0);
         notifyVerificationEmailSent(payload);
       })
       .catch((err: unknown) => {
@@ -177,20 +178,15 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     setSendMode(null);
   }, [needsOtpVerification]);
 
+  // Single ticking interval while OTP gate is shown (avoid deps on `resendCooldown` — that
+  // recreated the timer every second and made the countdown stall / Resend feel stuck).
   useEffect(() => {
-    if (!needsOtpVerification || resendCooldown <= 0) return;
-    const timer = window.setInterval(() => {
-      setResendCooldown((current) => {
-        if (current <= 1) {
-          window.clearInterval(timer);
-          return 0;
-        }
-        return current - 1;
-      });
+    if (!needsOtpVerification) return;
+    const id = window.setInterval(() => {
+      setResendCooldown((current) => (current <= 0 ? 0 : current - 1));
     }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [needsOtpVerification, resendCooldown]);
+    return () => window.clearInterval(id);
+  }, [needsOtpVerification]);
 
   const resendDisabled = (sendingOtp && sendMode === "manual") || resendCooldown > 0;
 
