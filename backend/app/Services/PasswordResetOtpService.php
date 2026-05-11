@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EmailLog;
 use App\Models\PasswordResetOtp;
 use App\Models\User;
+use App\Support\OutboundMail;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -29,6 +30,14 @@ class PasswordResetOtpService
      */
     public function sendForEmail(string $normalizedEmail): array
     {
+        if (! OutboundMail::isConfiguredForDelivery()) {
+            return [
+                'ok' => false,
+                'message' => 'Email could not be sent: outbound mail is not configured on the server. Please contact support.',
+                'expires_at' => null,
+            ];
+        }
+
         $user = User::query()
             ->whereRaw('lower(email) = ?', [mb_strtolower(trim($normalizedEmail))])
             ->first();

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EmailLog;
 use App\Models\EmailVerificationOtp;
 use App\Models\User;
+use App\Support\OutboundMail;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -23,6 +24,13 @@ class EmailVerificationOtpService
 
     public function send(User $user): array
     {
+        if (! OutboundMail::isConfiguredForDelivery()) {
+            return [
+                'ok' => false,
+                'message' => 'Email could not be sent: outbound mail is not configured on the server (mail driver is log/array). Configure SMTP in the API environment and try again, or contact support.',
+            ];
+        }
+
         $lock = Cache::lock("email_otp_send_lock:{$user->id}", 10);
         if (! $lock->get()) {
             return [
