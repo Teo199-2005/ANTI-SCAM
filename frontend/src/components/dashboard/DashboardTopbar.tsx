@@ -6,6 +6,7 @@ import { createSubscriptionInvoice } from "@/lib/api/subscription";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { validateReferralCode } from "@/lib/api/referral";
 import type { ReadinessPayload } from "@/lib/api/referral";
+import { clearPendingReferralSignup, readPendingReferralSignup } from "@/lib/pendingReferralSignup";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeReferralCodeInput } from "@/lib/inputRestrictions";
 import { getMarketingStats, type MarketingStats } from "@/lib/api/marketing";
@@ -176,6 +177,10 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       setReferralInlineError(null);
       return;
     }
+    const pending = readPendingReferralSignup();
+    if (pending?.code) {
+      setReferralCode(pending.code);
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowSubscribeModal(false);
     };
@@ -206,6 +211,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       setAppliedReferralCode(result.code);
       setAppliedMarketerName(result.marketer_name);
       setReferralReadiness(result.readiness);
+      clearPendingReferralSignup();
       const ready = result.readiness?.is_ready ?? false;
       pushToast({
         title: "Referral code verified",

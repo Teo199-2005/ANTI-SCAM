@@ -1,4 +1,5 @@
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
+import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import { BedDouble, CalendarDays, Shield } from "lucide-react";
 
 export default function BookingSummary({
@@ -45,6 +46,7 @@ export default function BookingSummary({
         <span className="text-2xl font-normal text-clOcean">₱</span>
         {reservationFee.toLocaleString()}
       </p>
+      <ReservationFeeBreakdownPanel totalPhp={reservationFee} variant="compact" className="mt-4" />
       <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-zinc-500">
         <Shield size={14} className="mt-0.5 shrink-0 text-clOcean/60" aria-hidden />
         <span>

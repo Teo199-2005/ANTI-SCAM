@@ -1,10 +1,9 @@
-import HeroSection from "@/components/home/HeroSection";
-import heroCover from "../../../public/coverphoto.png";
 import type { Metadata } from "next";
+import { LandingPremiumPage } from "@/components/landing-preview/LandingPremiumPage";
 
-const homeTitle = "Anti-Scam PH — Verified resort bookings & scam-aware protection";
+const homeTitle = "Anti-Scam PH — Verified resort bookings in the Philippines";
 const homeDescription =
-  "Discover verified resorts across the Philippines. Transparent pricing, secure booking flow, and protections designed to reduce scam risk—plan your staycation with confidence.";
+  "Anti-Scam PH helps Philippine resorts prevent fake bookings, avoid double reservations, and build guest trust through verified booking technology. Plan your staycation with confidence.";
 
 export const metadata: Metadata = {
   title: homeTitle,
@@ -16,10 +15,10 @@ export const metadata: Metadata = {
     url: "/",
     images: [
       {
-        url: "/coverphoto.png",
-        width: heroCover.width,
-        height: heroCover.height,
-        alt: "Anti-Scam PH resort booking",
+        url: "/founding500.png",
+        width: 560,
+        height: 620,
+        alt: "Anti-Scam PH founding resort partners",
       },
     ],
   },
@@ -27,10 +26,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: homeTitle,
     description: homeDescription,
-    images: ["/coverphoto.png"]
-  }
+    images: ["/founding500.png"],
+  },
 };
 
 export default function Home() {
-  return <HeroSection />;
+  return <LandingPremiumPage />;
 }

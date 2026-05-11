@@ -14,6 +14,8 @@ type BrandWordmarkProps = {
   subtitleSmOnly?: boolean;
   className?: string;
   as?: ElementType;
+  /** Poppins (`font-pop`) instead of nav Montserrat — use with landing / marketing typography */
+  displayHeading?: boolean;
 };
 
 const titleSize: Record<BrandWordmarkSize, string> = {
@@ -35,8 +37,8 @@ const subtitleSize: Record<BrandWordmarkSize, string> = {
 };
 
 /**
- * Product wordmark: **Anti-** / **Scam** / **PH** (navy · alert red · navy), Montserrat, uppercase.
- * Use `tone="onDark"` on deep navy / hero overlays; default `onLight` for light backgrounds.
+ * Product wordmark: **Anti-** / **Scam** / **PH** (navy · alert red · navy), uppercase.
+ * Default: Montserrat (`font-nav`). With `displayHeading`, Poppins (`font-pop`) for landing typography.
  */
 export function BrandWordmark({
   tone = "onLight",
@@ -45,6 +47,7 @@ export function BrandWordmark({
   subtitleSmOnly = false,
   className,
   as: Comp = "span",
+  displayHeading = false,
 }: BrandWordmarkProps) {
   const navy = tone === "onLight" ? "text-navy" : "text-white";
   const subColor = tone === "onLight" ? "text-zinc-500" : "text-white/65";
@@ -57,7 +60,12 @@ export function BrandWordmark({
         className,
       )}
     >
-      <span className={cn("font-nav font-extrabold uppercase leading-tight", titleSize[size])}>
+      <span
+        className={cn(
+          displayHeading ? "font-pop font-extrabold uppercase leading-tight" : "font-nav font-extrabold uppercase leading-tight",
+          titleSize[size],
+        )}
+      >
         <span className={navy}>Anti-</span>
         <span className="text-clScamWordmark">Scam</span>
         <span className={navy}> PH</span>
@@ -65,7 +73,7 @@ export function BrandWordmark({
       {subtitle ? (
         <span
           className={cn(
-            "mt-0.5 font-nav font-semibold uppercase leading-tight",
+            displayHeading ? "font-pop font-semibold uppercase leading-tight" : "font-nav font-semibold uppercase leading-tight",
             subtitleSize[size],
             subColor,
             subtitleSmOnly && "hidden sm:block",

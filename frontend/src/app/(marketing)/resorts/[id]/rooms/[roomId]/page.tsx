@@ -12,6 +12,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useState } from "react";
@@ -104,6 +105,7 @@ function RoomDetailInner({ params }: { params: Promise<{ id: string; roomId: str
 
   const checkoutHref = `/resorts/${resortId}/checkout?roomId=${roomId}&checkIn=${checkIn}&checkOut=${checkOut}&resortId=${resortId}`;
   const checkOutMin = checkIn ? addDays(checkIn, 1) : today;
+  const reservationFeePhp = Number(room.reservationFee ?? 500);
 
   return (
     <PageContainer className="section-padding">
@@ -261,13 +263,16 @@ function RoomDetailInner({ params }: { params: Promise<{ id: string; roomId: str
                   </div>
                   <div className="flex justify-between text-amber-700">
                     <span>Reservation fee (now)</span>
-                    <span>₱500</span>
+                    <span>
+                      ₱{reservationFeePhp.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </span>
                   </div>
                   <div className="flex justify-between border-t border-zinc-200 pt-2 font-semibold text-zinc-900">
                     <span>Balance at resort</span>
                     <span>₱{(Number(room.basePrice) * nights).toLocaleString()}</span>
                   </div>
                 </div>
+                <ReservationFeeBreakdownPanel totalPhp={reservationFeePhp} variant="compact" className="mt-3" />
               </div>
             ) : null}
 

@@ -20,6 +20,8 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
   const fixedOverlayNav = isAuthMarketingNavOverlayPath(pathname);
   /** Home (`/`) only — auth pages use `AuthSplitShell` for their own top offset. */
   const mainTopPadForFixedNav = fixedOverlayNav && !isAuthSplitShellPath(pathname);
+  /** Premium home ships its own header; skip duplicate `Navbar` and use a tighter main shell. */
+  const marketingHomeFullBleed = pathname === "/";
 
   useEffect(() => {
     if (!loading && user) {
@@ -33,6 +35,16 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
         message="Redirecting…"
         submessage="You’re already signed in. Sending you to your dashboard."
       />
+    );
+  }
+
+  if (marketingHomeFullBleed) {
+    return (
+      <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-white">
+        {/* No flex-1 — avoid a tall empty band above <Footer /> when page content is shorter than the viewport */}
+        <main className="relative z-0 min-w-0 shrink-0 grow-0">{children}</main>
+        <Footer />
+      </div>
     );
   }
 

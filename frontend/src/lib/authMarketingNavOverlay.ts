@@ -3,7 +3,7 @@
  * (home hero, auth split imagery). Uses exact matches + known subpaths only —
  * `/` is never matched as a prefix of other paths.
  */
-const FLOATING_NAV_EXACT = ["/", "/login", "/register", "/forgot-password", "/landing-preview"] as const;
+const FLOATING_NAV_EXACT = ["/", "/login", "/register", "/forgot-password"] as const;
 const FLOATING_NAV_PREFIX = ["/login/", "/register/", "/forgot-password/"] as const;
 
 export function isAuthMarketingNavOverlayPath(pathname: string | null): boolean {

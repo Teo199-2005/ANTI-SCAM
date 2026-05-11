@@ -74,6 +74,10 @@ const config: Config = {
         heading: ["var(--font-playfair)", "serif"],
         /** Nav bar brand + menu — Montserrat loaded in root layout */
         nav: ["var(--font-montserrat)", "var(--font-plus-jakarta)", "system-ui", "sans-serif"],
+        /** Landing preview / display headings (Poppins loaded in root layout) */
+        pop: ["var(--font-poppins)", "system-ui", "sans-serif"],
+        /** Full-page marketing (e.g. older Montserrat sections) */
+        mont: ["var(--font-montserrat)", "system-ui", "sans-serif"],
         body: ["var(--font-inter)", "sans-serif"],
         /** Dashboard + all authenticated product UI */
         dash: ["var(--font-plus-jakarta)", "Plus Jakarta Sans", "sans-serif"],

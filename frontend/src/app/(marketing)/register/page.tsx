@@ -7,21 +7,26 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHydrated } from "@/hooks/useHydrated";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
+import { validateReferralCodePublic } from "@/lib/api/referral";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import {
   sanitizeBusinessOrResortName,
   sanitizeEmailTyping,
   sanitizePersonName,
   sanitizePhilippinesMobileInput,
+  sanitizeReferralCodeInput,
 } from "@/lib/inputRestrictions";
+import { setPendingReferralFromSignup } from "@/lib/pendingReferralSignup";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Eye, EyeOff, Lock, Mail, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Eye, EyeOff, Loader2, Lock, Mail, UserPlus, X } from "lucide-react";
 
 const authInput =
-  "w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.875rem] md:rounded-lg md:py-2 md:text-sm";
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.625rem] md:py-2";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -38,6 +43,44 @@ export default function RegisterPage() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const [referralDraft, setReferralDraft] = useState("");
+  const [appliedReferral, setAppliedReferral] = useState<{ code: string; marketerName: string } | null>(null);
+  const [referralFieldError, setReferralFieldError] = useState<string | null>(null);
+  const [referralVerifyModalOpen, setReferralVerifyModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const clearAppliedReferral = () => {
+    setAppliedReferral(null);
+    setReferralFieldError(null);
+  };
+
+  const applyReferral = async () => {
+    setReferralFieldError(null);
+    const normalized = sanitizeReferralCodeInput(referralDraft);
+    if (!normalized) {
+      setReferralFieldError("Enter a referral code first.");
+      return;
+    }
+    setReferralVerifyModalOpen(true);
+    try {
+      const result = await validateReferralCodePublic(normalized);
+      if (!result.valid) {
+        setReferralFieldError(result.message);
+        return;
+      }
+      setAppliedReferral({ code: result.code, marketerName: result.marketer_name });
+      setReferralDraft(result.code);
+    } catch {
+      setReferralFieldError("Unable to verify. Check your connection and try again.");
+    } finally {
+      setReferralVerifyModalOpen(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +109,12 @@ export default function RegisterPage() {
         password_confirmation: passwordConfirmation,
         accept_terms: true,
       });
+      if (appliedReferral) {
+        setPendingReferralFromSignup({
+          code: appliedReferral.code,
+          marketerName: appliedReferral.marketerName,
+        });
+      }
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
@@ -76,25 +125,48 @@ export default function RegisterPage() {
 
   return (
     <AuthSplitShell>
-      <div className={AUTH_MARKETING_CARD}>
-        <div className="mb-4 flex gap-3 sm:mb-3 sm:items-center">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20 sm:h-10 sm:w-10">
-            <UserPlus size={18} strokeWidth={2} />
+      {mounted && referralVerifyModalOpen
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[400] flex items-center justify-center bg-zinc-900/45 p-4 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="register-referral-verify-title"
+              aria-busy="true"
+            >
+              <div className="w-full max-w-sm rounded-2xl border border-white/20 bg-white px-6 py-8 text-center shadow-2xl shadow-zinc-900/25">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-clOcean/10">
+                  <Loader2 className="h-8 w-8 animate-spin text-clOcean" aria-hidden />
+                </div>
+                <p id="register-referral-verify-title" className="mt-4 font-heading text-lg font-semibold text-zinc-900">
+                  Verifying referral code
+                </p>
+                <p className="mt-1.5 text-sm text-zinc-600">Please wait while we check this code…</p>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      <div className={cn(AUTH_MARKETING_CARD, "!p-4 sm:!p-5")}>
+        <div className="mb-3 flex gap-2.5 sm:mb-2.5 sm:items-center">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20 sm:h-9 sm:w-9">
+            <UserPlus size={17} strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1 pt-0.5">
-            <h1 className="font-heading text-[1.35rem] font-semibold leading-tight tracking-tight text-zinc-900 sm:text-2xl">
+            <h1 className="font-heading text-xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-[1.35rem]">
               Create your account
             </h1>
-            <p className="mt-1 text-sm leading-relaxed text-zinc-600 sm:mt-0.5 sm:leading-snug">
+            <p className="mt-0.5 text-xs leading-snug text-zinc-600 sm:text-sm sm:leading-snug">
               Book resorts and track reservations in one place.
             </p>
           </div>
         </div>
 
-        <div className="max-lg:mb-4 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-3 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
+        <div className="max-lg:mb-3 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-2.5 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
         <a
           href={googleOAuthRedirectUrl()}
-          className="mb-3 flex w-full min-h-[2.875rem] items-center justify-center gap-2 rounded-xl border border-zinc-200/90 bg-white py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 max-lg:mb-3 max-lg:shadow-md max-lg:shadow-clOcean/10 max-lg:active:scale-[0.99] lg:mb-3 lg:shadow-sm md:rounded-lg md:py-2"
+          className="mb-2 flex w-full min-h-[2.5rem] items-center justify-center gap-2 rounded-lg border border-zinc-200/90 bg-white py-2.5 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 max-lg:shadow-sm max-lg:active:scale-[0.99] lg:mb-2.5"
         >
               <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -105,7 +177,7 @@ export default function RegisterPage() {
           Continue with Google
         </a>
 
-        <div className="relative mb-0 text-center text-[11px] font-semibold uppercase tracking-wider text-zinc-500 lg:mb-3">
+        <div className="relative mb-0 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-500 lg:mb-2.5">
           <span className="relative z-10 bg-white px-3 max-lg:rounded-full max-lg:bg-white max-lg:px-3 max-lg:shadow-sm">
             or register with email
           </span>
@@ -113,8 +185,8 @@ export default function RegisterPage() {
         </div>
         </div>
 
-        <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-4 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
-        <form className="space-y-4 md:space-y-3" onSubmit={onSubmit}>
+        <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-3 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
+        <form className="space-y-2.5 md:space-y-2" onSubmit={onSubmit}>
           {error ? (
             <p role="alert" className="rounded-lg border border-red-200/90 bg-red-50 px-3 py-2 text-sm text-red-800">
               {error}
@@ -122,7 +194,7 @@ export default function RegisterPage() {
           ) : null}
 
           <div>
-            <label htmlFor="register-name" className="mb-1.5 block text-xs font-semibold text-zinc-700">
+            <label htmlFor="register-name" className="mb-1 block text-[11px] font-semibold text-zinc-700">
               Full name
             </label>
             <input
@@ -137,9 +209,9 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-3">
+          <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-2">
             <div>
-              <label htmlFor="register-phone" className="mb-1.5 block text-xs font-semibold text-zinc-700">
+              <label htmlFor="register-phone" className="mb-1 block text-[11px] font-semibold text-zinc-700">
                 Contact number
               </label>
               <input
@@ -156,7 +228,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label htmlFor="register-business" className="mb-1.5 block text-xs font-semibold text-zinc-700">
+              <label htmlFor="register-business" className="mb-1 block text-[11px] font-semibold text-zinc-700">
                 Business name
               </label>
               <input
@@ -171,7 +243,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="register-email" className="mb-1.5 block text-xs font-semibold text-zinc-700">
+            <label htmlFor="register-email" className="mb-1 block text-[11px] font-semibold text-zinc-700">
               Email
             </label>
             <div className="relative">
@@ -191,87 +263,142 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="register-password" className="mb-1.5 block text-xs font-semibold text-zinc-700">
-              Password
-            </label>
-            <div className="relative">
-              <Lock size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
-              <input
-                id="register-password"
-                suppressHydrationWarning
-                className={`${authInput} pl-10 ${hydrated ? "pr-11" : "pr-4"}`}
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min 8 chars, mixed case + number"
-                aria-describedby="password-hint register-password-meter"
-              />
-              {hydrated ? (
-                <button
-                  type="button"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-500 outline-none transition hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-clOcean/25"
-                >
-                  {showPassword ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
-                </button>
-              ) : (
-                <span className="pointer-events-none absolute right-3 top-1/2 h-6 w-6 -translate-y-1/2" aria-hidden />
-              )}
+          <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-x-3 lg:gap-y-1">
+            <div className="min-w-0">
+              <label htmlFor="register-password" className="mb-1 block text-[11px] font-semibold text-zinc-700">
+                Password
+              </label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
+                <input
+                  id="register-password"
+                  suppressHydrationWarning
+                  className={`${authInput} pl-9 ${hydrated ? "pr-10" : "pr-4"}`}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Min 8 chars, mixed case + number"
+                  aria-describedby="password-hint register-password-meter"
+                />
+                {hydrated ? (
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-500 outline-none transition hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-clOcean/25"
+                  >
+                    {showPassword ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+                  </button>
+                ) : (
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 h-6 w-6 -translate-y-1/2" aria-hidden />
+                )}
+              </div>
             </div>
-            <p id="password-hint" className="mt-1 text-xs text-zinc-500">
+
+            <div className="min-w-0">
+              <label htmlFor="register-confirm" className="mb-1 block text-[11px] font-semibold text-zinc-700">
+                Confirm password
+              </label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
+                <input
+                  id="register-confirm"
+                  suppressHydrationWarning
+                  className={`${authInput} pl-9 ${hydrated ? "pr-10" : "pr-4"}`}
+                  type={showPasswordConfirmation ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  value={passwordConfirmation}
+                  onChange={(e) => setPasswordConfirmation(e.target.value)}
+                  placeholder="Repeat password"
+                />
+                {hydrated ? (
+                  <button
+                    type="button"
+                    aria-label={showPasswordConfirmation ? "Hide confirmation password" : "Show confirmation password"}
+                    aria-pressed={showPasswordConfirmation}
+                    onClick={() => setShowPasswordConfirmation((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-500 outline-none transition hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-clOcean/25"
+                  >
+                    {showPasswordConfirmation ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+                  </button>
+                ) : (
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 h-6 w-6 -translate-y-1/2" aria-hidden />
+                )}
+              </div>
+            </div>
+
+            <p id="password-hint" className="text-[10px] leading-snug text-zinc-500 lg:col-span-2">
               At least 8 characters with uppercase, lowercase, and a number.
             </p>
             <PasswordRequirementsMeter
-              className="mt-2"
+              className="lg:col-span-2"
+              dense
               password={password}
               confirmation={passwordConfirmation}
               id="register-password-meter"
             />
           </div>
 
-          <div>
-            <label htmlFor="register-confirm" className="mb-1.5 block text-xs font-semibold text-zinc-700">
-              Confirm password
-            </label>
-            <div className="relative">
-              <Lock size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-clOcean/55" aria-hidden />
-              <input
-                id="register-confirm"
-                suppressHydrationWarning
-                className={`${authInput} pl-10 ${hydrated ? "pr-11" : "pr-4"}`}
-                type={showPasswordConfirmation ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                value={passwordConfirmation}
-                onChange={(e) => setPasswordConfirmation(e.target.value)}
-                placeholder="Repeat password"
-              />
-              {hydrated ? (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="register-referral" className="text-[11px] font-semibold text-zinc-700">
+                Referral code <span className="font-normal text-zinc-500">(optional)</span>
+              </label>
+              {appliedReferral ? (
                 <button
                   type="button"
-                  aria-label={showPasswordConfirmation ? "Hide confirmation password" : "Show confirmation password"}
-                  aria-pressed={showPasswordConfirmation}
-                  onClick={() => setShowPasswordConfirmation((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-500 outline-none transition hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-clOcean/25"
+                  onClick={clearAppliedReferral}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-clOcean hover:bg-clOcean/10"
                 >
-                  {showPasswordConfirmation ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+                  <X className="h-3 w-3" aria-hidden />
+                  Change
                 </button>
-              ) : (
-                <span className="pointer-events-none absolute right-3 top-1/2 h-6 w-6 -translate-y-1/2" aria-hidden />
-              )}
+              ) : null}
             </div>
+            <div className="flex gap-2">
+              <input
+                id="register-referral"
+                suppressHydrationWarning
+                className={cn(authInput, "min-w-0 flex-1 font-mono uppercase tracking-wide")}
+                autoComplete="off"
+                spellCheck={false}
+                disabled={Boolean(appliedReferral)}
+                value={referralDraft}
+                onChange={(e) => setReferralDraft(sanitizeReferralCodeInput(e.target.value))}
+                placeholder="e.g. RODRIGUEZ8391"
+                maxLength={32}
+              />
+              <button
+                type="button"
+                onClick={() => void applyReferral()}
+                disabled={Boolean(appliedReferral) || referralVerifyModalOpen}
+                className="shrink-0 rounded-lg border border-clOcean/30 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-clOcean shadow-sm transition hover:bg-clSeafoam/50 disabled:pointer-events-none disabled:opacity-50"
+              >
+                Apply
+              </button>
+            </div>
+            {appliedReferral ? (
+              <p className="text-[11px] font-medium text-emerald-700">
+                Applied: <span className="font-mono">{appliedReferral.code}</span>
+                <span className="text-zinc-600"> — {appliedReferral.marketerName}</span>
+              </p>
+            ) : null}
+            {referralFieldError && !appliedReferral ? (
+              <p role="status" className="text-[11px] font-medium text-red-700">
+                {referralFieldError}
+              </p>
+            ) : null}
           </div>
 
-          <label className="flex items-start gap-3 rounded-xl border border-zinc-200/90 bg-zinc-50/90 px-3 py-3 text-xs leading-relaxed text-zinc-600 max-lg:bg-white/80 md:gap-2 md:rounded-lg md:px-2.5 md:py-2">
+          <label className="flex items-start gap-2 rounded-lg border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-2 text-[11px] leading-snug text-zinc-600 max-lg:bg-white/80">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-clOcean focus:ring-clOcean/30"
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-clOcean focus:ring-clOcean/30"
               checked={acceptTerms}
               onChange={(e) => setAcceptTerms(e.target.checked)}
             />
@@ -285,7 +412,7 @@ export default function RegisterPage() {
 
           <Button
             type="submit"
-            className="w-full justify-center rounded-xl py-3.5 text-sm font-semibold shadow-md shadow-clOcean/20 max-lg:min-h-[3rem] md:rounded-lg md:py-2.5"
+            className="w-full justify-center rounded-lg py-2.5 text-sm font-semibold shadow-md shadow-clOcean/20 max-lg:min-h-[2.75rem]"
             disabled={pending || !acceptTerms}
           >
             {pending ? "Creating account…" : "Create account"}
@@ -293,14 +420,14 @@ export default function RegisterPage() {
         </form>
         </div>
 
-        <p className="mt-4 text-center text-sm text-zinc-600">
+        <p className="mt-2.5 text-center text-xs text-zinc-600 sm:text-sm">
           Already have an account?{" "}
           <Link href="/login" className="font-semibold text-clOcean hover:text-clOceanHover hover:underline">
             Sign in
           </Link>
         </p>
 
-        <AuthPageBrandTagline />
+        <AuthPageBrandTagline className="mt-3 border-t-0 pt-2 md:mt-2 md:pt-2" />
       </div>
     </AuthSplitShell>
   );

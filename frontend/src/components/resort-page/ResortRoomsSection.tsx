@@ -19,7 +19,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import ScrollReveal from "@/components/shared/ScrollReveal";
+import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
 import { createPortal } from "react-dom";
 
 function extractRoomMeta(amenities: string[]) {
@@ -365,6 +367,8 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                       : "Enjoy a relaxing and secure stay with complete comfort and guest-first hospitality."}
                   </p>
                 </div>
+
+                <ReservationFeeBreakdownPanel totalPhp={RESERVATION_FEE_REFERENCE_TOTAL} variant="compact" className="mb-4" />
 
                 <div className="mb-4 rounded-xl border border-sky-200/80 bg-sky-50/50 p-3">
                   <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-900">

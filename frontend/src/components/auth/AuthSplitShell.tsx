@@ -57,50 +57,65 @@ type AuthSplitShellProps = {
  */
 export function AuthSplitShell({ children }: AuthSplitShellProps) {
   const pathname = usePathname();
-  /** Auth pages use fixed nav — pad so hero/imagery is not covered (home `/` uses HeroSection instead). */
+  /** Auth pages use fixed nav — pad so hero/imagery is not covered (marketing home uses its own hero). */
   const clearFixedNav = isAuthSplitShellPath(pathname);
+  /** Register: single centered column — no side image / no mobile hero strip (clean layout). */
+  const registerCentered = pathname === "/register" || pathname.startsWith("/register/");
 
   return (
     <div className="auth-paper-bg relative min-h-screen">
-      <div className="flex min-h-screen flex-col lg:flex-row lg:items-stretch">
-        {/* Mobile: taller hero + brand line; desktop uses aside only */}
-        {/* Extra bottom padding so taglines stay above the form sheet (sheet uses negative margin). */}
-        <div
-          className={cn(
-            "relative z-0 shrink-0 bg-[#0d1e42] px-3 pb-12 sm:px-4 sm:pb-14 lg:hidden",
-            clearFixedNav ? AUTH_SHELL_CLEAR_NAV_MOBILE_PT : "pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-4"
-          )}
-        >
-          {/* Art only inside the frame — never stack HTML text on the bitmap (overlaps campaign type). */}
-          <div className="relative h-[min(38svh,13.5rem)] min-h-[11.5rem] w-full overflow-hidden rounded-2xl sm:h-[min(36svh,15rem)] sm:min-h-[12.5rem]">
-            <Image
-              src={BRAND_HERO_SRC}
-              alt="Anti-Scam PH — safe resort bookings"
-              fill
-              className="object-cover object-[center_15%]"
-              sizes="100vw"
-              priority
-            />
-            <div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1628]/55 via-transparent to-transparent"
-              aria-hidden
-            />
-          </div>
-          <div className="mt-2.5 space-y-1 px-1 sm:mt-3">
-            <div className="flex justify-center">
-              <BrandWordmark tone="onDark" size="sm" className="items-center" />
+      <div
+        className={cn(
+          "flex min-h-screen flex-col lg:flex-row lg:items-stretch",
+          registerCentered && "lg:justify-center"
+        )}
+      >
+        {/* Mobile: hero strip — hidden on /register (centered clean layout) */}
+        {!registerCentered ? (
+          <div
+            className={cn(
+              "relative z-0 shrink-0 bg-[#0d1e42] px-3 pb-12 sm:px-4 sm:pb-14 lg:hidden",
+              clearFixedNav ? AUTH_SHELL_CLEAR_NAV_MOBILE_PT : "pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-4"
+            )}
+          >
+            {/* Art only inside the frame — never stack HTML text on the bitmap (overlaps campaign type). */}
+            <div className="relative h-[min(38svh,13.5rem)] min-h-[11.5rem] w-full overflow-hidden rounded-2xl sm:h-[min(36svh,15rem)] sm:min-h-[12.5rem]">
+              <Image
+                src={BRAND_HERO_SRC}
+                alt="Anti-Scam PH — safe resort bookings"
+                fill
+                className="object-cover object-[center_15%]"
+                sizes="100vw"
+                priority
+              />
+              <div
+                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1628]/55 via-transparent to-transparent"
+                aria-hidden
+              />
             </div>
-            <p className="mx-auto max-w-[20rem] text-center text-[11px] leading-snug text-white/70">
-              Verify. Check. Protect. · Philippines
-            </p>
+            <div className="mt-2.5 space-y-1 px-1 sm:mt-3">
+              <div className="flex justify-center">
+                <BrandWordmark tone="onDark" size="sm" className="items-center" />
+              </div>
+              <p className="mx-auto max-w-[20rem] text-center text-[11px] leading-snug text-white/70">
+                Verify. Check. Protect. · Philippines
+              </p>
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        {/* Left: authentication panel — 50% width on large screens */}
+        {/* Auth panel — full width when register; half width + side image otherwise */}
         <div
           className={cn(
-            "relative z-10 flex w-full min-w-0 flex-1 flex-col lg:w-1/2 lg:flex-none lg:shrink-0",
-            clearFixedNav && AUTH_SHELL_CLEAR_NAV_DESKTOP_FORM_PT
+            "relative z-10 flex w-full min-w-0 flex-1 flex-col",
+            registerCentered ? "lg:mx-auto lg:w-full lg:max-w-4xl lg:flex-none lg:shrink-0 lg:justify-center" : "lg:w-1/2 lg:flex-none lg:shrink-0",
+            clearFixedNav &&
+              (registerCentered
+                ? cn(
+                    "max-lg:pt-[max(0.75rem,calc(env(safe-area-inset-top)+4.1rem))] sm:max-lg:pt-[max(1rem,calc(env(safe-area-inset-top)+4.25rem))]",
+                    AUTH_SHELL_CLEAR_NAV_DESKTOP_FORM_PT
+                  )
+                : AUTH_SHELL_CLEAR_NAV_DESKTOP_FORM_PT)
           )}
         >
           <div
@@ -116,39 +131,49 @@ export function AuthSplitShell({ children }: AuthSplitShellProps) {
           />
           {/* Mobile: sheet-style panel overlapping hero for app-like flow */}
           <div
-            className="auth-paper-bg relative flex flex-1 flex-col justify-center px-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-2 -mt-2 max-lg:rounded-t-[1.75rem] max-lg:shadow-[0_-16px_48px_-20px_rgba(13,30,66,0.22)] sm:-mt-3 sm:px-5 sm:pt-3 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-8 lg:py-10 lg:shadow-none xl:px-10"
+            className={cn(
+              "auth-paper-bg relative flex flex-1 flex-col justify-center px-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-2 max-lg:-mt-2 max-lg:rounded-t-[1.75rem] max-lg:shadow-[0_-16px_48px_-20px_rgba(13,30,66,0.22)] sm:max-lg:-mt-3 sm:px-5 sm:max-lg:pt-3 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-8 lg:py-10 lg:shadow-none xl:px-10",
+              registerCentered && "max-lg:mt-0 max-lg:rounded-none max-lg:shadow-none lg:min-h-0 lg:py-8 xl:py-10"
+            )}
           >
-            <div className="mx-auto w-full max-w-md pb-1 lg:max-w-lg">
+            <div
+              className={cn(
+                "mx-auto w-full max-w-md pb-1 lg:max-w-lg",
+                registerCentered && "lg:max-w-2xl"
+              )}
+            >
               <div className={AUTH_MOBILE_FORM_CHROME}>{children}</div>
             </div>
           </div>
         </div>
 
-        {/* Right: full-height branding (desktop) — inset padding shrinks the poster away from corners */}
-        <aside className="relative z-0 hidden min-h-screen w-full min-w-0 shrink-0 bg-[#0d1e42] lg:block lg:w-1/2">
-          <div
-            className={cn(
-              "absolute inset-0",
-              clearFixedNav
-                ? cn(
-                    "p-6 pb-6 md:p-8 md:pb-8 lg:px-8 lg:pb-10 xl:px-10 xl:pb-10",
-                    AUTH_SHELL_CLEAR_NAV_DESKTOP_ASIDE_PT
-                  )
-                : "p-6 md:p-8 lg:py-10 lg:px-8 xl:p-10 xl:px-10"
-            )}
-          >
-            <div className="relative h-full w-full min-h-0">
-              <Image
-                src={BRAND_HERO_SRC}
-                alt="Anti-Scam PH — safe travels, verified resorts"
-                fill
-                sizes="50vw"
-                className="object-contain object-center"
-                priority
-              />
+        {/* Right: branding poster — hidden on /register */}
+        {!registerCentered ? (
+          <aside className="relative z-0 hidden min-h-screen w-full min-w-0 shrink-0 bg-[#0d1e42] lg:block lg:w-1/2">
+            <div
+              className={cn(
+                "absolute inset-0",
+                clearFixedNav
+                  ? cn(
+                      "p-6 pb-6 md:p-8 md:pb-8 lg:px-8 lg:pb-10 xl:px-10 xl:pb-10",
+                      AUTH_SHELL_CLEAR_NAV_DESKTOP_ASIDE_PT
+                    )
+                  : "p-6 md:p-8 lg:py-10 lg:px-8 xl:p-10 xl:px-10"
+              )}
+            >
+              <div className="relative h-full w-full min-h-0">
+                <Image
+                  src={BRAND_HERO_SRC}
+                  alt="Anti-Scam PH — safe travels, verified resorts"
+                  fill
+                  sizes="50vw"
+                  className="object-contain object-center"
+                  priority
+                />
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </div>
   );

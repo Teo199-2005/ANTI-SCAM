@@ -1,407 +1,549 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
 import {
-  ArrowRight,
-  Award,
-  BarChart3,
+  BarChart2,
+  Building,
   Calendar,
+  CheckCircle,
   Globe,
-  Handshake,
-  Headphones,
   Lock,
+  MapPin,
+  Menu,
+  MessageSquare,
+  Phone,
   Play,
   Shield,
-  ShieldCheck,
-  TrendingUp,
   Users,
+  X,
 } from "lucide-react";
-import { MARKETING_OVERLAY_HERO_BLEED_NEG_CLASS } from "@/lib/authMarketingNavOverlay";
+import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 import { cn } from "@/lib/utils";
 
-const trustItems = [
-  { label: "SEC Registered Company", Icon: Shield },
-  { label: "Philippine-Based Support", Icon: Headphones },
-  { label: "Verified Resort Badge System", Icon: ShieldCheck },
-  { label: "Secure Reservation Processing", Icon: Lock },
+const NAVY = "#0d1f3c";
+const GOLD = "#f5a623";
+/** Wordmark: trust navy + alert red (not gold) */
+const WORDMARK_NAVY = "#0B1F3A";
+const SCAM_ALERT_RED = "#E53935";
+
+const navItems = [
+  { href: "/", label: "Home" },
+  { href: "/verify-resort", label: "Verify Resort", icon: Shield },
+  { href: "/about", label: "About" },
+  { href: "/blogs", label: "Blogs" },
+  { href: "/contact", label: "Contact" },
 ] as const;
 
-const glassFeatures = [
-  {
-    icon: ShieldCheck,
-    title: "Actual Verification",
-    description: "Site inspection or live video verification for legitimacy and guest confidence.",
-  },
-  {
-    icon: Calendar,
-    title: "Smart Reservation System",
-    description: "Real-time booking management with calendar sync and double-booking prevention.",
-  },
-  {
-    icon: Globe,
-    title: "Dedicated Booking Website",
-    description: "Each resort gets a branded reservation page with automated inquiry handling.",
-  },
-  {
-    icon: BarChart3,
-    title: "Monthly Reports",
-    description: "Reservations, revenue, occupancy, and performance in one organized view.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Less Inquiries, More Bookings",
-    description: "Streamlined flows so guests book faster with fewer back-and-forth messages.",
-  },
-] as const;
+/** Headline lines — scaled up slightly while staying nowrap in the hero column. */
+const HERO_HEADLINE_ROW =
+  "block whitespace-nowrap text-[clamp(1.12rem,5.5vw+0.5rem,3.25rem)] lg:text-[clamp(1.02rem,1.82vw+0.52rem,1.92rem)] xl:text-[clamp(1.06rem,1.92vw+0.48rem,2.1rem)] 2xl:text-[clamp(1.12rem,2.02vw+0.45rem,2.55rem)]";
 
-type ValuePropRow =
-  | { kind: "icon"; title: string; subtitle: string; Icon: LucideIcon }
-  | { kind: "flag"; title: string; subtitle: string };
+const REGISTER_GOLD_BACKGROUND = `linear-gradient(165deg, #ffd47a 0%, ${GOLD} 40%, #c9840f 100%)`;
+const REGISTER_GOLD_SHINE_CORE =
+  "relative isolate inline-flex items-center overflow-hidden text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_5px_14px_rgba(180,110,0,0.22)] transition [text-shadow:0_1px_0_rgba(0,0,0,0.12)] hover:brightness-[1.05] active:brightness-[0.98]";
+/** Pricing “Get Started” + small gold pills — lighter rim */
+const REGISTER_GOLD_SHINE_BASE = `${REGISTER_GOLD_SHINE_CORE} border border-amber-200/50`;
+/** Nav + hero “Register Your Resort” — darker rim */
+const REGISTER_GOLD_SHINE_REGISTER_BTN = `${REGISTER_GOLD_SHINE_CORE} border-2 border-amber-950/45`;
+const REGISTER_GOLD_GLOSS_LAYER =
+  "pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,transparent_0%,transparent_42%,rgba(255,255,255,0.22)_50%,transparent_58%,transparent_100%)] opacity-90";
 
-const valueProps: readonly ValuePropRow[] = [
-  { kind: "icon", title: "Stronger Resorts", subtitle: "Safer guests. Better business.", Icon: Shield },
-  { kind: "icon", title: "Industry trust", subtitle: "Building a trusted resort industry.", Icon: Award },
-  { kind: "flag", title: "Proudly Filipino", subtitle: "Built for Philippine resorts." },
-  { kind: "icon", title: "Real people", subtitle: "Real support.", Icon: Headphones },
-  { kind: "icon", title: "Your partner", subtitle: "Growth and guest trust.", Icon: Handshake },
-];
+const registerGoldButtonStyle = {
+  background: REGISTER_GOLD_BACKGROUND,
+  fontFamily: "var(--font-inter), system-ui, sans-serif",
+} as const;
 
-const pricingPlans: readonly {
-  name: string;
+type PricingCardProps = {
+  label: string;
+  original: string;
   price: string;
-  listPrice: string;
-  period: string;
-  blurb: string;
-  featured: boolean;
-  tag?: string;
-  saveYearly?: string;
-}[] = [
-  {
-    name: "Monthly Plan",
-    price: "₱2,100",
-    listPrice: "₱2,500",
-    period: "/mo",
-    blurb: "Flexible month-to-month access.",
-    featured: false,
-  },
-  {
-    name: "3-Month Plan",
-    price: "₱1,900",
-    listPrice: "₱2,200",
-    period: "/mo",
-    blurb: "Save when you commit quarterly.",
-    featured: false,
-  },
-  {
-    name: "6-Month Plan",
-    price: "₱1,750",
-    listPrice: "₱2,000",
-    period: "/mo",
-    blurb: "Best balance of savings and agility.",
-    featured: false,
-  },
-  {
-    name: "12-Month Plan",
-    price: "₱1,500",
-    listPrice: "₱2,300",
-    period: "/mo",
-    blurb: "Maximum savings for established resorts.",
-    featured: true,
-    tag: "BEST VALUE",
-    saveYearly: "Save ₱9,600 yearly",
-  },
-];
+  note: string;
+  highlight: boolean;
+  badge?: string;
+};
+
+function PricingCard({ label, original, price, note, highlight, badge }: PricingCardProps) {
+  const pricePx = highlight ? 38 : 34;
+  return (
+    <div
+      className="relative flex flex-col items-center rounded-xl p-4 text-center sm:p-5"
+      style={{
+        backgroundColor: highlight ? NAVY : "#fff",
+        border: highlight ? `3px solid #ffd47a` : "2px solid #94a3b8",
+        boxShadow: highlight
+          ? "inset 0 1px 0 rgba(255,212,122,0.22), 0 0 0 2px rgba(245,166,35,0.55), 0 0 28px rgba(245,166,35,0.28), 0 10px 36px rgba(13,31,60,0.2)"
+          : "0 2px 8px rgba(0,0,0,0.06)",
+      }}
+    >
+      {badge ? (
+        <span
+          className="absolute -top-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center justify-center isolate overflow-hidden whitespace-nowrap rounded-full border border-amber-200/50 px-4 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_14px_rgba(180,110,0,0.32)] [text-shadow:0_1px_0_rgba(0,0,0,0.12)]"
+          style={registerGoldButtonStyle}
+        >
+          <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+          <span className="relative z-10">{badge}</span>
+        </span>
+      ) : null}
+
+      <p
+        className="font-pop mb-2 text-[11px] font-semibold uppercase tracking-wide sm:text-xs"
+        style={{
+          color: highlight ? GOLD : "#111",
+        }}
+      >
+        {label}
+      </p>
+
+      <p
+        className="mb-0.5 text-[13px] font-normal line-through"
+        style={{ fontFamily: "var(--font-inter), system-ui, sans-serif", color: "#c0392b" }}
+      >
+        {original}
+      </p>
+
+      <div className="flex items-baseline gap-1">
+        <span
+          className={highlight ? "font-black leading-none" : "font-bold leading-none tracking-tight"}
+          style={{
+            fontFamily: "var(--font-inter), system-ui, sans-serif",
+            fontSize: highlight ? `${pricePx}px` : `${pricePx - 4}px`,
+            color: highlight ? GOLD : "#111",
+          }}
+        >
+          {price}
+        </span>
+        <span
+          className="mb-1 text-xs font-normal"
+          style={{
+            fontFamily: "var(--font-inter), system-ui, sans-serif",
+            color: highlight ? "#b0bcd4" : "#777",
+          }}
+        >
+          /month
+        </span>
+      </div>
+
+      <p
+        className="mb-3 mt-1 text-[11px] font-normal sm:text-xs"
+        style={{
+          fontFamily: "var(--font-inter), system-ui, sans-serif",
+          color: highlight ? GOLD : "#666",
+        }}
+      >
+        {note}
+      </p>
+
+      {highlight ? (
+        <Link
+          href="/register"
+          className={cn(
+            REGISTER_GOLD_SHINE_BASE,
+            "inline-flex w-full justify-center rounded-lg py-2 text-[12px] font-extrabold sm:text-[13px]"
+          )}
+          style={registerGoldButtonStyle}
+        >
+          <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+          <span className="relative z-10">Get Started</span>
+        </Link>
+      ) : (
+        <Link
+          href="/register"
+          className="w-full rounded-lg py-2 text-center text-[12px] font-extrabold text-white transition hover:opacity-95 sm:text-[13px]"
+          style={{
+            backgroundColor: NAVY,
+            fontFamily: "var(--font-inter), system-ui, sans-serif",
+          }}
+        >
+          Get Started
+        </Link>
+      )}
+    </div>
+  );
+}
 
 export function LandingPremiumPage() {
+  const [mobileNav, setMobileNav] = useState(false);
+
   return (
-    <div className="relative min-w-0 bg-[#F8FAFC] pb-[calc(3.25rem+env(safe-area-inset-bottom))] font-body text-[#071B46] antialiased">
-      {/* ── Hero ── */}
-      <section
-        className={cn(
-          "relative isolate min-h-[min(92svh,56rem)] overflow-hidden lg:min-h-[min(88vh,52rem)]",
-          MARKETING_OVERLAY_HERO_BLEED_NEG_CLASS
-        )}
-      >
-        <div className="pointer-events-none absolute inset-0 z-0">
-          <Image
+    <div className="min-w-0 origin-top overflow-x-hidden bg-white font-body text-[#111] antialiased [zoom:1.05]">
+      {/* ── Hero + glass nav over image (nav does not stack above hero) ── */}
+      <section className="relative isolate overflow-hidden lg:pb-2">
+        <div className="absolute inset-0">
+          <ImageWithFallback
             src="/bgresort.png"
-            alt=""
+            alt="Luxury resort at dusk"
             fill
             priority
-            className="object-cover object-center brightness-[0.9] saturate-[1.14]"
             sizes="100vw"
+            className="object-cover object-center"
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to right, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.88) 7%, rgba(255,255,255,0.62) 28%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0) 62%)",
+            }}
+            aria-hidden
           />
         </div>
 
-        <div
-          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-r from-[#F8FAFC] from-0% via-[#F8FAFC]/94 via-[32%] via-[#eef2f9]/50 via-[50%] to-transparent to-[76%]"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-br from-white/45 via-transparent to-[#0B2C6B]/22 mix-blend-soft-light"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -left-[20%] top-[18%] z-[1] h-[min(85vw,30rem)] w-[min(85vw,30rem)] rounded-full bg-[#FFC928]/14 blur-3xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute bottom-0 right-0 z-[1] h-[55%] w-[55%] bg-gradient-to-tl from-[#071B46]/18 to-transparent blur-2xl"
-          aria-hidden
-        />
+        {/* Floating glass nav — over the photo, no solid bar, no border */}
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-40 pt-[max(0.35rem,env(safe-area-inset-top))]">
+          <div className="pointer-events-auto mx-auto w-full max-w-[min(1360px,100%)] pb-1.5 ps-0.5 pe-4 pt-0.5 sm:ps-1 sm:pe-5 md:ps-1 md:pe-6 lg:ps-2 lg:pe-8">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+              <Link
+                href="/"
+                className="flex min-w-0 shrink-0 items-center gap-2.5 sm:gap-3"
+                onClick={() => setMobileNav(false)}
+              >
+                <ImageWithFallback
+                  src="/mainlogo.png"
+                  alt="Anti-Scam PH Logo"
+                  width={112}
+                  height={112}
+                  className="h-10 w-10 shrink-0 object-contain drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] sm:h-11 sm:w-11"
+                  sizes="56px"
+                />
+                <div className="min-w-0 leading-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.85)]">
+                  <div className="flex items-baseline">
+                    <span className="font-pop whitespace-nowrap text-[17px] font-extrabold uppercase tracking-[0.07em] sm:text-[19px]">
+                      <span style={{ color: WORDMARK_NAVY }}>ANTI-</span>
+                      <span style={{ color: SCAM_ALERT_RED }}>SCAM</span>
+                      <span style={{ color: WORDMARK_NAVY }}> PH</span>
+                    </span>
+                  </div>
+                  <p
+                    className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#0B1F3A]/75 sm:text-[10px]"
+                    style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                  >
+                    Verified resort platform
+                  </p>
+                </div>
+              </Link>
 
-        <div className="relative z-10 mx-auto flex max-w-[90rem] flex-col px-4 pb-16 pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.75rem))] sm:px-6 sm:pb-20 sm:pt-[max(5.75rem,calc(env(safe-area-inset-top)+4.9rem))] lg:grid lg:min-h-[min(80vh,48rem)] lg:grid-cols-12 lg:items-center lg:gap-x-5 lg:gap-y-8 lg:px-10 lg:pb-24 lg:pt-10 xl:gap-x-8 xl:px-12">
-          {/* Left */}
-          <div className="relative z-20 lg:col-span-5">
-            <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#071B46]/12 bg-white/75 px-3 py-1.5 text-[10px] font-bold uppercase leading-snug tracking-[0.16em] text-[#0B2C6B] shadow-sm backdrop-blur-md sm:text-[11px] sm:tracking-[0.18em]">
-              <Users className="h-3.5 w-3.5 shrink-0 text-[#F5B400]" aria-hidden />
-              <span className="text-balance">The Philippines&rsquo; verified resort platform</span>
-            </p>
+              <nav className="hidden items-center justify-center gap-0.5 md:flex md:flex-1 lg:gap-1">
+                {navItems.map((item) => {
+                  const isHome = item.href === "/";
+                  const Icon = "icon" in item ? item.icon : null;
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => setMobileNav(false)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-[#0d1f3c] backdrop-blur-md transition-colors duration-150 xl:px-4",
+                        isHome
+                          ? "bg-white/40 font-bold hover:bg-white/50"
+                          : "bg-transparent hover:bg-white/28"
+                      )}
+                      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                    >
+                      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} aria-hidden /> : null}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
 
-            <h1 className="mt-6 max-w-xl text-balance text-3xl font-bold leading-[1.08] tracking-tight text-[#071B46] sm:text-4xl md:text-5xl lg:text-[2.65rem] lg:leading-[1.06] xl:text-[2.75rem] 2xl:text-6xl">
-              Protect Your Resort.
-              <br />
-              Build Guest Trust.
-              <br />
-              <span className="bg-gradient-to-r from-[#F5B400] via-[#FFC928] to-[#F5B400] bg-clip-text text-transparent">
+              <div className="flex shrink-0 items-center gap-2">
+                <Link
+                  href="/login"
+                  className="hidden items-center gap-2 rounded-full border-2 border-white/85 bg-white/55 px-4 py-2 text-sm font-bold text-[#0d1f3c] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition hover:bg-white/75 sm:inline-flex"
+                  style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                >
+                  <Users className="h-4 w-4 shrink-0" aria-hidden />
+                  Log in
+                </Link>
+                <Link
+                  href="/register"
+                  className={cn(
+                    REGISTER_GOLD_SHINE_REGISTER_BTN,
+                    "gap-2 rounded-full px-4 py-2 text-sm font-bold sm:px-5"
+                  )}
+                  style={registerGoldButtonStyle}
+                >
+                  <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+                  <Building
+                    className="relative z-10 h-4 w-4 shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)]"
+                    aria-hidden
+                  />
+                  <span className="relative z-10 max-[380px]:sr-only">Register Your Resort</span>
+                  <span className="relative z-10 hidden max-[380px]:inline">Register</span>
+                </Link>
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/65 bg-white/25 text-[#0d1f3c] backdrop-blur-md transition hover:bg-white/40 md:hidden"
+                  aria-label={mobileNav ? "Close menu" : "Open menu"}
+                  aria-expanded={mobileNav}
+                  onClick={() => setMobileNav((o) => !o)}
+                >
+                  {mobileNav ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {mobileNav ? (
+              <nav
+                className="mt-2 flex max-h-[min(70vh,24rem)] flex-col gap-1 overflow-y-auto rounded-2xl border-2 border-white/70 bg-white/40 p-2 backdrop-blur-2xl md:hidden"
+                aria-label="Mobile"
+              >
+                {navItems.map((item) => {
+                  const isHome = item.href === "/";
+                  const Icon = "icon" in item ? item.icon : null;
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => setMobileNav(false)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/45",
+                        isHome && "bg-white/50 font-bold"
+                      )}
+                      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                    >
+                      {Icon ? <Icon className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden /> : null}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+                <Link
+                  href="/login"
+                  onClick={() => setMobileNav(false)}
+                  className="mt-1 flex items-center justify-center gap-2 rounded-xl border-2 border-white/85 bg-white/60 py-2.5 text-sm font-bold text-[#0d1f3c] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-md sm:hidden"
+                  style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                >
+                  <Users className="h-4 w-4" aria-hidden />
+                  Log in
+                </Link>
+              </nav>
+            ) : null}
+          </div>
+        </header>
+
+        <div className="relative z-10 mx-auto grid w-full max-w-[min(1360px,100%)] grid-cols-1 items-start gap-3 pb-6 pt-[max(6.75rem,calc(env(safe-area-inset-top)+5rem))] ps-[max(0.25rem,env(safe-area-inset-left))] pe-5 sm:gap-4 sm:ps-0.5 sm:pe-6 sm:pt-[max(7rem,calc(env(safe-area-inset-top)+5.25rem))] md:ps-1 md:pe-7 md:pt-[max(6.75rem,calc(env(safe-area-inset-top)+4.75rem))] lg:grid-cols-12 lg:items-center lg:gap-x-4 lg:gap-y-2 lg:pb-5 lg:ps-1 lg:pe-10 lg:pt-[max(5.25rem,calc(env(safe-area-inset-top)+4.15rem))] xl:pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.35rem))] 2xl:pt-[max(5.75rem,calc(env(safe-area-inset-top)+4.5rem))] xl:ps-2">
+          {/* Left — nudged further left (tight page gutter + slight translate on large screens) */}
+          <div className="z-10 min-w-0 lg:col-span-4 lg:-translate-x-3 xl:-translate-x-6 2xl:-translate-x-8">
+            <div className="mb-2 flex items-center gap-2">
+              <Users className="h-5 w-5 shrink-0 text-gray-500 sm:h-[1.35rem] sm:w-[1.35rem]" aria-hidden />
+              <span
+                className="text-[13px] font-bold uppercase tracking-[0.12em] text-[#555] sm:text-[14px]"
+                style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+              >
+                The Philippines&rsquo; verified resort platform
+              </span>
+            </div>
+
+            <h1 className="font-pop m-0 max-w-full font-extrabold leading-[1.06] tracking-tight">
+              <span className={HERO_HEADLINE_ROW} style={{ color: WORDMARK_NAVY }}>
+                Protect Your Resort.
+              </span>
+              <span className={HERO_HEADLINE_ROW} style={{ color: WORDMARK_NAVY }}>
+                Build Guest Trust.
+              </span>
+              <span className={HERO_HEADLINE_ROW} style={{ color: GOLD }}>
                 Increase Direct Bookings.
               </span>
             </h1>
 
-            <p className="mt-5 max-w-md text-pretty text-sm leading-relaxed text-[#0B2C6B]/88 sm:text-base">
-              Stop fake bookings and win back guest confidence with verified listings, secure reservations, and a
-              resort-first platform built for the Philippines.
+            <p
+              className="mt-3 max-w-xl text-pretty text-[15px] font-medium leading-relaxed text-[#444] sm:max-w-2xl sm:text-[16px]"
+              style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+            >
+              Anti-Scam PH helps Philippine resorts prevent fake bookings, avoid double reservations, and gain guest trust
+              through verified booking technology.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-4.0 flex flex-nowrap items-center gap-2 sm:gap-2.5">
               <Link
                 href="/register"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#F5B400] to-[#FFC928] px-7 py-3.5 text-sm font-bold uppercase tracking-wide text-[#071B46] shadow-[0_14px_44px_-10px_rgba(245,180,0,0.55)] transition hover:brightness-105"
+                className={cn(
+                  REGISTER_GOLD_SHINE_REGISTER_BTN,
+                  "min-w-0 flex-1 gap-2 rounded-lg px-3 py-2.5 text-[13px] font-extrabold sm:flex-none sm:px-6 sm:py-3 sm:text-base"
+                )}
+                style={registerGoldButtonStyle}
               >
-                Register Your Resort
-                <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+                <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+                <Building className="relative z-10 h-[1.125rem] w-[1.125rem] shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)] sm:h-5 sm:w-5" aria-hidden />
+                <span className="relative z-10">Register Your Resort →</span>
               </Link>
               <Link
                 href="#product-demo"
-                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-white/90 bg-white/30 px-6 py-3.5 text-sm font-semibold uppercase tracking-wide text-[#071B46] shadow-sm backdrop-blur-md transition hover:bg-white/50"
+                className="relative isolate inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-lg border-2 border-slate-500/85 bg-gradient-to-b from-white to-slate-100 px-3 py-2.5 text-[13px] font-extrabold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.06)] transition hover:brightness-[1.03] active:brightness-[0.99] sm:gap-2 sm:px-6 sm:py-3 sm:text-base"
+                style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
               >
-                <Play className="h-4 w-4 shrink-0 text-[#071B46]" strokeWidth={2.25} aria-hidden />
-                See Demo
+                <span
+                  className="pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,transparent_0%,transparent_40%,rgba(255,255,255,0.55)_50%,transparent_60%,transparent_100%)] opacity-70"
+                  aria-hidden
+                />
+                <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-800 bg-gradient-to-br from-white to-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:h-7 sm:w-7">
+                  <Play className="h-3 w-3 fill-slate-800 text-slate-800 sm:h-3.5 sm:w-3.5" aria-hidden />
+                </span>
+                <span className="relative z-10">See Demo</span>
               </Link>
             </div>
 
-            <ul className="mt-10 grid max-w-xl gap-3 sm:grid-cols-2">
-              {trustItems.map(({ label, Icon }) => (
-                <li
-                  key={label}
-                  className="flex items-start gap-2.5 text-xs font-medium leading-snug text-[#0B2C6B]/92 sm:text-sm"
-                >
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#071B46]/10 bg-white/60 text-[#0B2C6B] shadow-sm backdrop-blur-sm">
-                    <Icon className="h-3.5 w-3.5 text-[#F5B400]" strokeWidth={2} aria-hidden />
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-[#555] sm:gap-x-4 sm:gap-y-3">
+              {[
+                { icon: Shield, label: "SEC Registered Company" },
+                { icon: MapPin, label: "Philippine-Based Support" },
+                { icon: CheckCircle, label: "Verified Resort Badge System" },
+                { icon: Lock, label: "Secure Reservation Processing" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex min-w-0 items-start gap-2">
+                  <Icon className="mt-0.5 h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
+                  <span className="min-w-0 text-[12px] font-semibold leading-snug sm:text-[13px]" style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
+                    {label}
                   </span>
-                  {label}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
-          {/* Center badge */}
-          <div className="relative z-30 flex justify-center py-8 lg:col-span-2 lg:min-h-[20rem] lg:items-center lg:py-0">
-            <motion.div
-              className="relative w-[min(74vw,17rem)] sm:w-[min(58vw,19rem)] lg:w-[min(24vw,16rem)] xl:w-[17.5rem]"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              whileHover={{ y: -4, scale: 1.02 }}
-            >
-              <div
-                className="pointer-events-none absolute inset-[-18%] rounded-full bg-[#FFC928]/22 blur-3xl"
-                aria-hidden
-              />
-              <motion.div
-                className="pointer-events-none absolute inset-[-8%] rounded-full bg-[#F5B400]/18 blur-xl"
-                animate={{ opacity: [0.45, 0.88, 0.45] }}
-                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                aria-hidden
-              />
-              <Image
-                src="/founding500.png"
-                alt="Founding 500 — verified resort partners"
-                width={480}
-                height={520}
-                className="relative z-[1] w-full drop-shadow-[0_32px_60px_rgba(7,27,70,0.5)]"
-                priority
-              />
-            </motion.div>
+          {/* Center badge — compact for above-the-fold pricing */}
+          <div className="z-10 flex justify-center lg:col-span-4">
+            <ImageWithFallback
+              src="/founding500.png"
+              alt="Founding 500 — verified resort partners"
+              width={560}
+              height={620}
+              className="h-auto w-[15.5rem] max-w-full object-contain object-center drop-shadow-2xl sm:w-[18rem] md:w-[19.5rem] lg:w-[20rem] xl:w-[22rem] 2xl:w-[24rem]"
+              sizes="(max-width: 640px) 248px, (max-width: 768px) 288px, (max-width: 1024px) 312px, (max-width: 1280px) 320px, (max-width: 1536px) 352px, 384px"
+              priority
+            />
           </div>
 
-          {/* Right glass */}
-          <div id="product-demo" className="relative z-20 scroll-mt-28 lg:col-span-5">
+          {/* Right feature card */}
+          <div id="product-demo" className="z-10 scroll-mt-28 lg:col-span-4">
             <div
-              className={cn(
-                "rounded-[28px] border border-white/28 bg-[#071B46]/58 p-6 shadow-[0_28px_90px_-28px_rgba(7,27,70,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl backdrop-saturate-150",
-                "ring-1 ring-[#F5B400]/18"
-              )}
+              className="space-y-3 rounded-xl border-2 border-white/30 p-4 shadow-xl ring-2 ring-black/10 sm:space-y-3.5 sm:rounded-2xl sm:p-5"
+              style={{ backgroundColor: NAVY }}
             >
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#FFC928]/95">Platform</p>
-              <h2 className="mt-1 text-lg font-bold tracking-tight text-white sm:text-xl">
-                Everything you need in one verified stack
-              </h2>
-              <ul className="mt-5 divide-y divide-white/12">
-                {glassFeatures.map(({ icon: Icon, title, description }) => (
-                  <li key={title} className="flex gap-4 py-4 first:pt-0">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#F5B400]/38 bg-[#0B2C6B]/55 text-[#FFC928] shadow-inner">
-                      <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-white">{title}</p>
-                      <p className="mt-1 text-sm leading-relaxed text-white/72">{description}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              {[
+                {
+                  icon: Shield,
+                  title: "Actual Verification",
+                  desc: "Site inspection or live verification.",
+                },
+                {
+                  icon: Calendar,
+                  title: "Smart Reservation System",
+                  desc: "No double bookings. Real-time updates.",
+                },
+                {
+                  icon: Globe,
+                  title: "Dedicated Booking Website",
+                  desc: "Your own branded booking page.",
+                },
+                {
+                  icon: BarChart2,
+                  title: "Monthly Reports",
+                  desc: "Track reservations, occupancy and revenue.",
+                },
+                {
+                  icon: MessageSquare,
+                  title: "Less Inquiries, More Bookings",
+                  desc: "Automated guest management and confirmations.",
+                },
+              ].map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="flex items-start gap-2.5 sm:gap-3">
+                  <Icon className="mt-0.5 h-5 w-5 shrink-0 sm:h-[1.35rem] sm:w-[1.35rem]" style={{ color: GOLD }} aria-hidden />
+                  <div>
+                    <p className="font-pop text-[14px] font-bold leading-tight text-white sm:text-[15px]">
+                      {title}
+                    </p>
+                    <p
+                      className="mt-0.5 text-[12px] font-medium leading-snug text-[#b0bcd4] sm:text-[14px]"
+                      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                    >
+                      {desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Pricing ── */}
-      <section
-        id="pricing"
-        className="border-t border-[#071B46]/6 bg-[#F8FAFC] px-4 py-14 sm:px-6 lg:px-10 xl:px-12"
-        aria-labelledby="pricing-heading"
-      >
-        <div className="mx-auto max-w-6xl">
-          <div
-            className="mb-8 flex items-center justify-center gap-2 rounded-xl border border-[#071B46] bg-[#071B46] px-4 py-3 text-center shadow-lg sm:gap-3 sm:px-6"
-            role="note"
-          >
-            <Lock className="h-4 w-4 shrink-0 text-[#FFC928]" strokeWidth={2.25} aria-hidden />
-            <p className="text-[11px] font-bold uppercase leading-snug tracking-[0.14em] text-white sm:text-xs sm:tracking-[0.16em]">
-              Founding partner rates locked for early resorts
-            </p>
-          </div>
-
-          <div className="text-center">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#0B2C6B]/55">Simple pricing</p>
-            <h2 id="pricing-heading" className="mt-2 text-2xl font-bold tracking-tight text-[#071B46] sm:text-3xl">
-              Plans that scale with your resort
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-pretty text-sm text-[#0B2C6B]/75 sm:text-base">
-              Transparent tiers for verified Philippine resorts. Lock in founding rates while slots remain.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {pricingPlans.map((plan) => (
-              <article
-                key={plan.name}
-                className={cn(
-                  "relative flex flex-col rounded-2xl border p-6 shadow-xl transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_56px_-28px_rgba(7,27,70,0.22)]",
-                  plan.featured
-                    ? "border-[#F5B400]/45 bg-[#071B46] text-white ring-2 ring-[#FFC928]/35"
-                    : "border-[#071B46]/8 bg-white text-[#071B46]"
-                )}
-              >
-                {plan.tag ? (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-[#F5B400] to-[#FFC928] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[#071B46] shadow-md">
-                    {plan.tag}
-                  </span>
-                ) : null}
-                <h3
-                  className={cn(
-                    "text-sm font-bold uppercase tracking-wide",
-                    plan.featured ? "text-[#FFC928]" : "text-[#0B2C6B]/80"
-                  )}
-                >
-                  {plan.name}
-                </h3>
-                <div className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  {!plan.featured ? (
-                    <span className="text-lg font-semibold text-red-600/90 line-through decoration-red-600/70">
-                      {plan.listPrice}
-                    </span>
-                  ) : (
-                    <span className="text-lg font-semibold text-red-300/90 line-through decoration-red-200/60">
-                      {plan.listPrice}
-                    </span>
-                  )}
-                  <span
-                    className={cn(
-                      "text-3xl font-bold tracking-tight",
-                      plan.featured ? "text-white" : "text-[#071B46]"
-                    )}
-                  >
-                    {plan.price}
-                  </span>
-                  <span className={cn("text-sm", plan.featured ? "text-white/70" : "text-[#0B2C6B]/60")}>
-                    {plan.period}
-                  </span>
-                </div>
-                {plan.saveYearly ? (
-                  <p className="mt-2 text-sm font-semibold text-[#FFC928]">{plan.saveYearly}</p>
-                ) : null}
-                <p className={cn("mt-3 flex-1 text-sm leading-relaxed", plan.featured ? "text-white/76" : "text-[#0B2C6B]/72")}>
-                  {plan.blurb}
-                </p>
-                <Link
-                  href="/register"
-                  className={cn(
-                    "mt-6 inline-flex w-full items-center justify-center rounded-xl py-3 text-center text-sm font-bold uppercase tracking-wide transition",
-                    plan.featured
-                      ? "bg-gradient-to-r from-[#F5B400] to-[#FFC928] text-[#071B46] hover:brightness-110"
-                      : "border border-[#071B46]/14 bg-[#F8FAFC] text-[#071B46] hover:border-[#071B46]/28"
-                  )}
-                >
-                  Get started
-                </Link>
-              </article>
-            ))}
+      {/* ── Pricing (tight to hero — goal: visible on first paint on desktop) ── */}
+      <section className="border-t-2 border-slate-300 bg-white py-4 pl-4 pr-5 sm:py-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-4 lg:pl-6 lg:pr-10">
+        <div className="mx-auto w-full max-w-[min(1100px,100%)]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 lg:gap-3">
+            <PricingCard label="MONTHLY PLAN" original="₱3,000" price="₱2,100" note="Perfect for startup resorts" highlight={false} />
+            <PricingCard label="3-MONTH PLAN" original="₱2,700" price="₱1,900" note="Save ₱2,400 vs monthly" highlight={false} />
+            <PricingCard label="6-MONTH PLAN" original="₱2,500" price="₱1,700" note="Save ₱7,800 vs monthly" highlight={false} />
+            <PricingCard
+              label="12-MONTH PLAN"
+              original="₱2,300"
+              price="₱1,500"
+              note="Save ₱9,600 yearly"
+              highlight
+              badge="BEST VALUE"
+            />
           </div>
         </div>
       </section>
 
-      {/* ── Value proposition row ── */}
-      <section className="border-t border-[#071B46]/6 bg-white px-4 py-14 sm:px-6 lg:px-10 xl:px-12" aria-label="Why Anti-Scam PH">
-        <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
-          {valueProps.map((item) => (
-            <div
-              key={item.title}
-              className="flex flex-col items-center text-center lg:items-center lg:px-1"
-            >
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#071B46]/10 bg-[#F8FAFC] text-[#071B46] shadow-sm">
-                {item.kind === "flag" ? (
-                  <span className="text-2xl leading-none" role="img" aria-label="Philippines">
-                    🇵🇭
-                  </span>
-                ) : (
-                  <item.Icon className="h-6 w-6 text-[#0B2C6B]" strokeWidth={1.75} aria-hidden />
-                )}
-              </span>
-              <p className="mt-4 text-sm font-bold uppercase tracking-wide text-[#071B46]">{item.title}</p>
-              <p className="mt-1.5 max-w-[14rem] text-sm leading-snug text-[#0B2C6B]/75">{item.subtitle}</p>
+      {/* ── Trust strip ── */}
+      <section className="border-t-2 border-slate-300 bg-white py-6 pl-4 pr-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-5 lg:pl-6 lg:pr-10" aria-label="Trust and values">
+        <div className="mx-auto grid w-full max-w-[min(1100px,100%)] grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
+          {[
+            {
+              icon: <Shield className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
+              text: "Stronger Resorts. Safer Guests. Better Business.",
+            },
+            {
+              icon: <Users className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
+              text: "Together, let's build a trusted resort industry in the Philippines.",
+            },
+            {
+              icon: (
+                <ImageWithFallback
+                  src="/phcircle.png"
+                  alt="Philippines"
+                  width={56}
+                  height={56}
+                  className="mx-auto h-7 w-7 rounded-full object-cover shadow-sm ring-1 ring-black/10"
+                />
+              ),
+              text: "Proudly Filipino. Built for Philippine Resorts.",
+            },
+            {
+              icon: <Phone className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
+              text: "Real People. Real Support. We're here to help.",
+            },
+            {
+              icon: <Shield className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
+              text: "Your Partner in Growth and Guest Trust.",
+            },
+          ].map((item, i) => (
+            <div key={i} className="flex flex-col items-center gap-2 text-center">
+              {item.icon}
+              <p
+                className="text-xs font-semibold leading-snug text-[#333]"
+                style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+              >
+                {item.text}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Sticky founding rates bar */}
-      <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[35] flex justify-center px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
-        role="presentation"
+      {/* ── Footer bar ── */}
+      <footer
+        className="border-t-2 border-white/25 py-3 pl-4 pr-5 text-center sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:pl-6 lg:pr-10"
+        style={{ backgroundColor: NAVY }}
       >
-        <div
-          className="pointer-events-auto flex max-w-3xl items-center gap-2.5 rounded-full border border-white/10 bg-[#071B46]/95 px-4 py-2.5 text-center shadow-[0_-8px_40px_rgba(7,27,70,0.35)] backdrop-blur-md sm:gap-3 sm:px-5"
-          role="status"
+        <span
+          className="inline-flex flex-wrap items-center justify-center gap-2 text-[13px] font-bold text-white"
+          style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
         >
-          <Lock className="h-3.5 w-3.5 shrink-0 text-[#FFC928] sm:h-4 sm:w-4" aria-hidden />
-          <p className="text-[10px] font-semibold leading-snug text-white/95 sm:text-[11px] sm:leading-normal">
-            Founding rates are locked as long as your subscription remains active.
-          </p>
-        </div>
-      </div>
+          <Lock className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden />
+          Founding rates are locked as long as your subscription remains active.
+        </span>
+      </footer>
     </div>
   );
 }

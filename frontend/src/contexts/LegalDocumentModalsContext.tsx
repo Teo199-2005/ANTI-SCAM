@@ -9,7 +9,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -57,14 +59,19 @@ function TermsSectionBlock({ section }: { section: TermsSection }) {
 function ModalFrame({
   title,
   subtitle,
+  titleId,
   onClose,
   children,
 }: {
   title: string;
   subtitle?: ReactNode;
+  /** Unique id for `aria-labelledby` when multiple modal types exist in the codebase. */
+  titleId: string;
   onClose: () => void;
   children: ReactNode;
 }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -73,25 +80,37 @@ function ModalFrame({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /** Reset scroll when switching Terms ↔ Privacy (avoid `children` in deps — new ref every render). */
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (el) el.scrollTop = 0;
+  }, [titleId, title]);
+
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-y-contain sm:items-center sm:p-4"
+      className="fixed inset-0 z-[600] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-contain sm:items-center sm:p-4 sm:py-6"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="legal-modal-title"
+      aria-labelledby={titleId}
     >
       <button
         type="button"
-        className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm"
+        className="fixed inset-0 z-0 bg-zinc-900/50 backdrop-blur-sm"
         aria-label="Close dialog"
         onClick={onClose}
       />
-      <div className="relative z-10 box-border flex max-h-[min(92vh,900px)] w-full min-w-0 max-w-3xl flex-col rounded-t-2xl border border-zinc-200/90 bg-white shadow-2xl sm:rounded-2xl">
+      {/*
+        min-h-0 on the panel is required: flex items default to min-height:auto and would
+        otherwise refuse to shrink below full document height — no inner scroll, header clipped.
+      */}
+      <div
+        className="relative z-10 mx-auto box-border flex w-full min-h-0 min-w-0 max-w-lg flex-col overflow-hidden rounded-t-2xl border border-zinc-200/90 bg-white shadow-2xl max-h-[min(88dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1.25rem))] sm:max-h-[min(80dvh,720px)] sm:max-w-2xl sm:rounded-2xl lg:max-w-3xl my-[max(0.5rem,env(safe-area-inset-bottom))] sm:my-auto"
+      >
         <div className="flex shrink-0 items-start justify-between gap-2 border-b border-zinc-100 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
           <div className="min-w-0 pr-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-clTeal sm:text-xs">Legal</p>
             <h2
-              id="legal-modal-title"
+              id={titleId}
               className="font-heading text-lg font-semibold leading-snug tracking-tight text-navy sm:text-2xl"
             >
               {title}
@@ -103,13 +122,18 @@ function ModalFrame({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-zinc-200/80 p-2 text-zinc-600 transition hover:bg-zinc-50"
+            className="shrink-0 rounded-xl border border-zinc-200/80 p-2 text-zinc-600 transition hover:bg-zinc-50"
             aria-label="Close"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">{children}</div>
+        <div
+          ref={bodyRef}
+          className="min-h-0 flex-1 basis-0 overflow-y-auto overscroll-y-contain px-4 py-4 sm:px-6 sm:py-5 [scrollbar-gutter:stable]"
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -137,6 +161,8 @@ function TermsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <ModalFrame
+      key={payload ? `terms-${payload.version}` : failed ? "terms-failed" : "terms-loading"}
+      titleId="legal-modal-terms-title"
       title={payload?.document_title ?? "Terms & Conditions"}
       subtitle={
         payload
@@ -165,6 +191,7 @@ function TermsModal({ onClose }: { onClose: () => void }) {
 function PrivacyModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalFrame
+      titleId="legal-modal-privacy-title"
       title="Privacy Policy"
       subtitle={
         <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
@@ -185,6 +212,16 @@ export function LegalDocumentModalsProvider({ children }: { children: ReactNode 
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  const anyOpen = termsOpen || privacyOpen;
+  useEffect(() => {
+    if (!anyOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [anyOpen]);
 
   const closeAll = useCallback(() => {
     setTermsOpen(false);

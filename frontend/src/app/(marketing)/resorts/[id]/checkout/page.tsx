@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
 import {
@@ -344,6 +345,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                   <p className="mt-1 text-xs text-zinc-500">Max capacity: {room.capacity} guests</p>
                 ) : null}
               </div>
+
+              <ReservationFeeBreakdownPanel totalPhp={reservationFeePhp} />
 
               <div className="rounded-xl border border-white/40 bg-white/30 p-4 text-sm backdrop-blur-md">
                 <p className="flex items-center gap-1.5 text-xs text-zinc-500">

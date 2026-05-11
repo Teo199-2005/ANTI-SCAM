@@ -68,11 +68,11 @@ function RoleIcon({ kind }: { kind: (typeof people)[number]["icon"] }) {
 function OperatorPoweredBy({ dark }: { dark: boolean }) {
   return (
     <div
-      className={`flex w-full max-w-md shrink-0 flex-col items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-5 md:w-auto md:flex-col md:items-end md:justify-start md:px-6 md:py-5 lg:flex-row lg:items-center ${
+      className={`flex w-full max-w-md shrink-0 flex-col items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm sm:max-w-none sm:flex-row sm:items-center sm:justify-center sm:gap-5 md:w-auto md:gap-5 md:px-6 md:py-5 ${
         dark ? "border-white/20 bg-white/10" : "border-clSeafoam/80 bg-white/90"
       }`}
     >
-      <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24 md:h-28 md:w-28">
+      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center sm:h-24 sm:w-24 md:h-28 md:w-28">
         <Image
           src="/rising2brothers.png"
           alt="The Rising 2 Brothers OPC — company logo"
@@ -82,7 +82,7 @@ function OperatorPoweredBy({ dark }: { dark: boolean }) {
           priority
         />
       </div>
-      <div className="text-center sm:text-left md:text-right lg:text-left">
+      <div className="min-w-0 text-center sm:text-left">
         <p
           className={`text-[11px] font-bold uppercase tracking-[0.2em] ${
             dark ? "text-white/55" : "text-zinc-500"
@@ -123,26 +123,40 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
         <span className="cl-section-eyebrow">Leadership</span>
       </div>
 
-      <div className="mb-8 mx-auto flex max-w-5xl flex-col items-center gap-8 md:flex-row md:items-start md:justify-between md:gap-10 lg:gap-12">
-        <div className="text-center md:text-left">
-          <h2
-            className={`font-heading text-3xl font-semibold md:text-4xl ${
-              dark ? "text-white" : "text-zinc-900"
-            }`}
-          >
-            The Visionaries
-          </h2>
-          <p
-            className={`mx-auto mt-2 max-w-2xl text-base md:mx-0 ${
-              dark ? "text-white/70" : "text-zinc-600"
-            }`}
-          >
-            Meet our leadership team shaping premium digital hospitality.
-          </p>
+      <div className="mb-8 mx-auto flex max-w-5xl flex-col items-center gap-8 md:flex-row md:items-center md:justify-between md:gap-10 lg:gap-12">
+        <div className="w-full max-w-2xl text-center md:max-w-none md:flex-1 md:text-left">
+          <div className="flex flex-col items-center gap-4 sm:gap-5 md:flex-row md:items-center md:gap-5 lg:gap-6">
+            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm sm:h-24 sm:w-24 md:h-28 md:w-28">
+              <Image
+                src="/the-visionaries.png"
+                alt="The Visionaries — Anti-Scam PH executive leadership emblem"
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 5rem, 7rem"
+                priority
+              />
+            </div>
+            <div className="min-w-0">
+              <h2
+                className={`font-heading text-3xl font-semibold leading-tight tracking-tight md:text-4xl ${
+                  dark ? "text-white" : "text-zinc-900"
+                }`}
+              >
+                The Visionaries
+              </h2>
+              <p
+                className={`mx-auto mt-2 max-w-2xl text-base md:mx-0 ${
+                  dark ? "text-white/70" : "text-zinc-600"
+                }`}
+              >
+                Meet our leadership team shaping premium digital hospitality.
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Desktop / tablet: operator beside headline */}
-        <div className="hidden md:flex">
+        {/* Desktop / tablet: operator beside headline — shrink-0 keeps card height; items-center aligns with heading block */}
+        <div className="hidden shrink-0 md:flex md:items-center">
           <OperatorPoweredBy dark={dark} />
         </div>
       </div>

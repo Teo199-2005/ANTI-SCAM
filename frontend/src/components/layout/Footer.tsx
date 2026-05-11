@@ -4,6 +4,7 @@ import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Logo from "./Logo";
 import PoweredByMark from "@/components/branding/PoweredByMark";
 import { FooterLegalLinks } from "./FooterLegalLinks";
+import { cn } from "@/lib/utils";
 
 const quickLinks = [
   { href: "/", label: "Home" },
@@ -49,7 +50,7 @@ const year = new Date().getFullYear();
 
 export default function Footer() {
   return (
-    <footer className="relative overflow-hidden bg-clOceanDeep">
+    <footer className={cn("relative overflow-hidden bg-clOceanDeep", "font-body text-white")}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
       <div className="pointer-events-none absolute -top-24 left-1/2 h-48 w-[480px] -translate-x-1/2 rounded-full bg-white/8 blur-3xl" />
 
@@ -59,7 +60,7 @@ export default function Footer() {
           <div className="flex items-center gap-3">
             <Logo size="md" />
             <div>
-              <BrandWordmark tone="onDark" size="lg" />
+              <BrandWordmark tone="onDark" size="lg" displayHeading />
               <p className="mt-1 text-[11px] text-white/65 sm:text-xs">Verify. Check. Protect. · Philippines</p>
             </div>
           </div>
@@ -94,9 +95,9 @@ export default function Footer() {
         {/* About + links + map — single compact grid */}
         <div className="grid gap-6 py-5 lg:grid-cols-12 lg:gap-6 lg:py-6">
           <div className="lg:col-span-5">
-            <h2 className="text-sm font-medium leading-snug text-white/90 md:text-[15px]">About</h2>
+            <h2 className="font-pop text-sm font-semibold leading-snug text-white/90 md:text-[15px]">About</h2>
             <p className="mt-2 text-xs leading-relaxed text-white/45 md:text-[13px]">
-              <BrandWordmark tone="onDark" size="xs" className="mr-1 inline" /> helps Philippine resorts automate
+              <BrandWordmark tone="onDark" size="xs" className="mr-1 inline" displayHeading /> helps Philippine resorts automate
               reservations, prevent double bookings, and build guest trust through verified booking systems and
               professional resort management tools.
             </p>
@@ -104,7 +105,7 @@ export default function Footer() {
             <ul className="mt-4 space-y-1 border-t border-white/5 pt-3">
               {featureBullets.map(({ title, description }) => (
                 <li key={title} className="text-[11px] leading-snug text-white/35 md:text-xs">
-                  <span className="text-white/55">{title}</span>
+                  <span className="font-pop font-semibold text-white/65">{title}</span>
                   <span className="text-white/25"> · </span>
                   <span>{description}</span>
                 </li>
@@ -114,7 +115,7 @@ export default function Footer() {
 
           <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:col-span-4">
             <div>
-              <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Explore</h3>
+              <h3 className="font-pop mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Explore</h3>
               <ul className="space-y-1">
                 {quickLinks.map(({ href, label }) => (
                   <li key={href}>
@@ -126,7 +127,7 @@ export default function Footer() {
               </ul>
             </div>
             <div>
-              <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Contact</h3>
+              <h3 className="font-pop mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Contact</h3>
               <ul className="space-y-1 text-xs text-white/50">
                 <li>
                   <a href="mailto:support@antiscamph.com" className="inline-flex items-center gap-1.5 hover:text-white">
@@ -149,7 +150,7 @@ export default function Footer() {
           </div>
 
           <div className="lg:col-span-3">
-            <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Find Us</h3>
+            <h3 className="font-pop mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">Find Us</h3>
             <div className="overflow-hidden rounded-lg border border-white/10">
               <iframe
                 title="Anti-Scam PH — location map"
@@ -164,7 +165,7 @@ export default function Footer() {
             </div>
             <Link
               href="/contact"
-              className="mt-2 flex w-full items-center justify-center rounded-full bg-gradient-to-r from-clOcean to-clTeal py-2 text-xs font-semibold text-white shadow-cl-btn transition hover:from-clOceanHover hover:to-clOcean"
+              className="font-pop mt-2 flex w-full items-center justify-center rounded-full bg-gradient-to-r from-clOcean to-clTeal py-2 text-xs font-semibold text-white shadow-cl-btn transition hover:from-clOceanHover hover:to-clOcean"
             >
               Contact us →
             </Link>
@@ -176,7 +177,7 @@ export default function Footer() {
           <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1">
             <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
               <span>© {year}</span>
-              <BrandWordmark tone="onDark" size="xs" className="inline" />
+              <BrandWordmark tone="onDark" size="xs" className="inline" displayHeading />
               <span>. All rights reserved.</span>
             </span>
             <span className="hidden text-white/20 sm:inline" aria-hidden>

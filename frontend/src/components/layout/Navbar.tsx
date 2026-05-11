@@ -7,7 +7,7 @@ import PageContainer from "./PageContainer";
 import Logo from "./Logo";
 import { NavBrandWordmark } from "./NavBrandWordmark";
 import { useAuth } from "@/contexts/AuthContext";
-import { isAuthMarketingNavOverlayPath } from "@/lib/authMarketingNavOverlay";
+import { isAuthMarketingNavOverlayPath, isAuthSplitShellPath } from "@/lib/authMarketingNavOverlay";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useEffect, useRef, useState } from "react";
@@ -50,6 +50,21 @@ function desktopNavLinkClass(pathname: string, href: string, navOverMedia: boole
       active ? "bg-white/50 text-navy" : "bg-white/35 text-navy/95 hover:bg-white/45"
     );
   }
+  const authSplitNav = isAuthSplitShellPath(pathname);
+  const plainMarketingHref =
+    href === "/about" || href === "/blogs" || href === "/contact";
+  const isRegisterPath =
+    pathname === "/register" || pathname.startsWith("/register/");
+  // Register uses centered form (no hero photo); navy links match Home / Verify.
+  if (authSplitNav && plainMarketingHref && !isRegisterPath) {
+    return cn(
+      base,
+      "rounded-md px-2.5 py-2.5 xl:px-3",
+      active
+        ? "text-white underline decoration-white/45 decoration-2 underline-offset-[5px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]"
+        : "text-white/90 hover:text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+    );
+  }
   return cn(
     base,
     "rounded-md px-2.5 py-2.5 xl:px-3",
@@ -62,7 +77,6 @@ export default function Navbar() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const navOverMedia = isAuthMarketingNavOverlayPath(pathname);
-  const premiumLandingPreview = pathname === "/landing-preview" && navOverMedia;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const drawerPanelRef = useRef<HTMLElement | null>(null);
@@ -116,11 +130,7 @@ export default function Navbar() {
             "max-lg:flex max-lg:flex-col max-lg:gap-0 max-lg:pb-2.5 max-lg:pt-[max(0.35rem,env(safe-area-inset-top))]",
             "lg:flex lg:flex-row lg:items-center lg:gap-10 lg:pb-3.5 lg:pt-[max(0.35rem,env(safe-area-inset-top))] xl:gap-14",
             navOverMedia
-              ? cn(
-                  "pointer-events-auto lg:min-h-[4.6rem]",
-                  premiumLandingPreview &&
-                    "max-lg:mx-3 max-lg:mt-2 max-lg:rounded-[1.35rem] max-lg:border max-lg:border-white/50 max-lg:bg-white/[0.72] max-lg:shadow-[0_16px_48px_-28px_rgba(7,27,70,0.2)] max-lg:ring-1 max-lg:ring-white/70 max-lg:backdrop-blur-2xl max-lg:backdrop-saturate-150 sm:max-lg:mx-4 lg:rounded-full lg:border lg:border-white/50 lg:bg-white/[0.72] lg:px-4 lg:py-2 lg:shadow-[0_18px_56px_-32px_rgba(7,27,70,0.26)] lg:ring-1 lg:ring-white/75 lg:backdrop-blur-2xl lg:backdrop-saturate-150 xl:gap-12"
-                )
+              ? "pointer-events-auto lg:min-h-[4.6rem]"
               : "max-lg:rounded-b-[1.35rem] max-lg:border max-lg:border-navy/10 max-lg:bg-gradient-to-b max-lg:from-white max-lg:to-[#f6f8fc] max-lg:shadow-[0_14px_36px_-22px_rgba(13,30,66,0.18)] max-lg:ring-1 max-lg:ring-white/80 lg:h-[5.15rem] lg:min-h-[5.15rem] lg:border-0 lg:bg-transparent lg:bg-none lg:from-transparent lg:to-transparent lg:shadow-none lg:ring-0"
           )}
         >
@@ -248,13 +258,8 @@ export default function Navbar() {
                   <Link
                     href="/register"
                     className={cn(
-                      "inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-nav text-[13px] font-extrabold uppercase tracking-wide transition sm:px-5 sm:text-sm",
-                      premiumLandingPreview
-                        ? "bg-gradient-to-r from-[#F5B400] to-[#FFC928] text-[#071B46] shadow-[0_10px_36px_-10px_rgba(245,180,0,0.55)] hover:brightness-105"
-                        : cn(
-                            "bg-gradient-to-r from-accentOrange via-clCoral to-accentOrange text-navy hover:from-accentOrangeDark hover:via-clCoralDark hover:to-accentOrangeDark",
-                            navOverMedia ? "shadow-none" : "shadow-dash-accent"
-                          )
+                      "inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-accentOrange via-clCoral to-accentOrange px-4 py-2.5 font-nav text-[13px] font-extrabold uppercase tracking-wide text-navy transition hover:from-accentOrangeDark hover:via-clCoralDark hover:to-accentOrangeDark sm:px-5 sm:text-sm",
+                      navOverMedia ? "shadow-none" : "shadow-dash-accent"
                     )}
                   >
                     <Store size={17} className="shrink-0 text-navy" aria-hidden />
@@ -342,12 +347,7 @@ export default function Navbar() {
                 <Link
                   href="/register"
                   onClick={() => setDrawerOpen(false)}
-                  className={cn(
-                    "flex w-full items-center justify-center gap-2 rounded-full py-3.5 font-nav text-[15px] font-extrabold uppercase tracking-wide",
-                    premiumLandingPreview
-                      ? "bg-gradient-to-r from-[#F5B400] to-[#FFC928] text-[#071B46] shadow-[0_10px_36px_-10px_rgba(245,180,0,0.45)] hover:brightness-105"
-                      : "bg-gradient-to-r from-accentOrange via-clCoral to-accentOrange text-navy shadow-dash-accent hover:from-accentOrangeDark hover:via-clCoralDark hover:to-accentOrangeDark"
-                  )}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accentOrange via-clCoral to-accentOrange py-3.5 font-nav text-[15px] font-extrabold uppercase tracking-wide text-navy shadow-dash-accent hover:from-accentOrangeDark hover:via-clCoralDark hover:to-accentOrangeDark"
                 >
                   <Store size={18} className="shrink-0 text-navy" aria-hidden />
                   Register your resort

@@ -17,3 +17,11 @@ export async function validateReferralCode(code: string, resortId: number): Prom
   });
   return data.data;
 }
+
+/** Validate a marketer code before signup (no resort scope; `readiness` is null). */
+export async function validateReferralCodePublic(code: string): Promise<ReferralValidateResult> {
+  const { data } = await publicClient.post<ApiEnvelope<ReferralValidateResult>>("/public/referrals/validate", {
+    code: code.trim().toUpperCase(),
+  });
+  return data.data;
+}
