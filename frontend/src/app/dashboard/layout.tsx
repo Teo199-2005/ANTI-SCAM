@@ -13,7 +13,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { sanitizeOtpInput } from "@/lib/inputRestrictions";
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-const OTP_RESEND_COOLDOWN_SECONDS = 30;
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const OTP_SEND_TIMEOUT_MS = 15000;
 
 export default function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -43,11 +43,9 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
   };
 
   const applyCooldownFromPayload = (cooldownSeconds: number | null | undefined) => {
-    if (typeof cooldownSeconds === "number" && cooldownSeconds > 0) {
-      setResendCooldown(Math.max(1, Math.floor(cooldownSeconds)));
-      return;
-    }
-    startResendCooldown();
+    const fromServer =
+      typeof cooldownSeconds === "number" && cooldownSeconds > 0 ? Math.floor(cooldownSeconds) : 0;
+    setResendCooldown(Math.max(OTP_RESEND_COOLDOWN_SECONDS, fromServer));
   };
 
   const sendOtpWithTimeout = async () => {
@@ -149,8 +147,10 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     return () => window.clearInterval(timer);
   }, [needsOtpVerification, resendCooldown]);
 
+  const resendDisabled = (sendingOtp && sendMode === "manual") || resendCooldown > 0;
+
   const handleResendOtp = async () => {
-    if (sendingOtp || resendCooldown > 0) return;
+    if (resendDisabled) return;
     setSendingOtp(true);
     setSendMode("manual");
     setOtpError(null);
@@ -347,7 +347,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
                   <button
                     type="button"
                     onClick={handleResendOtp}
-                    disabled={sendingOtp || resendCooldown > 0}
+                    disabled={resendDisabled}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {sendingOtp && sendMode === "manual"

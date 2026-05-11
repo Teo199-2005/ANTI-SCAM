@@ -16,7 +16,7 @@ class EmailVerificationOtpService
     private const OTP_LENGTH = 6;
     private const OTP_TTL_MINUTES = 10;
     private const MAX_ATTEMPTS = 5;
-    private const RESEND_COOLDOWN_SECONDS = 30;
+    private const RESEND_COOLDOWN_SECONDS = 60;
 
     public function __construct(private readonly BrandedEmailTemplateService $templateService)
     {
