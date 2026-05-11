@@ -21,10 +21,23 @@ function firstNonEmptyEnv(...keys: string[]): string | undefined {
   return undefined;
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
 /**
- * Browser / shared — uses `NEXT_PUBLIC_API_BASE_URL` (inlined where client bundles import this module).
+ * Browser / shared — uses `NEXT_PUBLIC_API_BASE_URL` (inlined at build time).
+ *
+ * On a real deployed host (not localhost), the browser always uses
+ * `{window.location.origin}/api/v1` so Terms and `publicClient` keep working even if
+ * production was built without a correct `NEXT_PUBLIC_API_BASE_URL` (a common VPS issue).
+ * Local dev on localhost / 127.0.0.1 still uses the env default pointing at Laravel.
  */
 export function laravelApiV1BaseUrl(): string {
+  if (typeof window !== "undefined" && !isLoopbackHostname(window.location.hostname)) {
+    const origin = window.location.origin.replace(/\/$/, "");
+    return `${origin}/api/v1`;
+  }
   const raw = firstNonEmptyEnv("NEXT_PUBLIC_API_BASE_URL") ?? "http://127.0.0.1:8000/api/v1";
   return normalizeLaravelApiV1Base(raw);
 }
