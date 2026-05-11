@@ -4,6 +4,9 @@ import DashCard from "@/components/dash/DashCard";
 import DashModal from "@/components/dash/DashModal";
 import ProgressRing from "@/components/dashboard/ProgressRing";
 import StatCard from "@/components/dashboard/StatCard";
+import SubscriptionPaymentThankYouModal, {
+  type SubscriptionPaymentThankVariant,
+} from "@/components/dashboard/SubscriptionPaymentThankYouModal";
 import {
   getResortBookingCalendar,
   getResortStats,
@@ -34,6 +37,7 @@ export default function ResortOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [paymentThankYou, setPaymentThankYou] = useState<SubscriptionPaymentThankVariant | null>(null);
 
   const calendarMonth = useMemo(() => new Date(), []);
   const monthStart = useMemo(
@@ -78,37 +82,19 @@ export default function ResortOverviewPage() {
 
     if (payment === "success") {
       void (async () => {
+        let thankVariant: SubscriptionPaymentThankVariant = "generic";
         try {
           const landing = await getOwnerLandingPage();
           const result = await syncPendingSubscriptionInvoice(landing.resort_id);
-          if (result.synced) {
-            pushToast({
-              title: "Subscription active",
-              description: "Your payment was confirmed. Premium status is updated.",
-              tone: "success",
-            });
-          } else if (result.gateway_status === "PENDING") {
-            pushToast({
-              title: "Payment processing",
-              description: "The provider still shows pending. Wait a few seconds and refresh, or check your email.",
-              tone: "info",
-            });
-          } else {
-            pushToast({
-              title: "Payment received",
-              description: "If the top bar still shows pending, refresh the page in a moment.",
-              tone: "success",
-            });
-          }
+          if (result.synced) thankVariant = "synced";
+          else if (result.gateway_status === "PENDING") thankVariant = "pending";
+          else thankVariant = "generic";
         } catch {
-          pushToast({
-            title: "Could not confirm instantly",
-            description: "Your payment may still succeed via webhook. Refresh shortly or contact support if it stays pending.",
-            tone: "warning",
-          });
+          thankVariant = "error";
         } finally {
           stripPaymentQuery();
           notifyTopbar();
+          setPaymentThankYou(thankVariant);
         }
       })();
       return;
@@ -437,6 +423,14 @@ export default function ResortOverviewPage() {
           )}
         </DashCard>
       </div>
+
+      {paymentThankYou ? (
+        <SubscriptionPaymentThankYouModal
+          open
+          variant={paymentThankYou}
+          onClose={() => setPaymentThankYou(null)}
+        />
+      ) : null}
 
       <DashModal
         open={Boolean(selectedDate)}
