@@ -524,10 +524,11 @@ export default function ResortProfilePage() {
             <div className="flex flex-wrap items-center gap-3">
               {form.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={laravelPublicUrl(form.logo_url)} alt="Resort logo" className="h-16 w-16 rounded-xl border border-softBorder object-cover" />
+                <img src={laravelPublicUrl(form.logo_url)} alt="Resort logo" className="h-20 w-20 rounded-xl border border-softBorder object-cover" />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 text-xs text-rose-400">
-                  No logo
+                <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1 text-center text-[10px] font-medium leading-tight text-rose-500">
+                  <span>No logo</span>
+                  <span className="mt-1 text-[9px] font-normal text-rose-400">Preferred 512×512 px</span>
                 </div>
               )}
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-softBorder bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
@@ -541,15 +542,16 @@ export default function ResortProfilePage() {
           <div>
             <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
               <ImageIcon size={13} className="text-zinc-500" />
-              Hero background image <RequiredBadge />
+              Background image <RequiredBadge />
             </label>
             <div className="flex flex-wrap items-center gap-3">
               {form.background_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={laravelPublicUrl(form.background_image_url)} alt="Background" className="h-16 w-28 rounded-xl border border-softBorder object-cover" />
+                <img src={laravelPublicUrl(form.background_image_url)} alt="Background" className="h-20 w-36 rounded-xl border border-softBorder object-cover" />
               ) : (
-                <div className="flex h-16 w-28 items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 text-xs text-rose-400">
-                  No image
+                <div className="flex h-20 w-36 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1.5 text-center text-[10px] font-medium leading-tight text-rose-500">
+                  <span>No image</span>
+                  <span className="mt-1 text-[9px] font-normal text-rose-400">Preferred 1920×1080 px</span>
                 </div>
               )}
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-softBorder bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
@@ -558,7 +560,7 @@ export default function ResortProfilePage() {
                 <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploadingBg} onChange={onBgUpload} />
               </label>
             </div>
-            <p className="mt-1.5 text-xs text-zinc-500">Used as the full-width hero background on your landing page.</p>
+            <p className="mt-1.5 text-xs text-zinc-500">Used as the full-width background on your landing page.</p>
           </div>
         </div>
 

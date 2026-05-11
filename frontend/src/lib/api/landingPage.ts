@@ -17,7 +17,7 @@ export const LANDING_MISSING_FIELD_LABELS: Record<LandingMissingField, string> =
   address: "Address",
   contact_number: "Contact number",
   logo: "Resort logo",
-  background_image: "Background/hero image",
+  background_image: "Background image",
   room_with_image: "At least one active room with a photo",
 };
 

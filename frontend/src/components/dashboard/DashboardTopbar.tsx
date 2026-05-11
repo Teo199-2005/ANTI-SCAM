@@ -59,7 +59,7 @@ const MISSING_FIELD_LABELS: Record<string, string> = {
   address:          "Address",
   contact_number:   "Contact number",
   logo:             "Resort logo",
-  background_image: "Background/hero image",
+  background_image: "Background image",
   room_with_image:  "At least one active room with a photo",
 };
 
@@ -454,7 +454,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
           onClick={() => setShowSubscribeModal(false)}
         >
           <div
-            className="box-border w-full min-w-0 max-w-lg overflow-hidden rounded-t-2xl border border-skyBlue/20 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.35)] sm:rounded-3xl"
+            className="box-border w-full min-w-0 max-w-3xl overflow-hidden rounded-t-2xl border border-skyBlue/20 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.35)] sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -497,7 +497,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   <CalendarDays size={13} className="mt-0.5 shrink-0 text-zinc-500 sm:mt-0 sm:h-[14px] sm:w-[14px]" />
                   Choose your plan duration (3 rooms included)
                 </p>
-                <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:mt-3 sm:gap-2 md:grid-cols-4">
+                <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-2.5 lg:grid-cols-4">
                   {STANDARD_OFFERS.map((offer) => {
                     const active = selectedDuration === offer.duration;
                     return (
@@ -505,7 +505,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         key={`duration-${offer.duration}`}
                         type="button"
                         onClick={() => setSelectedDuration(offer.duration)}
-                        className={`flex min-w-0 flex-col items-stretch gap-0.5 rounded-lg border px-2 py-1.5 text-left transition sm:rounded-xl sm:px-2 sm:py-2 ${
+                        className={`flex min-w-0 flex-col items-stretch gap-1 rounded-lg border px-2.5 py-2 text-left transition sm:rounded-xl sm:px-3 sm:py-2.5 ${
                           active
                             ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/30"
                             : "border-softBorder bg-white hover:border-primaryBlue/35"
@@ -517,15 +517,17 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                             {offer.duration} month{offer.duration > 1 ? "s" : ""}
                           </span>
                         </span>
-                        <span className="min-w-0 w-full break-words whitespace-normal text-[10px] leading-tight text-zinc-500 sm:text-[11px]">
+                        <span className="min-w-0 w-full text-[10px] leading-tight text-zinc-500 sm:text-[11px]">
                           {offer.billingType}
                         </span>
-                        <span className="mt-0.5 min-w-0 w-full break-words whitespace-normal font-dash text-[10px] font-bold tabular-nums leading-tight text-navy sm:text-[11px]">
-                          <span className="text-zinc-400 line-through decoration-zinc-400 decoration-1 break-words">
+                        <span className="mt-0.5 flex min-w-0 flex-col gap-0.5 font-dash text-[10px] font-bold tabular-nums leading-tight text-navy sm:text-[11px]">
+                          <span className="whitespace-nowrap text-zinc-400 line-through decoration-zinc-400 decoration-1">
                             ₱{offer.listMonthlyRate.toLocaleString()}
                           </span>
-                          <span className="mx-0.5 text-zinc-300">·</span>
-                          <span>₱{offer.monthlyRate.toLocaleString()}/mo</span>
+                          <span className="whitespace-nowrap text-navy">
+                            ₱{offer.monthlyRate.toLocaleString()}
+                            <span className="font-semibold text-zinc-500">/mo</span>
+                          </span>
                         </span>
                       </button>
                     );
