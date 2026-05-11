@@ -35,9 +35,9 @@ export function useLegalDocuments(): LegalDocumentsContextValue {
 
 function TermsSectionBlock({ section }: { section: TermsSection }) {
   return (
-    <section className="scroll-mt-6 border-b border-zinc-200/80 py-6 last:border-0">
-      <h3 className="font-heading text-base font-semibold text-navy">{section.title}</h3>
-      <div className="mt-3 space-y-2 text-sm leading-relaxed text-zinc-700">
+    <section className="scroll-mt-4 border-b border-zinc-200/80 py-4 last:border-0 sm:py-5">
+      <h3 className="font-heading text-[15px] font-semibold leading-snug text-navy sm:text-base">{section.title}</h3>
+      <div className="mt-2.5 space-y-2 text-sm leading-relaxed text-zinc-700 sm:mt-3">
         {section.paragraphs.map((p, i) => (
           <p key={`p-${i}`}>{p}</p>
         ))}
@@ -87,50 +87,55 @@ function ModalFrame({
   }, [titleId, title]);
 
   return (
-    <div
-      className="fixed inset-0 z-[600] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-contain sm:items-center sm:p-4 sm:py-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-    >
+    <div className="fixed inset-0 z-[800]" role="presentation">
       <button
         type="button"
-        className="fixed inset-0 z-0 bg-zinc-900/50 backdrop-blur-sm"
+        className="absolute inset-0 z-0 bg-zinc-950/55 backdrop-blur-[2px]"
         aria-label="Close dialog"
         onClick={onClose}
       />
       {/*
-        min-h-0 on the panel is required: flex items default to min-height:auto and would
-        otherwise refuse to shrink below full document height — no inner scroll, header clipped.
+        Fixed + top + bottom gives a definite height. Grid row minmax(0,1fr) is required so the
+        body can shrink below content height and overflow-y-auto actually scrolls (flex-1 alone
+        inside abspos flex is unreliable across browsers).
       */}
       <div
-        className="relative z-10 mx-auto box-border flex w-full min-h-0 min-w-0 max-w-lg flex-col overflow-hidden rounded-t-2xl border border-zinc-200/90 bg-white shadow-2xl max-h-[min(88dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1.25rem))] sm:max-h-[min(80dvh,720px)] sm:max-w-2xl sm:rounded-2xl lg:max-w-3xl my-[max(0.5rem,env(safe-area-inset-bottom))] sm:my-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="legal-modal-shell pointer-events-auto fixed left-1/2 z-10 grid min-h-0 w-[calc(100%-1.25rem)] max-w-3xl -translate-x-1/2 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-zinc-200/95 bg-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] ring-1 ring-black/5 sm:w-[calc(100%-2rem)]"
+        style={{
+          top: "max(8rem, calc(env(safe-area-inset-top) + 7rem))",
+          bottom: "max(1.25rem, env(safe-area-inset-bottom))",
+        }}
       >
-        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-zinc-100 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
-          <div className="min-w-0 pr-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-clTeal sm:text-xs">Legal</p>
-            <h2
-              id={titleId}
-              className="font-heading text-lg font-semibold leading-snug tracking-tight text-navy sm:text-2xl"
+        <div className="min-h-0 shrink-0 border-b border-zinc-200 bg-zinc-50/90 px-4 py-3 sm:px-5 sm:py-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 pr-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-clTeal sm:text-xs">Legal</p>
+              <h2
+                id={titleId}
+                className="font-heading text-base font-semibold leading-snug tracking-tight text-navy sm:text-lg"
+              >
+                {title}
+              </h2>
+              {subtitle ? (
+                <div className="mt-0.5 max-w-prose text-[11px] leading-snug text-zinc-500 sm:text-xs">{subtitle}</div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-xl border border-zinc-200 bg-white p-2 text-zinc-600 shadow-sm transition hover:bg-zinc-100 hover:text-zinc-900"
+              aria-label="Close"
             >
-              {title}
-            </h2>
-            {subtitle ? (
-              <div className="mt-1 text-xs leading-snug text-zinc-500 sm:text-sm">{subtitle}</div>
-            ) : null}
+              <X size={18} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-xl border border-zinc-200/80 p-2 text-zinc-600 transition hover:bg-zinc-50"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
         </div>
         <div
           ref={bodyRef}
-          className="min-h-0 flex-1 basis-0 overflow-y-auto overscroll-y-contain px-4 py-4 sm:px-6 sm:py-5 [scrollbar-gutter:stable]"
+          className="legal-modal-scroll touch-pan-y min-h-0 overflow-y-auto overscroll-contain border-r border-zinc-200/80 bg-white px-3 py-3 pr-1.5 sm:px-4 sm:py-3.5 sm:pr-2"
         >
           {children}
         </div>
@@ -178,7 +183,7 @@ function TermsModal({ onClose }: { onClose: () => void }) {
         </p>
       ) : null}
       {payload ? (
-        <article className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 sm:p-5">
+        <article className="rounded-xl border border-zinc-100/90 bg-zinc-50/40 p-3 sm:p-4">
           {payload.sections.map((section) => (
             <TermsSectionBlock key={section.title} section={section} />
           ))}

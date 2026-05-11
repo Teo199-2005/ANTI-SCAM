@@ -2,7 +2,7 @@
 
 import AppLoadingScreen from "@/components/layout/AppLoadingScreen";
 import Footer from "@/components/layout/Footer";
-import Navbar from "@/components/layout/Navbar";
+import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   isAuthMarketingNavOverlayPath,
@@ -20,7 +20,7 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
   const fixedOverlayNav = isAuthMarketingNavOverlayPath(pathname);
   /** Home (`/`) only — auth pages use `AuthSplitShell` for their own top offset. */
   const mainTopPadForFixedNav = fixedOverlayNav && !isAuthSplitShellPath(pathname);
-  /** Premium home ships its own header; skip duplicate `Navbar` and use a tighter main shell. */
+  /** Premium home ships its own header; skip duplicate top bar in layout and use a tighter main shell. */
   const marketingHomeFullBleed = pathname === "/";
 
   useEffect(() => {
@@ -48,9 +48,11 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
     );
   }
 
+  const marketingNavMode = isAuthSplitShellPath(pathname) ? "auth-overlay" : "marketing-solid";
+
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden">
-      <Navbar />
+      <MarketingPremiumNavbar mode={marketingNavMode} />
       <main
         className={cn(
           "relative z-0 flex-1 min-w-0",

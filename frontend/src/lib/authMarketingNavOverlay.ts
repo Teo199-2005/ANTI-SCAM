@@ -32,7 +32,7 @@ export const MARKETING_OVERLAY_HERO_BLEED_NEG_CLASS =
 
 /**
  * Padding below fixed marketing navbar on auth split (safe-area + one-row mobile bar + buffer).
- * Sync with `Navbar` mobile overlay: logo + menu only (~3.25rem) + safe + small buffer.
+ * Sync with `MarketingPremiumNavbar` mobile row: logo + menu (~3.25rem) + safe + small buffer.
  */
 export const AUTH_SHELL_CLEAR_NAV_MOBILE_PT =
   "pt-[max(0.75rem,calc(env(safe-area-inset-top)+4.1rem))] sm:pt-[max(1rem,calc(env(safe-area-inset-top)+4.25rem))]";

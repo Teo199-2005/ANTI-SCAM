@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import {
   BarChart2,
   Building,
@@ -10,15 +9,14 @@ import {
   Globe,
   Lock,
   MapPin,
-  Menu,
   MessageSquare,
   Phone,
   Play,
   Shield,
   Users,
-  X,
 } from "lucide-react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
+import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
 import { cn } from "@/lib/utils";
 
 const NAVY = "#0d1f3c";
@@ -26,14 +24,6 @@ const GOLD = "#f5a623";
 /** Wordmark: trust navy + alert red (not gold) */
 const WORDMARK_NAVY = "#0B1F3A";
 const SCAM_ALERT_RED = "#E53935";
-
-const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/verify-resort", label: "Verify Resort", icon: Shield },
-  { href: "/about", label: "About" },
-  { href: "/blogs", label: "Blogs" },
-  { href: "/contact", label: "Contact" },
-] as const;
 
 /** Headline lines — scaled up slightly while staying nowrap in the hero column. */
 const HERO_HEADLINE_ROW =
@@ -163,8 +153,6 @@ function PricingCard({ label, original, price, note, highlight, badge }: Pricing
 }
 
 export function LandingPremiumPage() {
-  const [mobileNav, setMobileNav] = useState(false);
-
   return (
     <div className="min-w-0 origin-top overflow-x-hidden bg-white font-body text-[#111] antialiased [zoom:1.05]">
       {/* ── Hero + glass nav over image (nav does not stack above hero) ── */}
@@ -188,138 +176,7 @@ export function LandingPremiumPage() {
           />
         </div>
 
-        {/* Floating glass nav — over the photo, no solid bar, no border */}
-        <header className="pointer-events-none absolute inset-x-0 top-0 z-40 pt-[max(0.35rem,env(safe-area-inset-top))]">
-          <div className="pointer-events-auto mx-auto w-full max-w-[min(1360px,100%)] pb-1.5 ps-0.5 pe-4 pt-0.5 sm:ps-1 sm:pe-5 md:ps-1 md:pe-6 lg:ps-2 lg:pe-8">
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-              <Link
-                href="/"
-                className="flex min-w-0 shrink-0 items-center gap-2.5 sm:gap-3"
-                onClick={() => setMobileNav(false)}
-              >
-                <ImageWithFallback
-                  src="/mainlogo.png"
-                  alt="Anti-Scam PH Logo"
-                  width={112}
-                  height={112}
-                  className="h-10 w-10 shrink-0 object-contain drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] sm:h-11 sm:w-11"
-                  sizes="56px"
-                />
-                <div className="min-w-0 leading-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.85)]">
-                  <div className="flex items-baseline">
-                    <span className="font-pop whitespace-nowrap text-[17px] font-extrabold uppercase tracking-[0.07em] sm:text-[19px]">
-                      <span style={{ color: WORDMARK_NAVY }}>ANTI-</span>
-                      <span style={{ color: SCAM_ALERT_RED }}>SCAM</span>
-                      <span style={{ color: WORDMARK_NAVY }}> PH</span>
-                    </span>
-                  </div>
-                  <p
-                    className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#0B1F3A]/75 sm:text-[10px]"
-                    style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-                  >
-                    Verified resort platform
-                  </p>
-                </div>
-              </Link>
-
-              <nav className="hidden items-center justify-center gap-0.5 md:flex md:flex-1 lg:gap-1">
-                {navItems.map((item) => {
-                  const isHome = item.href === "/";
-                  const Icon = "icon" in item ? item.icon : null;
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      onClick={() => setMobileNav(false)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-[#0d1f3c] backdrop-blur-md transition-colors duration-150 xl:px-4",
-                        isHome
-                          ? "bg-white/40 font-bold hover:bg-white/50"
-                          : "bg-transparent hover:bg-white/28"
-                      )}
-                      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-                    >
-                      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} aria-hidden /> : null}
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <Link
-                  href="/login"
-                  className="hidden items-center gap-2 rounded-full border-2 border-white/85 bg-white/55 px-4 py-2 text-sm font-bold text-[#0d1f3c] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition hover:bg-white/75 sm:inline-flex"
-                  style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-                >
-                  <Users className="h-4 w-4 shrink-0" aria-hidden />
-                  Log in
-                </Link>
-                <Link
-                  href="/register"
-                  className={cn(
-                    REGISTER_GOLD_SHINE_REGISTER_BTN,
-                    "gap-2 rounded-full px-4 py-2 text-sm font-bold sm:px-5"
-                  )}
-                  style={registerGoldButtonStyle}
-                >
-                  <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
-                  <Building
-                    className="relative z-10 h-4 w-4 shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)]"
-                    aria-hidden
-                  />
-                  <span className="relative z-10 max-[380px]:sr-only">Register Your Resort</span>
-                  <span className="relative z-10 hidden max-[380px]:inline">Register</span>
-                </Link>
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/65 bg-white/25 text-[#0d1f3c] backdrop-blur-md transition hover:bg-white/40 md:hidden"
-                  aria-label={mobileNav ? "Close menu" : "Open menu"}
-                  aria-expanded={mobileNav}
-                  onClick={() => setMobileNav((o) => !o)}
-                >
-                  {mobileNav ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            {mobileNav ? (
-              <nav
-                className="mt-2 flex max-h-[min(70vh,24rem)] flex-col gap-1 overflow-y-auto rounded-2xl border-2 border-white/70 bg-white/40 p-2 backdrop-blur-2xl md:hidden"
-                aria-label="Mobile"
-              >
-                {navItems.map((item) => {
-                  const isHome = item.href === "/";
-                  const Icon = "icon" in item ? item.icon : null;
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      onClick={() => setMobileNav(false)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/45",
-                        isHome && "bg-white/50 font-bold"
-                      )}
-                      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-                    >
-                      {Icon ? <Icon className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden /> : null}
-                      {item.label}
-                    </Link>
-                  );
-                })}
-                <Link
-                  href="/login"
-                  onClick={() => setMobileNav(false)}
-                  className="mt-1 flex items-center justify-center gap-2 rounded-xl border-2 border-white/85 bg-white/60 py-2.5 text-sm font-bold text-[#0d1f3c] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-md sm:hidden"
-                  style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-                >
-                  <Users className="h-4 w-4" aria-hidden />
-                  Log in
-                </Link>
-              </nav>
-            ) : null}
-          </div>
-        </header>
+        <MarketingPremiumNavbar mode="hero" />
 
         <div className="relative z-10 mx-auto grid w-full max-w-[min(1360px,100%)] grid-cols-1 items-start gap-3 pb-6 pt-[max(6.75rem,calc(env(safe-area-inset-top)+5rem))] ps-[max(0.25rem,env(safe-area-inset-left))] pe-5 sm:gap-4 sm:ps-0.5 sm:pe-6 sm:pt-[max(7rem,calc(env(safe-area-inset-top)+5.25rem))] md:ps-1 md:pe-7 md:pt-[max(6.75rem,calc(env(safe-area-inset-top)+4.75rem))] lg:grid-cols-12 lg:items-center lg:gap-x-4 lg:gap-y-2 lg:pb-5 lg:ps-1 lg:pe-10 lg:pt-[max(5.25rem,calc(env(safe-area-inset-top)+4.15rem))] xl:pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.35rem))] 2xl:pt-[max(5.75rem,calc(env(safe-area-inset-top)+4.5rem))] xl:ps-2">
           {/* Left — nudged further left (tight page gutter + slight translate on large screens) */}
