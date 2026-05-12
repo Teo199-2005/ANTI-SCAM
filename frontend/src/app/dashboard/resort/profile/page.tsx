@@ -5,7 +5,7 @@ import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
-import { listResorts, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
+import { listResorts, getResort, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
 import {
   getOwnerLandingPage,
   LANDING_MISSING_FIELD_LABELS,
@@ -314,10 +314,27 @@ export default function ResortProfilePage() {
   const emailVerified = Boolean(user?.email_verified_at);
 
   const refreshOwnerLanding = async () => {
+    const resortId = form?.id;
     try {
       const landing = await getOwnerLandingPage();
       setOwnerLanding(landing);
       setSubdomain(landing.subdomain ?? null);
+      if (resortId != null) {
+        try {
+          const resort = await getResort(resortId);
+          setForm((prev) => {
+            if (!prev || prev.id !== resort.id) return prev;
+            return {
+              ...prev,
+              name: resort.name,
+              logo_url: resort.logo_url ?? "",
+              background_image_url: resort.background_image_url ?? "",
+            };
+          });
+        } catch {
+          /* keep existing form if resort fetch fails */
+        }
+      }
     } catch {
       setOwnerLanding(null);
     }
@@ -372,7 +389,7 @@ export default function ResortProfilePage() {
       await refreshOwnerLanding();
       pushToast({
         title: "Logo uploaded",
-        description: "Saved to your resort. You can still use Save profile for other fields.",
+        description: "Saved on the server. The preview should update automatically; if not, refresh the page.",
         tone: "success",
       });
     } catch (err) {
@@ -397,7 +414,7 @@ export default function ResortProfilePage() {
       await refreshOwnerLanding();
       pushToast({
         title: "Background image uploaded",
-        description: "Saved to your resort. Use Save profile for text fields if you changed them.",
+        description: "Saved on the server. The preview should update automatically; if not, refresh the page.",
         tone: "success",
       });
     } catch (err) {
