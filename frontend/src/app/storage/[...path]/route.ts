@@ -1,4 +1,5 @@
 import { serverLaravelWebOrigin } from "@/lib/api/laravelApiBase";
+import { existsSync } from "fs";
 import fs from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
@@ -22,13 +23,37 @@ function guessContentType(filePath: string): string {
 }
 
 /**
+ * Laravel `storage/app/public` on a typical VPS monorepo (`.../anti-scam/frontend` + `.../anti-scam/backend`).
+ * Override with `LARAVEL_STORAGE_APP_PUBLIC` when layout differs.
+ */
+function resolveDiskStorageRoot(): string | null {
+  const explicit = process.env.LARAVEL_STORAGE_APP_PUBLIC?.trim();
+  if (explicit) {
+    if (existsSync(explicit)) {
+      return path.resolve(explicit);
+    }
+    console.warn("[storage proxy] LARAVEL_STORAGE_APP_PUBLIC is set but path not found:", explicit);
+  }
+
+  const siblingBackend = path.resolve(process.cwd(), "../backend/storage/app/public");
+  if (existsSync(siblingBackend)) {
+    return siblingBackend;
+  }
+
+  const backendFromRepoRoot = path.resolve(process.cwd(), "backend/storage/app/public");
+  if (existsSync(backendFromRepoRoot)) {
+    return backendFromRepoRoot;
+  }
+
+  return null;
+}
+
+/**
  * Serves `GET /storage/*` for uploaded assets (logos, backgrounds, room photos).
  *
- * 1) **Preferred on VPS (same machine as Laravel):** set `LARAVEL_STORAGE_APP_PUBLIC` to the absolute
- *    path of Laravel's `storage/app/public` directory (same files as `public/storage` via
- *    `php artisan storage:link`). No HTTP to PHP is required.
- * 2) **Fallback:** HTTP GET to Laravel web origin derived from `LARAVEL_API_BASE_URL` /
- *    `NEXT_PUBLIC_API_BASE_URL` (see {@link serverLaravelWebOrigin}).
+ * 1) **Disk (VPS):** `LARAVEL_STORAGE_APP_PUBLIC`, or auto `../backend/storage/app/public` from the
+ *    Next working directory (no HTTP to PHP).
+ * 2) **Fallback:** HTTP GET to Laravel web origin from `LARAVEL_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL`.
  */
 export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse> {
   const { path: segments } = await context.params;
@@ -39,7 +64,7 @@ export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse>
     return new NextResponse("Bad request", { status: 400 });
   }
 
-  const diskRoot = process.env.LARAVEL_STORAGE_APP_PUBLIC?.trim();
+  const diskRoot = resolveDiskStorageRoot();
   if (diskRoot) {
     const baseResolved = path.resolve(diskRoot);
     const filePath = path.resolve(baseResolved, ...segments);
@@ -59,7 +84,7 @@ export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse>
         console.error("[storage proxy] disk read failed:", filePath, e);
         return new NextResponse("Internal server error", { status: 500 });
       }
-      /* fall through to HTTP — file may only exist on another host */
+      /* fall through to HTTP */
     }
   }
 
@@ -79,8 +104,16 @@ export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse>
     return new NextResponse("Bad gateway", { status: 502 });
   }
 
-  if (!upstreamRes.ok && diskRoot) {
-    console.error("[storage proxy] upstream HTTP", upstreamRes.status, upstream, "(disk miss + HTTP fail)");
+  if (!upstreamRes.ok) {
+    console.error(
+      "[storage proxy] miss HTTP",
+      upstreamRes.status,
+      upstream,
+      "cwd=",
+      process.cwd(),
+      "diskRoot=",
+      diskRoot ?? "(none)",
+    );
   }
 
   const headers = new Headers();
