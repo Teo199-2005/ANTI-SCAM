@@ -72,24 +72,22 @@ class ResortService
             }
         }
 
-        // Keep public /stay/{subdomain} aligned with resort name whenever the profile payload includes `name`
-        // (owner dashboard always sends it on save — fixes legacy subdomains derived from owner name).
-        if (array_key_exists('name', $payload)) {
-            $resort->loadMissing('tenant');
-            $tenant = $resort->tenant;
-            if ($tenant instanceof Tenant) {
-                $idealBase = TenantPublicIdentifier::preferredSubdomainBaseFromResortName($payload['name'], null);
-                if ($tenant->subdomain !== $idealBase) {
-                    $newSub = TenantPublicIdentifier::allocateUniqueSubdomain($idealBase, $tenant->id);
-                    if ($newSub !== $tenant->subdomain) {
-                        $tenant->update(['subdomain' => $newSub, 'slug' => $newSub]);
-                    }
-                }
-            }
-        }
-
         if (! empty($changes)) {
             $resort->update($changes);
+        }
+
+        // Always align /stay/{subdomain} with the persisted resort name (fixes legacy slugs even when
+        // the request omits `name` or only partial fields are validated).
+        $resort->refresh()->loadMissing('tenant');
+        $tenant = $resort->tenant;
+        if ($tenant instanceof Tenant) {
+            $idealBase = TenantPublicIdentifier::preferredSubdomainBaseFromResortName($resort->name, null);
+            if ($tenant->subdomain !== $idealBase) {
+                $newSub = TenantPublicIdentifier::allocateUniqueSubdomain($idealBase, $tenant->id);
+                if ($newSub !== $tenant->subdomain) {
+                    $tenant->update(['subdomain' => $newSub, 'slug' => $newSub]);
+                }
+            }
         }
 
         return $resort->refresh()->load('subscription')->loadCount('rooms');

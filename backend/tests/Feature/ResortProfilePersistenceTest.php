@@ -72,4 +72,55 @@ class ResortProfilePersistenceTest extends TestCase
         $this->assertSame('Free cancellation up to 48 hours.', $resort->cancellation_policy);
         $this->assertSame(['Pool', 'Free Wi-Fi'], $resort->amenities);
     }
+
+    public function test_put_resort_without_name_still_resyncs_tenant_subdomain_from_db_resort_name(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Owner Name',
+            'slug' => 'teofilo-harry-paet-w1scd1',
+            'subdomain' => 'teofilo-harry-paet-w1scd1',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'TEO',
+            'description' => 'Test',
+            'address' => 'Somewhere',
+            'contact_number' => '+63000000000',
+            'is_publicly_listed' => true,
+        ]);
+
+        Subscription::create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'plan' => 'basic',
+            'base_price' => 2000,
+            'included_rooms' => 3,
+            'extra_room_fee' => 300,
+            'active_room_count' => 0,
+            'total_monthly_fee' => 2000,
+            'status' => 'active',
+            'billing_cycle_start' => now()->startOfMonth()->toDateString(),
+            'billing_cycle_end' => now()->endOfMonth()->toDateString(),
+            'next_due_date' => now()->endOfMonth()->toDateString(),
+        ]);
+
+        $owner = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'resort_owner',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->putJson("/api/v1/resorts/{$resort->id}", [
+            'cancellation_policy' => 'Updated policy only',
+        ]);
+
+        $response->assertOk();
+
+        $tenant->refresh();
+        $this->assertSame('teo', $tenant->subdomain);
+        $this->assertSame('teo', $tenant->slug);
+    }
 }
