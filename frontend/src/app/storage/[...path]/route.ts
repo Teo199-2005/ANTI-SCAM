@@ -48,12 +48,28 @@ function resolveDiskStorageRoot(): string | null {
   return null;
 }
 
+/** Avoid fetch() to the same host as this request — that recurses through nginx and returns 500. */
+function upstreamWouldLoopBackToThisSite(req: NextRequest, upstreamUrl: string): boolean {
+  try {
+    const u = new URL(upstreamUrl);
+    const rawHost =
+      req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ??
+      req.headers.get("host")?.split(",")[0]?.trim() ??
+      "";
+    const requestHost = rawHost.split(":")[0]?.toLowerCase() ?? "";
+    return Boolean(requestHost) && u.hostname.toLowerCase() === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Serves `GET /storage/*` for uploaded assets (logos, backgrounds, room photos).
  *
  * 1) **Disk (VPS):** `LARAVEL_STORAGE_APP_PUBLIC`, or auto `../backend/storage/app/public` from the
  *    Next working directory (no HTTP to PHP).
- * 2) **Fallback:** HTTP GET to Laravel web origin from `LARAVEL_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL`.
+ * 2) **Fallback:** HTTP GET to Laravel web origin from `LARAVEL_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL`
+ *    (only when disk root is unknown — never same-host fetch to avoid recursion).
  */
 export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse> {
   const { path: segments } = await context.params;
@@ -77,20 +93,31 @@ export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse>
       headers.set("Content-Type", guessContentType(filePath));
       headers.set("Content-Length", String(data.length));
       headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
-      return new NextResponse(data, { status: 200, headers });
+      return new NextResponse(new Uint8Array(data), { status: 200, headers });
     } catch (e) {
       const code = e && typeof e === "object" && "code" in e ? String((e as NodeJS.ErrnoException).code) : "";
-      if (code !== "ENOENT") {
-        console.error("[storage proxy] disk read failed:", filePath, e);
-        return new NextResponse("Internal server error", { status: 500 });
+      if (code === "ENOENT") {
+        return new NextResponse("Not found", { status: 404 });
       }
-      /* fall through to HTTP */
+      console.error("[storage proxy] disk read failed:", filePath, e);
+      return new NextResponse("Internal server error", { status: 500 });
     }
   }
 
   const relative = segments.map((s) => encodeURIComponent(s)).join("/");
   const origin = serverLaravelWebOrigin().replace(/\/$/, "");
   const upstream = `${origin}/storage/${relative}${req.nextUrl.search}`;
+
+  if (upstreamWouldLoopBackToThisSite(req, upstream)) {
+    console.error(
+      "[storage proxy] misconfigured: Laravel origin matches public site host; disk root not found (cwd=%s). Set LARAVEL_STORAGE_APP_PUBLIC or run PM2 with cwd=.../frontend.",
+      process.cwd(),
+    );
+    return new NextResponse(
+      "Storage unavailable: set LARAVEL_STORAGE_APP_PUBLIC to Laravel storage/app/public, or fix PM2 cwd so ../backend/storage/app/public exists.",
+      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
 
   let upstreamRes: Response;
   try {
@@ -112,7 +139,7 @@ export async function GET(req: NextRequest, context: Ctx): Promise<NextResponse>
       "cwd=",
       process.cwd(),
       "diskRoot=",
-      diskRoot ?? "(none)",
+      "(none)",
     );
   }
 
