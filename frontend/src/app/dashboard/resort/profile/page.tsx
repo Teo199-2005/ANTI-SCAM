@@ -82,7 +82,7 @@ export default function ResortProfilePage() {
   const [onboardingGate, setOnboardingGate] = useState(false);
   const [acceptOnboardTerms, setAcceptOnboardTerms] = useState(false);
   const [onboardingBusy, setOnboardingBusy] = useState(false);
-  /** Same readiness rules as the public `/stay/{subdomain}` page (includes active room + photo). */
+  /** Same readiness rules as the public `/resort/{slug}` page (includes active room + photo). */
   const [ownerLanding, setOwnerLanding] = useState<OwnerLandingPageResponse | null>(null);
 
   const publicLink =
@@ -732,7 +732,7 @@ export default function ResortProfilePage() {
         </div>
         <p className="text-xs leading-snug text-zinc-500">
           The web address is built from your <strong className="font-semibold text-zinc-600">Resort name</strong> (for example, TEO →{" "}
-          <span className="font-mono text-[11px] text-navy">/stay/teo</span>). Click <strong className="font-semibold text-zinc-600">Save profile</strong> once to
+          <span className="font-mono text-[11px] text-navy">/resort/teo</span>). Click <strong className="font-semibold text-zinc-600">Save profile</strong> once to
           refresh the link (any field can change — we sync from the saved name). If that short name is already taken, a short random suffix is added automatically.
         </p>
       </div>

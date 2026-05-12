@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Production apex domain (no protocol), e.g. anti-scamph.com.
- * When set, `{tenant}.{root}` is rewritten to `/stay/{tenant}` (optional; needs wildcard DNS).
- * Shareable links use `{apex}/stay/{tenant}` so owners work without `*.{root}` DNS.
+ * When set, `{tenant}.{root}` is rewritten to `/resort/{tenant}` (optional; needs wildcard DNS).
+ * Shareable links use `{apex}/resort/{tenant}` so owners work without `*.{root}` DNS.
  * If unset, only `*.localhost` is treated as tenant hosts (local dev).
  */
 const ROOT_DOMAIN_CONFIG = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase() ?? "";
@@ -12,7 +12,14 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const pathname = request.nextUrl.pathname;
 
-  // Dashboard, auth API, and BFF must never be rewritten to /stay/{tenant}/...
+  // Legacy `/stay/{slug}` → `/resort/{slug}` (permanent)
+  if (pathname === "/stay" || pathname.startsWith("/stay/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/stay/, "/resort");
+    return NextResponse.redirect(url, 308);
+  }
+
+  // Dashboard, auth API, and BFF must never be rewritten to /resort/{tenant}/...
   // (otherwise e.g. tenant.localhost/dashboard/resort → 404 after payment redirect).
   if (
     pathname.startsWith("/dashboard") ||
@@ -56,8 +63,8 @@ export function middleware(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   const originalPath = pathname === "/" ? "" : pathname;
-  // Use /stay/... so we do not collide with (marketing)/resorts/[id] (catalog resort pages).
-  url.pathname = `/stay/${subdomain}${originalPath}`;
+  // Singular /resort/... avoids collision with marketing /resorts/[id] (catalog).
+  url.pathname = `/resort/${subdomain}${originalPath}`;
   return NextResponse.rewrite(url);
 }
 

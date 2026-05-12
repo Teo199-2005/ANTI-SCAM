@@ -6,7 +6,7 @@ function isLoopbackHostname(hostname: string): boolean {
  * Shareable URL for a resort’s public landing (owner profile “Copy link”, etc.).
  *
  * - **Local dev:** `http://{tenant}.localhost:{port}` — matches `middleware.ts` tenant routing.
- * - **Deployed:** `{origin}/stay/{tenant}` — works with only an apex DNS record; no `*.{root}` wildcard required.
+ * - **Deployed:** `{origin}/resort/{tenant}` — works with only an apex DNS record; no `*.{root}` wildcard required.
  */
 export function resortPublicLandingPageUrl(subdomain: string): string {
   if (typeof window === "undefined") return "";
@@ -18,5 +18,5 @@ export function resortPublicLandingPageUrl(subdomain: string): string {
     return `${protocol}//${encodeURIComponent(tenant)}.localhost${portPart}`;
   }
   const origin = `${protocol}//${hostname}${portPart}`.replace(/\/+$/, "");
-  return `${origin}/stay/${encodeURIComponent(tenant)}`;
+  return `${origin}/resort/${encodeURIComponent(tenant)}`;
 }

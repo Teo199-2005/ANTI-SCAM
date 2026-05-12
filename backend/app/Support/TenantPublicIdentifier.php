@@ -6,8 +6,8 @@ use App\Models\Tenant;
 use Illuminate\Support\Str;
 
 /**
- * Public landing URLs use /stay/{tenant.subdomain}. Values are derived from the resort name
- * so links look like /stay/teo instead of /stay/teofilo-harry-paet-w1scd1.
+ * Public landing URLs use /resort/{tenant.subdomain} on the Next.js app. Values are derived from the resort name
+ * so links look like /resort/teo instead of long legacy slugs.
  */
 final class TenantPublicIdentifier
 {

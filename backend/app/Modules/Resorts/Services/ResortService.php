@@ -76,7 +76,7 @@ class ResortService
             $resort->update($changes);
         }
 
-        // Always align /stay/{subdomain} with the persisted resort name (fixes legacy slugs even when
+        // Always align /resort/{subdomain} with the persisted resort name (fixes legacy slugs even when
         // the request omits `name` or only partial fields are validated).
         $resort->refresh()->loadMissing('tenant');
         $tenant = $resort->tenant;
