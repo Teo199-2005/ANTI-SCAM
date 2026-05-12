@@ -4,6 +4,7 @@ import { ResortFooterSection } from "@/components/resort-page/ResortFooterSectio
 import ResortPromoStrip from "@/components/resort-page/ResortPromoStrip";
 import ScrollReveal from "@/components/shared/ScrollReveal";
 import { getPublicResortBySubdomain } from "@/lib/api/landingPage";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -111,7 +112,7 @@ export default async function PublicResortLandingPage({ params }: Props) {
                   className="aspect-[4/3] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <img src={laravelPublicUrl(src)} alt="" className="h-full w-full object-cover" />
                 </div>
               ))}
             </div>

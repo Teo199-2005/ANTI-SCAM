@@ -52,3 +52,11 @@ export function serverLaravelApiV1BaseUrl(): string {
     "http://127.0.0.1:8000/api/v1";
   return normalizeLaravelApiV1Base(raw);
 }
+
+/**
+ * Laravel `public/` origin (files under `/storage/...` live here).
+ * Used by server-side routes that proxy uploads when the browser uses the Next host for `/storage/`.
+ */
+export function serverLaravelWebOrigin(): string {
+  return serverLaravelApiV1BaseUrl().replace(/\/api\/v\d+$/i, "");
+}

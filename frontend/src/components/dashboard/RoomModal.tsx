@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/shared/ToastProvider";
 import { sanitizeLongText, sanitizeRoomCodeInput, sanitizeRoomNameInput } from "@/lib/inputRestrictions";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -521,7 +522,7 @@ export default function RoomModal({
                 <>
                   <Upload size={22} className="text-zinc-400 mb-2" />
                   <p className="text-sm font-medium text-zinc-600">Click to upload photos</p>
-                  <p className="text-xs text-zinc-400 mt-1">JPG, PNG, WebP · max 4 MB each · up to 5 files</p>
+                  <p className="text-xs text-zinc-400 mt-1">JPG, PNG, WebP · max 8 MB each · up to 5 files</p>
                 </>
               )}
               <input
@@ -546,7 +547,7 @@ export default function RoomModal({
                 {images.map((img) => (
                   <div key={img.id} className="group relative aspect-video overflow-hidden rounded-xl bg-softGray">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={img.original_name} className="h-full w-full object-cover" />
+                    <img src={laravelPublicUrl(img.url)} alt={img.original_name} className="h-full w-full object-cover" />
                     {img.is_primary && (
                       <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/90 px-2 py-0.5 text-[10px] font-bold text-white">
                         <Star size={8} fill="white" /> Primary

@@ -1,6 +1,7 @@
 "use client";
 
 import { checkRoomAvailability, getPublicResort, PublicRoom, PublicResort } from "@/lib/api/public";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { BedDouble, CalendarRange, ChevronLeft, Loader2, MapPin, Phone, Users } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
@@ -147,7 +148,7 @@ export default function ResortExplorePage({ params }: { params: Promise<{ resort
             {resort.images && resort.images.length > 0 ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={resort.images[0].url}
+                src={laravelPublicUrl(resort.images[0].url)}
                 alt={resort.images[0].caption ?? resort.name}
                 className="h-48 w-full max-w-md rounded-xl object-cover md:h-40 md:w-72"
               />

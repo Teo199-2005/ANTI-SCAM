@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import ScrollReveal from "@/components/shared/ScrollReveal";
 import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { createPortal } from "react-dom";
 
 function extractRoomMeta(amenities: string[]) {
@@ -166,7 +167,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={primaryImage}
+                      src={laravelPublicUrl(primaryImage)}
                       alt={room.name}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                     />
@@ -270,7 +271,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                   {selectedRoom.images[activeImage] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={selectedRoom.images[activeImage]}
+                      src={laravelPublicUrl(selectedRoom.images[activeImage])}
                       alt={selectedRoom.name}
                       className="h-full w-full object-cover"
                     />
@@ -293,7 +294,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                         className={`overflow-hidden rounded-lg border ${activeImage === idx ? "border-navy" : "border-zinc-200"}`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt="" className="h-16 w-full object-cover" />
+                        <img src={laravelPublicUrl(img)} alt="" className="h-16 w-full object-cover" />
                       </button>
                     ))}
                   </div>

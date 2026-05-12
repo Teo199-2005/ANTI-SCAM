@@ -1,6 +1,7 @@
 "use client";
 
 import { checkRoomAvailability, getPublicRoom, RoomDetail } from "@/lib/api/public";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { CalendarRange, ChevronLeft, ChevronRight, ExternalLink, Loader2, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -242,12 +243,12 @@ export default function ClientRoomExplorePage({
           {images.length > 0 ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={images[0].url} alt={images[0].caption ?? room.name} className="h-72 w-full rounded-2xl object-cover" />
+              <img src={laravelPublicUrl(images[0].url)} alt={images[0].caption ?? room.name} className="h-72 w-full rounded-2xl object-cover" />
               {images.length > 1 ? (
                 <div className="flex flex-wrap gap-2">
                   {images.slice(1, 7).map((img) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={img.id} src={img.url} alt={img.caption ?? room.name} className="h-20 w-28 rounded-lg object-cover" />
+                    <img key={img.id} src={laravelPublicUrl(img.url)} alt={img.caption ?? room.name} className="h-20 w-28 rounded-lg object-cover" />
                   ))}
                 </div>
               ) : null}

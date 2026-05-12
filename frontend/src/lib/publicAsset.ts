@@ -16,11 +16,23 @@ function publicAssetOrigin(): string {
 }
 
 /**
- * Turn a Laravel `/storage/...` path into an absolute URL for <img src> / next/image.
+ * Turn a Laravel `/storage/...` path or a full `Storage::url()` into an absolute URL for img src.
+ * Re-writes absolute URLs whose path is `/storage/...` to {@link publicAssetOrigin} so wrong `APP_URL`
+ * in API responses does not break images on the deployed site (img src, etc.).
  */
 export function laravelPublicUrl(path: string | null | undefined): string {
   if (!path) return "";
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    try {
+      const u = new URL(path);
+      if (u.pathname.startsWith("/storage/")) {
+        return `${publicAssetOrigin()}${u.pathname}${u.search}`;
+      }
+    } catch {
+      return path;
+    }
+    return path;
+  }
   const origin = publicAssetOrigin();
   return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
 }
