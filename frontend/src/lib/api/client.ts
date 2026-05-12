@@ -10,16 +10,32 @@
  * This prevents token theft via XSS because JavaScript has no access to rs_session cookie.
  */
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { laravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
+import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 
 // ── Public catalog client (no auth required) ──────────────────────────────────
-// Direct calls to the Laravel backend for unauthenticated data.
-const RAW_BACKEND = laravelApiV1BaseUrl();
-
+// Browser: same-origin `/api/public/*` → Next route proxies to Laravel (production has no `/api/v1` on nginx).
+// Server: direct Laravel base from env.
 export const publicClient = axios.create({
-  baseURL: RAW_BACKEND,
+  baseURL: serverLaravelApiV1BaseUrl(),
   headers: { Accept: "application/json", "Content-Type": "application/json" },
   timeout: 10_000,
+});
+
+publicClient.interceptors.request.use((config) => {
+  const url = config.url ?? "";
+  if (typeof window !== "undefined") {
+    const origin = window.location.origin.replace(/\/$/, "");
+    config.baseURL = `${origin}/api/public`;
+    if (url.startsWith("/")) {
+      config.url = url.slice(1);
+    }
+  } else {
+    config.baseURL = serverLaravelApiV1BaseUrl();
+    if (url.startsWith("/")) {
+      config.url = url.slice(1);
+    }
+  }
+  return config;
 });
 
 // ── Authenticated API client ──────────────────────────────────────────────────
