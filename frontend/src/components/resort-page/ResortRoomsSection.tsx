@@ -271,7 +271,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="grid max-h-[92vh] grid-cols-1 overflow-y-auto lg:grid-cols-2">
-              <div className="border-b border-zinc-200 bg-zinc-100 lg:border-b-0 lg:border-r">
+              <div className="flex flex-col border-b border-zinc-200 bg-zinc-100 lg:border-b-0 lg:border-r">
                 <div className="aspect-[16/10] w-full bg-zinc-200">
                   {selectedRoom.images[activeImage] ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -304,6 +304,93 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                     ))}
                   </div>
                 ) : null}
+
+                <div className="border-t border-zinc-200 bg-zinc-50/95 p-3 md:p-4">
+                  <div className="rounded-xl border border-sky-200/80 bg-sky-50/80 p-3">
+                    <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-900">
+                      <CalendarDays size={14} className="shrink-0" />
+                      Stay dates
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="block text-[11px] font-medium text-zinc-600">
+                        Check-in
+                        <input
+                          type="date"
+                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
+                          min={todayStr}
+                          value={modalCheckIn}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setModalCheckIn(v);
+                            if (!v) return;
+                            const minOut = addDaysIso(v, 1);
+                            setModalCheckOut((prev) => (prev <= v ? minOut : prev));
+                          }}
+                        />
+                      </label>
+                      <label className="block text-[11px] font-medium text-zinc-600">
+                        Check-out
+                        <input
+                          type="date"
+                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
+                          min={checkOutMin}
+                          value={modalCheckOut}
+                          onChange={(e) => setModalCheckOut(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    {!datesValid ? (
+                      <p className="mt-2 text-[11px] text-amber-800">Choose check-out after check-in (from today onward).</p>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      disabled={!datesValid || bookChecking}
+                      onClick={async () => {
+                        if (!datesValid || !selectedRoom) return;
+                        setBookChecking(true);
+                        try {
+                          const r = await checkRoomAvailability(selectedRoom.id, modalCheckIn, modalCheckOut);
+                          if (!r.available) {
+                            pushToast({
+                              title: "Those dates are not available",
+                              description:
+                                "This room is already booked, on hold, or blocked for part of your stay. Try other dates or open Check availability for a calendar view.",
+                              tone: "error",
+                            });
+                            return;
+                          }
+                          router.push(buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut));
+                        } catch {
+                          pushToast({
+                            title: "Could not verify availability",
+                            description: "Check your connection and try again.",
+                            tone: "error",
+                          });
+                        } finally {
+                          setBookChecking(false);
+                        }
+                      }}
+                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${
+                        datesValid
+                          ? "bg-navy text-white hover:bg-navy/90 disabled:opacity-80"
+                          : "cursor-not-allowed bg-zinc-200 text-zinc-500"
+                      }`}
+                    >
+                      {bookChecking ? <Loader2 size={16} className="animate-spin shrink-0" aria-hidden /> : null}
+                      Book now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvailabilityOpen(true)}
+                      className="inline-flex items-center justify-center rounded-xl border border-navy/20 bg-white px-4 py-2.5 text-sm font-semibold text-navy shadow-sm hover:bg-zinc-50"
+                    >
+                      Check availability
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-gradient-to-b from-white to-zinc-50/45 p-5 md:p-6">
@@ -374,92 +461,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                   </p>
                 </div>
 
-                <ReservationFeeBreakdownPanel totalPhp={RESERVATION_FEE_REFERENCE_TOTAL} variant="compact" className="mb-4" />
-
-                <div className="mb-4 rounded-xl border border-sky-200/80 bg-sky-50/50 p-3">
-                  <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-900">
-                    <CalendarDays size={14} className="shrink-0" />
-                    Stay dates
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="block text-[11px] font-medium text-zinc-600">
-                      Check-in
-                      <input
-                        type="date"
-                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
-                        min={todayStr}
-                        value={modalCheckIn}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setModalCheckIn(v);
-                          if (!v) return;
-                          const minOut = addDaysIso(v, 1);
-                          setModalCheckOut((prev) => (prev <= v ? minOut : prev));
-                        }}
-                      />
-                    </label>
-                    <label className="block text-[11px] font-medium text-zinc-600">
-                      Check-out
-                      <input
-                        type="date"
-                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
-                        min={checkOutMin}
-                        value={modalCheckOut}
-                        onChange={(e) => setModalCheckOut(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  {!datesValid ? (
-                    <p className="mt-2 text-[11px] text-amber-800">Choose check-out after check-in (from today onward).</p>
-                  ) : null}
-                </div>
-
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    disabled={!datesValid || bookChecking}
-                    onClick={async () => {
-                      if (!datesValid || !selectedRoom) return;
-                      setBookChecking(true);
-                      try {
-                        const r = await checkRoomAvailability(selectedRoom.id, modalCheckIn, modalCheckOut);
-                        if (!r.available) {
-                          pushToast({
-                            title: "Those dates are not available",
-                            description:
-                              "This room is already booked, on hold, or blocked for part of your stay. Try other dates or open Check availability for a calendar view.",
-                            tone: "error",
-                          });
-                          return;
-                        }
-                        router.push(buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut));
-                      } catch {
-                        pushToast({
-                          title: "Could not verify availability",
-                          description: "Check your connection and try again.",
-                          tone: "error",
-                        });
-                      } finally {
-                        setBookChecking(false);
-                      }
-                    }}
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${
-                      datesValid
-                        ? "bg-navy text-white hover:bg-navy/90 disabled:opacity-80"
-                        : "cursor-not-allowed bg-zinc-200 text-zinc-500"
-                    }`}
-                  >
-                    {bookChecking ? <Loader2 size={16} className="animate-spin shrink-0" aria-hidden /> : null}
-                    Book now
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAvailabilityOpen(true)}
-                    className="inline-flex items-center justify-center rounded-xl border border-navy/20 bg-white px-4 py-2.5 text-sm font-semibold text-navy hover:bg-zinc-50"
-                  >
-                    Check availability
-                  </button>
-                </div>
+                <ReservationFeeBreakdownPanel totalPhp={RESERVATION_FEE_REFERENCE_TOTAL} variant="compact" className="mb-0" />
               </div>
                 </div>
               </div>
