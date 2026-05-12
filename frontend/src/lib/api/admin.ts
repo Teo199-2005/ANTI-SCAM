@@ -210,7 +210,10 @@ export async function adminOnboard(payload: {
   tenant_name: string;
   resort_name: string;
   subdomain: string;
-  address?: string;
+  address_province_psgc?: string | null;
+  address_city_municipality_psgc?: string | null;
+  address_barangay_psgc?: string | null;
+  address_label?: string | null;
   contact_number?: string;
   logo_url?: string;
   description?: string;

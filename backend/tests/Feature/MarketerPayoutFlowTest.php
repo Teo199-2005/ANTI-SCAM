@@ -499,23 +499,31 @@ class MarketerPayoutFlowTest extends TestCase
 
     public function test_marketing_user_can_update_contact_tin_and_bank_via_profile(): void
     {
+        $this->seed(\Database\Seeders\PsgcReferenceSeeder::class);
+
         $user = User::factory()->create([
             'role' => 'marketing',
             'phone' => null,
-            'marketer_mailing_address' => null,
+            'mailing_province_psgc' => null,
+            'mailing_city_municipality_psgc' => null,
+            'mailing_barangay_psgc' => null,
+            'mailing_location_label' => null,
             'marketer_tin' => null,
         ]);
         Sanctum::actingAs($user);
 
         $this->patchJson('/api/v1/auth/profile', [
             'phone' => '09170001122',
-            'marketer_mailing_address' => '12 Sample St, Quezon City, Metro Manila 1100',
+            'mailing_province_psgc' => \Database\Seeders\PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'mailing_city_municipality_psgc' => \Database\Seeders\PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'mailing_barangay_psgc' => \Database\Seeders\PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
             'marketer_tin' => '123-456-789-000',
         ])->assertSuccessful();
 
         $user->refresh();
         $this->assertSame('09170001122', $user->phone);
-        $this->assertSame('12 Sample St, Quezon City, Metro Manila 1100', $user->marketer_mailing_address);
+        $this->assertSame(\Database\Seeders\PsgcReferenceSeeder::DEMO_PROVINCE_CODE, $user->mailing_province_psgc);
+        $this->assertSame('Demo Barangay, Demo City, Demo Province', $user->mailing_location_label);
         $this->assertSame('123456789000', $user->marketer_tin);
 
         $this->patchJson('/api/v1/auth/profile', [

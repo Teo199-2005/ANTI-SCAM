@@ -1,3 +1,9 @@
+# When PHP runs as an Apache module (XAMPP/WAMP/Laragon "Apache"). Ignored under nginx+PHP-FPM — edit pool php.ini there.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 128M
+    php_value post_max_size 260M
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

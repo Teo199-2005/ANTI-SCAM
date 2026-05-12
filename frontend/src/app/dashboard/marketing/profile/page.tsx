@@ -1,5 +1,6 @@
 "use client";
 
+import { PhilippineLocationPicker, type PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
 import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,7 +22,6 @@ import {
   Wallet,
 } from "lucide-react";
 import {
-  sanitizeAddressLine,
   sanitizeEmailTyping,
   sanitizeGovIdNumberInput,
   sanitizePersonName,
@@ -43,7 +43,11 @@ export default function MarketingProfilePage() {
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [mailingAddress, setMailingAddress] = useState(user?.marketer_mailing_address ?? "");
+  const [mailingLocation, setMailingLocation] = useState<PhilippineLocationValue>({
+    provinceCode: user?.mailing_province_psgc ?? null,
+    cityCode: user?.mailing_city_municipality_psgc ?? null,
+    barangayCode: user?.mailing_barangay_psgc ?? null,
+  });
   const [tin, setTin] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -85,7 +89,11 @@ export default function MarketingProfilePage() {
       setName(user.name);
       setEmail(user.email);
       setPhone(user.phone ?? "");
-      setMailingAddress(user.marketer_mailing_address ?? "");
+      setMailingLocation({
+        provinceCode: user.mailing_province_psgc ?? null,
+        cityCode: user.mailing_city_municipality_psgc ?? null,
+        barangayCode: user.mailing_barangay_psgc ?? null,
+      });
       setTin("");
       setGcashHolder(user.gcash_account_holder_name ?? "");
       setGcashNumber("");
@@ -125,7 +133,7 @@ export default function MarketingProfilePage() {
   const payoutDetailsOk = Boolean(user?.gcash_payout_configured);
   const checklistItems = [
     { label: "Full name", ok: Boolean(user?.name?.trim()) },
-    { label: "Mailing address", ok: Boolean(user?.marketer_mailing_address?.trim()) },
+    { label: "Philippine mailing location", ok: Boolean(user?.marketer_mailing_address?.trim()) },
     { label: "Valid government ID (type, number & upload)", ok: Boolean(user?.marketer_gov_id_complete) },
     { label: "TIN (strongly recommended)", ok: Boolean(user?.marketer_tin_masked) },
     { label: "Mobile number", ok: Boolean(user?.phone?.trim()) },
@@ -141,7 +149,9 @@ export default function MarketingProfilePage() {
         name,
         email,
         phone: phone.trim() || "",
-        marketer_mailing_address: mailingAddress.trim() || "",
+        mailing_province_psgc: mailingLocation.provinceCode,
+        mailing_city_municipality_psgc: mailingLocation.cityCode,
+        mailing_barangay_psgc: mailingLocation.barangayCode,
         marketer_tin: tin.trim() || "",
       });
       await refreshUser();
@@ -462,18 +472,16 @@ export default function MarketingProfilePage() {
             </div>
 
             <div className="md:col-span-2">
-              <label htmlFor="marketing-profile-address" className="mb-1.5 block text-xs font-semibold text-zinc-600">Mailing address</label>
-              <div className="relative">
-                <MapPin size={14} className="pointer-events-none absolute left-3 top-3 text-zinc-500" />
-                <textarea
-                  id="marketing-profile-address"
-                  className="dash-input min-h-[88px] resize-y pl-9"
-                  placeholder="House / street, barangay, city, province, postal code"
-                  value={mailingAddress}
-                  onChange={(e) => setMailingAddress(sanitizeAddressLine(e.target.value, 500))}
-                  rows={3}
-                />
+              <div className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                <MapPin size={14} className="text-zinc-500" />
+                Philippine mailing location
               </div>
+              <PhilippineLocationPicker
+                idPrefix="marketing-profile"
+                disabled={saving}
+                value={mailingLocation}
+                onChange={setMailingLocation}
+              />
             </div>
 
             <div className="md:col-span-2">

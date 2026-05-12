@@ -32,7 +32,7 @@ class ReservationController extends Controller
             return $this->errorResponse($exception->getMessage(), ['reservation' => ['lock_invalid']], 409);
         }
 
-        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation created', 201);
     }
@@ -43,7 +43,7 @@ class ReservationController extends Controller
 
         $user    = auth()->user();
         $query   = Reservation::withoutGlobalScopes()
-            ->with(['resort:id,name,address', 'room:id,name']);
+            ->with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
         $status  = request()->string('status')->value();
         $dateFrom = request()->string('dateFrom')->value();
         $dateTo  = request()->string('dateTo')->value();
@@ -97,7 +97,7 @@ class ReservationController extends Controller
     {
         $this->authorize('view', $reservation);
 
-        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation details');
     }
@@ -114,7 +114,7 @@ class ReservationController extends Controller
             return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_cancel']], 409);
         }
 
-        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation cancelled');
     }
@@ -146,7 +146,7 @@ class ReservationController extends Controller
             return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_complete']], 409);
         }
 
-        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation marked completed.');
     }
@@ -161,7 +161,7 @@ class ReservationController extends Controller
             return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_no_show']], 409);
         }
 
-        $reservation->loadMissing(['resort:id,name,address', 'room:id,name']);
+        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation marked as no-show.');
     }

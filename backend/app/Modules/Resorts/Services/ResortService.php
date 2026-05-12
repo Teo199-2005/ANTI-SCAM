@@ -5,6 +5,7 @@ namespace App\Modules\Resorts\Services;
 use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\PhilippineLocationService;
 use App\Support\SafeSort;
 use App\Support\TenantPublicIdentifier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -12,6 +13,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ResortService
 {
+    public function __construct(
+        private readonly PhilippineLocationService $locations,
+    ) {}
+
     public function list(User $user, int $perPage = 10, ?string $search = null, ?string $sortBy = null, ?string $sortDir = null): LengthAwarePaginator
     {
         $query = Resort::query()
@@ -21,7 +26,7 @@ class ResortService
         if ($search) {
             $query->where(function (Builder $inner) use ($search): void {
                 $inner->where('name', 'like', "%{$search}%")
-                    ->orWhere('address', 'like', "%{$search}%")
+                    ->orWhere('address_label', 'like', "%{$search}%")
                     ->orWhere('contact_number', 'like', "%{$search}%");
             });
         }
@@ -30,22 +35,28 @@ class ResortService
             $query->where('tenant_id', $user->tenant_id);
         }
 
-        SafeSort::apply($query, $sortBy, $sortDir, ['name', 'created_at', 'address'], 'created_at', 'desc');
+        SafeSort::apply($query, $sortBy, $sortDir, ['name', 'created_at', 'address_label'], 'created_at', 'desc');
 
         return $query->paginate($perPage);
     }
 
     public function create(array $payload, User $creator): Resort
     {
-        return Resort::create([
+        $resort = Resort::create([
             'tenant_id' => $payload['tenant_id'] ?? $creator->tenant_id,
             'name' => $payload['name'],
             'description' => $payload['description'] ?? null,
-            'address' => $payload['address'] ?? null,
+            'address_province_psgc' => $payload['address_province_psgc'] ?? null,
+            'address_city_municipality_psgc' => $payload['address_city_municipality_psgc'] ?? null,
+            'address_barangay_psgc' => $payload['address_barangay_psgc'] ?? null,
+            'address_label' => $payload['address_label'] ?? null,
             'contact_number' => $payload['contact_number'] ?? null,
             'logo_url' => $payload['logo_url'] ?? null,
             'is_publicly_listed' => $payload['is_publicly_listed'] ?? true,
         ]);
+        $this->locations->syncResortAddressLabel($resort);
+
+        return $resort->fresh();
     }
 
     public function update(Resort $resort, array $payload): Resort
@@ -57,10 +68,16 @@ class ResortService
         foreach ([
             'name',
             'description',
-            'address',
+            'address_province_psgc',
+            'address_city_municipality_psgc',
+            'address_barangay_psgc',
+            'address_label',
             'contact_number',
             'logo_url',
             'background_image_url',
+            'facebook_url',
+            'instagram_url',
+            'tiktok_url',
             'representative_name',
             'representative_contact_number',
             'cancellation_policy',
@@ -74,6 +91,8 @@ class ResortService
 
         if (! empty($changes)) {
             $resort->update($changes);
+            $resort->refresh();
+            $this->locations->syncResortAddressLabel($resort);
         }
 
         // Always align /resort/{subdomain} with the persisted resort name (fixes legacy slugs even when

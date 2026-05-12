@@ -25,16 +25,32 @@ class RoomController extends Controller
 
     public function index(Request $request)
     {
-        $rooms = RoomResource::collection(
-            $this->service->list(
-                (int) $request->integer('perPage', 10),
-                $request->string('search')->value(),
-                $request->string('status')->value(),
-                $request->filled('resort_id') ? (int) $request->integer('resort_id') : null,
-            )
+        $resortId = $request->filled('resort_id') ? (int) $request->integer('resort_id') : null;
+
+        $paginator = $this->service->list(
+            (int) $request->integer('perPage', 10),
+            $request->string('search')->value(),
+            $request->string('status')->value(),
+            $resortId,
+            $request->string('sort_by')->value(),
+            $request->string('sort_dir')->value(),
         );
 
-        return $this->successResponse($rooms, 'Rooms fetched');
+        $collection = RoomResource::collection($paginator);
+
+        if ($resortId !== null) {
+            $collection->additional([
+                'resort_room_counts' => [
+                    'active' => (int) Room::query()->where('resort_id', $resortId)->where('status', 'active')->count(),
+                    'total' => (int) Room::query()->where('resort_id', $resortId)->count(),
+                ],
+            ]);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = $collection->toResponse($request)->getData(true);
+
+        return $this->successResponse($payload, 'Rooms fetched');
     }
 
     public function store(StoreRoomRequest $request)

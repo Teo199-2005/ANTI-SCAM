@@ -27,5 +27,15 @@ class ResortOwnerRoomsIndexTest extends TestCase
         $response = $this->getJson('/api/v1/rooms?perPage=50&resort_id='.$resort->id);
 
         $response->assertOk()->assertJsonPath('success', true);
+        $response->assertJsonStructure([
+            'success',
+            'data' => [
+                'data',
+                'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+                'links',
+            ],
+        ]);
+        $response->assertJsonPath('data.resort_room_counts.active', fn ($v) => is_numeric($v));
+        $response->assertJsonPath('data.resort_room_counts.total', fn ($v) => is_numeric($v));
     }
 }

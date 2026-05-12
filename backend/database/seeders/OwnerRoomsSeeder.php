@@ -6,6 +6,7 @@ use App\Models\Resort;
 use App\Models\Room;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\PhilippineLocationService;
 use Illuminate\Database\Seeder;
 
 class OwnerRoomsSeeder extends Seeder
@@ -36,11 +37,15 @@ class OwnerRoomsSeeder extends Seeder
             [
                 'name' => 'Azure Sands 1',
                 'description' => 'Premium beachfront stay with modern amenities.',
-                'address' => '123 Beach Road, Nasugbu, Batangas',
+                'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+                'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+                'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+                'address_label' => null,
                 'contact_number' => '+63 917 874 4889',
                 'is_publicly_listed' => true,
             ]
         );
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
 
         $starterRooms = [
             [

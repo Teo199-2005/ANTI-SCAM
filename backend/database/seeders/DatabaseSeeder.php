@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            PsgcReferenceSeeder::class,
             FullDashboardDemoSeeder::class,
             MarketingPartnerDemoSeeder::class,
             DemoLoginAccountsSeeder::class,

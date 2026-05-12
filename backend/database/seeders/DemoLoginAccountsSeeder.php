@@ -18,6 +18,8 @@ class DemoLoginAccountsSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call(PsgcReferenceSeeder::class);
+
         User::query()->updateOrCreate(
             ['email' => 'admin@resort.test'],
             [
@@ -56,10 +58,14 @@ class DemoLoginAccountsSeeder extends Seeder
                 'tenant_id' => $tenant->id,
                 'name' => 'Demo Resort',
                 'description' => 'Seeded demo property for dashboard testing.',
-                'address' => 'Tagaytay City, Cavite, Philippines',
+                'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+                'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+                'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+                'address_label' => null,
                 'contact_number' => '+63 917 874 4889',
                 'is_publicly_listed' => true,
             ]);
+            app(\App\Services\PhilippineLocationService::class)->syncResortAddressLabel($resort);
             app(SubscriptionService::class)->refreshForResort($resort, 'basic');
         }
 

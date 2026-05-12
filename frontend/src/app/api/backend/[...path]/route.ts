@@ -10,6 +10,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
 
+/** Room/logo multipart can exceed default serverless limits on some hosts. */
+export const maxDuration = 180;
+
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 async function proxy(req: NextRequest, context: RouteContext): Promise<NextResponse> {
@@ -52,19 +55,26 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
 
   let body: BodyInit | null = null;
   if (!["GET", "HEAD"].includes(req.method)) {
-    body = isMultipart ? req.body : await req.text();
+    if (isMultipart) {
+      // Buffer multipart end-to-end. Streaming `req.body` with `duplex: "half"` often
+      // yields truncated bodies → Laravel reports "images.0 failed to upload" (invalid tmp file).
+      const bytes = await req.arrayBuffer();
+      body = bytes.byteLength === 0 ? null : bytes;
+      if (body) {
+        forwardHeaders["Content-Length"] = String(bytes.byteLength);
+      }
+    } else {
+      body = await req.text();
+    }
   }
 
   let backendRes: Response;
   try {
-    const fetchInit: RequestInit & { duplex?: "half" } = {
+    const fetchInit: RequestInit = {
       method: req.method,
       headers: forwardHeaders,
       body: body ?? undefined,
     };
-    if (isMultipart && body) {
-      fetchInit.duplex = "half";
-    }
 
     backendRes = await fetch(targetUrl, {
       ...fetchInit,

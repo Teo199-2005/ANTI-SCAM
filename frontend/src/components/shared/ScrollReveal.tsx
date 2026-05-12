@@ -8,6 +8,8 @@ type ScrollRevealProps = {
   delayMs?: number;
   direction?: "up" | "down";
   threshold?: number;
+  /** e.g. "0px 0px -10% 0px" — reveal slightly before the block enters view */
+  rootMargin?: string;
 };
 
 export default function ScrollReveal({
@@ -15,7 +17,8 @@ export default function ScrollReveal({
   className = "",
   delayMs = 0,
   direction = "up",
-  threshold = 0.18,
+  threshold = 0.15,
+  rootMargin = "0px 0px -6% 0px",
 }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
@@ -34,12 +37,12 @@ export default function ScrollReveal({
           }
         }
       },
-      { threshold },
+      { threshold, rootMargin },
     );
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [threshold]);
+  }, [threshold, rootMargin]);
 
   return (
     <div

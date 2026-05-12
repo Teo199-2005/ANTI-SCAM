@@ -22,7 +22,7 @@ import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } fro
 
 const SORT_FIRST: Record<string, SortDir> = {
   name: "asc",
-  address: "asc",
+  address_label: "asc",
   created_at: "desc",
 };
 
@@ -297,7 +297,7 @@ export default function AdminResortsPage() {
           headers={
             <>
               <SortableTh label="Name" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Address" sortKey="address" activeKey={sortBy} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Address" sortKey="address_label" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <SortableTh label="Added" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <th>Subscription</th>
               <th>Listed</th>

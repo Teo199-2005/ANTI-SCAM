@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Marketing home (`/`) — premium landing surface.
+ * - Desktop / large layout: `lg:` grid + headline nowrap + side-by-side CTAs (unchanged intent).
+ * - Small screens (`max-lg:`): mobile-first composition — wrapped headlines, stacked CTAs,
+ *   horizontal pricing strip, single-column trust rhythm, safe-area gutters.
+ */
+
 import Link from "next/link";
 import {
   BarChart2,
@@ -17,17 +24,20 @@ import {
 } from "lucide-react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
+import ScrollReveal from "@/components/shared/ScrollReveal";
 import { cn } from "@/lib/utils";
 
 const NAVY = "#0d1f3c";
 const GOLD = "#f5a623";
+/** Darker gold for hero accent line (“Increase Direct Bookings.”) — reads stronger on light hero wash */
+const GOLD_DARK = "#b8730d";
 /** Wordmark: trust navy + alert red (not gold) */
 const WORDMARK_NAVY = "#0B1F3A";
 const SCAM_ALERT_RED = "#E53935";
 
-/** Headline lines — scaled up slightly while staying nowrap in the hero column. */
+/** Headline lines — `lg:`+ match desktop column (nowrap + vw clamps). Below `lg`, wrap for readable mobile line length. */
 const HERO_HEADLINE_ROW =
-  "block whitespace-nowrap text-[clamp(1.12rem,5.5vw+0.5rem,3.25rem)] lg:text-[clamp(1.02rem,1.82vw+0.52rem,1.92rem)] xl:text-[clamp(1.06rem,1.92vw+0.48rem,2.1rem)] 2xl:text-[clamp(1.12rem,2.02vw+0.45rem,2.55rem)]";
+  "block max-lg:whitespace-normal max-lg:text-pretty max-lg:text-[clamp(1.28rem,6.2vw+0.35rem,2rem)] max-lg:leading-[1.08] lg:whitespace-nowrap lg:text-[clamp(1.02rem,1.82vw+0.52rem,1.92rem)] xl:text-[clamp(1.06rem,1.92vw+0.48rem,2.1rem)] 2xl:text-[clamp(1.12rem,2.02vw+0.45rem,2.55rem)]";
 
 const REGISTER_GOLD_BACKGROUND = `linear-gradient(165deg, #ffd47a 0%, ${GOLD} 40%, #c9840f 100%)`;
 const REGISTER_GOLD_SHINE_CORE =
@@ -57,7 +67,7 @@ function PricingCard({ label, original, price, note, highlight, badge }: Pricing
   const pricePx = highlight ? 38 : 34;
   return (
     <div
-      className="relative flex flex-col items-center rounded-xl p-4 text-center sm:p-5"
+      className="relative flex h-full min-w-0 w-full flex-col items-center rounded-xl p-3 text-center sm:p-5"
       style={{
         backgroundColor: highlight ? NAVY : "#fff",
         border: highlight ? `3px solid #ffd47a` : "2px solid #94a3b8",
@@ -154,9 +164,9 @@ function PricingCard({ label, original, price, note, highlight, badge }: Pricing
 
 export function LandingPremiumPage() {
   return (
-    <div className="min-w-0 origin-top overflow-x-hidden bg-white font-body text-[#111] antialiased [zoom:1.05]">
+    <div className="min-w-0 origin-top overflow-x-hidden bg-white font-body text-[#111] antialiased max-lg:[zoom:1] lg:[zoom:1.05]">
       {/* ── Hero + glass nav over image (nav does not stack above hero) ── */}
-      <section className="relative isolate overflow-hidden lg:pb-2">
+      <section className="relative isolate min-h-[min(52svh,34rem)] overflow-hidden max-lg:min-h-[min(58svh,36rem)] lg:min-h-[min(50svh,30rem)] lg:pb-2">
         <div className="absolute inset-0">
           <ImageWithFallback
             src="/bgresort.png"
@@ -170,53 +180,61 @@ export function LandingPremiumPage() {
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(to right, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.88) 7%, rgba(255,255,255,0.62) 28%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0) 62%)",
+                "linear-gradient(to right, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.55) 14%, rgba(255,255,255,0.22) 30%, rgba(255,255,255,0.06) 46%, rgba(255,255,255,0) 58%)",
             }}
+            aria-hidden
+          />
+          {/* Mobile-only legibility wash — desktop gradient above stays as authored from `lg`. */}
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/45 to-white/10 lg:hidden"
             aria-hidden
           />
         </div>
 
         <MarketingPremiumNavbar mode="hero" />
 
-        <div className="relative z-10 mx-auto grid w-full max-w-[min(1360px,100%)] grid-cols-1 items-start gap-3 pb-6 pt-[max(6.75rem,calc(env(safe-area-inset-top)+5rem))] ps-[max(0.25rem,env(safe-area-inset-left))] pe-5 sm:gap-4 sm:ps-0.5 sm:pe-6 sm:pt-[max(7rem,calc(env(safe-area-inset-top)+5.25rem))] md:ps-1 md:pe-7 md:pt-[max(6.75rem,calc(env(safe-area-inset-top)+4.75rem))] lg:grid-cols-12 lg:items-center lg:gap-x-4 lg:gap-y-2 lg:pb-5 lg:ps-1 lg:pe-10 lg:pt-[max(5.25rem,calc(env(safe-area-inset-top)+4.15rem))] xl:pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.35rem))] 2xl:pt-[max(5.75rem,calc(env(safe-area-inset-top)+4.5rem))] xl:ps-2">
-          {/* Left — nudged further left (tight page gutter + slight translate on large screens) */}
-          <div className="z-10 min-w-0 lg:col-span-4 lg:-translate-x-3 xl:-translate-x-6 2xl:-translate-x-8">
-            <div className="mb-2 flex items-center gap-2">
-              <Users className="h-5 w-5 shrink-0 text-gray-500 sm:h-[1.35rem] sm:w-[1.35rem]" aria-hidden />
+        <div className="relative z-10 mx-auto grid w-full max-w-[min(1360px,100%)] grid-cols-1 items-start gap-5 pb-8 pt-[max(4.75rem,calc(env(safe-area-inset-top)+3.25rem))] ps-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] max-lg:gap-6 max-lg:pb-10 sm:gap-4 sm:ps-0.5 sm:pe-6 md:ps-1 md:pe-7 lg:grid-cols-12 lg:items-center lg:gap-x-4 lg:gap-y-2 lg:pb-5 lg:ps-1 lg:pe-10 lg:pt-[max(5.25rem,calc(env(safe-area-inset-top)+4.15rem))] xl:pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.35rem))] 2xl:pt-[max(5.75rem,calc(env(safe-area-inset-top)+4.5rem))] xl:ps-2">
+          {/* Left — copy + CTAs. `lg:` column + nudge matches desktop layout. */}
+          <div className="z-10 min-w-0 max-lg:order-1 lg:col-span-4 lg:-translate-x-3 xl:-translate-x-6 2xl:-translate-x-8">
+            <div className="mb-3 flex max-w-lg flex-col gap-1.5 sm:mb-2 sm:flex-row sm:items-center sm:gap-2">
+              <Users
+                className="hidden h-5 w-5 shrink-0 text-gray-500 sm:block sm:h-[1.35rem] sm:w-[1.35rem]"
+                aria-hidden
+              />
               <span
-                className="text-[13px] font-bold uppercase tracking-[0.12em] text-[#555] sm:text-[14px]"
+                className="text-[12px] font-bold uppercase leading-snug tracking-[0.12em] text-[#555] sm:text-[13px] md:text-[14px]"
                 style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
               >
                 The Philippines&rsquo; verified resort platform
               </span>
             </div>
 
-            <h1 className="font-pop m-0 max-w-full font-extrabold leading-[1.06] tracking-tight">
+            <h1 className="font-pop m-0 max-w-full font-extrabold leading-[1.06] tracking-tight max-lg:max-w-[22rem] lg:max-w-full">
               <span className={HERO_HEADLINE_ROW} style={{ color: WORDMARK_NAVY }}>
                 Protect Your Resort.
               </span>
               <span className={HERO_HEADLINE_ROW} style={{ color: WORDMARK_NAVY }}>
                 Build Guest Trust.
               </span>
-              <span className={HERO_HEADLINE_ROW} style={{ color: GOLD }}>
+              <span className={HERO_HEADLINE_ROW} style={{ color: GOLD_DARK }}>
                 Increase Direct Bookings.
               </span>
             </h1>
 
             <p
-              className="mt-3 max-w-xl text-pretty text-[15px] font-medium leading-relaxed text-[#444] sm:max-w-2xl sm:text-[16px]"
+              className="mt-3 max-w-xl text-pretty text-[15px] font-medium leading-relaxed text-[#444] max-lg:max-w-[22rem] sm:max-w-2xl sm:text-[16px]"
               style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
             >
               Anti-Scam PH helps Philippine resorts prevent fake bookings, avoid double reservations, and gain guest trust
               through verified booking technology.
             </p>
 
-            <div className="mt-4.0 flex flex-nowrap items-center gap-2 sm:gap-2.5">
+            <div className="mt-5 flex max-w-lg flex-col gap-3 lg:mt-4 lg:max-w-none lg:flex-row lg:flex-nowrap lg:items-center lg:gap-2.5">
               <Link
                 href="/register"
                 className={cn(
                   REGISTER_GOLD_SHINE_REGISTER_BTN,
-                  "min-w-0 flex-1 gap-2 rounded-lg px-3 py-2.5 text-[13px] font-extrabold sm:flex-none sm:px-6 sm:py-3 sm:text-base"
+                  "inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[14px] font-extrabold lg:min-h-0 lg:w-auto lg:flex-none lg:rounded-lg lg:px-6 lg:py-3 lg:text-base"
                 )}
                 style={registerGoldButtonStyle}
               >
@@ -226,7 +244,7 @@ export function LandingPremiumPage() {
               </Link>
               <Link
                 href="#product-demo"
-                className="relative isolate inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-lg border-2 border-slate-500/85 bg-gradient-to-b from-white to-slate-100 px-3 py-2.5 text-[13px] font-extrabold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.06)] transition hover:brightness-[1.03] active:brightness-[0.99] sm:gap-2 sm:px-6 sm:py-3 sm:text-base"
+                className="relative isolate inline-flex min-h-[48px] w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-slate-500/85 bg-gradient-to-b from-white to-slate-100 px-4 py-3 text-[14px] font-extrabold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.06)] transition hover:brightness-[1.03] active:brightness-[0.99] lg:min-h-0 lg:w-auto lg:shrink-0 lg:rounded-lg lg:gap-2 lg:px-6 lg:py-3 lg:text-base"
                 style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
               >
                 <span
@@ -240,7 +258,7 @@ export function LandingPremiumPage() {
               </Link>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-[#555] sm:gap-x-4 sm:gap-y-3">
+            <div className="mt-4 grid max-w-lg grid-cols-1 gap-x-3 gap-y-3 text-[#555] max-lg:gap-y-3.5 lg:max-w-none lg:grid-cols-2 lg:gap-x-4 lg:gap-y-3">
               {[
                 { icon: Shield, label: "SEC Registered Company" },
                 { icon: MapPin, label: "Philippine-Based Support" },
@@ -258,22 +276,22 @@ export function LandingPremiumPage() {
           </div>
 
           {/* Center badge — compact for above-the-fold pricing */}
-          <div className="z-10 flex justify-center lg:col-span-4">
+          <div className="z-10 flex justify-center max-lg:order-2 max-lg:pt-1 lg:col-span-4">
             <ImageWithFallback
               src="/founding500.png"
               alt="Founding 500 — verified resort partners"
               width={560}
               height={620}
-              className="h-auto w-[15.5rem] max-w-full object-contain object-center drop-shadow-2xl sm:w-[18rem] md:w-[19.5rem] lg:w-[20rem] xl:w-[22rem] 2xl:w-[24rem]"
+              className="h-auto w-[min(17.5rem,calc(100vw-2.5rem))] max-w-full object-contain object-center drop-shadow-2xl sm:w-[18rem] md:w-[19.5rem] lg:w-[20rem] xl:w-[22rem] 2xl:w-[24rem]"
               sizes="(max-width: 640px) 248px, (max-width: 768px) 288px, (max-width: 1024px) 312px, (max-width: 1280px) 320px, (max-width: 1536px) 352px, 384px"
               priority
             />
           </div>
 
-          {/* Right feature card */}
-          <div id="product-demo" className="z-10 scroll-mt-28 lg:col-span-4">
+          {/* Right feature card — `lg:` column matches desktop. */}
+          <div id="product-demo" className="z-10 scroll-mt-28 max-lg:order-3 lg:col-span-4">
             <div
-              className="space-y-3 rounded-xl border-2 border-white/30 p-4 shadow-xl ring-2 ring-black/10 sm:space-y-3.5 sm:rounded-2xl sm:p-5"
+              className="space-y-3.5 rounded-xl border-2 border-white/30 p-4 shadow-xl ring-2 ring-black/10 max-lg:backdrop-blur-xl sm:space-y-3.5 sm:rounded-2xl sm:p-5"
               style={{ backgroundColor: NAVY }}
             >
               {[
@@ -304,7 +322,11 @@ export function LandingPremiumPage() {
                 },
               ].map(({ icon: Icon, title, desc }) => (
                 <div key={title} className="flex items-start gap-2.5 sm:gap-3">
-                  <Icon className="mt-0.5 h-5 w-5 shrink-0 sm:h-[1.35rem] sm:w-[1.35rem]" style={{ color: GOLD }} aria-hidden />
+                  <Icon
+                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-300 sm:h-[1.35rem] sm:w-[1.35rem]"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
                   <div>
                     <p className="font-pop text-[14px] font-bold leading-tight text-white sm:text-[15px]">
                       {title}
@@ -323,10 +345,11 @@ export function LandingPremiumPage() {
         </div>
       </section>
 
-      {/* ── Pricing (tight to hero — goal: visible on first paint on desktop) ── */}
-      <section className="border-t-2 border-slate-300 bg-white py-4 pl-4 pr-5 sm:py-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-4 lg:pl-6 lg:pr-10">
-        <div className="mx-auto w-full max-w-[min(1100px,100%)]">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 lg:gap-3">
+      {/* ── Pricing — odd band (white). Mobile / tablet: 2×2 grid; `lg:` four columns (desktop). ── */}
+      <section className="border-t border-zinc-200/70 bg-white py-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-4 lg:pl-6 lg:pr-10">
+        <div className="mx-auto mb-4 h-px w-full max-w-[min(1100px,100%)] bg-gradient-to-r from-transparent via-zinc-300/80 to-transparent sm:mb-4" aria-hidden />
+        <ScrollReveal className="mx-auto w-full max-w-[min(1100px,100%)]" direction="up" delayMs={30}>
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 lg:gap-3">
             <PricingCard label="MONTHLY PLAN" original="₱3,000" price="₱2,100" note="Perfect for startup resorts" highlight={false} />
             <PricingCard label="3-MONTH PLAN" original="₱2,700" price="₱1,900" note="Save ₱2,400 vs monthly" highlight={false} />
             <PricingCard label="6-MONTH PLAN" original="₱2,500" price="₱1,700" note="Save ₱7,800 vs monthly" highlight={false} />
@@ -339,65 +362,80 @@ export function LandingPremiumPage() {
               badge="BEST VALUE"
             />
           </div>
-        </div>
+        </ScrollReveal>
       </section>
 
-      {/* ── Trust strip ── */}
-      <section className="border-t-2 border-slate-300 bg-white py-6 pl-4 pr-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-5 lg:pl-6 lg:pr-10" aria-label="Trust and values">
-        <div className="mx-auto grid w-full max-w-[min(1100px,100%)] grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
-          {[
-            {
-              icon: <Shield className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
-              text: "Stronger Resorts. Safer Guests. Better Business.",
-            },
-            {
-              icon: <Users className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
-              text: "Together, let's build a trusted resort industry in the Philippines.",
-            },
-            {
-              icon: (
-                <ImageWithFallback
-                  src="/phcircle.png"
-                  alt="Philippines"
-                  width={56}
-                  height={56}
-                  className="mx-auto h-7 w-7 rounded-full object-cover shadow-sm ring-1 ring-black/10"
-                />
-              ),
-              text: "Proudly Filipino. Built for Philippine Resorts.",
-            },
-            {
-              icon: <Phone className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
-              text: "Real People. Real Support. We're here to help.",
-            },
-            {
-              icon: <Shield className="mx-auto h-7 w-7 text-gray-700" aria-hidden />,
-              text: "Your Partner in Growth and Guest Trust.",
-            },
-          ].map((item, i) => (
-            <div key={i} className="flex flex-col items-center gap-2 text-center">
-              {item.icon}
-              <p
-                className="text-xs font-semibold leading-snug text-[#333]"
-                style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+      {/* ── Trust strip — even band. `md:grid-cols-5` restores desktop tablet grid. ── */}
+      <section
+        className="border-t border-zinc-200/70 bg-zinc-100/95 py-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-5 lg:pl-6 lg:pr-10"
+        aria-label="Trust and values"
+      >
+        <div className="mx-auto mb-6 h-px w-full max-w-[min(1100px,100%)] bg-gradient-to-r from-transparent via-zinc-300/85 to-transparent sm:mb-6" aria-hidden />
+        <ScrollReveal className="mx-auto w-full max-w-[min(1100px,100%)]" direction="down" delayMs={40}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-5 md:gap-5">
+            {[
+              {
+                icon: <Shield className="mx-auto h-7 w-7 text-zinc-600 [stroke-width:1.65] max-md:mx-0 md:mx-auto" aria-hidden />,
+                text: "Stronger Resorts. Safer Guests. Better Business.",
+              },
+              {
+                icon: <Users className="mx-auto h-7 w-7 text-zinc-600 [stroke-width:1.65] max-md:mx-0 md:mx-auto" aria-hidden />,
+                text: "Together, let's build a trusted resort industry in the Philippines.",
+              },
+              {
+                icon: (
+                  <ImageWithFallback
+                    src="/phcircle.png"
+                    alt="Philippines"
+                    width={56}
+                    height={56}
+                    className="mx-auto h-7 w-7 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-zinc-300/80 max-md:mx-0 md:mx-auto"
+                  />
+                ),
+                text: "Proudly Filipino. Built for Philippine Resorts.",
+              },
+              {
+                icon: <Phone className="mx-auto h-7 w-7 text-zinc-600 [stroke-width:1.65] max-md:mx-0 md:mx-auto" aria-hidden />,
+                text: "Real People. Real Support. We're here to help.",
+              },
+              {
+                icon: <Lock className="mx-auto h-7 w-7 text-zinc-600 [stroke-width:1.65] max-md:mx-0 md:mx-auto" aria-hidden />,
+                text: "Your Partner in Growth and Guest Trust.",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex flex-col items-center gap-2 text-center",
+                  "max-md:flex-row max-md:items-start max-md:gap-3 max-md:rounded-2xl max-md:border max-md:border-zinc-200/85 max-md:bg-white/75 max-md:p-4 max-md:text-left max-md:shadow-sm",
+                  i === 0 && "md:items-start md:text-left",
+                  i > 0 &&
+                    "border-zinc-800/80 md:flex md:flex-col md:items-start md:border-l md:pl-8 md:text-left lg:pl-10",
+                )}
               >
-                {item.text}
-              </p>
-            </div>
-          ))}
-        </div>
+                {item.icon}
+                <p
+                  className="max-md:min-w-0 max-md:flex-1 max-md:text-pretty text-xs font-semibold leading-snug text-zinc-700"
+                  style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+                >
+                  {item.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </ScrollReveal>
       </section>
 
       {/* ── Footer bar ── */}
       <footer
-        className="border-t-2 border-white/25 py-3 pl-4 pr-5 text-center sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:pl-6 lg:pr-10"
+        className="border-t-2 border-white/25 py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] text-center sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-3 lg:pl-6 lg:pr-10"
         style={{ backgroundColor: NAVY }}
       >
         <span
-          className="inline-flex flex-wrap items-center justify-center gap-2 text-[13px] font-bold text-white"
+          className="mx-auto inline-flex max-w-[min(22rem,100%)] flex-wrap items-center justify-center gap-2 text-pretty text-[13px] font-bold leading-snug text-white sm:max-w-none"
           style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
         >
-          <Lock className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden />
+          <Lock className="h-4 w-4 shrink-0 text-zinc-300 [stroke-width:1.75]" aria-hidden />
           Founding rates are locked as long as your subscription remains active.
         </span>
       </footer>

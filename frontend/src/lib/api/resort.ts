@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
+import { shrinkRasterForUpload } from "@/lib/uploads/shrinkRasterForUpload";
 
 export type SubscriptionInfo = {
   id: number;
@@ -21,10 +22,19 @@ export type ResortItem = {
   tenant_id: number;
   name: string;
   description: string | null;
+  /** Resolved display line (barangay, city, province) or legacy label */
   address: string | null;
+  address_display?: string | null;
+  address_province_psgc?: string | null;
+  address_city_municipality_psgc?: string | null;
+  address_barangay_psgc?: string | null;
+  address_label?: string | null;
   contact_number: string | null;
   logo_url?: string | null;
   background_image_url?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  tiktok_url?: string | null;
   representative_name?: string | null;
   representative_contact_number?: string | null;
   cancellation_policy?: string | null;
@@ -85,7 +95,10 @@ export async function ownerOnboardResort(payload: {
   resort_name: string;
   /** Omit to let the API derive a unique subdomain from the tenant name. */
   subdomain?: string;
-  address?: string;
+  address_province_psgc?: string | null;
+  address_city_municipality_psgc?: string | null;
+  address_barangay_psgc?: string | null;
+  address_label?: string | null;
   contact_number?: string;
   logo_url?: string;
   description?: string;
@@ -99,11 +112,17 @@ export async function ownerOnboardResort(payload: {
 }
 
 export async function uploadOwnerResortLogo(file: File): Promise<string> {
+  const prepared = typeof window !== "undefined" ? await shrinkRasterForUpload(file) : file;
   const form = new FormData();
-  form.append("logo", file);
+  form.append("logo", prepared);
   const { data } = await apiClient.post<ApiEnvelope<{ logo_url: string }>>(
     "/resort-owner/onboard/upload-logo",
     form,
+    {
+      timeout: 120_000,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    },
   );
   return data.data.logo_url;
 }

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Public resort rooms grid + booking modal. Desktop: responsive CSS grid (`sm:` / `lg:`).
+ * Narrow viewports: horizontal snap carousel (`max-lg:`) for thumb-friendly browsing.
+ */
+
 import type { LandingComputedRoom } from "@/lib/api/landingPage";
 import {
   BedDouble,
@@ -29,6 +34,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { createPortal } from "react-dom";
+import type { ResortLandingSurface } from "@/components/resort-page/resortLandingSurface";
 
 function extractRoomMeta(amenities: string[]) {
   const bedCountRaw = amenities.find((a) => a.startsWith("BED_COUNT:"))?.split(":")[1] ?? null;
@@ -41,19 +47,16 @@ function extractRoomMeta(amenities: string[]) {
   return { bedCount, bedType, visibleAmenities };
 }
 
-function amenityMeta(label: string): { icon: LucideIcon; tone: string } {
+function amenityMeta(label: string): { icon: LucideIcon } {
   const normalized = label.toLowerCase();
-  if (normalized.includes("wifi")) return { icon: Wifi, tone: "text-sky-700 bg-sky-50 border-sky-200/80" };
-  if (normalized.includes("shower")) return { icon: ShowerHead, tone: "text-cyan-700 bg-cyan-50 border-cyan-200/80" };
-  if (normalized.includes("air")) return { icon: Snowflake, tone: "text-indigo-700 bg-indigo-50 border-indigo-200/80" };
-  if (normalized.includes("tv") || normalized.includes("netflix"))
-    return { icon: Tv, tone: "text-violet-700 bg-violet-50 border-violet-200/80" };
-  if (normalized.includes("pool") || normalized.includes("jacuzzi"))
-    return { icon: Waves, tone: "text-teal-700 bg-teal-50 border-teal-200/80" };
-  if (normalized.includes("breakfast") || normalized.includes("drink"))
-    return { icon: Coffee, tone: "text-amber-700 bg-amber-50 border-amber-200/80" };
-  if (normalized.includes("parking")) return { icon: Car, tone: "text-slate-700 bg-slate-50 border-slate-200/80" };
-  return { icon: ShieldCheck, tone: "text-zinc-700 bg-zinc-50 border-zinc-200/80" };
+  if (normalized.includes("wifi")) return { icon: Wifi };
+  if (normalized.includes("shower")) return { icon: ShowerHead };
+  if (normalized.includes("air")) return { icon: Snowflake };
+  if (normalized.includes("tv") || normalized.includes("netflix")) return { icon: Tv };
+  if (normalized.includes("pool") || normalized.includes("jacuzzi")) return { icon: Waves };
+  if (normalized.includes("breakfast") || normalized.includes("drink")) return { icon: Coffee };
+  if (normalized.includes("parking")) return { icon: Car };
+  return { icon: ShieldCheck };
 }
 
 function todayIsoLocal(): string {
@@ -75,6 +78,22 @@ function defaultStayDates(): { checkIn: string; checkOut: string } {
   return { checkIn, checkOut };
 }
 
+function formatPhp(amount: number): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return "—";
+  const hasFraction = Math.abs(n % 1) > 1e-9;
+  return `₱${n.toLocaleString("en-PH", {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatPhpPerNight(amount: number): string {
+  const core = formatPhp(amount);
+  if (core === "—") return "—";
+  return `${core}/night`;
+}
+
 function buildCheckoutHref(resortId: number, roomId: number, checkIn: string, checkOut: string): string {
   const q = new URLSearchParams({
     roomId: String(roomId),
@@ -88,9 +107,10 @@ function buildCheckoutHref(resortId: number, roomId: number, checkIn: string, ch
 type Props = {
   rooms: LandingComputedRoom[];
   resortId: number;
+  surface: ResortLandingSurface;
 };
 
-export function ResortRoomsSection({ rooms, resortId }: Props) {
+export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
@@ -144,21 +164,30 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
 
   if (rooms.length === 0) return null;
 
-  return (
-    <section id="rooms" className="resort-light-pattern px-6 py-20">
-      <div className="mx-auto max-w-5xl">
-        <h2 className="font-heading text-3xl font-bold text-navy sm:text-4xl">Our rooms</h2>
-        <p className="mt-3 text-sm text-zinc-600">Choose from our available accommodations below.</p>
-        <div className="mt-4 h-px w-full bg-zinc-300/90" />
+  const band = surface === "odd" ? "resort-landing-band-odd" : "resort-landing-band-even";
+  const revealDir = surface === "even" ? "down" : "up";
 
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+  return (
+    <section id="rooms" className={`resort-landing-section scroll-mt-24 border-t border-zinc-200/70 ${band}`}>
+      <ScrollReveal className="resort-landing-container" direction={revealDir} delayMs={50}>
+        <p className="resort-landing-muted">Stay with us</p>
+        <h2 className="font-pop mt-1 text-2xl font-extrabold tracking-tight text-navy sm:text-3xl md:text-4xl">
+          Our rooms
+        </h2>
+        <p className="mt-3 max-w-2xl text-pretty text-sm leading-relaxed text-zinc-600 max-lg:max-w-[22rem]">
+          Choose an accommodation and pick your dates to book with a secure online reservation fee.
+        </p>
+        <div className="mt-4 h-px max-w-md bg-gradient-to-r from-zinc-400/70 via-zinc-200/80 to-transparent" />
+
+        <div className="max-lg:-mx-4 max-lg:overflow-x-auto max-lg:px-4 max-lg:pb-2 max-lg:snap-x max-lg:snap-mandatory max-lg:[scrollbar-width:thin] lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0">
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 max-lg:mt-8 max-lg:flex max-lg:w-max max-lg:flex-nowrap max-lg:gap-4 lg:mt-10">
           {rooms.map((room) => {
             const primaryImage = room.images[0];
             const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities);
             return (
               <ScrollReveal key={room.id} delayMs={Math.min(220, (room.id % 4) * 70)} direction="up">
                 <article
-                  className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-gradient-to-b from-white via-white to-zinc-50/70 shadow-[0_12px_30px_rgba(2,6,23,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(2,6,23,0.18)]"
+                  className="resort-landing-card group flex w-[min(18.5rem,calc(100vw-2.5rem))] shrink-0 snap-center flex-col overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-md max-lg:min-h-[20rem] lg:min-h-0 lg:w-auto lg:shrink-0"
                   role="button"
                   tabIndex={0}
                   onClick={() => setSelectedRoom(room)}
@@ -192,28 +221,21 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                   </h3>
 
                   <div className="mt-2 min-h-[2rem] flex flex-wrap gap-2">
-                    <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-0.5 text-xs font-medium text-zinc-800">
+                      <Users size={12} className="shrink-0 text-zinc-500" aria-hidden />
                       {room.capacity} {room.capacity === 1 ? "guest" : "guests"}
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                      ₱{Number(room.basePrice).toLocaleString()}/night
+                    <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2.5 py-0.5 text-xs font-semibold text-zinc-800">
+                      {formatPhpPerNight(room.basePrice)}
                     </span>
                     {bedCount ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                        <BedDouble size={12} />
+                      <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-0.5 text-xs font-medium text-zinc-800">
+                        <BedDouble size={12} className="shrink-0 text-zinc-500" aria-hidden />
                         {bedCount} {bedCount === 1 ? "bed" : "beds"}
                       </span>
                     ) : null}
                     {bedType ? (
-                      <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
-                        {bedType}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-2 min-h-[1.75rem]">
-                    {bedType ? (
-                      <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
+                      <span className="inline-flex items-center rounded-full border border-zinc-200/90 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-700">
                         {bedType}
                       </span>
                     ) : null}
@@ -228,9 +250,9 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                           return (
                             <span
                               key={a}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.tone}`}
+                              className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-zinc-700"
                             >
-                              <Icon size={11} />
+                              <Icon size={11} className="shrink-0 text-zinc-500" aria-hidden />
                               {a}
                             </span>
                           );
@@ -248,8 +270,8 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                     {room.rules?.trim() || "Comfortable stay with guest-first amenities."}
                   </p>
 
-                  <div className="mt-auto border-t border-zinc-300/90 pt-4">
-                    <span className="inline-flex w-full items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-navy/90">
+                  <div className="mt-auto border-t border-zinc-200/90 pt-4">
+                    <span className="inline-flex w-full items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white transition group-hover:bg-navy/90">
                       View room details
                     </span>
                   </div>
@@ -259,7 +281,8 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
             );
           })}
         </div>
-      </div>
+        </div>
+      </ScrollReveal>
 
       {mounted && selectedRoom
         ? createPortal(
@@ -413,7 +436,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                 <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 shadow-sm">
                     <p className="text-xs text-zinc-500">Price per night</p>
-                    <p className="font-bold text-emerald-700">₱{Number(selectedRoom.basePrice).toLocaleString()}</p>
+                    <p className="font-bold text-emerald-800">{formatPhp(selectedRoom.basePrice)}</p>
                   </div>
                   <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
                     <p className="text-xs text-zinc-500">Maximum guests</p>
@@ -442,9 +465,9 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                         return (
                           <span
                             key={a}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${meta.tone}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-700"
                           >
-                            <Icon size={12} />
+                            <Icon size={12} className="shrink-0 text-zinc-500" aria-hidden />
                             {a}
                           </span>
                         );

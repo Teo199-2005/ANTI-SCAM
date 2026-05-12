@@ -23,6 +23,7 @@ use App\Modules\Billing\Http\Controllers\XenditWebhookController;
 use App\Modules\Dashboard\Http\Controllers\DashboardController;
 use App\Modules\Dashboard\Http\Controllers\MarketingDashboardController;
 use App\Modules\Public\Http\Controllers\PublicCatalogController;
+use App\Modules\Public\Http\Controllers\PublicLocationController;
 use App\Modules\Public\Http\Controllers\ReferralValidationController;
 use App\Modules\Reservations\Http\Controllers\BookingLockController;
 use App\Modules\Reservations\Http\Controllers\ReservationController;
@@ -68,6 +69,9 @@ Route::prefix('v1')->group(function (): void {
 
     // ---------- Public catalog ----------
     Route::get('/public/resorts', [PublicCatalogController::class, 'resorts']);
+    Route::get('/public/locations/provinces', [PublicLocationController::class, 'provinces']);
+    Route::get('/public/locations/provinces/{provinceCode}/cities', [PublicLocationController::class, 'cities']);
+    Route::get('/public/locations/cities/{cityCode}/barangays', [PublicLocationController::class, 'barangays']);
     Route::get('/public/resorts/landing/{slug}', [PublicCatalogController::class, 'landingBySlug']);
     Route::get('/public/resorts/slug/{slug}', [PublicCatalogController::class, 'resortBySlug']);
     Route::get('/public/resorts/{resort}', [PublicCatalogController::class, 'resort']);

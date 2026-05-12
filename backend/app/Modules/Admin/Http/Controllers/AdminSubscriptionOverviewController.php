@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Models\SubscriptionInvoice;
+use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Support\Facades\DB;
 
@@ -14,6 +15,8 @@ class AdminSubscriptionOverviewController extends Controller
 
     public function index()
     {
+        $loc = app(PhilippineLocationService::class);
+
         $resorts = Resort::withoutGlobalScopes()
             ->with('subscription')
             ->orderBy('name')
@@ -22,7 +25,10 @@ class AdminSubscriptionOverviewController extends Controller
                 'tenant_id',
                 'name',
                 'description',
-                'address',
+                'address_province_psgc',
+                'address_city_municipality_psgc',
+                'address_barangay_psgc',
+                'address_label',
                 'contact_number',
                 'logo_url',
                 'is_publicly_listed',
@@ -47,7 +53,7 @@ class AdminSubscriptionOverviewController extends Controller
                 'tenant_id' => $resort->tenant_id,
                 'name' => $resort->name,
                 'description' => $resort->description,
-                'address' => $resort->address,
+                'address' => $loc->resortDisplayLine($resort),
                 'contact_number' => $resort->contact_number,
                 'logo_url' => $resort->logo_url,
                 'is_publicly_listed' => (bool) $resort->is_publicly_listed,

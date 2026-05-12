@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Storage;
 
 class LandingReadinessService
 {
+    public function __construct(
+        private readonly PhilippineLocationService $locations,
+    ) {}
+
     /**
      * Check whether a resort's profile and rooms are complete enough to:
      *  (a) display a public landing page, AND
@@ -24,8 +28,8 @@ class LandingReadinessService
         if (empty($resort->name)) {
             $missing[] = 'resort_name';
         }
-        if (empty($resort->address)) {
-            $missing[] = 'address';
+        if (! $this->locations->resortHasUsableLocation($resort)) {
+            $missing[] = 'location';
         }
         if (empty($resort->contact_number)) {
             $missing[] = 'contact_number';
@@ -82,8 +86,9 @@ class LandingReadinessService
         // Google Maps embed URL (no API key needed for basic search embed)
         $mapEmbedUrl = null;
         $mapSearchUrl = null;
-        if (! empty($resort->address)) {
-            $encoded = rawurlencode($resort->address);
+        $mapQuery = $this->locations->resortMapQueryString($resort);
+        if ($mapQuery !== null) {
+            $encoded = rawurlencode($mapQuery);
             $mapEmbedUrl = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
             $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$encoded}";
         }
@@ -94,6 +99,9 @@ class LandingReadinessService
                 'subheading' => $resort->description,
                 'bgImageUrl' => $resort->background_image_url,
                 'logoUrl' => $resort->logo_url,
+                'facebookUrl' => $this->safePublicHttpUrl($resort->facebook_url),
+                'instagramUrl' => $this->safePublicHttpUrl($resort->instagram_url),
+                'tiktokUrl' => $this->safePublicHttpUrl($resort->tiktok_url),
             ],
             'about' => [
                 'heading' => 'About '.$resort->name,
@@ -119,10 +127,10 @@ class LandingReadinessService
                 'representativeContact' => $resort->representative_contact_number,
                 'contactEmail' => $owner?->email,
                 'resortContact' => $resort->contact_number,
-                'address' => $resort->address,
+                'address' => $this->locations->resortDisplayLine($resort),
             ],
             'map' => [
-                'address' => $resort->address,
+                'address' => $this->locations->resortDisplayLine($resort),
                 'embedUrl' => $mapEmbedUrl,
                 'searchUrl' => $mapSearchUrl,
             ],
@@ -138,5 +146,22 @@ class LandingReadinessService
             ->where('tenant_id', $resort->tenant_id)
             ->where('role', 'resort_owner')
             ->first();
+    }
+
+    private function safePublicHttpUrl(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (filter_var($trimmed, FILTER_VALIDATE_URL) === false) {
+            return null;
+        }
+        $scheme = strtolower((string) parse_url($trimmed, PHP_URL_SCHEME));
+
+        return in_array($scheme, ['http', 'https'], true) ? $trimmed : null;
     }
 }

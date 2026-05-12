@@ -1,6 +1,7 @@
 "use client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
+import { PhilippineLocationPicker, type PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
 import { adminOnboard, AssignableOwner, getAssignableOwners, uploadResortLogo } from "@/lib/api/admin";
@@ -8,7 +9,6 @@ import { getLaravelWebOrigin } from "@/lib/api/baseUrl";
 import { getResort, updateResort } from "@/lib/api/resort";
 import { Building2, Globe, Image as ImageIcon, Loader2 } from "lucide-react";
 import {
-  sanitizeAddressLine,
   sanitizeBusinessOrResortName,
   sanitizeLongText,
   sanitizeNumericIdInput,
@@ -24,7 +24,9 @@ type FormState = {
   tenant_name: string;
   resort_name: string;
   subdomain: string;
-  address: string;
+  address_province_psgc: string | null;
+  address_city_municipality_psgc: string | null;
+  address_barangay_psgc: string | null;
   contact_number: string;
   logo_url: string;
   description: string;
@@ -37,7 +39,9 @@ const initial: FormState = {
   tenant_name: "",
   resort_name: "",
   subdomain: "",
-  address: "",
+  address_province_psgc: null,
+  address_city_municipality_psgc: null,
+  address_barangay_psgc: null,
   contact_number: "",
   logo_url: "",
   description: "",
@@ -74,9 +78,6 @@ export default function AdminOnboardPage() {
         case "subdomain":
           next = sanitizeSubdomainInput(value);
           break;
-        case "address":
-          next = sanitizeAddressLine(value);
-          break;
         case "contact_number":
           next = sanitizePhoneInput(value);
           break;
@@ -108,7 +109,9 @@ export default function AdminOnboardPage() {
           tenant_name: "",
           resort_name: resort.name ?? "",
           subdomain: "",
-          address: resort.address ?? "",
+          address_province_psgc: resort.address_province_psgc ?? null,
+          address_city_municipality_psgc: resort.address_city_municipality_psgc ?? null,
+          address_barangay_psgc: resort.address_barangay_psgc ?? null,
           contact_number: resort.contact_number ?? "",
           logo_url: resort.logo_url ?? "",
           description: resort.description ?? "",
@@ -155,7 +158,9 @@ export default function AdminOnboardPage() {
       if (isEditMode && editResortId) {
         await updateResort(editResortId, {
           name: form.resort_name.trim(),
-          address: form.address.trim() || null,
+          address_province_psgc: form.address_province_psgc,
+          address_city_municipality_psgc: form.address_city_municipality_psgc,
+          address_barangay_psgc: form.address_barangay_psgc,
           contact_number: form.contact_number.trim() || null,
           logo_url: form.logo_url.trim() || null,
           description: form.description.trim() || null,
@@ -166,7 +171,9 @@ export default function AdminOnboardPage() {
           tenant_name: form.tenant_name.trim(),
           resort_name: form.resort_name.trim(),
           subdomain: form.subdomain.trim().toLowerCase(),
-          address: form.address.trim() || undefined,
+          address_province_psgc: form.address_province_psgc,
+          address_city_municipality_psgc: form.address_city_municipality_psgc,
+          address_barangay_psgc: form.address_barangay_psgc,
           contact_number: form.contact_number.trim() || undefined,
           logo_url: form.logo_url.trim() || undefined,
           description: form.description.trim() || undefined,
@@ -314,7 +321,7 @@ export default function AdminOnboardPage() {
             <div className="mt-2 rounded-xl border border-softBorder bg-softGray/40 p-3 text-xs text-zinc-600">
               <p className="font-semibold text-navy">Current pricing model:</p>
               <p className="mt-1">Standard: 1M ₱2,100/mo, 3M ₱1,900/mo, 6M ₱1,700/mo, 12M ₱1,500/mo (+VAT).</p>
-              <p className="mt-1">Referral promo: owners who enter a valid referral code get their <strong>first month free</strong> on 3, 6, or 12-month plans (same standard rates apply). Requires a complete resort profile (logo, address, contact, background image, and at least one active room with a photo) before the code is accepted.</p>
+              <p className="mt-1">Referral promo: owners who enter a valid referral code get their <strong>first month free</strong> on 3, 6, or 12-month plans (same standard rates apply). Requires a complete resort profile (logo, Philippine location, contact, background image, and at least one active room with a photo) before the code is accepted.</p>
               <p className="mt-1">Owners choose duration and apply a referral code in the Subscribe modal.</p>
             </div>
           </div>
@@ -352,14 +359,25 @@ export default function AdminOnboardPage() {
           </div>
           ) : null}
 
-          {/* Address */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Address</label>
-            <input
-              className="dash-input"
-              placeholder="BGC, Taguig City"
-              value={form.address}
-              onChange={(e) => update("address", e.target.value)}
+          {/* Philippine location */}
+          <div className="sm:col-span-2">
+            <p className="mb-1.5 text-xs font-semibold text-zinc-600">Philippine location</p>
+            <PhilippineLocationPicker
+              idPrefix="admin-onboard"
+              disabled={saving}
+              value={{
+                provinceCode: form.address_province_psgc,
+                cityCode: form.address_city_municipality_psgc,
+                barangayCode: form.address_barangay_psgc,
+              }}
+              onChange={(next: PhilippineLocationValue) => {
+                setForm((prev) => ({
+                  ...prev,
+                  address_province_psgc: next.provinceCode,
+                  address_city_municipality_psgc: next.cityCode,
+                  address_barangay_psgc: next.barangayCode,
+                }));
+              }}
             />
           </div>
 

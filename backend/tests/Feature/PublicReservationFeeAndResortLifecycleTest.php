@@ -10,6 +10,8 @@ use App\Models\Subscription;
 use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\PhilippineLocationService;
+use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -21,6 +23,8 @@ class PublicReservationFeeAndResortLifecycleTest extends TestCase
 
     public function test_public_room_payload_includes_reservation_fee_from_system_setting(): void
     {
+        $this->seed(PsgcReferenceSeeder::class);
+
         SystemSetting::query()->updateOrCreate(
             ['key' => 'reservation_fee'],
             ['value' => '650', 'type' => 'integer', 'description' => 'Test fee']
@@ -39,9 +43,13 @@ class PublicReservationFeeAndResortLifecycleTest extends TestCase
             'is_publicly_listed' => true,
             'logo_url' => '/storage/x.png',
             'background_image_url' => '/storage/y.png',
-            'address' => 'Somewhere',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '09170000001',
         ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
 
         Subscription::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id,

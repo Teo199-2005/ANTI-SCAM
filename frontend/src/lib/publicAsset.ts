@@ -16,23 +16,35 @@ function publicAssetOrigin(): string {
 }
 
 /**
- * Turn a Laravel `/storage/...` path or a full `Storage::url()` into an absolute URL for img src.
- * Re-writes absolute URLs whose path is `/storage/...` to {@link publicAssetOrigin} so wrong `APP_URL`
- * in API responses does not break images on the deployed site (img src, etc.).
+ * Turn a Laravel `/storage/...` path or a full `Storage::url()` into a URL for img `src`.
+ *
+ * **Storage (`/storage/...`):** returns a **same-origin relative** path (e.g. `/storage/rooms/1/x.jpg`) so
+ * the Next.js `/storage` route handler can proxy files and **SSR + client hydration always match**
+ * (avoids `publicAssetOrigin()` differing: server uses Laravel origin, browser may use
+ * `window.location.origin` on some hosts).
+ *
+ * **Other paths / full URLs:** still resolved with {@link publicAssetOrigin} where applicable.
  */
 export function laravelPublicUrl(path: string | null | undefined): string {
   if (!path) return "";
+
   if (path.startsWith("http://") || path.startsWith("https://")) {
     try {
       const u = new URL(path);
       if (u.pathname.startsWith("/storage/")) {
-        return `${publicAssetOrigin()}${u.pathname}${u.search}`;
+        return `${u.pathname}${u.search}`;
       }
     } catch {
       return path;
     }
     return path;
   }
+
+  const rel = path.startsWith("/") ? path : `/${path}`;
+  if (rel.startsWith("/storage/")) {
+    return rel;
+  }
+
   const origin = publicAssetOrigin();
-  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${origin}${rel}`;
 }

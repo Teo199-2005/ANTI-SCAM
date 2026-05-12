@@ -87,7 +87,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${playfair.variable} ${plusJakarta.variable} ${montserrat.variable} ${poppins.variable} min-h-screen font-body`}
+        className={`${inter.variable} ${playfair.variable} ${plusJakarta.variable} ${montserrat.variable} ${poppins.variable} min-h-screen bg-zinc-50 font-body`}
       >
         <WebSiteJsonLd />
         <Providers>{children}</Providers>

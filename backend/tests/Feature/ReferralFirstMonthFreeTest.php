@@ -10,7 +10,9 @@ use App\Models\SubscriptionInvoice;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Modules\Billing\Services\XenditSubscriptionWebhookService;
+use App\Services\PhilippineLocationService;
 use Carbon\Carbon;
+use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +31,12 @@ use Tests\TestCase;
 class ReferralFirstMonthFreeTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(PsgcReferenceSeeder::class);
+    }
 
     private static int $counter = 0;
 
@@ -65,15 +73,21 @@ class ReferralFirstMonthFreeTest extends TestCase
 
     private function makeResort(Tenant $tenant, array $attrs = []): Resort
     {
-        return Resort::withoutGlobalScopes()->create(array_merge([
+        $resort = Resort::withoutGlobalScopes()->create(array_merge([
             'tenant_id' => $tenant->id,
             'name' => 'Test Resort',
-            'address' => '123 Beach Rd',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '09170000001',
             'logo_url' => '/storage/logo.png',
             'background_image_url' => '/storage/bg.jpg',
             'is_publicly_listed' => true,
         ], $attrs));
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
+
+        return $resort;
     }
 
     private function makeSubscription(Resort $resort, string $status = 'pending_payment'): Subscription

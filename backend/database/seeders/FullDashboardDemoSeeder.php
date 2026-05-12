@@ -11,6 +11,7 @@ use App\Models\RoomAvailability;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\PhilippineLocationService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -60,10 +61,16 @@ class FullDashboardDemoSeeder extends Seeder
                 'tenant_id' => $tenant->id,
                 'name' => fake()->randomElement(['Azure Sands', 'Coral Bay', 'Luna Ridge', 'Palm Crest'])." {$i}",
                 'description' => $faker->sentence(14),
-                'address' => $faker->streetAddress().', '.$faker->city(),
+                'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+                'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+                'address_barangay_psgc' => $i % 2 === 0
+                    ? PsgcReferenceSeeder::DEMO_BARANGAY_CODE
+                    : PsgcReferenceSeeder::DEMO_BARANGAY_ALT_CODE,
+                'address_label' => null,
                 'contact_number' => '+63 9'.$faker->numerify('#########'),
                 'is_publicly_listed' => $i % 5 !== 0,
             ]);
+            app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
             $resorts->push($resort);
 
             $roomCount = $faker->numberBetween(5, 9);

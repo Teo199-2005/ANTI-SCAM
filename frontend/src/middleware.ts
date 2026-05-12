@@ -30,6 +30,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Root-level files from `public/` (e.g. `/rising2brothers.png`) must not be rewritten to
+  // `/resort/{tenant}/...` on `*.localhost` / tenant subdomains — that breaks `<img src="/...">`.
+  const pathSegments = pathname.split("/").filter(Boolean);
+  if (
+    pathSegments.length === 1 &&
+    /\.(png|jpe?g|gif|webp|svg|ico|txt|xml|pdf|map|webmanifest|woff2?|ttf|eot)$/i.test(pathSegments[0] ?? "")
+  ) {
+    return NextResponse.next();
+  }
+
   // Strip port for comparison
   const hostname = host.split(":")[0].toLowerCase();
 

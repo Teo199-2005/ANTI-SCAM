@@ -56,7 +56,7 @@ const STANDARD_OFFERS: PlanOffer[] = [
 
 const MISSING_FIELD_LABELS: Record<string, string> = {
   resort_name:      "Resort name",
-  address:          "Address",
+  location:         "Philippine location (province, city, barangay)",
   contact_number:   "Contact number",
   logo:             "Resort logo",
   background_image: "Background image",

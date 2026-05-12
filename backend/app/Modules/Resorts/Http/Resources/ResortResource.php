@@ -2,6 +2,7 @@
 
 namespace App\Modules\Resorts\Http\Resources;
 
+use App\Services\PhilippineLocationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,15 +10,25 @@ class ResortResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $loc = app(PhilippineLocationService::class);
+
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
             'name' => $this->name,
             'description' => $this->description,
-            'address' => $this->address,
+            'address_province_psgc' => $this->address_province_psgc,
+            'address_city_municipality_psgc' => $this->address_city_municipality_psgc,
+            'address_barangay_psgc' => $this->address_barangay_psgc,
+            'address_label' => $this->address_label,
+            'address_display' => $loc->resortDisplayLine($this->resource),
+            'address' => $loc->resortDisplayLine($this->resource),
             'contact_number' => $this->contact_number,
             'logo_url' => $this->logo_url,
             'background_image_url' => $this->background_image_url,
+            'facebook_url' => $this->facebook_url,
+            'instagram_url' => $this->instagram_url,
+            'tiktok_url' => $this->tiktok_url,
             'representative_name' => $this->representative_name,
             'representative_contact_number' => $this->representative_contact_number,
             'cancellation_policy' => $this->cancellation_policy,

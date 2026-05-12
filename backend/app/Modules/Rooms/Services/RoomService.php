@@ -8,6 +8,7 @@ use App\Models\RoomAvailability;
 use App\Models\Subscription;
 use App\Modules\Subscriptions\Services\SubscriptionService;
 use App\Services\RoomOccupancyService;
+use App\Support\SafeSort;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -18,9 +19,15 @@ class RoomService
 {
     public function __construct(private readonly SubscriptionService $subscriptions) {}
 
-    public function list(int $perPage = 10, ?string $search = null, ?string $status = null, ?int $resortId = null): LengthAwarePaginator
-    {
-        $query = Room::query()->latest();
+    public function list(
+        int $perPage = 10,
+        ?string $search = null,
+        ?string $status = null,
+        ?int $resortId = null,
+        ?string $sortBy = null,
+        ?string $sortDir = null,
+    ): LengthAwarePaginator {
+        $query = Room::query();
 
         if ($resortId) {
             $query->where('resort_id', $resortId);
@@ -36,6 +43,15 @@ class RoomService
         if ($status) {
             $query->where('status', $status);
         }
+
+        SafeSort::apply(
+            $query,
+            $sortBy,
+            $sortDir,
+            ['name', 'code', 'capacity', 'units', 'base_price', 'status', 'created_at', 'id'],
+            'name',
+            'asc',
+        );
 
         return $query->paginate($perPage);
     }

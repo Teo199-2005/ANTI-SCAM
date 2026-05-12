@@ -1,13 +1,13 @@
 "use client";
 
 import { useToast } from "@/components/shared/ToastProvider";
+import { RoomPhotosPanel } from "@/components/dashboard/RoomPhotosPanel";
 import { apiClient } from "@/lib/api/client";
 import { listResorts } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
   sanitizeAmenityListTyping,
   sanitizeLongText,
-  sanitizeRoomCodeInput,
   sanitizeRoomNameInput,
 } from "@/lib/inputRestrictions";
 import {
@@ -33,7 +33,6 @@ type RoomStatus = "active" | "inactive" | "maintenance";
 type FormState = {
   resort_id: number;
   name: string;
-  code: string;
   capacity: number;
   units: number;
   base_price: number;
@@ -90,7 +89,6 @@ function parseAmenitiesMeta(amenities: string[]) {
 const initialForm: FormState = {
   resort_id: 0,
   name: "",
-  code: "",
   capacity: 1,
   units: 1,
   base_price: 0,
@@ -144,7 +142,6 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
           setForm({
             resort_id: room.resort_id ?? first.id,
             name: room.name ?? "",
-            code: room.code ?? "",
             capacity: Number(room.capacity ?? 1),
             units: Math.max(1, Math.min(99, Number(room.units ?? 1))),
             base_price: Number(room.base_price ?? 0),
@@ -169,7 +166,6 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     let next = value;
     if (key === "name" && typeof value === "string") next = sanitizeRoomNameInput(value) as FormState[K];
-    if (key === "code" && typeof value === "string") next = sanitizeRoomCodeInput(value) as FormState[K];
     if (key === "bed_type" && typeof value === "string") next = sanitizeRoomNameInput(value, 80) as FormState[K];
     if (key === "rules" && typeof value === "string") next = sanitizeLongText(value) as FormState[K];
     setForm((prev) => ({ ...prev, [key]: next }));
@@ -185,7 +181,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
       const payload = {
         resort_id: form.resort_id,
         name: form.name,
-        code: form.code || null,
+        code: null,
         capacity: form.capacity,
         units: form.units,
         base_price: form.base_price,
@@ -231,7 +227,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="dash-page-title">{mode === "create" ? "Add" : "Edit room"}</h1>
-          <p className="dash-page-sub">Fill in room details, pricing, and operating status.</p>
+          <p className="dash-page-sub">Fill in room details, pricing, photos, and operating status.</p>
         </div>
         <Link href="/dashboard/resort/rooms" className="dash-btn-sm inline-flex items-center gap-2">
           <ArrowLeft size={14} />
@@ -242,16 +238,10 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
       {error ? <div className="dash-card border-rose-200 bg-rose-50 p-6 text-rose-800">{error}</div> : null}
 
       <form onSubmit={onSubmit} className="dash-card space-y-4 p-6">
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className={inputWrap}>
-            <AlignLeft size={15} className={iconCls} />
-            <input className={inputCls} placeholder="Room name" value={form.name} onChange={(e) => update("name", e.target.value)} required />
-          </label>
-          <label className={inputWrap}>
-            <Hash size={15} className={iconCls} />
-            <input className={inputCls} placeholder="Room code" value={form.code} onChange={(e) => update("code", e.target.value)} />
-          </label>
-        </div>
+        <label className={inputWrap}>
+          <AlignLeft size={15} className={iconCls} />
+          <input className={inputCls} placeholder="Room name" value={form.name} onChange={(e) => update("name", e.target.value)} required />
+        </label>
 
         <div className="grid gap-3 md:grid-cols-3">
           <label className={inputWrap}>
@@ -383,6 +373,19 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
           </button>
         </div>
       </form>
+
+      {mode === "edit" && roomId && !error ? (
+        <div className="dash-card space-y-4 p-6 lg:p-8">
+          <h2 className="inline-flex items-center gap-2 font-dash text-lg text-navy">
+            <ImageIcon size={18} className="text-skyBlue" />
+            Room photos
+          </h2>
+          <p className="text-sm text-zinc-600">
+            Upload up to five images for this room. They power your public landing page and guest booking flows.
+          </p>
+          <RoomPhotosPanel roomId={roomId} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -8,9 +8,11 @@ use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Modules\Subscriptions\Services\SubscriptionService;
-use App\Support\TenantPublicIdentifier;
 use App\Services\EmailNotificationService;
+use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
+use App\Support\MultipartUploadHints;
+use App\Support\TenantPublicIdentifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +26,7 @@ class AdminOnboardController extends Controller
     public function __construct(
         private readonly SubscriptionService $subscriptions,
         private readonly EmailNotificationService $emailNotifications,
+        private readonly PhilippineLocationService $locations,
     ) {}
 
     public function store(Request $request)
@@ -32,7 +35,10 @@ class AdminOnboardController extends Controller
             'tenant_name' => ['required', 'string', 'max:120'],
             'resort_name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'address_province_psgc' => ['nullable', 'string', 'max:12'],
+            'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
+            'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
+            'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
             'plan' => ['required', 'in:basic'],
@@ -42,6 +48,12 @@ class AdminOnboardController extends Controller
             'is_publicly_listed' => ['nullable', 'boolean'],
             'accept_terms' => ['required', 'accepted'],
         ]);
+
+        $this->locations->assertValidTripleOrEmpty(
+            filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
+            filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
+            filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
+        );
 
         $payload = DB::transaction(function () use ($validated): array {
             $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName(
@@ -86,7 +98,10 @@ class AdminOnboardController extends Controller
                 'tenant_id' => $tenant->id,
                 'name' => $validated['resort_name'],
                 'description' => $validated['description'] ?? null,
-                'address' => $validated['address'] ?? null,
+                'address_province_psgc' => filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
+                'address_city_municipality_psgc' => filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
+                'address_barangay_psgc' => filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
+                'address_label' => filled($validated['address_label'] ?? null) ? (string) $validated['address_label'] : null,
                 'contact_number' => $validated['contact_number'] ?? null,
                 'is_publicly_listed' => $validated['is_publicly_listed'] ?? true,
             ];
@@ -97,6 +112,7 @@ class AdminOnboardController extends Controller
             }
 
             $resort = Resort::withoutGlobalScopes()->create($resortPayload);
+            $this->locations->syncResortAddressLabel($resort);
 
             $subscription = $this->subscriptions->refreshForResort($resort, 'basic');
 
@@ -129,8 +145,8 @@ class AdminOnboardController extends Controller
     public function uploadLogo(Request $request)
     {
         $request->validate([
-            // Allow admin-uploaded resort logos up to ~8 MB
-            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            // Logos: common formats, up to ~12 MB (high-res PNG / marketing exports).
+            'logo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:12288'],
         ]);
 
         $path = $request->file('logo')->store('resort-logos', 'public');
@@ -155,7 +171,10 @@ class AdminOnboardController extends Controller
             'tenant_name' => ['required', 'string', 'max:120'],
             'resort_name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'address_province_psgc' => ['nullable', 'string', 'max:12'],
+            'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
+            'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
+            'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
             'plan' => ['nullable', 'in:basic'],
@@ -164,6 +183,12 @@ class AdminOnboardController extends Controller
             'is_publicly_listed' => ['nullable', 'boolean'],
             'accept_terms' => ['required', 'accepted'],
         ]);
+
+        $this->locations->assertValidTripleOrEmpty(
+            filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
+            filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
+            filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
+        );
 
         $payload = DB::transaction(function () use ($validated, $user): array {
             $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName(
@@ -190,7 +215,10 @@ class AdminOnboardController extends Controller
                 'tenant_id' => $tenant->id,
                 'name' => $validated['resort_name'],
                 'description' => $validated['description'] ?? null,
-                'address' => $validated['address'] ?? null,
+                'address_province_psgc' => filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
+                'address_city_municipality_psgc' => filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
+                'address_barangay_psgc' => filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
+                'address_label' => filled($validated['address_label'] ?? null) ? (string) $validated['address_label'] : null,
                 'contact_number' => $validated['contact_number'] ?? null,
                 'is_publicly_listed' => $validated['is_publicly_listed'] ?? true,
             ];
@@ -200,6 +228,7 @@ class AdminOnboardController extends Controller
             }
 
             $resort = Resort::withoutGlobalScopes()->create($resortPayload);
+            $this->locations->syncResortAddressLabel($resort);
             $subscription = $this->subscriptions->refreshForResort($resort, 'basic');
 
             return [
@@ -224,10 +253,33 @@ class AdminOnboardController extends Controller
             abort(403, 'Only resort owner accounts can upload logos here.');
         }
 
+        if (! $request->hasFile('logo')) {
+            return $this->errorResponse(
+                MultipartUploadHints::missingFileMessage($request, 'logo'),
+                null,
+                422
+            );
+        }
+
         $request->validate([
-            // Allow owner-uploaded resort logos up to ~8 MB
-            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            // Logos: common formats, up to ~12 MB.
+            'logo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:12288'],
+        ], [
+            'logo.required' => 'Please choose a logo image to upload.',
+            'logo.image' => 'The file must be a valid image (JPEG, PNG, WebP, GIF, BMP, or TIFF).',
+            'logo.mimes' => 'Use JPEG, PNG, WebP, GIF, BMP, or TIFF — not HEIC/RAW unless converted.',
+            'logo.max' => 'Logo images may be at most 12 MB.',
         ]);
+
+        $uploaded = $request->file('logo');
+        if (! $uploaded->isValid()) {
+            return $this->errorResponse(
+                'Upload rejected: '.$uploaded->getErrorMessage().' (code '.$uploaded->getError().'). '
+                .'Try `composer run serve` from `backend`, or raise PHP `upload_max_filesize` / `post_max_size`.',
+                null,
+                422
+            );
+        }
 
         $resort = Resort::withoutGlobalScopes()
             ->where('tenant_id', $user->tenant_id)
@@ -242,7 +294,7 @@ class AdminOnboardController extends Controller
             Storage::disk('public')->delete($relative);
         }
 
-        $path = $request->file('logo')->store('resort-logos', 'public');
+        $path = $uploaded->store('resort-logos', 'public');
         $logoUrl = '/storage/'.$path;
 
         $resort->update(['logo_url' => $logoUrl]);

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Marketing site navigation (home, about, blogs, contact, auth).
+ * - Desktop / tablet: inline `md:flex` link row — layout owned by `desktopLinkClass()` + shell classes below.
+ * - Mobile-only: hamburger + collapsible glass panel (`md:hidden`, larger tap targets, safe-area padding).
+ * - Below `md`, the gold “Register Your Resort” control is hidden from the top bar (layout: wordmark + optional Log in + menu); register stays available from page CTAs and `/register`.
+ */
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building, Menu, Shield, Users, X } from "lucide-react";
@@ -104,30 +111,33 @@ export function MarketingPremiumNavbar({ mode }: Props) {
 
   function mobilePanelClass() {
     if (mode === "hero")
-      return "mt-2 flex max-h-[min(70vh,24rem)] flex-col gap-1 overflow-y-auto rounded-2xl border-2 border-white/70 bg-white/40 p-2 backdrop-blur-2xl md:hidden";
+      return "mt-2 flex max-h-[min(72vh,28rem)] flex-col gap-1 overflow-y-auto rounded-2xl border-2 border-white/70 bg-white/40 p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-2xl md:hidden";
     if (mode === "marketing-solid")
-      return "mt-2 flex max-h-[min(70vh,24rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-zinc-200/90 bg-white/95 p-2 shadow-lg backdrop-blur-xl md:hidden";
-    return "mt-2 flex max-h-[min(70vh,24rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-white/55 bg-white/80 p-2 shadow-lg backdrop-blur-2xl md:hidden";
+      return "mt-2 flex max-h-[min(72vh,28rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-zinc-200/90 bg-white/95 p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl md:hidden";
+    return "mt-2 flex max-h-[min(72vh,28rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-white/55 bg-white/80 p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-2xl md:hidden";
   }
 
   function mobileRowClass(isHome: boolean) {
     if (mode === "hero")
       return cn(
-        "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/45",
+        "flex min-h-[44px] items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/45",
         isHome && "bg-white/50 font-bold",
       );
     if (mode === "marketing-solid")
       return cn(
-        "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-zinc-100",
+        "flex min-h-[44px] items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-zinc-100",
         isHome && "bg-navy/[0.08] font-bold",
       );
     if (mode === "auth-overlay") {
       return cn(
-        "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/55",
+        "flex min-h-[44px] items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/55",
         isHome && "bg-white/50 font-bold",
       );
     }
-    return cn("flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/35", isHome && "bg-navy/[0.08] font-bold");
+    return cn(
+      "flex min-h-[44px] items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#0d1f3c] transition hover:bg-white/35",
+      isHome && "bg-navy/[0.08] font-bold",
+    );
   }
 
   const headerShell =
@@ -154,9 +164,19 @@ export function MarketingPremiumNavbar({ mode }: Props) {
         : "hidden items-center gap-2 rounded-full border-2 border-white/85 bg-white/70 px-4 py-2 text-sm font-bold text-[#0d1f3c] shadow-sm backdrop-blur-md transition hover:bg-white/90 sm:inline-flex";
 
   const inner = (
-    <div className="pointer-events-auto mx-auto w-full max-w-[min(1360px,100%)] pb-1.5 ps-0.5 pe-4 pt-0.5 sm:ps-1 sm:pe-5 md:ps-1 md:pe-6 lg:ps-2 lg:pe-8">
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-        <Link href="/" className={cn("flex min-w-0 shrink-0 items-center gap-2.5 sm:gap-3", wordmarkShadow)} onClick={() => setMobileNav(false)}>
+    <div
+      className={cn(
+        "pointer-events-auto mx-auto w-full max-w-[min(1360px,100%)] pb-1.5 ps-0.5 pe-4 pt-0.5 sm:ps-1 sm:pe-5 md:ps-1 md:pe-6 lg:ps-2 lg:pe-8",
+        mode === "hero" && "max-lg:pb-0",
+      )}
+    >
+      {/* One top row on mobile: wordmark (left) + actions/menu (right). `md:flex-wrap` restores comfortable wrapping for tablet/desktop clusters. */}
+      <div className="flex flex-nowrap items-center justify-between gap-x-2 gap-y-0 md:flex-wrap md:items-center md:gap-y-1.5">
+        <Link
+          href="/"
+          className={cn("flex min-w-0 flex-1 items-center gap-2.5 pr-1 sm:gap-3 md:flex-none md:pr-0", wordmarkShadow)}
+          onClick={() => setMobileNav(false)}
+        >
           <ImageWithFallback
             src="/mainlogo.png"
             alt="Anti-Scam PH Logo"
@@ -249,17 +269,19 @@ export function MarketingPremiumNavbar({ mode }: Props) {
                 <Users className="h-4 w-4 shrink-0" aria-hidden />
                 Log in
               </Link>
-              <Link
-                href="/register"
-                className={cn(REGISTER_GOLD_SHINE_REGISTER_BTN, "gap-2 rounded-full px-4 py-2 text-sm font-bold sm:px-5")}
-                style={registerGoldButtonStyle}
-                onClick={() => setMobileNav(false)}
-              >
-                <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
-                <Building className="relative z-10 h-4 w-4 shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)]" aria-hidden />
-                <span className="relative z-10 max-[380px]:sr-only">Register Your Resort</span>
-                <span className="relative z-10 hidden max-[380px]:inline">Register</span>
-              </Link>
+              <span className="hidden md:contents">
+                <Link
+                  href="/register"
+                  className={cn(REGISTER_GOLD_SHINE_REGISTER_BTN, "gap-2 rounded-full px-4 py-2 text-sm font-bold sm:px-5")}
+                  style={registerGoldButtonStyle}
+                  onClick={() => setMobileNav(false)}
+                >
+                  <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+                  <Building className="relative z-10 h-4 w-4 shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)]" aria-hidden />
+                  <span className="relative z-10 max-[380px]:sr-only">Register Your Resort</span>
+                  <span className="relative z-10 hidden max-[380px]:inline">Register</span>
+                </Link>
+              </span>
             </>
           )}
           <button

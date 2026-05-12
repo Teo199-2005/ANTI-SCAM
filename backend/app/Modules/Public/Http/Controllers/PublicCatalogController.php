@@ -8,6 +8,7 @@ use App\Models\Room;
 use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Tenant;
 use App\Services\LandingReadinessService;
+use App\Services\PhilippineLocationService;
 use App\Services\RoomOccupancyService;
 use App\Shared\Traits\ApiResponseTrait;
 
@@ -15,27 +16,29 @@ class PublicCatalogController extends Controller
 {
     use ApiResponseTrait;
 
-    private LandingReadinessService $readiness;
-
-    public function __construct()
-    {
-        $this->readiness = new LandingReadinessService();
-    }
+    public function __construct(
+        private readonly LandingReadinessService $readiness,
+        private readonly PhilippineLocationService $locations,
+    ) {}
 
     public function resorts()
     {
         $perPage = (int) request()->integer('perPage', 12);
-        $search  = request()->string('search')->value();
+        $search = request()->string('search')->value();
+        $provinceCode = request()->string('province_code')->value();
+        $cityCode = request()->string('city_code')->value();
 
         $resorts = Resort::query()
             ->with(['rooms' => fn ($q) => $q->where('status', 'active')->select('id', 'resort_id')])
             ->withCount(['rooms as active_rooms_count' => fn ($q) => $q->where('status', 'active')])
             ->where('is_publicly_listed', true)
             ->latest()
+            ->when($provinceCode, fn ($q) => $q->where('address_province_psgc', $provinceCode))
+            ->when($cityCode, fn ($q) => $q->where('address_city_municipality_psgc', $cityCode))
             ->when($search, function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
-                        ->orWhere('address', 'like', "%{$search}%");
+                        ->orWhere('address_label', 'like', "%{$search}%");
                 });
             })
             ->paginate($perPage);
@@ -53,7 +56,10 @@ class PublicCatalogController extends Controller
             'id'               => $resort->id,
             'name'             => $resort->name,
             'description'      => $resort->description,
-            'address'          => $resort->address,
+            'address'          => $this->locations->resortDisplayLine($resort),
+            'addressProvincePsgc' => $resort->address_province_psgc,
+            'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
+            'addressBarangayPsgc' => $resort->address_barangay_psgc,
             'contactNumber'    => $resort->contact_number,
             'isVip'            => (bool) $resort->is_vip,
             'activeRoomsCount' => $resort->active_rooms_count,
@@ -76,7 +82,10 @@ class PublicCatalogController extends Controller
             'id'            => $resort->id,
             'name'          => $resort->name,
             'description'   => $resort->description,
-            'address'       => $resort->address,
+            'address'       => $this->locations->resortDisplayLine($resort),
+            'addressProvincePsgc' => $resort->address_province_psgc,
+            'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
+            'addressBarangayPsgc' => $resort->address_barangay_psgc,
             'contactNumber' => $resort->contact_number,
             'isVip'         => (bool) $resort->is_vip,
             'rooms'         => $rooms,
@@ -111,7 +120,10 @@ class PublicCatalogController extends Controller
             'tenantId'      => $tenant->id,
             'name'          => $resort->name,
             'description'   => $resort->description,
-            'address'       => $resort->address,
+            'address'       => $this->locations->resortDisplayLine($resort),
+            'addressProvincePsgc' => $resort->address_province_psgc,
+            'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
+            'addressBarangayPsgc' => $resort->address_barangay_psgc,
             'contactNumber' => $resort->contact_number,
             'isVip'         => (bool) $resort->is_vip,
             'rooms'         => $rooms,
@@ -152,22 +164,33 @@ class PublicCatalogController extends Controller
         $owner   = $this->readiness->resolveOwner($resort);
         $payload = $this->readiness->computePayload($resort, $owner);
 
+        $resortAmenities = collect($resort->amenities ?? [])
+            ->map(fn ($a) => is_string($a) ? trim($a) : '')
+            ->filter()
+            ->values()
+            ->all();
+
         return $this->successResponse([
-            'id'            => $resort->id,
-            'slug'          => $slug,
-            'tenantId'      => $tenant->id,
-            'name'          => $resort->name,
-            'description'   => $resort->description,
-            'address'       => $resort->address,
-            'contactNumber' => $resort->contact_number,
-            'logoUrl'       => $resort->logo_url,
-            'isVip'         => (bool) $resort->is_vip,
-            'hero'          => $payload['hero'],
-            'about'         => $payload['about'],
-            'rooms'         => $payload['rooms'],
-            'gallery'       => $payload['gallery'],
-            'footer'        => $payload['footer'],
-            'map'           => $payload['map'],
+            'id'                   => $resort->id,
+            'slug'                 => $slug,
+            'tenantId'             => $tenant->id,
+            'name'                 => $resort->name,
+            'description'          => $resort->description,
+            'address'              => $this->locations->resortDisplayLine($resort),
+            'addressProvincePsgc' => $resort->address_province_psgc,
+            'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
+            'addressBarangayPsgc' => $resort->address_barangay_psgc,
+            'contactNumber'        => $resort->contact_number,
+            'logoUrl'              => $resort->logo_url,
+            'isVip'                => (bool) $resort->is_vip,
+            'amenities'            => $resortAmenities,
+            'cancellationPolicy'   => $resort->cancellation_policy,
+            'hero'                 => $payload['hero'],
+            'about'                => $payload['about'],
+            'rooms'                => $payload['rooms'],
+            'gallery'              => $payload['gallery'],
+            'footer'               => $payload['footer'],
+            'map'                  => $payload['map'],
         ], 'Resort landing page fetched');
     }
 
@@ -229,7 +252,7 @@ class PublicCatalogController extends Controller
             'resort'         => [
                 'id'            => $room->resort?->id,
                 'name'          => $room->resort?->name,
-                'address'       => $room->resort?->address,
+                'address'       => $room->resort ? $this->locations->resortDisplayLine($room->resort) : null,
                 'description'   => $room->resort?->description,
                 'contactNumber' => $room->resort?->contact_number,
             ],

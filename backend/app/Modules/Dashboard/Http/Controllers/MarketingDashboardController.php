@@ -95,8 +95,32 @@ class MarketingDashboardController extends Controller
         $resorts = DB::table('marketer_resorts')
             ->where('marketer_resorts.marketer_id', $marketerId)
             ->join('resorts', 'resorts.id', '=', 'marketer_resorts.resort_id')
-            ->select('resorts.id', 'resorts.name', 'resorts.address', 'resorts.is_publicly_listed', 'resorts.is_vip')
-            ->get();
+            ->select(
+                'resorts.id',
+                'resorts.name',
+                'resorts.address_label',
+                'resorts.address_province_psgc',
+                'resorts.address_city_municipality_psgc',
+                'resorts.address_barangay_psgc',
+                'resorts.is_publicly_listed',
+                'resorts.is_vip',
+            )
+            ->get()
+            ->map(function ($row): array {
+                $display = app(\App\Services\PhilippineLocationService::class)->formatFromCodes(
+                    $row->address_province_psgc,
+                    $row->address_city_municipality_psgc,
+                    $row->address_barangay_psgc,
+                ) ?? (filled($row->address_label) ? (string) $row->address_label : null);
+
+                return [
+                    'id' => $row->id,
+                    'name' => $row->name,
+                    'address' => $display,
+                    'is_publicly_listed' => (bool) $row->is_publicly_listed,
+                    'is_vip' => (bool) $row->is_vip,
+                ];
+            });
 
         return $this->successResponse($resorts, 'Assigned resorts fetched');
     }
@@ -106,7 +130,7 @@ class MarketingDashboardController extends Controller
         $marketerId = $request->user()->id;
         $perPage = (int) $request->integer('perPage', 12);
 
-        $commissions = Commission::with(['resort:id,name', 'releases'])
+        $commissions = Commission::with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'releases'])
             ->where('marketer_id', $marketerId)
             ->latest()
             ->paginate($perPage);

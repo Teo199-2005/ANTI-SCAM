@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reservations\Http\Resources;
 
+use App\Services\PhilippineLocationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,8 @@ class ReservationResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $loc = app(PhilippineLocationService::class);
+
         return [
             'id' => $this->id,
             'referenceNo' => $this->reference_no,
@@ -33,7 +36,7 @@ class ReservationResource extends JsonResource
                 fn (): array => [
                     'id' => $this->resort->id,
                     'name' => $this->resort->name,
-                    'address' => $this->resort->address,
+                    'address' => $loc->resortDisplayLine($this->resort),
                 ],
             ),
             'room' => $this->when(

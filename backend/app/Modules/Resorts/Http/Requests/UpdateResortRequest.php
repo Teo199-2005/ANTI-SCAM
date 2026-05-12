@@ -3,10 +3,47 @@
 namespace App\Modules\Resorts\Http\Requests;
 
 use App\Models\Resort;
+use App\Services\PhilippineLocationService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateResortRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        foreach (['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_psgc'] as $key) {
+            if (! $this->has($key)) {
+                continue;
+            }
+            $raw = $this->input($key);
+            if (! is_string($raw)) {
+                continue;
+            }
+            $trimmed = trim($raw);
+            $this->merge([$key => $trimmed === '' ? null : $trimmed]);
+        }
+
+        foreach (['facebook_url', 'instagram_url', 'tiktok_url'] as $key) {
+            if (! $this->has($key)) {
+                continue;
+            }
+            $raw = $this->input($key);
+            if (! is_string($raw)) {
+                continue;
+            }
+            $trimmed = trim($raw);
+            if ($trimmed === '') {
+                $this->merge([$key => null]);
+
+                continue;
+            }
+            if (! preg_match('#^https?://#i', $trimmed)) {
+                $trimmed = 'https://'.ltrim($trimmed, '/');
+            }
+            $this->merge([$key => $trimmed]);
+        }
+    }
+
     public function authorize(): bool
     {
         /** @var Resort $resort */
@@ -19,10 +56,16 @@ class UpdateResortRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:120'],
             'description' => ['nullable', 'string'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'address_province_psgc' => ['nullable', 'string', 'max:12'],
+            'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
+            'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
+            'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
             'background_image_url' => ['nullable', 'string', 'max:2048'],
+            'facebook_url' => ['nullable', 'string', 'max:2048', 'url'],
+            'instagram_url' => ['nullable', 'string', 'max:2048', 'url'],
+            'tiktok_url' => ['nullable', 'string', 'max:2048', 'url'],
             'representative_name' => ['nullable', 'string', 'max:190'],
             'representative_contact_number' => ['nullable', 'string', 'max:30'],
             'is_publicly_listed' => ['sometimes', 'boolean'],
@@ -30,5 +73,16 @@ class UpdateResortRequest extends FormRequest
             'amenities' => ['nullable', 'array'],
             'amenities.*' => ['string', 'max:120'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            app(PhilippineLocationService::class)->assertValidTripleOrEmpty(
+                $this->input('address_province_psgc'),
+                $this->input('address_city_municipality_psgc'),
+                $this->input('address_barangay_psgc'),
+            );
+        });
     }
 }

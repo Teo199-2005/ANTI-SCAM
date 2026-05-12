@@ -8,7 +8,9 @@ use App\Models\RoomImage;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class RoomImageController extends Controller
 {
@@ -27,14 +29,48 @@ class RoomImageController extends Controller
     {
         $this->authorizeRoom($room);
 
-        $request->validate([
-            // enforce max 5 images per room
-            'images'   => ['required', 'array', 'min:1', 'max:5'],
-            // Allow room photos up to ~8 MB each
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
-        ]);
+        $files = $this->normalizeUploadedImages($request);
+        if ($files === null) {
+            return $this->errorResponse(
+                'No photos were received.',
+                ['images' => ['The browser did not send any files. Try again, or use a smaller JPEG/PNG/WebP.']],
+                422
+            );
+        }
 
-        $files = $request->file('images');
+        $invalidHints = [];
+        foreach ($files as $idx => $file) {
+            if (! $file instanceof UploadedFile) {
+                $invalidHints[] = 'File #'.($idx + 1).': not a valid upload part.';
+
+                continue;
+            }
+            if (! $file->isValid()) {
+                $invalidHints[] = $this->explainUploadFailure($idx, $file);
+            }
+        }
+        if ($invalidHints !== []) {
+            return $this->errorResponse(
+                'One or more photos could not be uploaded.',
+                ['images' => $invalidHints],
+                422
+            );
+        }
+
+        Validator::make(
+            ['images' => $files],
+            [
+                'images'   => ['array', 'min:1', 'max:5'],
+                // 25600 KB = 25 MB — keep in sync with RESORT_ROOM_PHOTO_MAX_BYTES and PHP upload limits.
+                'images.*' => ['image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
+            ],
+            [
+                'images.*.image' => 'Each file must be a readable image.',
+                'images.*.mimes' => 'Use JPEG, PNG, WebP, GIF, BMP, or TIFF.',
+                'images.*.max'   => 'Each image may be up to 25 MB.',
+            ],
+        )->validate();
+
         $existing = $room->images()->count();
         if ($existing + count($files) > 5) {
             return $this->errorResponse('A maximum of 5 images per room is allowed. Remove some photos first.', [
@@ -46,6 +82,7 @@ class RoomImageController extends Controller
 
         $created = [];
         foreach ($files as $file) {
+            /** @var UploadedFile $file */
             $path      = $file->store("rooms/{$room->id}", 'public');
             $isPrimary = $room->images()->count() === 0 && count($created) === 0;
 
@@ -97,6 +134,52 @@ class RoomImageController extends Controller
         if ($tenantId && $room->tenant_id !== $tenantId) {
             abort(403, 'Access denied.');
         }
+    }
+
+    /**
+     * @return list<UploadedFile>|null null = missing input
+     */
+    private function normalizeUploadedImages(Request $request): ?array
+    {
+        $raw = $request->file('images');
+        if ($raw === null) {
+            return null;
+        }
+
+        if ($raw instanceof UploadedFile) {
+            return [$raw];
+        }
+
+        if (is_array($raw)) {
+            $out = [];
+            foreach ($raw as $f) {
+                if ($f instanceof UploadedFile) {
+                    $out[] = $f;
+                }
+            }
+
+            return $out === [] ? null : $out;
+        }
+
+        return null;
+    }
+
+    private function explainUploadFailure(int $index, UploadedFile $file): string
+    {
+        $label = $file->getClientOriginalName() !== ''
+            ? '"'.$file->getClientOriginalName().'"'
+            : 'file #'.($index + 1);
+
+        return match ($file->getError()) {
+            UPLOAD_ERR_INI_SIZE => $label.': exceeds PHP upload_max_filesize (server limit).',
+            UPLOAD_ERR_FORM_SIZE => $label.': exceeds the maximum size allowed for this request.',
+            UPLOAD_ERR_PARTIAL => $label.': only part of the file arrived (network cut-off or proxy). Try again or a smaller file.',
+            UPLOAD_ERR_NO_FILE => $label.': empty — nothing was stored on the server.',
+            UPLOAD_ERR_NO_TMP_DIR => $label.': server has no temporary folder for uploads.',
+            UPLOAD_ERR_CANT_WRITE => $label.': server could not write the file to disk.',
+            UPLOAD_ERR_EXTENSION => $label.': blocked by a PHP extension.',
+            default => $label.': upload error #'.$file->getError().'.',
+        };
     }
 
     private function format(RoomImage $img): array

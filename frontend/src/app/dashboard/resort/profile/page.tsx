@@ -1,6 +1,7 @@
 "use client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
+import { PhilippineLocationPicker, type PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
@@ -17,6 +18,11 @@ import { apiClient } from "@/lib/api/client";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { resortPublicLandingPageUrl } from "@/lib/urls/resortPublicLandingUrl";
 import {
+  ACCEPT_RASTER_IMAGES,
+  RESORT_BACKGROUND_MAX_BYTES,
+  RESORT_LOGO_MAX_BYTES,
+} from "@/lib/uploads/resortProfileUploads";
+import {
   AlertTriangle,
   Building2,
   CheckCircle2,
@@ -29,6 +35,7 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
+  Sparkles,
   Upload,
   User,
   UserRoundCheck,
@@ -36,7 +43,6 @@ import {
   XCircle,
 } from "lucide-react";
 import {
-  sanitizeAddressLine,
   sanitizeAmenityListTyping,
   sanitizeBusinessOrResortName,
   sanitizeEmailTyping,
@@ -45,13 +51,16 @@ import {
   sanitizePhoneInput,
 } from "@/lib/inputRestrictions";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type FormState = {
   id: number;
   name: string;
   description: string;
-  address: string;
+  address_province_psgc: string | null;
+  address_city_municipality_psgc: string | null;
+  address_barangay_psgc: string | null;
   contact_number: string;
   is_publicly_listed: boolean;
   cancellation_policy: string;
@@ -63,13 +72,29 @@ type FormState = {
   representative_name: string;
   representative_email: string;
   representative_contact_number: string;
+  facebook_url: string;
+  instagram_url: string;
+  tiktok_url: string;
 };
 
 function RequiredBadge() {
   return <span className="ml-1 text-rose-500">*</span>;
 }
 
+function UploadErrorNotice({ detail }: { detail: string }) {
+  return (
+    <details className="group mt-2 rounded-xl border border-rose-200 bg-rose-50/95 text-rose-900">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-xs font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" aria-hidden />
+        <span>Upload didn&apos;t complete — expand for full message</span>
+      </summary>
+      <p className="border-t border-rose-100/90 px-3 py-2.5 text-xs leading-relaxed text-rose-900/95 whitespace-pre-wrap">{detail}</p>
+    </details>
+  );
+}
+
 export default function ResortProfilePage() {
+  const router = useRouter();
   const { user, refreshUser } = useAuth();
   const { pushToast } = useToast();
   const [form, setForm] = useState<FormState | null>(null);
@@ -77,6 +102,8 @@ export default function ResortProfilePage() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
+  const [logoUploadDetail, setLogoUploadDetail] = useState<string | null>(null);
+  const [bgUploadDetail, setBgUploadDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [subdomain, setSubdomain] = useState<string | null>(null);
   const [onboardingGate, setOnboardingGate] = useState(false);
@@ -128,7 +155,9 @@ export default function ResortProfilePage() {
           id: first.id,
           name: first.name,
           description: first.description ?? "",
-          address: first.address ?? "",
+          address_province_psgc: first.address_province_psgc ?? null,
+          address_city_municipality_psgc: first.address_city_municipality_psgc ?? null,
+          address_barangay_psgc: first.address_barangay_psgc ?? null,
           contact_number: first.contact_number ?? "",
           is_publicly_listed: first.is_publicly_listed,
           cancellation_policy: (raw.cancellation_policy as string) ?? "",
@@ -142,6 +171,9 @@ export default function ResortProfilePage() {
           representative_name: (raw.representative_name as string) ?? "",
           representative_email: user?.email ?? "",
           representative_contact_number: (raw.representative_contact_number as string) ?? "",
+          facebook_url: (raw.facebook_url as string) ?? "",
+          instagram_url: (raw.instagram_url as string) ?? "",
+          tiktok_url: (raw.tiktok_url as string) ?? "",
         });
         setError(null);
       } catch (err) {
@@ -192,7 +224,9 @@ export default function ResortProfilePage() {
         id: first.id,
         name: first.name,
         description: first.description ?? "",
-        address: first.address ?? "",
+        address_province_psgc: first.address_province_psgc ?? null,
+        address_city_municipality_psgc: first.address_city_municipality_psgc ?? null,
+        address_barangay_psgc: first.address_barangay_psgc ?? null,
         contact_number: first.contact_number ?? "",
         is_publicly_listed: first.is_publicly_listed,
         cancellation_policy: (raw.cancellation_policy as string) ?? "",
@@ -206,6 +240,9 @@ export default function ResortProfilePage() {
         representative_name: (raw.representative_name as string) ?? "",
         representative_email: user?.email ?? "",
         representative_contact_number: (raw.representative_contact_number as string) ?? "",
+        facebook_url: (raw.facebook_url as string) ?? "",
+        instagram_url: (raw.instagram_url as string) ?? "",
+        tiktok_url: (raw.tiktok_url as string) ?? "",
       });
       setError(null);
       pushToast({
@@ -291,15 +328,17 @@ export default function ResortProfilePage() {
         case "representative_email":
           next = sanitizeEmailTyping(value).toLowerCase() as FormState[K];
           break;
-        case "address":
-          next = sanitizeAddressLine(value) as FormState[K];
-          break;
         case "description":
         case "cancellation_policy":
           next = sanitizeLongText(value) as FormState[K];
           break;
         case "amenities":
           next = sanitizeAmenityListTyping(value) as FormState[K];
+          break;
+        case "facebook_url":
+        case "instagram_url":
+        case "tiktok_url":
+          next = value.trim().slice(0, 2048) as FormState[K];
           break;
         default:
           break;
@@ -329,6 +368,12 @@ export default function ResortProfilePage() {
               name: resort.name,
               logo_url: resort.logo_url ?? "",
               background_image_url: resort.background_image_url ?? "",
+              address_province_psgc: resort.address_province_psgc ?? null,
+              address_city_municipality_psgc: resort.address_city_municipality_psgc ?? null,
+              address_barangay_psgc: resort.address_barangay_psgc ?? null,
+              facebook_url: resort.facebook_url ?? "",
+              instagram_url: resort.instagram_url ?? "",
+              tiktok_url: resort.tiktok_url ?? "",
             };
           });
         } catch {
@@ -347,7 +392,9 @@ export default function ResortProfilePage() {
       await updateResort(form.id, {
         name: form.name,
         description: form.description || null,
-        address: form.address || null,
+        address_province_psgc: form.address_province_psgc,
+        address_city_municipality_psgc: form.address_city_municipality_psgc,
+        address_barangay_psgc: form.address_barangay_psgc,
         contact_number: form.contact_number || null,
         logo_url: form.logo_url || null,
         background_image_url: form.background_image_url || null,
@@ -358,6 +405,9 @@ export default function ResortProfilePage() {
         amenities: form.amenities
           ? form.amenities.split(",").map((s) => s.trim()).filter(Boolean)
           : [],
+        facebook_url: form.facebook_url.trim() || null,
+        instagram_url: form.instagram_url.trim() || null,
+        tiktok_url: form.tiktok_url.trim() || null,
       } as Parameters<typeof updateResort>[1]);
       await apiClient.patch("/auth/profile", {
         name: form.owner_name,
@@ -382,6 +432,15 @@ export default function ResortProfilePage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !form) return;
+    setLogoUploadDetail(null);
+    if (file.size > RESORT_LOGO_MAX_BYTES) {
+      pushToast({
+        title: "Logo file too large",
+        description: `Use an image up to ${Math.floor(RESORT_LOGO_MAX_BYTES / (1024 * 1024))} MB (try a smaller export or JPEG/WebP).`,
+        tone: "error",
+      });
+      return;
+    }
     setUploadingLogo(true);
     try {
       const logoUrl = await uploadOwnerResortLogo(file);
@@ -389,13 +448,16 @@ export default function ResortProfilePage() {
       await refreshOwnerLanding();
       pushToast({
         title: "Logo uploaded",
-        description: "Saved on the server. The preview should update automatically; if not, refresh the page.",
+        description: "Opening the media editor to crop and position your logo.",
         tone: "success",
       });
+      router.push("/dashboard/resort/profile/media?tab=logo");
     } catch (err) {
+      const detail = parseApiErrorMessage(err, "Please try another image.");
+      setLogoUploadDetail(detail);
       pushToast({
         title: "Logo upload failed",
-        description: parseApiErrorMessage(err, "Please try another image."),
+        description: detail,
         tone: "error",
       });
     } finally {
@@ -407,6 +469,15 @@ export default function ResortProfilePage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !form) return;
+    setBgUploadDetail(null);
+    if (file.size > RESORT_BACKGROUND_MAX_BYTES) {
+      pushToast({
+        title: "Background image too large",
+        description: `Use a file up to ${Math.floor(RESORT_BACKGROUND_MAX_BYTES / (1024 * 1024))} MB. If it still fails, your server may need a higher PHP upload limit (upload_max_filesize / post_max_size).`,
+        tone: "error",
+      });
+      return;
+    }
     setUploadingBg(true);
     try {
       const url = await uploadBgImage(file);
@@ -414,13 +485,16 @@ export default function ResortProfilePage() {
       await refreshOwnerLanding();
       pushToast({
         title: "Background image uploaded",
-        description: "Saved on the server. The preview should update automatically; if not, refresh the page.",
+        description: "Opening the media editor to frame your cover photo.",
         tone: "success",
       });
+      router.push("/dashboard/resort/profile/media?tab=cover");
     } catch (err) {
+      const detail = parseApiErrorMessage(err, "Please try another image.");
+      setBgUploadDetail(detail);
       pushToast({
         title: "Upload failed",
-        description: parseApiErrorMessage(err, "Please try another image."),
+        description: detail,
         tone: "error",
       });
     } finally {
@@ -534,7 +608,7 @@ export default function ResortProfilePage() {
             <div className="flex flex-wrap items-center gap-3">
               {form.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={laravelPublicUrl(form.logo_url)} alt="Resort logo" className="h-20 w-20 rounded-xl border border-softBorder object-cover" />
+                <img src={laravelPublicUrl(form.logo_url)} alt="Resort logo" className="h-20 w-20 rounded-xl border border-softBorder object-contain bg-white" />
               ) : (
                 <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1 text-center text-[10px] font-medium leading-tight text-rose-500">
                   <span>No logo</span>
@@ -544,9 +618,10 @@ export default function ResortProfilePage() {
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-softBorder bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
                 <Upload size={14} />
                 {uploadingLogo ? "Uploading..." : "Upload logo"}
-                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploadingLogo} onChange={onLogoUpload} />
+                <input type="file" accept={ACCEPT_RASTER_IMAGES} className="hidden" disabled={uploadingLogo} onChange={onLogoUpload} />
               </label>
             </div>
+            {logoUploadDetail ? <UploadErrorNotice detail={logoUploadDetail} /> : null}
           </div>
 
           <div>
@@ -557,22 +632,99 @@ export default function ResortProfilePage() {
             <div className="flex flex-wrap items-center gap-3">
               {form.background_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={laravelPublicUrl(form.background_image_url)} alt="Background" className="h-20 w-36 rounded-xl border border-softBorder object-cover" />
+                <img
+                  src={laravelPublicUrl(form.background_image_url)}
+                  alt="Background"
+                  className="h-24 w-44 rounded-xl border border-softBorder bg-zinc-100 object-contain"
+                />
               ) : (
                 <div className="flex h-20 w-36 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1.5 text-center text-[10px] font-medium leading-tight text-rose-500">
                   <span>No image</span>
-                  <span className="mt-1 text-[9px] font-normal text-rose-400">Preferred 1920×1080 px</span>
+                  <span className="mt-1 text-[9px] font-normal text-rose-400">Any aspect ratio</span>
                 </div>
               )}
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-softBorder bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
                 <Upload size={14} />
                 {uploadingBg ? "Uploading..." : "Upload image"}
-                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploadingBg} onChange={onBgUpload} />
+                <input type="file" accept={ACCEPT_RASTER_IMAGES} className="hidden" disabled={uploadingBg} onChange={onBgUpload} />
               </label>
             </div>
-            <p className="mt-1.5 text-xs text-zinc-500">Used as the full-width background on your landing page.</p>
+            {bgUploadDetail ? <UploadErrorNotice detail={bgUploadDetail} /> : null}
           </div>
         </div>
+
+        <div className="rounded-xl border border-softBorder bg-softGray/15 p-4">
+          <p className="font-dash text-xs font-semibold text-navy">Social links (optional)</p>
+          <p className="mt-1 font-dash text-xs text-zinc-500">
+            Paste full profile URLs. Icons appear next to the booking trust line on your public landing page when saved.
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <div>
+              <label htmlFor="social-facebook" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+                Facebook
+              </label>
+              <input
+                id="social-facebook"
+                type="url"
+                inputMode="url"
+                className="dash-input"
+                value={form.facebook_url}
+                onChange={(e) => onChange("facebook_url", e.target.value)}
+                placeholder="https://facebook.com/…"
+              />
+            </div>
+            <div>
+              <label htmlFor="social-instagram" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+                Instagram
+              </label>
+              <input
+                id="social-instagram"
+                type="url"
+                inputMode="url"
+                className="dash-input"
+                value={form.instagram_url}
+                onChange={(e) => onChange("instagram_url", e.target.value)}
+                placeholder="https://instagram.com/…"
+              />
+            </div>
+            <div>
+              <label htmlFor="social-tiktok" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+                TikTok
+              </label>
+              <input
+                id="social-tiktok"
+                type="url"
+                inputMode="url"
+                className="dash-input"
+                value={form.tiktok_url}
+                onChange={(e) => onChange("tiktok_url", e.target.value)}
+                placeholder="https://www.tiktok.com/@…"
+              />
+            </div>
+          </div>
+        </div>
+
+        {(form.logo_url || form.background_image_url) && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50/95 to-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                <Sparkles className="h-4 w-4" aria-hidden />
+              </span>
+              <div>
+                <p className="font-dash text-sm font-semibold text-navy">Profile media editor</p>
+                <p className="mt-0.5 max-w-xl font-dash text-xs leading-relaxed text-zinc-600 sm:text-sm">
+                  Crop, zoom, and align your logo and cover photo. Saved images update your resort profile for guests.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/resort/profile/media"
+              className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-primaryBlue px-4 py-2.5 font-dash text-sm font-semibold text-white shadow-dash-primary transition hover:bg-primaryBlueDark sm:self-center"
+            >
+              Open editor
+            </Link>
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
@@ -603,17 +755,31 @@ export default function ResortProfilePage() {
             />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="resort-address" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+            <div className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
               <MapPin size={13} className="text-zinc-500" />
-              Address <RequiredBadge />
-              <span className="ml-1.5 font-normal text-zinc-400">(used to generate Google Maps on your landing page)</span>
-            </label>
-            <input
-              id="resort-address"
-              className="dash-input"
-              value={form.address}
-              onChange={(e) => onChange("address", e.target.value)}
-              placeholder="Full address e.g. 123 Beach Rd, Palawan, Philippines"
+              Philippine location <RequiredBadge />
+              <span className="ml-1.5 font-normal text-zinc-400">(province, city or municipality, barangay — used for maps and search)</span>
+            </div>
+            <PhilippineLocationPicker
+              idPrefix="resort-profile"
+              disabled={saving}
+              value={{
+                provinceCode: form.address_province_psgc,
+                cityCode: form.address_city_municipality_psgc,
+                barangayCode: form.address_barangay_psgc,
+              }}
+              onChange={(next: PhilippineLocationValue) => {
+                setForm((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        address_province_psgc: next.provinceCode,
+                        address_city_municipality_psgc: next.cityCode,
+                        address_barangay_psgc: next.barangayCode,
+                      }
+                    : prev,
+                );
+              }}
             />
           </div>
           <div className="md:col-span-2">

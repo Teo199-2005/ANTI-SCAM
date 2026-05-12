@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Services\LandingReadinessService;
 use App\Shared\Traits\ApiResponseTrait;
+use App\Support\MultipartUploadHints;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -60,6 +61,9 @@ class ResortLandingPageController extends Controller
     /**
      * POST /resort-owner/landing-page/upload-bg-image
      * Uploads a background image and saves it directly to the resort record.
+     *
+     * Server limits: ensure PHP upload_max_filesize and post_max_size exceed the max below (e.g. 32M),
+     * and nginx client_max_body_size if applicable, or large uploads will fail before Laravel runs.
      */
     public function uploadBgImage(Request $request)
     {
@@ -68,9 +72,33 @@ class ResortLandingPageController extends Controller
             abort(403, 'Only resort owners can upload background images.');
         }
 
+        if (! $request->hasFile('image')) {
+            return $this->errorResponse(
+                MultipartUploadHints::missingFileMessage($request, 'background image'),
+                null,
+                422
+            );
+        }
+
         $request->validate([
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            // Large hero backgrounds: up to ~25 MB; common raster formats (GIF/BMP/TIFF for exports & scans).
+            'image' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
+        ], [
+            'image.required' => 'Please choose a background image to upload.',
+            'image.image' => 'The file must be a valid image (JPEG, PNG, WebP, GIF, BMP, or TIFF).',
+            'image.mimes' => 'Use JPEG, PNG, WebP, GIF, BMP, or TIFF — not HEIC/RAW unless converted.',
+            'image.max' => 'Background images may be at most 25 MB.',
         ]);
+
+        $uploaded = $request->file('image');
+        if (! $uploaded->isValid()) {
+            return $this->errorResponse(
+                'Upload rejected: '.$uploaded->getErrorMessage().' (code '.$uploaded->getError().'). '
+                .'Try `composer run serve` from `backend`, or raise PHP `upload_max_filesize` / `post_max_size`.',
+                null,
+                422
+            );
+        }
 
         $resort = Resort::withoutGlobalScopes()
             ->where('tenant_id', $user->tenant_id)
@@ -86,7 +114,7 @@ class ResortLandingPageController extends Controller
             Storage::disk('public')->delete($relative);
         }
 
-        $path = $request->file('image')->store('resort-backgrounds', 'public');
+        $path = $uploaded->store('resort-backgrounds', 'public');
         $url  = '/storage/' . $path;
 
         $resort->update(['background_image_url' => $url]);
@@ -106,9 +134,9 @@ class ResortLandingPageController extends Controller
         }
 
         $request->validate([
-            'image'    => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'image'    => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
             'images'   => ['nullable', 'array', 'min:1', 'max:6'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images.*' => ['image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
         ]);
 
         $uploaded = [];

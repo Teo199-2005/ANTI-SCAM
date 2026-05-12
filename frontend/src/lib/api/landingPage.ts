@@ -1,11 +1,12 @@
 import { apiClient, publicClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
+import { shrinkRasterForUpload } from "@/lib/uploads/shrinkRasterForUpload";
 
 // ── Owner dashboard types ────────────────────────────────────────────────────
 
 export type LandingMissingField =
   | "resort_name"
-  | "address"
+  | "location"
   | "contact_number"
   | "logo"
   | "background_image"
@@ -14,7 +15,7 @@ export type LandingMissingField =
 /** Human labels — matches backend `LandingReadinessService` keys */
 export const LANDING_MISSING_FIELD_LABELS: Record<LandingMissingField, string> = {
   resort_name: "Resort name",
-  address: "Address",
+  location: "Philippine location (province, city, barangay)",
   contact_number: "Contact number",
   logo: "Resort logo",
   background_image: "Background image",
@@ -26,6 +27,9 @@ export type LandingComputedHero = {
   subheading: string | null;
   bgImageUrl: string | null;
   logoUrl: string | null;
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
+  tiktokUrl?: string | null;
 };
 
 export type LandingComputedAbout = {
@@ -91,6 +95,9 @@ export type PublicResortLandingPayload = {
   contactNumber: string | null;
   logoUrl: string | null;
   isVip: boolean;
+  /** Resort-level amenities from the owner profile (display chips on the public landing page). */
+  amenities?: string[];
+  cancellationPolicy?: string | null;
   hero: LandingComputedHero;
   about: LandingComputedAbout;
   rooms: LandingComputedRoom[];
@@ -106,12 +113,20 @@ export async function getOwnerLandingPage(): Promise<OwnerLandingPageResponse> {
   return data.data;
 }
 
+const MULTIPART_UPLOAD_TIMEOUT_MS = 180_000;
+
 export async function uploadBgImage(file: File): Promise<string> {
+  const prepared = typeof window !== "undefined" ? await shrinkRasterForUpload(file) : file;
   const form = new FormData();
-  form.append("image", file);
+  form.append("image", prepared);
   const { data } = await apiClient.post<ApiEnvelope<{ url: string }>>(
     "/resort-owner/landing-page/upload-bg-image",
     form,
+    {
+      timeout: MULTIPART_UPLOAD_TIMEOUT_MS,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    },
   );
   return data.data.url;
 }
@@ -122,11 +137,18 @@ export async function uploadLandingPageImage(file: File): Promise<string> {
 }
 
 export async function uploadLandingPageImages(files: File[]): Promise<string[]> {
+  const prepared =
+    typeof window !== "undefined" ? await Promise.all(files.map((f) => shrinkRasterForUpload(f))) : files;
   const form = new FormData();
-  files.forEach((f) => form.append("images[]", f));
+  prepared.forEach((f) => form.append("images[]", f));
   const { data } = await apiClient.post<ApiEnvelope<{ url?: string; urls?: string[] }>>(
     "/resort-owner/landing-page/upload-image",
     form,
+    {
+      timeout: MULTIPART_UPLOAD_TIMEOUT_MS,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    },
   );
   const urls = data.data.urls ?? (data.data.url ? [data.data.url] : []);
   return urls.filter(Boolean);

@@ -60,7 +60,11 @@ export type AuthUser = {
   marketer_gov_id_format_hint?: string | null;
   marketer_gov_id_label?: string | null;
   marketer_gov_id_complete?: boolean;
-  /** Marketing: complete mailing address for KYC / BIR */
+  mailing_province_psgc?: string | null;
+  mailing_city_municipality_psgc?: string | null;
+  mailing_barangay_psgc?: string | null;
+  mailing_location_label?: string | null;
+  /** Resolved mailing line for display (PSGC names or legacy label) */
   marketer_mailing_address?: string | null;
   /** Marketing: masked TIN, e.g. ••••••1234 */
   marketer_tin_masked?: string | null;

@@ -9,6 +9,8 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\LandingReadinessService;
+use App\Services\PhilippineLocationService;
+use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -22,7 +24,8 @@ class LandingReadinessTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new LandingReadinessService;
+        $this->seed(PsgcReferenceSeeder::class);
+        $this->service = app(LandingReadinessService::class);
     }
 
     private static int $counter = 0;
@@ -72,7 +75,10 @@ class LandingReadinessTest extends TestCase
     {
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'address' => null,
+            'address_province_psgc' => null,
+            'address_city_municipality_psgc' => null,
+            'address_barangay_psgc' => null,
+            'address_label' => null,
             'contact_number' => null,
             'logo_url' => null,
             'background_image_url' => null,
@@ -81,7 +87,7 @@ class LandingReadinessTest extends TestCase
         $result = $this->service->check($resort);
 
         $this->assertFalse($result['is_ready']);
-        $this->assertContains('address', $result['missing_fields']);
+        $this->assertContains('location', $result['missing_fields']);
         $this->assertContains('contact_number', $result['missing_fields']);
         $this->assertContains('logo', $result['missing_fields']);
         $this->assertContains('background_image', $result['missing_fields']);
@@ -94,11 +100,15 @@ class LandingReadinessTest extends TestCase
 
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'address' => '123 Shore Rd',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '0917-111-2222',
             'logo_url' => '/storage/logos/logo.png',
             'background_image_url' => '/storage/resort-backgrounds/bg.jpg',
         ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
 
         $room = Room::withoutGlobalScopes()->create([
             'resort_id' => $resort->id,
@@ -131,11 +141,15 @@ class LandingReadinessTest extends TestCase
     {
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
-            'address' => '123 Rd',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '09171234567',
             'logo_url' => '/storage/logo.png',
             'background_image_url' => '/storage/bg.jpg',
         ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
 
         // No rooms at all
         $result = $this->service->check($resort);
@@ -151,8 +165,12 @@ class LandingReadinessTest extends TestCase
         $tenant = $this->makeTenant();
         $resort = $this->makeResort($tenant, [
             'name' => 'Palm Crest',
-            'address' => 'Boracay Island, Aklan',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
         ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
 
         $payload = $this->service->computePayload($resort, null);
 
@@ -160,13 +178,18 @@ class LandingReadinessTest extends TestCase
         $this->assertStringContainsString('maps.google.com', $payload['map']['embedUrl']);
         $this->assertNotNull($payload['map']['searchUrl']);
         $this->assertStringContainsString('maps/search', $payload['map']['searchUrl']);
-        $this->assertEquals('Boracay Island, Aklan', $payload['map']['address']);
+        $this->assertEquals('Demo Barangay, Demo City, Demo Province', $payload['map']['address']);
     }
 
-    public function test_computed_payload_has_null_map_when_address_is_empty(): void
+    public function test_computed_payload_has_null_map_when_location_is_empty(): void
     {
         $tenant = $this->makeTenant();
-        $resort = $this->makeResort($tenant, ['address' => null]);
+        $resort = $this->makeResort($tenant, [
+            'address_province_psgc' => null,
+            'address_city_municipality_psgc' => null,
+            'address_barangay_psgc' => null,
+            'address_label' => null,
+        ]);
 
         $payload = $this->service->computePayload($resort, null);
 
@@ -207,7 +230,10 @@ class LandingReadinessTest extends TestCase
         $resort = $this->makeResort($tenant, [
             'background_image_url' => null,
             'logo_url' => null,
-            'address' => null,
+            'address_province_psgc' => null,
+            'address_city_municipality_psgc' => null,
+            'address_barangay_psgc' => null,
+            'address_label' => null,
         ]);
         $this->makeSubscription($resort, 'active');
 

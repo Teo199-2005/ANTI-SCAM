@@ -6,6 +6,7 @@ use App\Models\Resort;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
+use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -16,6 +17,8 @@ class ResortProfilePersistenceTest extends TestCase
 
     public function test_put_resort_persists_background_representatives_policy_and_amenities(): void
     {
+        $this->seed(PsgcReferenceSeeder::class);
+
         $tenant = Tenant::create([
             'name' => 'Persist Tenant',
             'slug' => 'persist-tenant',
@@ -27,7 +30,10 @@ class ResortProfilePersistenceTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'Persist Resort',
             'description' => 'Before',
-            'address' => 'Somewhere',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '+63000000000',
             'is_publicly_listed' => true,
         ]);
@@ -60,6 +66,9 @@ class ResortProfilePersistenceTest extends TestCase
             'representative_contact_number' => '+639171234567',
             'cancellation_policy' => 'Free cancellation up to 48 hours.',
             'amenities' => ['Pool', 'Free Wi-Fi'],
+            'facebook_url' => 'https://facebook.com/myresort',
+            'instagram_url' => 'instagram.com/myresort',
+            'tiktok_url' => 'https://www.tiktok.com/@myresort',
         ]);
 
         $response->assertOk();
@@ -71,10 +80,15 @@ class ResortProfilePersistenceTest extends TestCase
         $this->assertSame('+639171234567', $resort->representative_contact_number);
         $this->assertSame('Free cancellation up to 48 hours.', $resort->cancellation_policy);
         $this->assertSame(['Pool', 'Free Wi-Fi'], $resort->amenities);
+        $this->assertSame('https://facebook.com/myresort', $resort->facebook_url);
+        $this->assertSame('https://instagram.com/myresort', $resort->instagram_url);
+        $this->assertSame('https://www.tiktok.com/@myresort', $resort->tiktok_url);
     }
 
     public function test_put_resort_without_name_still_resyncs_tenant_subdomain_from_db_resort_name(): void
     {
+        $this->seed(PsgcReferenceSeeder::class);
+
         $tenant = Tenant::create([
             'name' => 'Owner Name',
             'slug' => 'teofilo-harry-paet-w1scd1',
@@ -86,7 +100,10 @@ class ResortProfilePersistenceTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'TEO',
             'description' => 'Test',
-            'address' => 'Somewhere',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '+63000000000',
             'is_publicly_listed' => true,
         ]);

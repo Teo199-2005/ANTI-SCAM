@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Resort;
 use App\Models\Tenant;
+use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -22,7 +23,10 @@ class ResortFactory extends Factory
             'tenant_id' => Tenant::query()->inRandomOrder()->value('id') ?? TenantFactory::new()->create()->id,
             'name' => $prefix.' Resort '.fake()->numberBetween(1, 99),
             'description' => fake()->sentence(14),
-            'address' => fake()->streetAddress().', '.fake()->city(),
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
             'contact_number' => '+63 9'.fake()->numerify('#########'),
             'is_publicly_listed' => fake()->boolean(80),
         ];

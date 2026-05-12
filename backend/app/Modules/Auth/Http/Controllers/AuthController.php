@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\EmailNotificationService;
 use App\Services\EmailVerificationOtpService;
 use App\Services\PasswordResetOtpService;
+use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\GcashAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
@@ -27,6 +28,7 @@ class AuthController extends Controller
         private readonly EmailVerificationOtpService $emailOtpService,
         private readonly PasswordResetOtpService $passwordResetOtpService,
         private readonly EmailNotificationService $emailNotifications,
+        private readonly PhilippineLocationService $locations,
     ) {}
 
     public function register(Request $request)
@@ -274,7 +276,10 @@ class AuthController extends Controller
 
         $kycPayload = [];
         if ($user->role === 'marketing' && $request->hasAny([
-            'marketer_mailing_address',
+            'mailing_province_psgc',
+            'mailing_city_municipality_psgc',
+            'mailing_barangay_psgc',
+            'mailing_location_label',
             'marketer_tin',
             'marketer_bank_name',
             'marketer_bank_branch',
@@ -282,7 +287,10 @@ class AuthController extends Controller
             'marketer_bank_account_number',
         ])) {
             $kycIn = $request->validate([
-                'marketer_mailing_address' => ['nullable', 'string', 'max:2000'],
+                'mailing_province_psgc' => ['nullable', 'string', 'max:12'],
+                'mailing_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
+                'mailing_barangay_psgc' => ['nullable', 'string', 'max:12'],
+                'mailing_location_label' => ['nullable', 'string', 'max:512'],
                 'marketer_tin' => ['nullable', 'string', 'max:32'],
                 'marketer_bank_name' => ['nullable', 'string', 'max:120'],
                 'marketer_bank_branch' => ['nullable', 'string', 'max:120'],
@@ -290,9 +298,35 @@ class AuthController extends Controller
                 'marketer_bank_account_number' => ['nullable', 'string', 'max:64'],
             ]);
 
-            if (array_key_exists('marketer_mailing_address', $kycIn)) {
-                $addr = trim((string) ($kycIn['marketer_mailing_address'] ?? ''));
-                $kycPayload['marketer_mailing_address'] = $addr === '' ? null : $addr;
+            $finalP = array_key_exists('mailing_province_psgc', $kycIn)
+                ? (filled($kycIn['mailing_province_psgc']) ? trim((string) $kycIn['mailing_province_psgc']) : null)
+                : $user->mailing_province_psgc;
+            $finalC = array_key_exists('mailing_city_municipality_psgc', $kycIn)
+                ? (filled($kycIn['mailing_city_municipality_psgc']) ? trim((string) $kycIn['mailing_city_municipality_psgc']) : null)
+                : $user->mailing_city_municipality_psgc;
+            $finalB = array_key_exists('mailing_barangay_psgc', $kycIn)
+                ? (filled($kycIn['mailing_barangay_psgc']) ? trim((string) $kycIn['mailing_barangay_psgc']) : null)
+                : $user->mailing_barangay_psgc;
+
+            $this->locations->assertValidTripleOrEmpty(
+                $finalP,
+                $finalC,
+                $finalB,
+                ['mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc'],
+            );
+
+            if (array_key_exists('mailing_province_psgc', $kycIn)) {
+                $kycPayload['mailing_province_psgc'] = $finalP;
+            }
+            if (array_key_exists('mailing_city_municipality_psgc', $kycIn)) {
+                $kycPayload['mailing_city_municipality_psgc'] = $finalC;
+            }
+            if (array_key_exists('mailing_barangay_psgc', $kycIn)) {
+                $kycPayload['mailing_barangay_psgc'] = $finalB;
+            }
+            if (array_key_exists('mailing_location_label', $kycIn)) {
+                $lab = trim((string) ($kycIn['mailing_location_label'] ?? ''));
+                $kycPayload['mailing_location_label'] = $lab === '' ? null : $lab;
             }
 
             if (array_key_exists('marketer_tin', $kycIn)) {
@@ -360,6 +394,10 @@ class AuthController extends Controller
         }
 
         $user->update([...$validated, ...$gcashPayload, ...$govPayload, ...$kycPayload]);
+
+        if ($user->role === 'marketing') {
+            $this->locations->syncUserMailingLabel($user->fresh());
+        }
 
         return $this->successResponse(UserProfilePresenter::toArray($user->fresh()), 'Profile updated');
     }
