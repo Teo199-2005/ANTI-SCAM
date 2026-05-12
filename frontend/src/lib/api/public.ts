@@ -1,5 +1,7 @@
 import { publicClient } from "@/lib/api/client";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import type { ApiEnvelope } from "@/lib/api/types";
+import axios from "axios";
 
 // Re-map to publicClient since none of these endpoints require authentication.
 const apiClient = publicClient;
@@ -94,9 +96,36 @@ export async function checkRoomAvailability(
   checkIn: string,
   checkOut: string
 ): Promise<AvailabilityResult> {
-  const { data } = await apiClient.get<ApiEnvelope<AvailabilityResult>>(
-    `/public/rooms/${roomId}/availability`,
-    { params: { check_in_date: checkIn, check_out_date: checkOut } }
-  );
-  return data.data;
+  const id = Number(roomId);
+  if (!Number.isFinite(id) || id <= 0) {
+    throw new Error("Invalid room.");
+  }
+  try {
+    const res = await apiClient.get<ApiEnvelope<AvailabilityResult>>(`/public/rooms/${id}/availability`, {
+      params: { check_in_date: checkIn, check_out_date: checkOut },
+      validateStatus: () => true,
+    });
+    const body = res.data as ApiEnvelope<AvailabilityResult>;
+    if (res.status >= 400) {
+      const raw = body as unknown as { message?: string };
+      const msg =
+        typeof raw?.message === "string" && raw.message.trim() !== ""
+          ? raw.message
+          : `Availability check failed (${res.status}).`;
+      throw new Error(msg);
+    }
+    if (!body?.success || body.data == null) {
+      throw new Error(
+        typeof body?.message === "string" && body.message.trim() !== ""
+          ? body.message
+          : "Availability check failed.",
+      );
+    }
+    return body.data;
+  } catch (e) {
+    if (axios.isAxiosError(e)) {
+      throw new Error(parseApiErrorMessage(e, "Could not reach the availability service."));
+    }
+    throw e instanceof Error ? e : new Error("Availability check failed.");
+  }
 }

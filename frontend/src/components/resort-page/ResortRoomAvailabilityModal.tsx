@@ -1,6 +1,7 @@
 "use client";
 
 import { checkRoomAvailability } from "@/lib/api/public";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -49,6 +50,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
   const [monthLoading, setMonthLoading] = useState(false);
   const [rangeChecking, setRangeChecking] = useState(false);
   const [rangeResult, setRangeResult] = useState<"idle" | "available" | "unavailable" | "error">("idle");
+  const [verifyDetail, setVerifyDetail] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -62,6 +64,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
       setMonthYm(todayStr.slice(0, 7));
     }
     setRangeResult("idle");
+    setVerifyDetail(null);
   }, [open, checkIn, todayStr]);
 
   const [y, m] = monthYm.split("-").map(Number);
@@ -110,15 +113,18 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
   const verifySelectedStay = async () => {
     if (!checkIn || !checkOut || checkOut <= checkIn) {
       setRangeResult("error");
+      setVerifyDetail("Pick a check-out date after check-in.");
       return;
     }
     setRangeChecking(true);
     setRangeResult("idle");
+    setVerifyDetail(null);
     try {
       const r = await checkRoomAvailability(roomId, checkIn, checkOut);
       setRangeResult(r.available ? "available" : "unavailable");
-    } catch {
+    } catch (err) {
       setRangeResult("error");
+      setVerifyDetail(parseApiErrorMessage(err, "Could not verify availability."));
     } finally {
       setRangeChecking(false);
     }
@@ -282,7 +288,8 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           ) : null}
           {rangeResult === "error" ? (
             <p className="mt-2 text-sm font-medium text-amber-800">
-              Could not verify. Pick valid check-in/check-out in the room details dialog, then try again.
+              {verifyDetail ??
+                "Pick valid check-in and check-out in the room details dialog, then try again."}
             </p>
           ) : null}
         </div>

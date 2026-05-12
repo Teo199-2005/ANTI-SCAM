@@ -21,6 +21,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkRoomAvailability } from "@/lib/api/public";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import { ResortRoomAvailabilityModal } from "@/components/resort-page/ResortRoomAvailabilityModal";
 import ScrollReveal from "@/components/shared/ScrollReveal";
@@ -352,7 +353,7 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                         if (!datesValid || !selectedRoom) return;
                         setBookChecking(true);
                         try {
-                          const r = await checkRoomAvailability(selectedRoom.id, modalCheckIn, modalCheckOut);
+                          const r = await checkRoomAvailability(Number(selectedRoom.id), modalCheckIn, modalCheckOut);
                           if (!r.available) {
                             pushToast({
                               title: "Those dates are not available",
@@ -363,10 +364,10 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                             return;
                           }
                           router.push(buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut));
-                        } catch {
+                        } catch (err) {
                           pushToast({
                             title: "Could not verify availability",
-                            description: "Check your connection and try again.",
+                            description: parseApiErrorMessage(err, "Check your connection and try again."),
                             tone: "error",
                           });
                         } finally {
