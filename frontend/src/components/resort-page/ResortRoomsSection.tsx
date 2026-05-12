@@ -1,6 +1,5 @@
- "use client";
+"use client";
 
-import Link from "next/link";
 import type { LandingComputedRoom } from "@/lib/api/landingPage";
 import {
   BedDouble,
@@ -8,6 +7,7 @@ import {
   Car,
   Coffee,
   ImageOff,
+  Loader2,
   ShieldCheck,
   ShowerHead,
   Snowflake,
@@ -18,9 +18,13 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { checkRoomAvailability } from "@/lib/api/public";
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
+import { ResortRoomAvailabilityModal } from "@/components/resort-page/ResortRoomAvailabilityModal";
 import ScrollReveal from "@/components/shared/ScrollReveal";
+import { useToast } from "@/components/shared/ToastProvider";
 import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { createPortal } from "react-dom";
@@ -80,22 +84,23 @@ function buildCheckoutHref(resortId: number, roomId: number, checkIn: string, ch
   return `/resorts/${resortId}/checkout?${q.toString()}`;
 }
 
-function buildRoomAvailabilityHref(resortId: number, roomId: number, checkIn: string, checkOut: string): string {
-  const q = new URLSearchParams({ checkIn, checkOut });
-  return `/resorts/${resortId}/rooms/${roomId}?${q.toString()}`;
-}
-
 type Props = {
   rooms: LandingComputedRoom[];
   resortId: number;
 };
 
 export function ResortRoomsSection({ rooms, resortId }: Props) {
+  const router = useRouter();
+  const { pushToast } = useToast();
   const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [modalCheckIn, setModalCheckIn] = useState(() => defaultStayDates().checkIn);
   const [modalCheckOut, setModalCheckOut] = useState(() => defaultStayDates().checkOut);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [bookChecking, setBookChecking] = useState(false);
+  const availabilityOpenRef = useRef(false);
+  availabilityOpenRef.current = availabilityOpen;
 
   const selectedMeta = useMemo(
     () => (selectedRoom ? extractRoomMeta(selectedRoom.amenities) : null),
@@ -120,19 +125,19 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
     setModalCheckIn(checkIn);
     setModalCheckOut(checkOut);
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedRoom(null);
+      if (event.key !== "Escape") return;
+      if (availabilityOpenRef.current) {
+        setAvailabilityOpen(false);
+        return;
+      }
+      setSelectedRoom(null);
     };
     window.addEventListener("keydown", onEscape);
     document.body.style.overflow = "hidden";
-    return () => window.removeEventListener("keydown", onEscape);
-  }, [selectedRoom]);
-
-  useEffect(() => {
-    if (!selectedRoom) {
-      document.body.style.overflow = "";
-    }
     return () => {
+      window.removeEventListener("keydown", onEscape);
       document.body.style.overflow = "";
+      setAvailabilityOpen(false);
     };
   }, [selectedRoom]);
 
@@ -410,30 +415,50 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <Link
-                    href={
-                      datesValid
-                        ? buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut)
-                        : "#"
-                    }
-                    onClick={(e) => {
-                      if (!datesValid) e.preventDefault();
+                  <button
+                    type="button"
+                    disabled={!datesValid || bookChecking}
+                    onClick={async () => {
+                      if (!datesValid || !selectedRoom) return;
+                      setBookChecking(true);
+                      try {
+                        const r = await checkRoomAvailability(selectedRoom.id, modalCheckIn, modalCheckOut);
+                        if (!r.available) {
+                          pushToast({
+                            title: "Those dates are not available",
+                            description:
+                              "This room is already booked, on hold, or blocked for part of your stay. Try other dates or open Check availability for a calendar view.",
+                            tone: "error",
+                          });
+                          return;
+                        }
+                        router.push(buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut));
+                      } catch {
+                        pushToast({
+                          title: "Could not verify availability",
+                          description: "Check your connection and try again.",
+                          tone: "error",
+                        });
+                      } finally {
+                        setBookChecking(false);
+                      }
                     }}
-                    aria-disabled={!datesValid}
-                    className={`inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold ${
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${
                       datesValid
-                        ? "bg-navy text-white hover:bg-navy/90"
+                        ? "bg-navy text-white hover:bg-navy/90 disabled:opacity-80"
                         : "cursor-not-allowed bg-zinc-200 text-zinc-500"
                     }`}
                   >
+                    {bookChecking ? <Loader2 size={16} className="animate-spin shrink-0" aria-hidden /> : null}
                     Book now
-                  </Link>
-                  <Link
-                    href={buildRoomAvailabilityHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAvailabilityOpen(true)}
                     className="inline-flex items-center justify-center rounded-xl border border-navy/20 bg-white px-4 py-2.5 text-sm font-semibold text-navy hover:bg-zinc-50"
                   >
                     Check availability
-                  </Link>
+                  </button>
                 </div>
               </div>
                 </div>
@@ -442,6 +467,16 @@ export function ResortRoomsSection({ rooms, resortId }: Props) {
             document.body,
           )
         : null}
+      {mounted && selectedRoom && availabilityOpen ? (
+        <ResortRoomAvailabilityModal
+          open={availabilityOpen}
+          onClose={() => setAvailabilityOpen(false)}
+          roomId={selectedRoom.id}
+          roomName={selectedRoom.name}
+          checkIn={modalCheckIn}
+          checkOut={modalCheckOut}
+        />
+      ) : null}
     </section>
   );
 }

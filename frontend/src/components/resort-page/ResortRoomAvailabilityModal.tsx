@@ -1,0 +1,305 @@
+"use client";
+
+import { checkRoomAvailability } from "@/lib/api/public";
+import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+function isoFromYmd(y: number, m: number, d: number): string {
+  return `${y}-${pad2(m)}-${pad2(d)}`;
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const dt = new Date(iso + "T12:00:00");
+  dt.setDate(dt.getDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+function todayIsoLocal(): string {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+type DayState = "past" | "loading" | "free" | "busy" | "unknown";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  roomId: number;
+  roomName: string;
+  /** Dates selected in the parent room modal (verified by “Verify selected stay”). */
+  checkIn: string;
+  checkOut: string;
+};
+
+/**
+ * Month heatmap using public one-night probes (start night → next day).
+ * Full range is re-checked explicitly for the guest’s chosen check-in / check-out.
+ */
+export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, checkIn, checkOut }: Props) {
+  const todayStr = useMemo(() => todayIsoLocal(), []);
+  const [mounted, setMounted] = useState(false);
+  const [monthYm, setMonthYm] = useState(() => todayStr.slice(0, 7));
+  const [dayMap, setDayMap] = useState<Record<string, DayState>>({});
+  const [monthLoading, setMonthLoading] = useState(false);
+  const [rangeChecking, setRangeChecking] = useState(false);
+  const [rangeResult, setRangeResult] = useState<"idle" | "available" | "unavailable" | "error">("idle");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    if (checkIn && checkIn >= todayStr) {
+      setMonthYm(checkIn.slice(0, 7));
+    } else {
+      setMonthYm(todayStr.slice(0, 7));
+    }
+    setRangeResult("idle");
+  }, [open, checkIn, todayStr]);
+
+  const [y, m] = monthYm.split("-").map(Number);
+  const dim = new Date(y, m, 0).getDate();
+  const firstDow = new Date(y, m - 1, 1).getDay();
+  const title = new Date(y, m - 1, 15).toLocaleString(undefined, { month: "long", year: "numeric" });
+
+  const loadMonth = useCallback(async () => {
+    setMonthLoading(true);
+    const nextMap: Record<string, DayState> = {};
+    const isos: string[] = [];
+    for (let d = 1; d <= dim; d++) {
+      const iso = isoFromYmd(y, m, d);
+      if (iso < todayStr) {
+        nextMap[iso] = "past";
+      } else {
+        nextMap[iso] = "loading";
+        isos.push(iso);
+      }
+    }
+    setDayMap(nextMap);
+
+    const batch = 6;
+    for (let i = 0; i < isos.length; i += batch) {
+      const chunk = isos.slice(i, i + batch);
+      await Promise.all(
+        chunk.map(async (iso) => {
+          const out = addDaysIso(iso, 1);
+          try {
+            const r = await checkRoomAvailability(roomId, iso, out);
+            setDayMap((prev) => ({ ...prev, [iso]: r.available ? "free" : "busy" }));
+          } catch {
+            setDayMap((prev) => ({ ...prev, [iso]: "unknown" }));
+          }
+        }),
+      );
+    }
+    setMonthLoading(false);
+  }, [roomId, y, m, dim, todayStr]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadMonth();
+  }, [open, loadMonth]);
+
+  const verifySelectedStay = async () => {
+    if (!checkIn || !checkOut || checkOut <= checkIn) {
+      setRangeResult("error");
+      return;
+    }
+    setRangeChecking(true);
+    setRangeResult("idle");
+    try {
+      const r = await checkRoomAvailability(roomId, checkIn, checkOut);
+      setRangeResult(r.available ? "available" : "unavailable");
+    } catch {
+      setRangeResult("error");
+    } finally {
+      setRangeChecking(false);
+    }
+  };
+
+  const shiftMonth = (delta: number) => {
+    const d = new Date(y, m - 1 + delta, 1);
+    setMonthYm(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}`);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!mounted || !open) return null;
+
+  const weekLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= dim; d++) cells.push(d);
+
+  const inSelectedRange = (iso: string) =>
+    Boolean(checkIn && checkOut && iso >= checkIn && iso < checkOut);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[240] flex items-center justify-center bg-zinc-950/75 p-3 md:p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/40 bg-white p-5 shadow-2xl md:p-6"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="avail-modal-title"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 id="avail-modal-title" className="font-heading text-xl font-bold text-navy">
+              Availability
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">{roomName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <p className="mb-3 text-xs leading-relaxed text-zinc-600">
+          Green nights can start a <strong>one-night</strong> stay; red is sold out or blocked for that start night.
+          Your full stay is checked below with your selected check-in and check-out.
+        </p>
+
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              className="rounded-lg p-1.5 hover:bg-white"
+              aria-label="Previous month"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="text-sm font-semibold text-navy">{title}</span>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              className="rounded-lg p-1.5 hover:bg-white"
+              aria-label="Next month"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+          {monthLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-zinc-500">
+              <Loader2 size={18} className="animate-spin" />
+              Loading calendar…
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold uppercase text-zinc-400">
+                {weekLabels.map((w) => (
+                  <div key={w} className="py-1">
+                    {w}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 grid grid-cols-7 gap-0.5">
+                {cells.map((d, idx) => {
+                  if (d === null) return <div key={`e-${idx}`} className="aspect-square" />;
+                  const iso = isoFromYmd(y, m, d);
+                  const st = dayMap[iso] ?? "loading";
+                  const selected = inSelectedRange(iso) || iso === checkIn;
+                  return (
+                    <div
+                      key={iso}
+                      className={`flex aspect-square flex-col items-center justify-center rounded-lg text-[11px] font-semibold ${
+                        st === "past"
+                          ? "text-zinc-300"
+                          : st === "loading"
+                            ? "bg-zinc-100 text-zinc-400"
+                            : st === "free"
+                              ? "bg-emerald-100 text-emerald-900"
+                              : st === "busy"
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-amber-50 text-amber-900"
+                      } ${selected && st !== "past" ? "ring-2 ring-navy ring-offset-1" : ""}`}
+                      title={
+                        st === "free"
+                          ? "Available for a 1-night stay starting this date"
+                          : st === "busy"
+                            ? "Not available for a 1-night stay starting this date"
+                            : st === "unknown"
+                              ? "Could not load"
+                              : ""
+                      }
+                    >
+                      <span>{d}</span>
+                      {st === "loading" ? <Loader2 size={10} className="mt-0.5 animate-spin opacity-60" /> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-sky-200/80 bg-sky-50/50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-900">Your selected stay</p>
+          <p className="mt-1 text-sm text-zinc-700">
+            Check-in <strong>{checkIn || "—"}</strong> → Check-out <strong>{checkOut || "—"}</strong>
+          </p>
+          <button
+            type="button"
+            onClick={() => void verifySelectedStay()}
+            disabled={rangeChecking || !checkIn || !checkOut || checkOut <= checkIn}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
+          >
+            {rangeChecking ? <Loader2 size={16} className="animate-spin" /> : null}
+            Verify selected stay
+          </button>
+          {rangeResult === "available" ? (
+            <p className="mt-2 text-sm font-medium text-emerald-700">These dates are available for booking.</p>
+          ) : null}
+          {rangeResult === "unavailable" ? (
+            <p className="mt-2 text-sm font-medium text-rose-700">
+              These dates are not available (booked, on hold, or blocked). Adjust your stay in the room window
+              behind this dialog.
+            </p>
+          ) : null}
+          {rangeResult === "error" ? (
+            <p className="mt-2 text-sm font-medium text-amber-800">
+              Could not verify. Pick valid check-in/check-out in the room details dialog, then try again.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-zinc-500">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-200" /> Free (1 night)
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-rose-200" /> Unavailable
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-amber-100" /> Unknown
+          </span>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
