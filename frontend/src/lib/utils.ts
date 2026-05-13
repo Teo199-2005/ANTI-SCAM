@@ -7,6 +7,7 @@ export const cn = (...classes: Array<string | undefined | false | null>) =>
  */
 export function formatRoleLabel(role?: string): string {
   if (!role || role === "user") return "Client";
+  if (role === "guest") return "Resort guest";
   return role
     .replaceAll("_", " ")
     .split(" ")

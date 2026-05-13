@@ -161,11 +161,27 @@ const clientGroups: NavGroup[] = [
   },
 ];
 
+const guestGroups: NavGroup[] = [
+  {
+    label: "Stay",
+    items: [
+      { href: "/dashboard/guest", label: "Overview", icon: LayoutDashboard, exact: true },
+      { href: "/dashboard/guest/rooms", label: "Rooms", icon: ListChecks },
+      { href: "/dashboard/guest/history", label: "Travel history", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Account",
+    items: [{ href: "/dashboard/guest/profile", label: "Profile", icon: Settings }],
+  },
+];
+
 function rolePillClass(role: string): string {
   if (role === "admin")        return "bg-navy/10 text-navy ring-1 ring-navy/20";
   if (role === "resort_owner") return "bg-clOcean/10 text-clOcean ring-1 ring-clOcean/20";
   if (role === "marketing")    return "bg-violet-50 text-violet-900 ring-1 ring-violet-200/80";
   if (role === "admin_staff")  return "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80";
+  if (role === "guest")        return "bg-sky-50 text-sky-900 ring-1 ring-sky-200/80";
   return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80";
 }
 
@@ -180,6 +196,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
     role === "resort_owner" ? resortOwnerGroups :
     role === "marketing"    ? marketingGroups :
     role === "admin_staff"  ? staffGroups :
+    role === "guest"        ? guestGroups :
     clientGroups;
   function isActive(item: NavItem): boolean {
     if (item.exact) return pathname === item.href;

@@ -21,7 +21,7 @@ class UpdateUserRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:120'],
             'email' => ['sometimes', 'email', 'max:190', Rule::unique('users', 'email')->ignore($userId)],
             'password' => PlatformPasswordRules::optionalWithConfirmation(),
-            'role' => ['sometimes', 'in:user,client,admin,resort_owner,marketing,admin_staff'],
+            'role' => ['sometimes', 'in:user,client,guest,admin,resort_owner,marketing,admin_staff'],
         ];
     }
 }

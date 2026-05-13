@@ -4,6 +4,8 @@ namespace App\Modules\Auth\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Legal\PlatformTerms;
+use App\Models\Resort;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\EmailNotificationService;
 use App\Services\EmailVerificationOtpService;
@@ -42,23 +44,57 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'max:190', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
             'business_name' => ['nullable', 'string', 'max:190'],
-            'role_intent' => ['nullable', 'in:resort_owner,client'],
+            'role_intent' => ['nullable', 'in:resort_owner,client,guest'],
+            'resort_subdomain' => [
+                Rule::requiredIf(fn () => ($request->input('role_intent') ?? 'resort_owner') === 'guest'),
+                'nullable',
+                'string',
+                'max:120',
+            ],
             'accept_terms' => ['required', 'accepted'],
             'password' => PlatformPasswordRules::requiredWithConfirmation(),
         ]);
 
         $roleIntent = $validated['role_intent'] ?? 'resort_owner';
 
-        $user = User::create([
+        $homeResortId = null;
+        if ($roleIntent === 'guest') {
+            $slug = mb_strtolower(trim((string) ($validated['resort_subdomain'] ?? '')));
+            $tenant = Tenant::withoutGlobalScopes()
+                ->where('subdomain', $slug)
+                ->where('status', 'active')
+                ->first();
+            if (! $tenant) {
+                throw ValidationException::withMessages([
+                    'resort_subdomain' => ['This resort link is invalid or inactive.'],
+                ]);
+            }
+            $resort = Resort::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->id)
+                ->where('is_publicly_listed', true)
+                ->first();
+            if (! $resort) {
+                throw ValidationException::withMessages([
+                    'resort_subdomain' => ['This resort is not accepting public bookings yet.'],
+                ]);
+            }
+            $homeResortId = $resort->id;
+        }
+
+        $payload = [
             'name' => $validated['name'],
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'password' => Hash::make($validated['password']),
-            // Allows checkout flow to create client accounts safely.
             'role' => $roleIntent,
             'terms_accepted_at' => now(),
             'terms_version' => PlatformTerms::version(),
-        ]);
+        ];
+        if ($roleIntent === 'guest') {
+            $payload['home_resort_id'] = $homeResortId;
+        }
+
+        $user = User::create($payload);
 
         $this->emailNotifications->sendTermsAccepted($user, 'account registration');
 

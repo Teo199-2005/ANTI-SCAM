@@ -146,6 +146,37 @@ class ReservationPolicyTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_guest_can_view_own_reservation_when_client_id_matches(): void
+    {
+        $guest = User::factory()->create([
+            'role' => 'guest',
+            'tenant_id' => null,
+            'home_resort_id' => $this->resort->id,
+        ]);
+
+        $this->reservation->forceFill(['client_id' => $guest->id])->save();
+
+        Sanctum::actingAs($guest);
+
+        $response = $this->getJson('/api/v1/reservations/' . $this->reservation->id);
+
+        $response->assertStatus(200);
+    }
+
+    public function test_guest_cannot_view_another_clients_reservation(): void
+    {
+        $guest = User::factory()->create([
+            'role' => 'guest',
+            'tenant_id' => null,
+            'home_resort_id' => $this->resort->id,
+        ]);
+        Sanctum::actingAs($guest);
+
+        $response = $this->getJson('/api/v1/reservations/' . $this->reservation->id);
+
+        $response->assertStatus(403);
+    }
+
     public function test_non_admin_cannot_admin_override_reservation(): void
     {
         $owner = User::factory()->create([

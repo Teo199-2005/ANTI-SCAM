@@ -31,6 +31,11 @@ export default function DashboardPage() {
       return;
     }
 
+    if (user.role === "guest") {
+      router.replace("/dashboard/guest");
+      return;
+    }
+
     if (user.role === "marketing") {
       router.replace("/dashboard/marketing");
       return;

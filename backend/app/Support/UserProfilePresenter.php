@@ -10,7 +10,18 @@ final class UserProfilePresenter
     /** @return array<string, mixed> */
     public static function toArray(User $user): array
     {
+        $user->loadMissing(['homeResort.tenant:id,subdomain']);
+
         $a = $user->toArray();
+        if ($user->homeResort) {
+            $slug = (string) ($user->homeResort->tenant?->subdomain ?? '');
+            $a['home_resort'] = [
+                'id' => $user->homeResort->id,
+                'name' => $user->homeResort->name,
+                'slug' => $slug,
+            ];
+        }
+
         if ($user->role === 'marketing') {
             $a['gcash_masked_number'] = $user->gcashAccountNumberMasked();
             $a['gcash_account_holder_name'] = $user->gcash_account_holder_name;

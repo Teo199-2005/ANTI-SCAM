@@ -43,6 +43,7 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         facebookUrl={data.hero.facebookUrl ?? null}
         instagramUrl={data.hero.instagramUrl ?? null}
         tiktokUrl={data.hero.tiktokUrl ?? null}
+        listingSlug={data.slug}
       />
 
       <div className="w-full border-t border-white/10 border-b border-zinc-800/80 resort-landing-trust-strip-shell py-8 max-lg:py-9 sm:py-9">
@@ -85,7 +86,7 @@ export function ResortPublicLandingTemplate({ data }: Props) {
 
       <ResortLandingFooter footer={data.footer} resortName={data.name} />
 
-      <ResortLandingMobileStickyNav showMapLink={hasMap} />
+      <ResortLandingMobileStickyNav showMapLink={hasMap} listingSlug={data.slug} />
     </main>
   );
 }

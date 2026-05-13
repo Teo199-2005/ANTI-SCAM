@@ -11,6 +11,7 @@ use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Reservation;
 use App\Support\SafeSort;
 use App\Shared\Traits\ApiResponseTrait;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class ReservationController extends Controller
@@ -22,6 +23,20 @@ class ReservationController extends Controller
     public function store(StoreReservationRequest $request)
     {
         $this->authorize('create', Reservation::class);
+
+        $user = $request->user();
+        if ($user->role === 'guest') {
+            if (! $user->home_resort_id) {
+                throw ValidationException::withMessages([
+                    'resort_id' => ['Guest account is not linked to a resort.'],
+                ]);
+            }
+            if ((int) $user->home_resort_id !== (int) $request->input('resort_id')) {
+                throw ValidationException::withMessages([
+                    'resort_id' => ['You can only book your home resort.'],
+                ]);
+            }
+        }
 
         try {
             $reservation = $this->service->createFromLock([
@@ -71,11 +86,13 @@ class ReservationController extends Controller
             });
         }
 
-        if (in_array($user->role, ['client', 'user'], true)) {
+        if (in_array($user->role, ['client', 'user', 'guest'], true)) {
             $query->where('client_id', $user->id);
         }
 
-        if (! in_array($user->role, ['admin'], true)) {
+        if ($user->role === 'guest') {
+            $query->where('resort_id', $user->home_resort_id);
+        } elseif (! in_array($user->role, ['admin'], true)) {
             $query->where('tenant_id', $user->tenant_id);
         }
 

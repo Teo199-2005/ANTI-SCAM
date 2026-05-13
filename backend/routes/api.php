@@ -31,6 +31,7 @@ use App\Modules\Reservations\Http\Controllers\StaffNoteController;
 use App\Modules\Resorts\Http\Controllers\DiscountCodeController;
 use App\Modules\Resorts\Http\Controllers\ResortController;
 use App\Modules\Resorts\Http\Controllers\ResortGuestController;
+use App\Modules\Guests\Http\Controllers\GuestPortalController;
 use App\Modules\Resorts\Http\Controllers\ResortLandingPageController;
 use App\Modules\Rooms\Http\Controllers\RoomController;
 use App\Modules\Rooms\Http\Controllers\RoomImageController;
@@ -169,10 +170,20 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/reservations/{reservation}/notes', [StaffNoteController::class, 'store']);
         Route::delete('/reservations/{reservation}/notes/{note}', [StaffNoteController::class, 'destroy']);
 
-        // Resort guests
-        Route::get('/resort/guests', [ResortGuestController::class, 'index']);
+        Route::middleware('role:resort_owner,admin_staff,admin')->group(function (): void {
+            Route::get('/resort/guests/{guestKey}/reservations', [ResortGuestController::class, 'reservationsForGuest']);
+            Route::get('/resort/guests', [ResortGuestController::class, 'index']);
+        });
 
-        // Booking (abuse-sensitive: locks + checkout)
+        Route::middleware('role:guest')->prefix('guest')->group(function (): void {
+            Route::get('/resort', [GuestPortalController::class, 'resort']);
+            Route::get('/rooms', [GuestPortalController::class, 'rooms']);
+            Route::get('/reservations', [GuestPortalController::class, 'reservations']);
+            Route::get('/favorites', [GuestPortalController::class, 'favoritesIndex']);
+            Route::post('/favorites', [GuestPortalController::class, 'favoritesStore']);
+            Route::delete('/favorites/{roomId}', [GuestPortalController::class, 'favoritesDestroy'])
+                ->whereNumber('roomId');
+        });
         Route::middleware('throttle:booking-actions')->group(function (): void {
             Route::post('/booking-locks', [BookingLockController::class, 'store']);
             Route::post('/reservations', [ReservationController::class, 'store']);

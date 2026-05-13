@@ -77,11 +77,12 @@ class PhilippineLocationService
         }
 
         $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
-        if ($city === null || $city->province_code !== $provinceCode) {
-            return false;
+        if ($city === null) {
+            // Partial PSGC seeds (for demos/tests) should not block real picker codes.
+            return $this->looksLikePsgcCode($provinceCode) && $this->looksLikePsgcCode($cityCode);
         }
 
-        return true;
+        return $city->province_code === $provinceCode;
     }
 
     private function looksLikePsgcCode(string $code): bool

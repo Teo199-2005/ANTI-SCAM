@@ -27,6 +27,7 @@ function roleBadgeClass(role: string): string {
   if (role === "admin") return "bg-navy/10 text-navy ring-1 ring-navy/20";
   if (role === "resort_owner") return "bg-clOcean/10 text-clOcean ring-1 ring-clOcean/20";
   if (role === "marketing") return "bg-violet-50 text-violet-900 ring-1 ring-violet-200/80";
+  if (role === "guest") return "bg-sky-50 text-sky-900 ring-1 ring-sky-200/80";
   return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80";
 }
 

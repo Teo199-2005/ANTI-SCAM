@@ -30,7 +30,8 @@ export type UserRole =
   | "resort_owner"
   | "marketing"
   | "client"
-  | "user";
+  | "user"
+  | "guest";
 
 export type AuthUser = {
   id: number;
@@ -40,6 +41,10 @@ export type AuthUser = {
   avatar_url: string | null;
   phone: string | null;
   tenant_id: number | null;
+  /** Primary resort for `guest` accounts (from registration). */
+  home_resort_id?: number | null;
+  /** Present on `/auth/me` when `home_resort_id` is set (Laravel `UserProfilePresenter`). */
+  home_resort?: { id: number; name: string; slug: string } | null;
   google_id: string | null;
   email_verified_at: string | null;
   /** Set when the user accepted the current platform Terms & Conditions */

@@ -17,7 +17,7 @@ class BookingLockController extends Controller
 
     public function store(Request $request)
     {
-        if (! in_array($request->user()?->role, ['admin', 'client', 'user'], true)) {
+        if (! in_array($request->user()?->role, ['admin', 'client', 'user', 'guest'], true)) {
             return $this->errorResponse('Only guests can initiate booking locks.', null, 403);
         }
 
@@ -31,6 +31,13 @@ class BookingLockController extends Controller
         $tenant   = app()->bound('tenant') ? app('tenant') : null;
         $room     = Room::withoutGlobalScopes()->findOrFail($validated['room_id']);
         $tenantId = (int) $room->tenant_id;
+
+        if ($request->user()?->role === 'guest') {
+            $homeId = $request->user()->home_resort_id;
+            if (! $homeId || (int) $room->resort_id !== (int) $homeId) {
+                return $this->errorResponse('You can only book rooms at your home resort.', null, 403);
+            }
+        }
 
         if (! $tenantId) {
             return $this->errorResponse('Tenant context could not be resolved.', null, 400);

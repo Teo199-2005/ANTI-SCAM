@@ -2,13 +2,15 @@
 
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import Button from "@/components/ui/Button";
 import { apiClient } from "@/lib/api/client";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
-import { Download, Mail, Search, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Download, History, Mail, Search, Users, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 type Guest = {
   id: number;
+  guestKey: string;
   name: string;
   email: string | null;
   phone: string | null;
@@ -19,7 +21,33 @@ type Guest = {
   firstBooking: string | null;
 };
 
-type ApiEnvelope<T> = { success: boolean; data: T | { data: T } };
+type ReservationRow = {
+  id: number;
+  referenceNo: string;
+  status: string;
+  checkInDate: string;
+  checkOutDate: string;
+  reservationFee: number;
+  totalAmount: number;
+  xenditPaymentStatus: string | null;
+  room?: { id: number; name: string };
+};
+
+function extractGuestRows(payload: unknown): Guest[] {
+  if (Array.isArray(payload)) return payload as Guest[];
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data: Guest[] }).data)) {
+    return (payload as { data: Guest[] }).data;
+  }
+  return [];
+}
+
+function extractReservationRows(payload: unknown): ReservationRow[] {
+  if (Array.isArray(payload)) return payload as ReservationRow[];
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data: ReservationRow[] }).data)) {
+    return (payload as { data: ReservationRow[] }).data;
+  }
+  return [];
+}
 
 export default function ResortGuestsPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -28,32 +56,54 @@ export default function ResortGuestsPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const load = async (q = "") => {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyName, setHistoryName] = useState("");
+  const [historyRows, setHistoryRows] = useState<ReservationRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const load = useCallback(async (q = "") => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await apiClient.get<ApiEnvelope<Guest[]>>("/resort/guests", {
+      const { data } = await apiClient.get<{ success: boolean; data: unknown }>("/resort/guests", {
         params: { search: q || undefined, perPage: 100 },
       });
-      const payload = data.data;
-      if (Array.isArray(payload)) {
-        setGuests(payload);
-      } else {
-        setGuests(Array.isArray(payload?.data) ? payload.data : []);
-      }
-    } catch (err) {
+      setGuests(extractGuestRows(data.data));
+    } catch {
       setError("Failed to load guest list.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(query);
     void load(query);
+  };
+
+  const openHistory = async (g: Guest) => {
+    setHistoryName(g.name);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistoryRows([]);
+    try {
+      const { data } = await apiClient.get<{ success: boolean; data: unknown }>(
+        `/resort/guests/${encodeURIComponent(g.guestKey)}/reservations`,
+        { params: { perPage: 100 } },
+      );
+      setHistoryRows(extractReservationRows(data.data));
+    } catch {
+      setHistoryError("Could not load reservation history.");
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const filtered = guests.filter((g) => {
@@ -68,7 +118,6 @@ export default function ResortGuestsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="dash-page-title flex items-center gap-2">
           <Users size={24} className="text-skyBlue" /> Guest Directory
@@ -76,7 +125,6 @@ export default function ResortGuestsPage() {
         <p className="dash-page-sub">All guests derived from your reservations and booking history.</p>
       </div>
 
-      {/* Search bar + stats */}
       <div className="dash-filter-bar items-stretch md:flex-row md:flex-wrap md:items-center">
         <form onSubmit={onSearch} className="dash-filter-bar flex-1 md:min-w-[220px]">
           <div className="relative flex-1">
@@ -97,7 +145,6 @@ export default function ResortGuestsPage() {
         )}
       </div>
 
-      {/* Table */}
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-800">{error}</div>
       ) : (
@@ -106,7 +153,7 @@ export default function ResortGuestsPage() {
             <>
               <div className="md:hidden p-4"><DashMobileTableSkeleton rows={5} /></div>
               <div className="hidden md:block space-y-2 p-4">
-                {[1,2,3,4,5].map(i => <div key={i} className="h-12 animate-pulse rounded-xl bg-softGray" />)}
+                {[1,2,3,4,5].map((i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-softGray" />)}
               </div>
             </>
           ) : filtered.length === 0 ? (
@@ -120,7 +167,7 @@ export default function ResortGuestsPage() {
               <div className="md:hidden space-y-3 p-4">
                 {filtered.map((g) => (
                   <DashMobileTableCard
-                    key={g.id}
+                    key={g.guestKey}
                     title={g.name}
                     fields={[
                       {
@@ -149,6 +196,16 @@ export default function ResortGuestsPage() {
                       },
                       { label: "First visit", value: g.firstBooking ?? "—" },
                     ]}
+                    actions={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-center gap-2 text-xs"
+                        onClick={() => void openHistory(g)}
+                      >
+                        <History size={14} /> View history
+                      </Button>
+                    }
                   />
                 ))}
               </div>
@@ -163,11 +220,12 @@ export default function ResortGuestsPage() {
                       <th>Total spent</th>
                       <th>Last stay</th>
                       <th>First visit</th>
+                      <th className="text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((g) => (
-                      <tr key={g.id}>
+                      <tr key={g.guestKey}>
                         <td className="font-semibold text-navy">{g.name}</td>
                         <td>
                           {g.email ? (
@@ -187,6 +245,15 @@ export default function ResortGuestsPage() {
                           {g.lastCheckIn ? `${g.lastCheckIn} → ${g.lastCheckOut ?? "?"}` : "—"}
                         </td>
                         <td className="text-zinc-500 text-xs">{g.firstBooking ?? "—"}</td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            className="dash-btn-sm inline-flex items-center gap-1"
+                            onClick={() => void openHistory(g)}
+                          >
+                            <History size={14} /> History
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -197,14 +264,75 @@ export default function ResortGuestsPage() {
         </DashCard>
       )}
 
-      {/* Export note */}
       {!loading && filtered.length > 0 && (
         <p className="flex items-center gap-2 text-xs text-zinc-400">
           <Download size={12} />
           Contact the admin to export a full guest report as CSV.
         </p>
       )}
+
+      {historyOpen ? (
+        <div className="fixed inset-0 z-[300] flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guest-history-title"
+            className="flex max-h-[min(92vh,640px)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-zinc-200 bg-white shadow-2xl sm:rounded-2xl"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 sm:px-5">
+              <div>
+                <h2 id="guest-history-title" className="font-dash text-lg font-semibold text-navy">
+                  Reservation history
+                </h2>
+                <p className="text-xs text-zinc-500">{historyName}</p>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100"
+                aria-label="Close"
+                onClick={() => setHistoryOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+              {historyLoading ? <p className="text-sm text-zinc-500">Loading…</p> : null}
+              {historyError ? <p className="text-sm text-rose-600">{historyError}</p> : null}
+              {!historyLoading && !historyError && historyRows.length === 0 ? (
+                <p className="text-sm text-zinc-500">No reservations for this guest.</p>
+              ) : null}
+              {!historyLoading && historyRows.length > 0 ? (
+                <table className="dash-table text-sm">
+                  <thead>
+                    <tr>
+                      <th>Reference</th>
+                      <th>Room</th>
+                      <th>Stay</th>
+                      <th>Fee</th>
+                      <th>Status</th>
+                      <th>Payment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyRows.map((r) => (
+                      <tr key={r.id}>
+                        <td className="font-mono text-xs">{r.referenceNo}</td>
+                        <td>{r.room?.name ?? "—"}</td>
+                        <td className="text-xs text-zinc-600">
+                          {r.checkInDate} → {r.checkOutDate}
+                        </td>
+                        <td>₱{Number(r.reservationFee).toLocaleString()}</td>
+                        <td className="text-xs uppercase text-zinc-600">{r.status.replace("_", " ")}</td>
+                        <td className="text-xs">{r.xenditPaymentStatus ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
-

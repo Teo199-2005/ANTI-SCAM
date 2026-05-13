@@ -115,6 +115,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       admin_staff: "/dashboard/staff",
       client: "/dashboard/client",
       user: "/dashboard/client",
+      guest: "/dashboard/guest",
     };
 
     const allowedPrefixByRole: Record<string, string> = {
@@ -124,6 +125,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       admin_staff: "/dashboard/staff",
       client: "/dashboard/client",
       user: "/dashboard/client",
+      guest: "/dashboard/guest",
     };
 
     const allowedPrefix = allowedPrefixByRole[user.role];

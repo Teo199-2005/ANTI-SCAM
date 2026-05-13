@@ -53,6 +53,8 @@ type Props = {
   facebookUrl?: string | null;
   instagramUrl?: string | null;
   tiktokUrl?: string | null;
+  /** Public tenant subdomain — enables subtle Register / Login links for guest accounts. */
+  listingSlug?: string | null;
 };
 
 export function ResortLandingHero({
@@ -66,6 +68,7 @@ export function ResortLandingHero({
   facebookUrl,
   instagramUrl,
   tiktokUrl,
+  listingSlug,
 }: Props) {
   const logoAbs = logoUrl ? laravelPublicUrl(logoUrl) : "";
   const fb = safeHttpHref(facebookUrl);
@@ -90,6 +93,25 @@ export function ResortLandingHero({
           aria-hidden
         />
       </div>
+
+      {listingSlug ? (
+        <div className="relative z-20 flex w-full justify-end px-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6 md:px-8 lg:px-10">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link
+              href={`/register?resort=${encodeURIComponent(listingSlug)}`}
+              className="rounded-full border border-white/25 bg-zinc-950/30 px-3 py-1.5 text-[11px] font-semibold text-white/95 shadow-sm backdrop-blur-md transition hover:bg-white/10 sm:text-xs"
+            >
+              Register
+            </Link>
+            <Link
+              href={`/login?resort=${encodeURIComponent(listingSlug)}`}
+              className="rounded-full border border-white/18 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-zinc-100 backdrop-blur-md transition hover:bg-white/16 sm:text-xs"
+            >
+              Log in
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative z-10 flex w-full flex-1 flex-col justify-end">
         <div className="resort-landing-container flex w-full justify-center px-[max(1rem,env(safe-area-inset-left))] pb-12 pe-[max(1rem,env(safe-area-inset-right))] pt-[max(1.25rem,env(safe-area-inset-top)+0.75rem)] max-lg:pb-28 sm:px-6 sm:pb-12 md:px-8 lg:px-10 lg:pb-10">

@@ -19,7 +19,7 @@ class StoreUserRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'password' => PlatformPasswordRules::requiredWithConfirmation(),
-            'role' => ['required', 'in:user,client,admin,resort_owner,marketing,admin_staff'],
+            'role' => ['required', 'in:user,client,guest,admin,resort_owner,marketing,admin_staff'],
         ];
     }
 }

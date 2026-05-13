@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHydrated } from "@/hooks/useHydrated";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
+import { publicClient } from "@/lib/api/client";
 import { validateReferralCodePublic } from "@/lib/api/referral";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import {
@@ -50,6 +51,36 @@ function RegisterPageInner() {
   const [referralFieldError, setReferralFieldError] = useState<string | null>(null);
   const [referralVerifyModalOpen, setReferralVerifyModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const resortSlug = searchParams.get("resort")?.trim() ?? "";
+  const isGuestFromResort = Boolean(resortSlug);
+  const [resortLabel, setResortLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!resortSlug) {
+      setResortLabel(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await publicClient.get<{ success: boolean; data?: { name?: string } }>(
+          `/public/resorts/slug/${encodeURIComponent(resortSlug)}`,
+        );
+        if (cancelled) return;
+        if (data.success && data.data?.name) {
+          setResortLabel(data.data.name);
+        } else {
+          setResortLabel(null);
+        }
+      } catch {
+        if (!cancelled) setResortLabel(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resortSlug]);
 
   useEffect(() => {
     setMounted(true);
@@ -131,23 +162,24 @@ function RegisterPageInner() {
     }
     setPending(true);
     try {
-      await register({
+      const user = await register({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
-        business_name: businessName.trim() || undefined,
-        role_intent: "resort_owner",
+        business_name: isGuestFromResort ? undefined : businessName.trim() || undefined,
+        role_intent: isGuestFromResort ? "guest" : "resort_owner",
+        resort_subdomain: isGuestFromResort ? resortSlug : undefined,
         password,
         password_confirmation: passwordConfirmation,
         accept_terms: true,
       });
-      if (appliedReferral) {
+      if (appliedReferral && !isGuestFromResort) {
         setPendingReferralFromSignup({
           code: appliedReferral.code,
           marketerName: appliedReferral.marketerName,
         });
       }
-      router.push("/dashboard");
+      router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
@@ -187,11 +219,19 @@ function RegisterPageInner() {
           </div>
           <div className="min-w-0 flex-1 pt-0.5">
             <h1 className="font-heading text-xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-[1.35rem]">
-              Create your account
+              {isGuestFromResort ? "Join as a guest" : "Create your account"}
             </h1>
             <p className="mt-0.5 text-xs leading-snug text-zinc-600 sm:text-sm sm:leading-snug">
-              Book resorts and track reservations in one place.
+              {isGuestFromResort
+                ? "Create a guest account to book rooms and manage stays at this resort."
+                : "Book resorts and track reservations in one place."}
             </p>
+            {isGuestFromResort ? (
+              <p className="mt-2 rounded-lg border border-clOcean/15 bg-sky-50/90 px-2.5 py-1.5 text-[11px] text-zinc-700 sm:text-xs">
+                Resort:{" "}
+                <span className="font-semibold text-navy">{resortLabel ?? resortSlug}</span>
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -241,7 +281,7 @@ function RegisterPageInner() {
             />
           </div>
 
-          <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-2">
+          <div className={`grid gap-2.5 sm:gap-2 ${isGuestFromResort ? "" : "sm:grid-cols-2"}`}>
             <div>
               <label htmlFor="register-phone" className="mb-1 block text-[11px] font-semibold text-zinc-700">
                 Contact number
@@ -251,7 +291,7 @@ function RegisterPageInner() {
                 suppressHydrationWarning
                 className={authInput}
                 autoComplete="tel"
-                required
+                required={!isGuestFromResort}
                 value={phone}
                 onChange={(e) => setPhone(sanitizePhilippinesMobileInput(e.target.value))}
                 inputMode="numeric"
@@ -259,6 +299,7 @@ function RegisterPageInner() {
                 placeholder="09XXXXXXXXX"
               />
             </div>
+            {isGuestFromResort ? null : (
             <div>
               <label htmlFor="register-business" className="mb-1 block text-[11px] font-semibold text-zinc-700">
                 Business name
@@ -272,6 +313,7 @@ function RegisterPageInner() {
                 placeholder="Sample Staycation OPC"
               />
             </div>
+            )}
           </div>
 
           <div>
@@ -454,7 +496,10 @@ function RegisterPageInner() {
 
         <p className="mt-2.5 text-center text-xs text-zinc-600 sm:text-sm">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-clOcean hover:text-clOceanHover hover:underline">
+          <Link
+            href={resortSlug ? `/login?resort=${encodeURIComponent(resortSlug)}` : "/login"}
+            className="font-semibold text-clOcean hover:text-clOceanHover hover:underline"
+          >
             Sign in
           </Link>
         </p>

@@ -60,13 +60,15 @@ function LoginPageContent() {
   const hydrated = useHydrated();
   const oauthError = searchParams.get("error");
 
+  const resortSlug = searchParams.get("resort")?.trim() ?? "";
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setPending(true);
     try {
-      await login(email.trim(), password);
-      router.push("/dashboard");
+      const user = await login(email.trim(), password);
+      router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
@@ -80,8 +82,8 @@ function LoginPageContent() {
     setEmail(e);
     setPassword(demoPassword);
     try {
-      await login(e, demoPassword);
-      router.push("/dashboard");
+      const user = await login(e, demoPassword);
+      router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed.";
       setError(msg);
@@ -104,6 +106,12 @@ function LoginPageContent() {
             <p className="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-[15px]">
               Sign in to manage bookings and your account.
             </p>
+            {resortSlug ? (
+              <p className="mt-2 rounded-lg border border-clOcean/15 bg-sky-50/80 px-3 py-2 text-xs text-zinc-700">
+                Signing in as a guest of <span className="font-semibold text-navy">{resortSlug}</span> takes you to your
+                stay dashboard after login.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -215,7 +223,10 @@ function LoginPageContent() {
 
         <p className="mt-7 text-center text-sm text-zinc-600">
           No account yet?{" "}
-          <Link href="/register" className="font-semibold text-clOcean hover:text-clOceanHover hover:underline">
+          <Link
+            href={resortSlug ? `/register?resort=${encodeURIComponent(resortSlug)}` : "/register"}
+            className="font-semibold text-clOcean hover:text-clOceanHover hover:underline"
+          >
             Create one
           </Link>
         </p>

@@ -9,7 +9,7 @@ class ReservationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'admin_staff', 'resort_owner', 'client', 'user'], true);
+        return in_array($user->role, ['admin', 'admin_staff', 'resort_owner', 'client', 'user', 'guest'], true);
     }
 
     public function view(User $user, Reservation $reservation): bool
@@ -27,12 +27,13 @@ class ReservationPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'client', 'user'], true);
+        return in_array($user->role, ['admin', 'client', 'user', 'guest'], true);
     }
 
     public function cancel(User $user, Reservation $reservation): bool
     {
-        return $user->role === 'admin' || $reservation->client_id === $user->id;
+        return $user->role === 'admin'
+            || ($reservation->client_id === $user->id && in_array($user->role, ['client', 'user', 'guest'], true));
     }
 
     public function adminOverride(User $user): bool

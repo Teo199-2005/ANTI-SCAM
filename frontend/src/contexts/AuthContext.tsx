@@ -29,17 +29,18 @@ import {
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   register: (input: {
     name: string;
     email: string;
     phone?: string;
     business_name?: string;
-    role_intent?: "resort_owner" | "client";
+    role_intent?: "resort_owner" | "client" | "guest";
+    resort_subdomain?: string;
     password: string;
     password_confirmation: string;
     accept_terms: boolean;
-  }) => Promise<void>;
+  }) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -132,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginLockRef = useRef(false);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string): Promise<AuthUser> => {
       if (loginLockRef.current) {
         throw new Error("Sign-in already in progress. Please wait.");
       }
@@ -145,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setUser(data.data.user);
         setLoading(false);
+        return data.data.user;
       } catch (err) {
         setLoading(false);
         throw new Error(parseApiErrorMessage(err, "Login failed."));
@@ -161,11 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       phone?: string;
       business_name?: string;
-      role_intent?: "resort_owner" | "client";
+      role_intent?: "resort_owner" | "client" | "guest";
+      resort_subdomain?: string;
       password: string;
       password_confirmation: string;
       accept_terms: boolean;
-    }) => {
+    }): Promise<AuthUser> => {
       bumpAuthEpoch();
       try {
         const { data } = await authClient.post<AuthEnvelope>("/register", input);
@@ -174,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setUser(data.data.user);
         setLoading(false);
+        return data.data.user;
       } catch (err) {
         setLoading(false);
         throw new Error(parseApiErrorMessage(err, "Registration failed."));
