@@ -29,8 +29,10 @@ import {
 } from "lucide-react";
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "@/components/layout/Logo";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 
 type SidebarProps = { open: boolean; onClose: () => void };
 
@@ -191,6 +193,9 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
 
   const role = user?.role ?? "user";
+  const guestResortLogo =
+    role === "guest" && user?.home_resort?.logo_url ? laravelPublicUrl(user.home_resort.logo_url) : "";
+
   const groups =
     role === "admin"        ? adminGroups :
     role === "resort_owner" ? resortOwnerGroups :
@@ -226,15 +231,18 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
           {/* Subtle diagonal sheen */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.04] to-transparent" />
 
-          <Link href="/dashboard" className="relative flex items-center gap-2.5 group" onClick={onClose}>
-            <Logo
-              size="sm"
-              className="border-white/20 bg-white/15 shadow-soft-sm backdrop-blur-md"
-            />
-            <div className="leading-tight">
+          <Link href="/dashboard" className="relative flex min-w-0 items-center gap-2.5 group" onClick={onClose}>
+            {guestResortLogo ? (
+              <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-white/25 bg-white/95 shadow-soft-sm">
+                <Image src={guestResortLogo} alt={`${user?.home_resort?.name ?? "Resort"} logo`} fill className="object-contain p-0.5" sizes="36px" unoptimized />
+              </span>
+            ) : (
+              <Logo size="sm" className="border-white/20 bg-white/15 shadow-soft-sm backdrop-blur-md" />
+            )}
+            <div className="min-w-0 leading-tight">
               <BrandWordmark tone="onDark" size="sm" className="leading-tight" />
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                Console
+              <span className="block truncate text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                {role === "guest" && user?.home_resort?.name ? user.home_resort.name : "Console"}
               </span>
             </div>
           </Link>

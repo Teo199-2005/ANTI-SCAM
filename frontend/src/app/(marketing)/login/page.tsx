@@ -2,13 +2,17 @@
 
 import { AuthPageBrandTagline } from "@/components/branding/AuthPageBrandTagline";
 import { AuthSplitShell } from "@/components/auth/AuthSplitShell";
+import { ResortGuestAuthSessionCallout } from "@/components/auth/ResortGuestAuthSessionCallout";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
+import { publicClient } from "@/lib/api/client";
 import { useHydrated } from "@/hooks/useHydrated";
+import { laravelPublicUrl } from "@/lib/publicAsset";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Eye, EyeOff, Lock, LogIn, Mail } from "lucide-react";
 import { sanitizeEmailTyping } from "@/lib/inputRestrictions";
 import DemoQuickLogin from "./DemoQuickLogin";
@@ -61,6 +65,38 @@ function LoginPageContent() {
   const oauthError = searchParams.get("error");
 
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
+  const isGuestFromResort = Boolean(resortSlug);
+  const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!resortSlug) {
+      setResortBrand(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await publicClient.get<{
+          success: boolean;
+          data?: { name?: string; logoUrl?: string | null };
+        }>(`/public/resorts/slug/${encodeURIComponent(resortSlug)}`);
+        if (cancelled) return;
+        if (data.success && data.data?.name) {
+          setResortBrand({ name: data.data.name, logoUrl: data.data.logoUrl ?? null });
+        } else {
+          setResortBrand(null);
+        }
+      } catch {
+        if (!cancelled) setResortBrand(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resortSlug]);
+
+  const resortLogoAbs =
+    isGuestFromResort && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,23 +129,58 @@ function LoginPageContent() {
 
   return (
     <>
-    <AuthSplitShell>
+    <AuthSplitShell resortBranding={isGuestFromResort && resortBrand ? resortBrand : null}>
       <div className={loginCardClass}>
+        {isGuestFromResort ? (
+          <ResortGuestAuthSessionCallout
+            resortSlug={resortSlug}
+            resortName={resortBrand?.name ?? null}
+            afterSignOut="login"
+          />
+        ) : null}
+
+        {isGuestFromResort ? (
+          <p className="mb-4 text-center">
+            <Link
+              href={`/resort/${encodeURIComponent(resortSlug)}`}
+              className="text-xs font-semibold text-clOcean underline-offset-2 hover:underline"
+            >
+              ← Back to {resortBrand?.name ?? "resort"} page
+            </Link>
+          </p>
+        ) : null}
+
         <div className="mb-6 flex gap-4 sm:items-center">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-lg shadow-clOcean/30 ring-1 ring-clOcean/25">
-            <LogIn size={22} strokeWidth={2} />
-          </div>
+          {resortLogoAbs ? (
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-md ring-1 ring-zinc-100 sm:h-12 sm:w-12">
+              <Image
+                src={resortLogoAbs}
+                alt={`${resortBrand?.name ?? "Resort"} logo`}
+                fill
+                className="object-contain p-1.5"
+                sizes="56px"
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-lg shadow-clOcean/30 ring-1 ring-clOcean/25">
+              <LogIn size={22} strokeWidth={2} />
+            </div>
+          )}
           <div className="min-w-0 flex-1 pt-0.5">
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-zinc-900 sm:text-[1.75rem] sm:leading-tight">
-              Welcome back
+              {isGuestFromResort ? `Welcome to ${resortBrand?.name ?? "this resort"}` : "Welcome back"}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-[15px]">
-              Sign in to manage bookings and your account.
+              {isGuestFromResort
+                ? "Sign in with your guest account to manage stays and payments."
+                : "Sign in to manage bookings and your account."}
             </p>
-            {resortSlug ? (
+            {isGuestFromResort ? (
               <p className="mt-2 rounded-lg border border-clOcean/15 bg-sky-50/80 px-3 py-2 text-xs text-zinc-700">
-                Signing in as a guest of <span className="font-semibold text-navy">{resortSlug}</span> takes you to your
-                stay dashboard after login.
+                Guest sign-in for{" "}
+                <span className="font-semibold text-navy">{resortBrand?.name ?? resortSlug}</span> — you will go to
+                your stay dashboard.
               </p>
             ) : null}
           </div>

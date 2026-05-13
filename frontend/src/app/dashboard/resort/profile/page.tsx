@@ -425,8 +425,8 @@ export default function ResortProfilePage() {
       pushToast({ title: "Resort profile saved", description: "Your property details were updated.", tone: "success" });
     } catch (err) {
       pushToast({
-        title: "Save failed",
-        description: parseApiErrorMessage(err, "We couldn't update the resort profile. Try again."),
+        title: "Could not save profile",
+        description: parseApiErrorMessage(err, "Check the form and try again."),
         tone: "error",
       });
     } finally {
@@ -479,7 +479,7 @@ export default function ResortProfilePage() {
     if (file.size > RESORT_BACKGROUND_MAX_BYTES) {
       pushToast({
         title: "Background image too large",
-        description: `Use a file up to ${Math.floor(RESORT_BACKGROUND_MAX_BYTES / (1024 * 1024))} MB. If it still fails, your server may need a higher PHP upload limit (upload_max_filesize / post_max_size).`,
+        description: `Use a file up to ${Math.floor(RESORT_BACKGROUND_MAX_BYTES / (1024 * 1024))} MB. If it still fails after that, ask your host to allow larger uploads.`,
         tone: "error",
       });
       return;

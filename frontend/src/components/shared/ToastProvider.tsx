@@ -55,14 +55,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pushToast = useCallback(
-    ({ title, description, tone = "info", durationMs = 3600 }: ToastInput) => {
+    ({ title, description, tone = "info", durationMs }: ToastInput) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const resolvedDuration =
+        typeof durationMs === "number"
+          ? durationMs
+          : tone === "error"
+            ? 5200
+            : tone === "warning"
+              ? 4400
+              : tone === "success"
+                ? 3600
+                : 4000;
       const item: ToastItem = { id, title, description, tone, durationMs, visible: false };
       setToasts((prev) => [...prev, item]);
       window.setTimeout(() => {
         setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, visible: true } : t)));
       }, 10);
-      window.setTimeout(() => removeToast(id), durationMs);
+      window.setTimeout(() => removeToast(id), resolvedDuration);
     },
     [removeToast],
   );

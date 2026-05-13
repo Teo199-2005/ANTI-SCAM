@@ -4,6 +4,7 @@ import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeEmailTyping, sanitizePersonName } from "@/lib/inputRestrictions";
 import { formatRoleLabel } from "@/lib/utils";
 import { Camera, Loader2, Mail, Settings, User } from "lucide-react";
@@ -39,10 +40,9 @@ export default function GuestProfilePage() {
       await refreshUser();
       pushToast({ title: "Profile updated", description: "Your details were saved successfully.", tone: "success" });
     } catch (error: unknown) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
       pushToast({
-        title: "Couldn’t save profile",
-        description: axiosErr?.response?.data?.message ?? "Something went wrong. Try again.",
+        title: "Could not save profile",
+        description: parseApiErrorMessage(error, "Check your details and try again."),
         tone: "error",
       });
     } finally {
@@ -75,8 +75,12 @@ export default function GuestProfilePage() {
       await refreshUser();
       setAvatarPreview(URL.createObjectURL(file));
       pushToast({ title: "Avatar updated", tone: "success" });
-    } catch {
-      pushToast({ title: "Upload failed", tone: "error" });
+    } catch (err: unknown) {
+      pushToast({
+        title: "Photo not uploaded",
+        description: parseApiErrorMessage(err, "Try a smaller PNG, JPEG, or WebP file."),
+        tone: "error",
+      });
     } finally {
       setUploadingAvatar(false);
     }

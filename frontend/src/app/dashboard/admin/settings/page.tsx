@@ -53,7 +53,7 @@ export default function SystemSettingsPage() {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       pushToast({
-        title: "Save failed",
+        title: "Could not save settings",
         description: err?.response?.data?.message ?? "Could not save settings.",
         tone: "error",
       });

@@ -3,6 +3,7 @@
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { getReservation, cancelReservation, ReservationDetail, createPaymentInvoice } from "@/lib/api/payment";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { BadgeCheck, CalendarDays, ChevronLeft, CreditCard, Printer, XCircle } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
@@ -50,8 +51,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       setCancelMsg("Booking cancelled successfully.");
       pushToast({ title: "Booking cancelled", tone: "success" });
     } catch (err) {
-      setCancelMsg(err instanceof Error ? err.message : "Cancellation failed.");
-      pushToast({ title: "Cancellation failed", description: "Could not cancel booking.", tone: "error" });
+      const detail = parseApiErrorMessage(err, "Could not cancel this booking.");
+      setCancelMsg(detail);
+      pushToast({ title: "Could not cancel", description: detail, tone: "error" });
     } finally {
       setCancelling(false);
       setConfirmCancel(false);
@@ -74,7 +76,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       }
       pushToast({ title: "Checkout unavailable", description: "No payment URL returned. Try again or contact support.", tone: "error" });
     } catch (err) {
-      pushToast({ title: "Failed to create invoice", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      pushToast({
+        title: "Payment could not start",
+        description: parseApiErrorMessage(err, "Try again in a moment or contact the resort for help."),
+        tone: "error",
+      });
     }
   };
 

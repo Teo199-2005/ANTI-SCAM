@@ -1,79 +1,200 @@
 import axios from "axios";
 
-function appendDevHint(data: Record<string, unknown> | undefined, message: string): string {
-  const hint = data?.devHint;
-  if (hint && typeof hint === "string" && hint.trim() !== "") {
-    return `${message} ${hint.trim()}`;
-  }
-  return message;
+/** Laravel / framework messages that add no value for end users when combined with field errors. */
+const GENERIC_BAG_MESSAGES = new Set([
+  "the given data was invalid.",
+  "validation failed",
+  "bad request",
+]);
+
+function isGenericBagMessage(s: string): boolean {
+  const t = s.trim().toLowerCase();
+  return t === "" || GENERIC_BAG_MESSAGES.has(t);
 }
 
-/** Flatten Laravel `errors` object (arrays of strings per field) into readable lines. */
+/** Map API / snake_case keys to short labels users see on forms. */
+const FIELD_LABELS: Record<string, string> = {
+  address_barangay_name: "Barangay",
+  address_barangay_psgc: "Barangay",
+  address_province_psgc: "Province",
+  address_city_municipality_psgc: "City or municipality",
+  contact_number: "Contact number",
+  representative_contact_number: "Representative contact number",
+  representative_name: "Representative name",
+  representative_email: "Contact email",
+  owner_contact_number: "Owner contact number",
+  name: "Name",
+  email: "Email",
+  password: "Password",
+  password_confirmation: "Password confirmation",
+  phone: "Phone",
+  current_password: "Current password",
+  description: "Description",
+  cancellation_policy: "Cancellation policy",
+  amenities: "Amenities",
+  logo_url: "Resort logo",
+  background_image_url: "Background image",
+  facebook_url: "Facebook link",
+  instagram_url: "Instagram link",
+  tiktok_url: "TikTok link",
+  resort_subdomain: "Resort link",
+  role_intent: "Account type",
+  guest_count: "Number of guests",
+  check_in_date: "Check-in date",
+  check_out_date: "Check-out date",
+  room_id: "Room",
+  images: "Photos",
+  otp: "Verification code",
+  gcash_account_number: "GCash number",
+  gcash_account_holder_name: "GCash account name",
+};
+
+function friendlyFieldLabel(fieldKey: string): string {
+  if (fieldKey === "images" || fieldKey.startsWith("images.")) return "Photo";
+  const direct = FIELD_LABELS[fieldKey];
+  if (direct) return direct;
+  const leaf = fieldKey.includes(".") ? (fieldKey.split(".").pop() ?? fieldKey) : fieldKey;
+  const mapped = FIELD_LABELS[leaf];
+  if (mapped) return mapped;
+  return leaf
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+/**
+ * Turn common Laravel validation sentences into shorter, plain language.
+ * Uses the field key when the sentence is generic ("The X field is required").
+ */
+function humanizeValidationLine(fieldKey: string, raw: string): string {
+  let msg = raw.trim();
+  if (!msg) return msg;
+
+  const label = friendlyFieldLabel(fieldKey);
+
+  const reqFull = /^the\s+(.+?)\s+field\s+is\s+required\.?$/i.exec(msg);
+  if (reqFull) {
+    return `${label} is required.`;
+  }
+
+  msg = msg.replace(/^the\s+email\s+field\s+must\s+be\s+a\s+valid\s+email\.?$/i, "Enter a valid email address.");
+  msg = msg.replace(/^the\s+password\s+field\s+confirmation\s+does\s+not\s+match\.?$/i, "Passwords do not match.");
+  msg = msg.replace(/^the\s+password\s+field\s+must\s+be\s+at\s+least\s+(\d+)\s+characters\.?$/i, "Password must be at least $1 characters.");
+  msg = msg.replace(/^the\s+selected\s+.+?\s+is\s+invalid\.?$/i, "That choice is not valid. Pick another option.");
+
+  // If message still contains "field" jargon with snake_case, soften
+  if (/field is required/i.test(msg) && msg.length < 120) {
+    return `${label} is required.`;
+  }
+
+  return msg;
+}
+
+function dedupeLines(lines: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const k = line.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(line.trim());
+  }
+  return out;
+}
+
+/**
+ * Flatten Laravel `errors` into short, user-readable lines (no `address_barangay_name: …` prefixes).
+ * Suitable for inline debug panels; for toasts prefer {@link parseApiErrorMessage}.
+ */
 export function flattenLaravelApiErrors(errors: unknown): string[] {
   if (!errors || typeof errors !== "object") return [];
   const lines: string[] = [];
-  const noPrefixKeys = new Set(["hint", "devHint"]);
-  const skipKeys = new Set(["code"]);
+  const skipKeys = new Set(["code", "hint", "devHint"]);
+
   for (const [key, val] of Object.entries(errors as Record<string, unknown>)) {
     if (skipKeys.has(key)) continue;
-    const usePrefix = !noPrefixKeys.has(key);
+
     if (Array.isArray(val)) {
       for (const item of val) {
         if (typeof item === "string" && item.trim() !== "") {
-          if (key !== "images" && !key.startsWith("images.") && usePrefix) {
-            lines.push(`${key}: ${item}`);
-          } else {
-            lines.push(item);
-          }
+          lines.push(humanizeValidationLine(key, item));
         }
       }
     } else if (typeof val === "string" && val.trim() !== "") {
-      if (key !== "images" && !key.startsWith("images.") && usePrefix) {
-        lines.push(`${key}: ${val}`);
-      } else {
-        lines.push(val);
-      }
+      lines.push(humanizeValidationLine(key, val));
     }
   }
-  return lines;
+
+  return dedupeLines(lines);
+}
+
+function joinValidationLines(lines: string[]): string {
+  if (lines.length === 0) return "";
+  if (lines.length === 1) return lines[0];
+  const withStop = lines.map((s) => (/[.!?…]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`));
+  if (withStop.length === 2) return `${withStop[0]} ${withStop[1]}`;
+  if (withStop.length <= 4) return withStop.join(" ");
+  return `${withStop.slice(0, 3).join(" ")} ${withStop[3]} Check the form for anything else.`;
 }
 
 export function parseApiErrorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as Record<string, unknown> | undefined;
 
-    // Validation errors — prefer every line joined (room uploads often set multiple `images.*` messages)
     const errors = data?.errors;
     if (errors && typeof errors === "object") {
       const flat = flattenLaravelApiErrors(errors);
       const rawMsg = typeof data?.message === "string" ? data.message.trim() : "";
-      const genericMsg = rawMsg === "" || rawMsg === "The given data was invalid.";
+      const rawNorm = rawMsg.toLowerCase();
+      const bagGeneric = !rawMsg || isGenericBagMessage(rawMsg);
 
       if (flat.length > 0) {
-        const joined = flat.join(" · ");
-        let combined = genericMsg ? joined : `${rawMsg} — ${joined}`;
-        combined = combined.replace(/\s+/g, " ").trim();
-        const max = 480;
-        const clipped = combined.length > max ? `${combined.slice(0, max).trim()}…` : combined;
-        return appendDevHint(data, clipped);
+        const joined = joinValidationLines(flat);
+        if (bagGeneric) {
+          return joined;
+        }
+        // Top-level message often repeats one field error (e.g. "Enter barangay." + errors.address_barangay_name)
+        const rawLower = rawMsg.toLowerCase();
+        const flatLower = joined.toLowerCase();
+        if (rawLower && (flatLower.includes(rawLower) || rawLower.includes(flatLower))) {
+          return joined;
+        }
+        if (rawMsg && flat.length === 1 && rawLower === flat[0].toLowerCase()) {
+          return joined;
+        }
+        if (rawMsg && !isGenericBagMessage(rawMsg)) {
+          return `${rawMsg} ${joined}`.replace(/\s+/g, " ").trim();
+        }
+        return joined;
       }
+
       const first = Object.values(errors as Record<string, string[] | string>)[0];
-      if (Array.isArray(first) && first[0]) return appendDevHint(data, String(first[0]));
-      if (typeof first === "string") return appendDevHint(data, first);
+      if (Array.isArray(first) && first[0]) {
+        const k = Object.keys(errors as Record<string, unknown>)[0] ?? "";
+        return humanizeValidationLine(k, String(first[0]));
+      }
+      if (typeof first === "string") {
+        const k = Object.keys(errors as Record<string, unknown>)[0] ?? "";
+        return humanizeValidationLine(k, first);
+      }
     }
 
     if (data?.message && typeof data.message === "string" && data.message !== "") {
-      return appendDevHint(data, data.message);
+      const m = data.message.trim();
+      if (!isGenericBagMessage(m)) {
+        return m;
+      }
     }
 
-    if (error.response?.status === 401) return appendDevHint(data, "Session expired. Please log in again.");
-    if (error.response?.status === 403) return appendDevHint(data, "You do not have permission to perform this action.");
-    if (error.response?.status === 404) return appendDevHint(data, "The requested resource was not found.");
+    if (error.response?.status === 401) return "Your session expired. Please sign in again.";
+    if (error.response?.status === 403) return "You are not allowed to do that.";
+    if (error.response?.status === 404) return "We could not find that. It may have been removed.";
     if (error.response?.status === 413)
-      return appendDevHint(data, "File is larger than the server allows. Try a smaller image or ask your host to raise upload limits.");
-    if (error.response?.status === 422) return appendDevHint(data, "Validation failed. Check your input and try again.");
-    if (error.response?.status === 502)
-      return appendDevHint(data, "API server is unreachable. Please check that the backend is running.");
+      return "That file is too large for the server. Try a smaller image, or use a compressed JPEG or WebP.";
+    if (error.response?.status === 422) return "Some information looks incorrect. Check the form and try again.";
+    if (error.response?.status === 429) return "Too many attempts. Please wait a moment and try again.";
+    if (error.response?.status === 502) return "The service is temporarily unavailable. Please try again in a moment.";
+    if (error.response?.status === 503) return "We are doing brief maintenance. Please try again shortly.";
   }
   if (error instanceof Error && error.message) return error.message;
   return fallback;

@@ -202,7 +202,7 @@ export default function MarketingProfilePage() {
         axiosErr?.response?.data?.errors?.marketer_gov_id_type?.[0] ??
         axiosErr?.response?.data?.message ??
         "Could not save ID details.";
-      pushToast({ title: "Save failed", description: msg, tone: "error" });
+      pushToast({ title: "Could not save profile", description: msg, tone: "error" });
     } finally {
       setSavingGovId(false);
     }
@@ -275,7 +275,7 @@ export default function MarketingProfilePage() {
         axiosErr?.response?.data?.errors?.gcash_account_holder_name?.[0] ??
         axiosErr?.response?.data?.message ??
         "Could not save GCash details.";
-      pushToast({ title: "Save failed", description: msg, tone: "error" });
+      pushToast({ title: "Could not save profile", description: msg, tone: "error" });
     } finally {
       setSavingGcash(false);
     }

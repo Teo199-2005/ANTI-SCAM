@@ -46,6 +46,7 @@ class GuestPortalController extends Controller
             'id' => $resort->id,
             'name' => $resort->name,
             'slug' => $slug,
+            'logoUrl' => $resort->logo_url,
             'address' => $this->locations->resortDisplayLine($resort),
             'contactNumber' => $resort->contact_number,
             'description' => $resort->description,

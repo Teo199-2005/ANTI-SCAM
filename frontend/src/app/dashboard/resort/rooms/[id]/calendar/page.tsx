@@ -93,7 +93,7 @@ export default function RoomCalendarPage() {
       await load();
       pushToast({ title: "Availability saved", tone: "success" });
     } catch (err) {
-      pushToast({ title: "Save failed", description: "Could not save date range.", tone: "error" });
+      pushToast({ title: "Could not save dates", description: "Check the dates and try again.", tone: "error" });
     } finally {
       setSaving(false);
     }

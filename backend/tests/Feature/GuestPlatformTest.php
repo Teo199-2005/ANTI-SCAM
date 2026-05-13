@@ -225,6 +225,7 @@ class GuestPlatformTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.home_resort.id', $resort->id)
             ->assertJsonPath('data.home_resort.name', $resort->name)
-            ->assertJsonPath('data.home_resort.slug', $tenant->subdomain);
+            ->assertJsonPath('data.home_resort.slug', $tenant->subdomain)
+            ->assertJsonPath('data.home_resort.logo_url', $resort->logo_url);
     }
 }

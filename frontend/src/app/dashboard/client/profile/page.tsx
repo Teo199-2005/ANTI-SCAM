@@ -4,6 +4,7 @@ import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeEmailTyping, sanitizePersonName } from "@/lib/inputRestrictions";
 import { formatRoleLabel } from "@/lib/utils";
 import { Camera, Loader2, Mail, Settings, User } from "lucide-react";
@@ -40,10 +41,9 @@ export default function ClientProfilePage() {
       await refreshUser();
       pushToast({ title: "Profile updated", description: "Your details were saved successfully.", tone: "success" });
     } catch (error: unknown) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
       pushToast({
-        title: "Couldn’t save profile",
-        description: axiosErr?.response?.data?.message ?? "Something went wrong. Try again.",
+        title: "Could not save profile",
+        description: parseApiErrorMessage(error, "Check your details and try again."),
         tone: "error",
       });
     } finally {
@@ -85,11 +85,10 @@ export default function ClientProfilePage() {
       await refreshUser();
       pushToast({ title: "Photo updated", description: "Your profile picture was uploaded.", tone: "success" });
     } catch (error: unknown) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
       setAvatarPreview(null);
       pushToast({
-        title: "Upload failed",
-        description: axiosErr?.response?.data?.message ?? "Check the file type (PNG, JPG, WebP) and size (max 2 MB), then try again.",
+        title: "Photo not uploaded",
+        description: parseApiErrorMessage(error, "Use PNG, JPG, or WebP under 2 MB and try again."),
         tone: "error",
       });
     } finally {

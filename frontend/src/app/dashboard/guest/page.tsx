@@ -5,11 +5,13 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import { createPaymentInvoice } from "@/lib/api/payment";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { BadgeCheck, CalendarDays, Clock, MapPin } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-type GuestResort = { id: number; name: string; slug: string; address: string | null };
+type GuestResort = { id: number; name: string; slug: string; address: string | null; logoUrl?: string | null };
 
 type ReservationRow = {
   id: number;
@@ -31,7 +33,12 @@ export default function GuestDashboardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r2 = await apiClient.get<{ success: boolean; data: unknown }>("/reservations", { params: { perPage: 50 } });
+      const [r1, r2] = await Promise.all([
+        apiClient.get<{ success: boolean; data: GuestResort }>("/guest/resort"),
+        apiClient.get<{ success: boolean; data: unknown }>("/reservations", { params: { perPage: 50 } }),
+      ]);
+      const resortPayload = r1.data?.data;
+      setResort(resortPayload && typeof resortPayload === "object" ? resortPayload : null);
       const payload = r2.data.data;
       const list = Array.isArray(payload)
         ? payload
@@ -53,6 +60,7 @@ export default function GuestDashboardPage() {
 
   const pending = reservations.filter((r) => r.status === "pending_payment");
   const firstName = user?.name?.split(" ")[0] ?? "Guest";
+  const resortLogoAbs = resort?.logoUrl ? laravelPublicUrl(resort.logoUrl) : "";
 
   const onPay = async (id: number) => {
     setPayingId(id);
@@ -74,9 +82,15 @@ export default function GuestDashboardPage() {
     <div className="space-y-6">
       <div className="dash-hero-banner-cta flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <span className="dash-hero-glass-avatar flex h-14 w-14 shrink-0 items-center justify-center">
-            {firstName.slice(0, 2).toUpperCase()}
-          </span>
+          {resortLogoAbs ? (
+            <span className="dash-hero-glass-avatar relative flex h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-white/25 bg-white/95 shadow-md ring-1 ring-white/30">
+              <Image src={resortLogoAbs} alt={`${resort?.name ?? "Resort"} logo`} fill className="object-contain p-1" sizes="56px" unoptimized />
+            </span>
+          ) : (
+            <span className="dash-hero-glass-avatar flex h-14 w-14 shrink-0 items-center justify-center">
+              {firstName.slice(0, 2).toUpperCase()}
+            </span>
+          )}
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-white/50">Guest stay portal</p>
             <h1 className="mt-0.5 font-dash text-xl font-bold text-white md:text-2xl">Welcome, {firstName}</h1>
@@ -85,8 +99,10 @@ export default function GuestDashboardPage() {
                 <>
                   Your home resort is <span className="font-semibold text-white">{resort.name}</span>.
                 </>
-              ) : (
+              ) : loading ? (
                 "Loading your resort…"
+              ) : (
+                "We could not load your resort details."
               )}
             </p>
           </div>

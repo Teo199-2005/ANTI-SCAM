@@ -2,6 +2,7 @@
 
 import { AuthPageBrandTagline } from "@/components/branding/AuthPageBrandTagline";
 import { AuthSplitShell, AUTH_MARKETING_CARD } from "@/components/auth/AuthSplitShell";
+import { ResortGuestAuthSessionCallout } from "@/components/auth/ResortGuestAuthSessionCallout";
 import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +20,9 @@ import {
 } from "@/lib/inputRestrictions";
 import { setPendingReferralFromSignup } from "@/lib/pendingReferralSignup";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -54,27 +57,31 @@ function RegisterPageInner() {
 
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
   const isGuestFromResort = Boolean(resortSlug);
-  const [resortLabel, setResortLabel] = useState<string | null>(null);
+  const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null } | null>(null);
 
   useEffect(() => {
     if (!resortSlug) {
-      setResortLabel(null);
+      setResortBrand(null);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const { data } = await publicClient.get<{ success: boolean; data?: { name?: string } }>(
-          `/public/resorts/slug/${encodeURIComponent(resortSlug)}`,
-        );
+        const { data } = await publicClient.get<{
+          success: boolean;
+          data?: { name?: string; logoUrl?: string | null };
+        }>(`/public/resorts/slug/${encodeURIComponent(resortSlug)}`);
         if (cancelled) return;
         if (data.success && data.data?.name) {
-          setResortLabel(data.data.name);
+          setResortBrand({
+            name: data.data.name,
+            logoUrl: data.data.logoUrl ?? null,
+          });
         } else {
-          setResortLabel(null);
+          setResortBrand(null);
         }
       } catch {
-        if (!cancelled) setResortLabel(null);
+        if (!cancelled) setResortBrand(null);
       }
     })();
     return () => {
@@ -187,8 +194,11 @@ function RegisterPageInner() {
     }
   };
 
+  const resortLogoAbs =
+    isGuestFromResort && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
+
   return (
-    <AuthSplitShell>
+    <AuthSplitShell resortBranding={isGuestFromResort && resortBrand ? resortBrand : null}>
       {mounted && referralVerifyModalOpen
         ? createPortal(
             <div
@@ -213,10 +223,42 @@ function RegisterPageInner() {
         : null}
 
       <div className={cn(AUTH_MARKETING_CARD, "!p-4 sm:!p-5")}>
+        {isGuestFromResort ? (
+          <ResortGuestAuthSessionCallout
+            resortSlug={resortSlug}
+            resortName={resortBrand?.name ?? null}
+            afterSignOut="register"
+          />
+        ) : null}
+
+        {isGuestFromResort ? (
+          <p className="mb-3 text-center">
+            <Link
+              href={`/resort/${encodeURIComponent(resortSlug)}`}
+              className="text-xs font-semibold text-clOcean underline-offset-2 hover:underline"
+            >
+              ← Back to {resortBrand?.name ?? "resort"} page
+            </Link>
+          </p>
+        ) : null}
+
         <div className="mb-3 flex gap-2.5 sm:mb-2.5 sm:items-center">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20 sm:h-9 sm:w-9">
-            <UserPlus size={17} strokeWidth={2} />
-          </div>
+          {resortLogoAbs ? (
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm ring-1 ring-zinc-100 sm:h-11 sm:w-11">
+              <Image
+                src={resortLogoAbs}
+                alt={`${resortBrand?.name ?? "Resort"} logo`}
+                fill
+                className="object-contain p-1"
+                sizes="48px"
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-clOcean to-clOceanDeep text-white shadow-md shadow-clOcean/25 ring-1 ring-clOcean/20 sm:h-9 sm:w-9">
+              <UserPlus size={17} strokeWidth={2} />
+            </div>
+          )}
           <div className="min-w-0 flex-1 pt-0.5">
             <h1 className="font-heading text-xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-[1.35rem]">
               {isGuestFromResort ? "Join as a guest" : "Create your account"}
@@ -229,7 +271,7 @@ function RegisterPageInner() {
             {isGuestFromResort ? (
               <p className="mt-2 rounded-lg border border-clOcean/15 bg-sky-50/90 px-2.5 py-1.5 text-[11px] text-zinc-700 sm:text-xs">
                 Resort:{" "}
-                <span className="font-semibold text-navy">{resortLabel ?? resortSlug}</span>
+                <span className="font-semibold text-navy">{resortBrand?.name ?? resortSlug}</span>
               </p>
             ) : null}
           </div>

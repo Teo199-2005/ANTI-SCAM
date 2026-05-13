@@ -44,7 +44,7 @@ export type AuthUser = {
   /** Primary resort for `guest` accounts (from registration). */
   home_resort_id?: number | null;
   /** Present on `/auth/me` when `home_resort_id` is set (Laravel `UserProfilePresenter`). */
-  home_resort?: { id: number; name: string; slug: string } | null;
+  home_resort?: { id: number; name: string; slug: string; logo_url?: string | null } | null;
   google_id: string | null;
   email_verified_at: string | null;
   /** Set when the user accepted the current platform Terms & Conditions */

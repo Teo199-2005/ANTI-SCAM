@@ -19,6 +19,7 @@ final class UserProfilePresenter
                 'id' => $user->homeResort->id,
                 'name' => $user->homeResort->name,
                 'slug' => $slug,
+                'logo_url' => $user->homeResort->logo_url,
             ];
         }
 

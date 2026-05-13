@@ -11,6 +11,7 @@ import { sendEmailVerificationOtp, verifyEmailVerificationOtp } from "@/lib/api/
 import { AlertCircle, ArrowLeft, CheckCircle2, LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeOtpInput } from "@/lib/inputRestrictions";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -205,8 +206,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       applyCooldownFromPayload(payload.cooldown_seconds);
       notifyVerificationEmailSent(payload);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to send verification code.";
-      setOtpError(message);
+      setOtpError(parseApiErrorMessage(err, "We could not send the code. Wait a moment and try again."));
     } finally {
       setSendingOtp(false);
       setSendMode(null);
@@ -230,8 +230,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       await refreshUser();
       router.refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Verification failed.";
-      setOtpError(message);
+      setOtpError(parseApiErrorMessage(err, "That code did not work. Check the email and try again."));
     } finally {
       setVerifyingOtp(false);
     }

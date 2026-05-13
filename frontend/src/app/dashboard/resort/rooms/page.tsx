@@ -306,7 +306,7 @@ export default function ResortRoomsPage() {
       }
     } catch (err) {
       pushToast({
-        title: "Save failed",
+        title: "Could not save room",
         description: parseApiErrorMessage(err, "Unable to save room details."),
         tone: "error",
       });

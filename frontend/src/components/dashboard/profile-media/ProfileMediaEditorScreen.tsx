@@ -222,7 +222,7 @@ export function ProfileMediaEditorScreen() {
       } catch (e) {
         pushToast({
           tone: "error",
-          title: "Save failed",
+          title: "Could not save logo",
           description: parseApiErrorMessage(e, "Check your connection and try again."),
         });
       } finally {
@@ -246,7 +246,7 @@ export function ProfileMediaEditorScreen() {
     } catch (e) {
       pushToast({
         tone: "error",
-        title: "Save failed",
+        title: "Could not save cover",
         description: parseApiErrorMessage(e, "Check your connection and try again."),
       });
     } finally {
