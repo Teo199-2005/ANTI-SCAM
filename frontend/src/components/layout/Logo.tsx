@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 type LogoProps = {
   size?: "sm" | "md" | "lg";
   className?: string;
+  /** Defaults to a short product name for accessibility. */
+  alt?: string;
 };
 
 const sizeMap = {
@@ -12,7 +14,7 @@ const sizeMap = {
   lg: "h-20 w-20"
 };
 
-export default function Logo({ size = "md", className }: LogoProps) {
+export default function Logo({ size = "md", className, alt = "Anti-Scam PH" }: LogoProps) {
   return (
     <span
       className={cn(
@@ -22,7 +24,7 @@ export default function Logo({ size = "md", className }: LogoProps) {
     >
       <Image
         src="/mainlogo.png"
-        alt="Anti-Scam PH — anti booking scam of resorts"
+        alt={alt}
         width={80}
         height={80}
         unoptimized

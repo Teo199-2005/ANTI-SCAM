@@ -2,7 +2,6 @@
 
 import { AuthPageBrandTagline } from "@/components/branding/AuthPageBrandTagline";
 import { AuthSplitShell } from "@/components/auth/AuthSplitShell";
-import { ResortGuestAuthSessionCallout } from "@/components/auth/ResortGuestAuthSessionCallout";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
@@ -132,14 +131,6 @@ function LoginPageContent() {
     <AuthSplitShell guestResortContext={isGuestFromResort}>
       <div className={loginCardClass}>
         {isGuestFromResort ? (
-          <ResortGuestAuthSessionCallout
-            resortSlug={resortSlug}
-            resortName={resortBrand?.name ?? null}
-            afterSignOut="login"
-          />
-        ) : null}
-
-        {isGuestFromResort ? (
           <p className="mb-4 text-center">
             <Link
               href={`/resort/${encodeURIComponent(resortSlug)}`}
@@ -171,16 +162,9 @@ function LoginPageContent() {
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-zinc-900 sm:text-[1.75rem] sm:leading-tight">
               {isGuestFromResort ? `Welcome to ${resortBrand?.name ?? "this resort"}` : "Welcome back"}
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-[15px]">
-              {isGuestFromResort
-                ? "Sign in with your guest account to manage stays and payments."
-                : "Sign in to manage bookings and your account."}
-            </p>
-            {isGuestFromResort ? (
-              <p className="mt-2 rounded-lg border border-clOcean/15 bg-sky-50/80 px-3 py-2 text-xs text-zinc-700">
-                Guest sign-in for{" "}
-                <span className="font-semibold text-navy">{resortBrand?.name ?? resortSlug}</span> — you will go to
-                your stay dashboard.
+            {!isGuestFromResort ? (
+              <p className="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-[15px]">
+                Sign in to manage bookings and your account.
               </p>
             ) : null}
           </div>

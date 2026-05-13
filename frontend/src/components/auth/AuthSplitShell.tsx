@@ -45,7 +45,6 @@ function ResortGuestCenteredShell({ children }: { children: ReactNode }) {
             <Logo size="sm" className="border-zinc-200/90 bg-white shadow-sm ring-1 ring-zinc-100" />
             <BrandWordmark tone="onLight" size="sm" className="leading-tight" />
           </div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">Verified resort platform</p>
         </header>
 
         <div className="flex flex-1 flex-col justify-center">
