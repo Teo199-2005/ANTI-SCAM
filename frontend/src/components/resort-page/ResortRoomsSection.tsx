@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   ShowerHead,
   Snowflake,
+  Star,
   Tv,
   Users,
   Waves,
@@ -35,6 +36,7 @@ import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { createPortal } from "react-dom";
 import type { ResortLandingSurface } from "@/components/resort-page/resortLandingSurface";
+import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 
 function extractRoomMeta(amenities: string[]) {
   const bedCountRaw = amenities.find((a) => a.startsWith("BED_COUNT:"))?.split(":")[1] ?? null;
@@ -48,7 +50,9 @@ function extractRoomMeta(amenities: string[]) {
 }
 
 function amenityMeta(label: string): { icon: LucideIcon } {
-  const normalized = label.toLowerCase();
+  if (isCustomInclusionToken(label)) return { icon: Star };
+  const display = displayInclusionLabel(label);
+  const normalized = display.toLowerCase();
   if (normalized.includes("wifi")) return { icon: Wifi };
   if (normalized.includes("shower")) return { icon: ShowerHead };
   if (normalized.includes("air")) return { icon: Snowflake };
@@ -252,8 +256,8 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
                               key={a}
                               className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-zinc-700"
                             >
-                              <Icon size={11} className="shrink-0 text-zinc-500" aria-hidden />
-                              {a}
+                              <Icon size={11} className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`} aria-hidden />
+                              {displayInclusionLabel(a)}
                             </span>
                           );
                         })()
@@ -467,8 +471,12 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
                             key={a}
                             className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-700"
                           >
-                            <Icon size={12} className="shrink-0 text-zinc-500" aria-hidden />
-                            {a}
+                            <Icon
+                              size={12}
+                              className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`}
+                              aria-hidden
+                            />
+                            {displayInclusionLabel(a)}
                           </span>
                         );
                       })}

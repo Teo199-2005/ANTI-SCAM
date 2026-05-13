@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['tenant_id', 'name', 'email', 'avatar_url', 'phone', 'google_id', 'password', 'role', 'referral_code', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_type', 'marketer_gov_id_number', 'marketer_gov_id_document_url', 'mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc', 'mailing_location_label', 'marketer_tin', 'marketer_bank_name', 'marketer_bank_branch', 'marketer_bank_account_name', 'marketer_bank_account_number', 'email_verified_at', 'terms_accepted_at', 'terms_version'])]
+#[Fillable(['tenant_id', 'name', 'email', 'avatar_url', 'phone', 'google_id', 'password', 'role', 'referral_code', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_type', 'marketer_gov_id_number', 'marketer_gov_id_document_url', 'mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc', 'mailing_barangay_name', 'mailing_location_label', 'marketer_tin', 'marketer_bank_name', 'marketer_bank_branch', 'marketer_bank_account_name', 'marketer_bank_account_number', 'email_verified_at', 'terms_accepted_at', 'terms_version'])]
 #[Hidden(['password', 'remember_token', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_number', 'marketer_tin', 'marketer_bank_account_number'])]
 class User extends Authenticatable
 {

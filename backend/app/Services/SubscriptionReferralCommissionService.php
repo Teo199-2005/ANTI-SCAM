@@ -13,7 +13,7 @@ class SubscriptionReferralCommissionService
 
     /**
      * Credit pending commission when a subscription invoice (with marketer) is paid.
-     * Invoice must already be persisted with status=paid so converting-resort count includes this resort.
+     * Invoice must already be persisted with status=paid so converting-client count includes this tenant.
      */
     public function creditFromPaidMonthlyInvoice(SubscriptionInvoice $invoice): void
     {
@@ -31,7 +31,7 @@ class SubscriptionReferralCommissionService
             : now()->format('Y-m');
 
         $marketerId = (int) $invoice->marketer_id;
-        $count = $this->marketerTiers->countConvertingResorts($marketerId);
+        $count = $this->marketerTiers->countConvertingClients($marketerId);
         $tier = $this->marketerTiers->resolveTier($count);
         if ($tier === null) {
             return;

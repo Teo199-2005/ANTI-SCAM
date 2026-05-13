@@ -121,6 +121,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware('role:marketing')->group(function (): void {
             Route::get('/dashboard/marketing/analytics', [MarketingDashboardController::class, 'analytics']);
+            Route::get('/dashboard/marketing/clients', [MarketingDashboardController::class, 'clients']);
         });
 
         // Admin-only routes

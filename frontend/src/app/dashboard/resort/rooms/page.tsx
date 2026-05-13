@@ -25,6 +25,7 @@ import {
   type SlotPrepayDuration,
 } from "@/lib/billing/slotPrepay";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { buildStoredAmenitiesArray } from "@/lib/roomInclusions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import {
   BedDouble,
@@ -243,14 +244,7 @@ export default function ResortRoomsPage() {
   const onCreateRoom = async (values: RoomFormValues) => {
     setCreateSaving(true);
     try {
-      const normalizedInclusions = Array.from(new Set(values.inclusions));
-      const normalizedAmenities = Array.from(new Set(values.amenities.filter(Boolean)));
-      const amenities = [
-        `BED_COUNT:${values.bed_count}`,
-        `BED_TYPE:${values.bed_type}`,
-        ...normalizedInclusions,
-        ...normalizedAmenities,
-      ];
+      const amenities = buildStoredAmenitiesArray(values);
 
       if (createRoomId != null) {
         await apiClient.put<ApiEnvelope<RoomItem>>(`/rooms/${createRoomId}`, {
@@ -716,6 +710,8 @@ export default function ResortRoomsPage() {
           bed_count: 1,
           bed_type: "Double",
           inclusions: [],
+          custom_inclusions_enabled: false,
+          custom_inclusions_text: "",
           amenities: [],
           rules: "",
           status: "active",

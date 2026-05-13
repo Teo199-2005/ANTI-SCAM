@@ -18,21 +18,21 @@ class MarketerTierService
     ];
 
     /**
-     * Distinct resorts with at least one paid, qualifying subscription invoice for this marketer.
-     * Matches admin marketing monitoring "referred_resorts_count" definition.
+     * Distinct resort-owner organizations (tenants) with at least one paid, qualifying subscription invoice
+     * attributed to this marketer. Multiple resorts or renewals under the same tenant still count once for tiers.
      */
-    public function countConvertingResorts(int $marketerId): int
+    public function countConvertingClients(int $marketerId): int
     {
         $conversionSub = DB::table('subscription_invoices')
-            ->select('marketer_id', 'resort_id', DB::raw('MIN(paid_at) as first_paid'))
+            ->select('marketer_id', 'tenant_id', DB::raw('MIN(paid_at) as first_paid'))
             ->where('status', 'paid')
             ->whereNotNull('paid_at')
             ->whereNotNull('marketer_id')
-            ->whereNotNull('resort_id')
+            ->whereNotNull('tenant_id')
             ->where(function ($q): void {
                 $q->whereNull('plan')->orWhere('plan', 'not like', '%_room_addon%');
             })
-            ->groupBy('marketer_id', 'resort_id');
+            ->groupBy('marketer_id', 'tenant_id');
 
         $row = DB::query()
             ->fromSub($conversionSub, 'conv')
@@ -44,11 +44,30 @@ class MarketerTierService
     }
 
     /**
+     * Distinct resorts with at least one qualifying paid referral invoice (informational; can exceed client count).
+     */
+    public function countDistinctReferredResorts(int $marketerId): int
+    {
+        $row = DB::table('subscription_invoices')
+            ->where('marketer_id', $marketerId)
+            ->where('status', 'paid')
+            ->whereNotNull('paid_at')
+            ->whereNotNull('resort_id')
+            ->where(function ($q): void {
+                $q->whereNull('plan')->orWhere('plan', 'not like', '%_room_addon%');
+            })
+            ->selectRaw('COUNT(DISTINCT resort_id) as c')
+            ->first();
+
+        return $row ? (int) $row->c : 0;
+    }
+
+    /**
      * @return array<string, mixed>|null Null when no tier (zero converting resorts).
      */
-    public function resolveTier(int $convertingResortsCount): ?array
+    public function resolveTier(int $convertingClientsCount): ?array
     {
-        if ($convertingResortsCount < 1) {
+        if ($convertingClientsCount < 1) {
             return null;
         }
 
@@ -68,10 +87,10 @@ class MarketerTierService
         foreach ($this->bands() as $band) {
             $min = (int) $band['min_clients'];
             $max = $band['max_clients'] !== null ? (int) $band['max_clients'] : null;
-            if ($convertingResortsCount < $min) {
+            if ($convertingClientsCount < $min) {
                 continue;
             }
-            if ($max !== null && $convertingResortsCount > $max) {
+            if ($max !== null && $convertingClientsCount > $max) {
                 continue;
             }
 
@@ -79,7 +98,7 @@ class MarketerTierService
             $clientsToNext = null;
             if ($max !== null) {
                 $nextTierAt = $max + 1;
-                $clientsToNext = max(0, $nextTierAt - $convertingResortsCount);
+                $clientsToNext = max(0, $nextTierAt - $convertingClientsCount);
             }
 
             return [
@@ -125,8 +144,9 @@ class MarketerTierService
 
     public function tierPolicySummary(): string
     {
-        return 'Tier is based on your total converting resorts (distinct resort partners with at least one paid platform subscription invoice attributed to you; room add-ons excluded). '
-            .'Each time a qualifying subscription payment is recorded, your current tier sets the commission amount credited for that resort billing period. '
+        return 'Tier is based on converting clients: each distinct resort-owner organization (tenant) with at least one paid platform subscription invoice attributed to your referral counts once — '
+            .'multiple renewals or multiple resorts under the same owner still count as one client. Room add-on lines are excluded. '
+            .'Each qualifying subscription payment credits commission for that billing period at your current per-payment rate. '
             .'Payouts follow the platform schedule and withholding shown in your dashboard.';
     }
 

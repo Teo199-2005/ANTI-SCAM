@@ -8,10 +8,17 @@ import {
   Image as ImageIcon,
   Layers,
   ScrollText,
+  Star,
   UserRound,
   X,
 } from "lucide-react";
 import { sanitizeLongText, sanitizeRoomNameInput } from "@/lib/inputRestrictions";
+import {
+  displayInclusionLabel,
+  encodeCustomInclusion,
+  splitCustomInclusionInput,
+  STANDARD_INCLUSION_OPTIONS,
+} from "@/lib/roomInclusions";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -25,6 +32,9 @@ export type RoomFormValues = {
   bed_count: number;
   bed_type: string;
   inclusions: string[];
+  /** When true, lines in custom_inclusions_text are saved as prefixed custom inclusion tokens. */
+  custom_inclusions_enabled: boolean;
+  custom_inclusions_text: string;
   amenities: string[];
   rules: string;
   status: "active" | "inactive" | "maintenance";
@@ -46,21 +56,6 @@ type RoomModalProps = {
   onClose: () => void;
   onSave: (values: RoomFormValues) => Promise<void>;
 };
-
-const INCLUSION_OPTIONS = [
-  "WiFi",
-  "Hot Shower",
-  "Air Conditioning",
-  "TV",
-  "Mini Fridge",
-  "Breakfast Included",
-  "Parking",
-  "Pool Access",
-  "Jacuzzi",
-  "Balcony",
-  "Toiletries",
-  "Room Service",
-];
 
 export default function RoomModal({
   open,
@@ -136,6 +131,9 @@ export default function RoomModal({
       next = sanitizeRoomNameInput(value, 80) as RoomFormValues[K];
     }
     if (key === "rules" && typeof value === "string") next = sanitizeLongText(value) as RoomFormValues[K];
+    if (key === "custom_inclusions_text" && typeof value === "string") {
+      next = sanitizeLongText(value, 2000) as RoomFormValues[K];
+    }
     setForm((prev) => ({ ...prev, [key]: next }));
   };
 
@@ -307,8 +305,12 @@ export default function RoomModal({
             </div>
             <div className="rounded-xl border border-softBorder bg-white p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Inclusions</p>
+              <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+                Don&apos;t see yours? Check &quot;Custom inclusion&quot; below and type your own — it appears with a star
+                icon on your listing.
+              </p>
               <div className="flex flex-wrap gap-2">
-                {INCLUSION_OPTIONS.map((item) => {
+                {STANDARD_INCLUSION_OPTIONS.map((item) => {
                   const checked = form.inclusions.includes(item);
                   return (
                     <label
@@ -336,6 +338,54 @@ export default function RoomModal({
                   );
                 })}
               </div>
+              <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-softBorder bg-softGray/20 px-3 py-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-softBorder accent-skyBlue"
+                  checked={form.custom_inclusions_enabled}
+                  onChange={(e) => updateField("custom_inclusions_enabled", e.target.checked)}
+                />
+                <span>
+                  <span className="font-semibold text-zinc-800">Custom inclusion</span>
+                  <span className="mt-0.5 block text-[11px] font-normal text-zinc-500">
+                    Add labels not in the list (one per line). Shown with a{" "}
+                    <Star size={10} className="inline-block align-[-0.1em] text-amber-500" aria-hidden /> star icon.
+                  </span>
+                </span>
+              </label>
+              {form.custom_inclusions_enabled ? (
+                <div className="mt-2">
+                  <label htmlFor="room-modal-custom-inclusions" className={fieldLabelCls}>
+                    Your inclusion labels
+                  </label>
+                  <textarea
+                    id="room-modal-custom-inclusions"
+                    rows={3}
+                    className="mt-1 w-full resize-y rounded-xl border border-softBorder bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-skyBlue focus:outline-none focus:ring-2 focus:ring-skyBlue/20"
+                    placeholder={"e.g. Kayak rental\nOutdoor kitchen"}
+                    value={form.custom_inclusions_text}
+                    onChange={(e) => updateField("custom_inclusions_text", e.target.value)}
+                    autoComplete="off"
+                  />
+                  {splitCustomInclusionInput(form.custom_inclusions_text).length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {splitCustomInclusionInput(form.custom_inclusions_text).map((line, idx) => {
+                        const token = encodeCustomInclusion(line);
+                        if (!token) return null;
+                        return (
+                          <span
+                            key={`cust-${idx}-${token}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2 py-0.5 text-[11px] font-medium text-amber-950"
+                          >
+                            <Star size={11} className="shrink-0 text-amber-500" aria-hidden />
+                            {displayInclusionLabel(token)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div>
               <p className={fieldLabelCls}>Rules and regulations</p>

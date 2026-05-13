@@ -82,7 +82,8 @@ export default function MarketingDashboardPage() {
         tierLadder={stats?.tierLadder ?? []}
         tierPolicy={stats?.tierPolicy ?? ""}
         marketerTier={stats?.marketerTier ?? null}
-        convertingResortsCount={stats?.convertingResortsCount ?? 0}
+        convertingClientsCount={stats?.convertingClientsCount ?? 0}
+        convertingResortsWithReferralCount={stats?.convertingResortsWithReferralCount ?? 0}
         loading={loading && !stats}
       />
 
@@ -91,14 +92,21 @@ export default function MarketingDashboardPage() {
         <StatCard compact label="Assigned resorts"  value={stats?.assignedResorts ?? "–"}                                       icon={Building2}  iconTone="navy" />
         <StatCard
           compact
-          label="Converting resorts"
-          value={stats ? stats.convertingResortsCount : "–"}
+          label="Converting clients"
+          value={stats ? stats.convertingClientsCount : "–"}
           subtitle={
-            stats?.marketerTier
-              ? `${stats.marketerTier.label} · ₱${Number(stats.marketerTier.perPaymentPhp).toLocaleString()} per paid credit`
-              : stats
-                ? "No tier until your first paid referral subscription"
-                : undefined
+            stats
+              ? [
+                  stats.convertingResortsWithReferralCount > stats.convertingClientsCount
+                    ? `${stats.convertingResortsWithReferralCount} resorts billed; same owner still counts as one client for your tier.`
+                    : null,
+                  stats.marketerTier
+                    ? `${stats.marketerTier.label} · ₱${Number(stats.marketerTier.perPaymentPhp).toLocaleString()} per paid credit`
+                    : "No tier until your first paid referral subscription",
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : undefined
           }
           icon={Users}
           iconTone="navy"

@@ -60,8 +60,10 @@ export type MarketingStats = {
   releasedCommissionsGross: number;
   payoutWithholdingRate: number;
   assignedResorts: number;
-  /** Distinct converting resorts (paid qualifying subscription invoices) */
-  convertingResortsCount: number;
+  /** Distinct resort-owner orgs (tenants) with qualifying referral subscription payments — drives tier. */
+  convertingClientsCount: number;
+  /** Distinct resorts that have had at least one such payment (can exceed clients when one owner has multiple resorts). */
+  convertingResortsWithReferralCount: number;
   marketerTier: MarketerTierInfo | null;
   tierLadder: TierLadderEntry[];
   tierPolicy: string;
@@ -150,7 +152,10 @@ function mapStats(raw: Record<string, unknown>): MarketingStats {
     releasedCommissionsGross: Number(raw.releasedCommissionsGross ?? raw.released_commissions_gross ?? 0),
     payoutWithholdingRate: Number(raw.payoutWithholdingRate ?? raw.payout_withholding_rate ?? 0),
     assignedResorts: Number(raw.assignedResorts ?? raw.assigned_resorts ?? 0),
-    convertingResortsCount: Number(raw.convertingResortsCount ?? raw.converting_resorts_count ?? 0),
+    convertingClientsCount: Number(raw.convertingClientsCount ?? raw.converting_clients_count ?? 0),
+    convertingResortsWithReferralCount: Number(
+      raw.convertingResortsWithReferralCount ?? raw.converting_resorts_with_referral_count ?? 0,
+    ),
     marketerTier: mapMarketerTier(raw.marketerTier ?? raw.marketer_tier),
     tierLadder: mapTierLadder(raw.tierLadder ?? raw.tier_ladder),
     tierPolicy: String(raw.tierPolicy ?? raw.tier_policy ?? ""),
@@ -223,5 +228,58 @@ export async function getReleaseHistory(params?: { page?: number; perPage?: numb
   return {
     ...payload,
     data: (payload.data ?? []).map(mapRelease),
+  };
+}
+
+export type MarketingClientRow = {
+  tenant_id: number;
+  tenant_name: string;
+  tenant_slug: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  first_qualifying_paid_at: string | null;
+  last_qualifying_paid_at: string | null;
+  qualifying_subscription_invoices: number;
+  referred_resorts_count: number;
+  total_subscription_volume_php: number;
+};
+
+export type MarketingClientsPayload = {
+  clients: MarketingClientRow[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+  tier_policy: string;
+};
+
+function mapMarketingClientRow(o: Record<string, unknown>): MarketingClientRow {
+  return {
+    tenant_id: Number(o.tenant_id),
+    tenant_name: String(o.tenant_name ?? ""),
+    tenant_slug: String(o.tenant_slug ?? ""),
+    owner_name: typeof o.owner_name === "string" ? o.owner_name : null,
+    owner_email: typeof o.owner_email === "string" ? o.owner_email : null,
+    first_qualifying_paid_at: typeof o.first_qualifying_paid_at === "string" ? o.first_qualifying_paid_at : null,
+    last_qualifying_paid_at: typeof o.last_qualifying_paid_at === "string" ? o.last_qualifying_paid_at : null,
+    qualifying_subscription_invoices: Number(o.qualifying_subscription_invoices ?? 0),
+    referred_resorts_count: Number(o.referred_resorts_count ?? 0),
+    total_subscription_volume_php: Number(o.total_subscription_volume_php ?? 0),
+  };
+}
+
+export async function getMarketingClients(params?: { page?: number; perPage?: number }): Promise<MarketingClientsPayload> {
+  const { data } = await apiClient.get<ApiEnvelope<Record<string, unknown>>>("/dashboard/marketing/clients", {
+    params: { page: params?.page, perPage: params?.perPage },
+  });
+  const raw = (data.data ?? {}) as Record<string, unknown>;
+  const metaRaw = raw.meta as Record<string, unknown> | undefined;
+  const list = Array.isArray(raw.clients) ? (raw.clients as Record<string, unknown>[]) : [];
+  return {
+    clients: list.map(mapMarketingClientRow),
+    meta: {
+      current_page: Number(metaRaw?.current_page ?? 1),
+      last_page: Number(metaRaw?.last_page ?? 1),
+      per_page: Number(metaRaw?.per_page ?? 15),
+      total: Number(metaRaw?.total ?? 0),
+    },
+    tier_policy: String(raw.tier_policy ?? ""),
   };
 }

@@ -29,9 +29,20 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
     }
   }, [loading, router, user]);
 
-  if (!loading && user) {
+  if (loading) {
     return (
       <AppLoadingScreen
+        variant="marketing"
+        message="Loading…"
+        submessage="Checking your session."
+      />
+    );
+  }
+
+  if (user) {
+    return (
+      <AppLoadingScreen
+        variant="marketing"
         message="Redirecting…"
         submessage="You’re already signed in. Sending you to your dashboard."
       />

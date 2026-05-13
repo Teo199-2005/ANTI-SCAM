@@ -38,6 +38,7 @@ class AdminOnboardController extends Controller
             'address_province_psgc' => ['nullable', 'string', 'max:12'],
             'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
             'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
+            'address_barangay_name' => ['nullable', 'string', 'max:180'],
             'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
@@ -49,9 +50,10 @@ class AdminOnboardController extends Controller
             'accept_terms' => ['required', 'accepted'],
         ]);
 
-        $this->locations->assertValidTripleOrEmpty(
+        $this->locations->assertValidPhilippineLocationOrEmpty(
             filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
             filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
+            isset($validated['address_barangay_name']) ? trim((string) $validated['address_barangay_name']) : null,
             filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
         );
 
@@ -101,6 +103,7 @@ class AdminOnboardController extends Controller
                 'address_province_psgc' => filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
                 'address_city_municipality_psgc' => filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
                 'address_barangay_psgc' => filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
+                'address_barangay_name' => filled($validated['address_barangay_name'] ?? null) ? trim((string) $validated['address_barangay_name']) : null,
                 'address_label' => filled($validated['address_label'] ?? null) ? (string) $validated['address_label'] : null,
                 'contact_number' => $validated['contact_number'] ?? null,
                 'is_publicly_listed' => $validated['is_publicly_listed'] ?? true,
@@ -174,6 +177,7 @@ class AdminOnboardController extends Controller
             'address_province_psgc' => ['nullable', 'string', 'max:12'],
             'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
             'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
+            'address_barangay_name' => ['nullable', 'string', 'max:180'],
             'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
@@ -184,9 +188,10 @@ class AdminOnboardController extends Controller
             'accept_terms' => ['required', 'accepted'],
         ]);
 
-        $this->locations->assertValidTripleOrEmpty(
+        $this->locations->assertValidPhilippineLocationOrEmpty(
             filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
             filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
+            isset($validated['address_barangay_name']) ? trim((string) $validated['address_barangay_name']) : null,
             filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
         );
 
@@ -218,6 +223,7 @@ class AdminOnboardController extends Controller
                 'address_province_psgc' => filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
                 'address_city_municipality_psgc' => filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
                 'address_barangay_psgc' => filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
+                'address_barangay_name' => filled($validated['address_barangay_name'] ?? null) ? trim((string) $validated['address_barangay_name']) : null,
                 'address_label' => filled($validated['address_label'] ?? null) ? (string) $validated['address_label'] : null,
                 'contact_number' => $validated['contact_number'] ?? null,
                 'is_publicly_listed' => $validated['is_publicly_listed'] ?? true,

@@ -20,16 +20,17 @@ import { setPendingReferralFromSignup } from "@/lib/pendingReferralSignup";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, EyeOff, Loader2, Lock, Mail, UserPlus, X } from "lucide-react";
 
 const authInput =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.625rem] md:py-2";
 
-export default function RegisterPage() {
+function RegisterPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register } = useAuth();
   const hydrated = useHydrated();
   const [name, setName] = useState("");
@@ -54,14 +55,45 @@ export default function RegisterPage() {
     setMounted(true);
   }, []);
 
+  const refFromQuery = searchParams.get("ref") ?? searchParams.get("referral") ?? "";
+
+  useEffect(() => {
+    const normalized = sanitizeReferralCodeInput(refFromQuery);
+    if (!normalized) return;
+    let cancelled = false;
+    setReferralVerifyModalOpen(true);
+    setReferralDraft(normalized);
+    void (async () => {
+      try {
+        const result = await validateReferralCodePublic(normalized);
+        if (cancelled) return;
+        if (!result.valid) {
+          setReferralFieldError(result.message);
+          return;
+        }
+        setAppliedReferral({ code: result.code, marketerName: result.marketer_name });
+        setReferralDraft(result.code);
+      } catch {
+        if (!cancelled) {
+          setReferralFieldError("Unable to verify. Check your connection and try again.");
+        }
+      } finally {
+        if (!cancelled) setReferralVerifyModalOpen(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refFromQuery]);
+
   const clearAppliedReferral = () => {
     setAppliedReferral(null);
     setReferralFieldError(null);
   };
 
-  const applyReferral = async () => {
+  const applyReferralForCode = useCallback(async (codeInput: string) => {
     setReferralFieldError(null);
-    const normalized = sanitizeReferralCodeInput(referralDraft);
+    const normalized = sanitizeReferralCodeInput(codeInput);
     if (!normalized) {
       setReferralFieldError("Enter a referral code first.");
       return;
@@ -80,7 +112,7 @@ export default function RegisterPage() {
     } finally {
       setReferralVerifyModalOpen(false);
     }
-  };
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -375,7 +407,7 @@ export default function RegisterPage() {
               />
               <button
                 type="button"
-                onClick={() => void applyReferral()}
+                onClick={() => void applyReferralForCode(referralDraft)}
                 disabled={Boolean(appliedReferral) || referralVerifyModalOpen}
                 className="shrink-0 rounded-lg border border-clOcean/30 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-clOcean shadow-sm transition hover:bg-clSeafoam/50 disabled:pointer-events-none disabled:opacity-50"
               >
@@ -430,5 +462,23 @@ export default function RegisterPage() {
         <AuthPageBrandTagline className="mt-3 border-t-0 pt-2 md:mt-2 md:pt-2" />
       </div>
     </AuthSplitShell>
+  );
+}
+
+function RegisterPageFallback() {
+  return (
+    <AuthSplitShell>
+      <div className={cn(AUTH_MARKETING_CARD, "flex min-h-[200px] items-center justify-center !p-4 sm:!p-5")}>
+        <Loader2 className="h-8 w-8 animate-spin text-clOcean" aria-label="Loading" />
+      </div>
+    </AuthSplitShell>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterPageFallback />}>
+      <RegisterPageInner />
+    </Suspense>
   );
 }

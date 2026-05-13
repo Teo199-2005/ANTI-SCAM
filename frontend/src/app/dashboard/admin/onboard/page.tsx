@@ -27,6 +27,7 @@ type FormState = {
   address_province_psgc: string | null;
   address_city_municipality_psgc: string | null;
   address_barangay_psgc: string | null;
+  address_barangay_name: string | null;
   contact_number: string;
   logo_url: string;
   description: string;
@@ -42,6 +43,7 @@ const initial: FormState = {
   address_province_psgc: null,
   address_city_municipality_psgc: null,
   address_barangay_psgc: null,
+  address_barangay_name: null,
   contact_number: "",
   logo_url: "",
   description: "",
@@ -112,6 +114,7 @@ export default function AdminOnboardPage() {
           address_province_psgc: resort.address_province_psgc ?? null,
           address_city_municipality_psgc: resort.address_city_municipality_psgc ?? null,
           address_barangay_psgc: resort.address_barangay_psgc ?? null,
+          address_barangay_name: resort.address_barangay_name ?? null,
           contact_number: resort.contact_number ?? "",
           logo_url: resort.logo_url ?? "",
           description: resort.description ?? "",
@@ -160,7 +163,8 @@ export default function AdminOnboardPage() {
           name: form.resort_name.trim(),
           address_province_psgc: form.address_province_psgc,
           address_city_municipality_psgc: form.address_city_municipality_psgc,
-          address_barangay_psgc: form.address_barangay_psgc,
+          address_barangay_name: form.address_barangay_name?.trim() || null,
+          address_barangay_psgc: null,
           contact_number: form.contact_number.trim() || null,
           logo_url: form.logo_url.trim() || null,
           description: form.description.trim() || null,
@@ -173,7 +177,8 @@ export default function AdminOnboardPage() {
           subdomain: form.subdomain.trim().toLowerCase(),
           address_province_psgc: form.address_province_psgc,
           address_city_municipality_psgc: form.address_city_municipality_psgc,
-          address_barangay_psgc: form.address_barangay_psgc,
+          address_barangay_name: form.address_barangay_name?.trim() || null,
+          address_barangay_psgc: null,
           contact_number: form.contact_number.trim() || undefined,
           logo_url: form.logo_url.trim() || undefined,
           description: form.description.trim() || undefined,
@@ -365,17 +370,18 @@ export default function AdminOnboardPage() {
             <PhilippineLocationPicker
               idPrefix="admin-onboard"
               disabled={saving}
+              legacyBarangayCodeHint={Boolean(form.address_barangay_psgc && !form.address_barangay_name?.trim())}
               value={{
                 provinceCode: form.address_province_psgc,
                 cityCode: form.address_city_municipality_psgc,
-                barangayCode: form.address_barangay_psgc,
+                barangayName: form.address_barangay_name,
               }}
               onChange={(next: PhilippineLocationValue) => {
                 setForm((prev) => ({
                   ...prev,
                   address_province_psgc: next.provinceCode,
                   address_city_municipality_psgc: next.cityCode,
-                  address_barangay_psgc: next.barangayCode,
+                  address_barangay_name: next.barangayName,
                 }));
               }}
             />

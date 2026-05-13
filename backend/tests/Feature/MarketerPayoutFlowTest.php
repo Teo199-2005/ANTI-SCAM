@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\MarketerPayoutBatch;
+use App\Models\MarketerPayoutBatchItem;
 use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Models\MarketerPayoutBatchItem;
 use App\Models\XenditWebhookEvent;
+use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -333,7 +335,7 @@ class MarketerPayoutFlowTest extends TestCase
         config(['services.marketing_payout.recover_pending_submit_after_minutes' => 0]);
         config(['services.marketing_payout.retry_backoff_base_minutes' => 0]);
         // Use raw DB update so created_at actually moves (Eloquent ignores it on update by default).
-        \Illuminate\Support\Facades\DB::table('marketer_payout_batches')
+        DB::table('marketer_payout_batches')
             ->where('id', $batch->id)
             ->update([
                 'created_at' => now()->subHour(),
@@ -499,7 +501,7 @@ class MarketerPayoutFlowTest extends TestCase
 
     public function test_marketing_user_can_update_contact_tin_and_bank_via_profile(): void
     {
-        $this->seed(\Database\Seeders\PsgcReferenceSeeder::class);
+        $this->seed(PsgcReferenceSeeder::class);
 
         $user = User::factory()->create([
             'role' => 'marketing',
@@ -514,16 +516,16 @@ class MarketerPayoutFlowTest extends TestCase
 
         $this->patchJson('/api/v1/auth/profile', [
             'phone' => '09170001122',
-            'mailing_province_psgc' => \Database\Seeders\PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
-            'mailing_city_municipality_psgc' => \Database\Seeders\PsgcReferenceSeeder::DEMO_CITY_CODE,
-            'mailing_barangay_psgc' => \Database\Seeders\PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'mailing_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'mailing_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'mailing_barangay_name' => 'Agtangao',
             'marketer_tin' => '123-456-789-000',
         ])->assertSuccessful();
 
         $user->refresh();
         $this->assertSame('09170001122', $user->phone);
-        $this->assertSame(\Database\Seeders\PsgcReferenceSeeder::DEMO_PROVINCE_CODE, $user->mailing_province_psgc);
-        $this->assertSame('Demo Barangay, Demo City, Demo Province', $user->mailing_location_label);
+        $this->assertSame(PsgcReferenceSeeder::DEMO_PROVINCE_CODE, $user->mailing_province_psgc);
+        $this->assertSame('Agtangao, Bangued, Abra', $user->mailing_location_label);
         $this->assertSame('123456789000', $user->marketer_tin);
 
         $this->patchJson('/api/v1/auth/profile', [

@@ -178,7 +178,7 @@ class LandingReadinessTest extends TestCase
         $this->assertStringContainsString('maps.google.com', $payload['map']['embedUrl']);
         $this->assertNotNull($payload['map']['searchUrl']);
         $this->assertStringContainsString('maps/search', $payload['map']['searchUrl']);
-        $this->assertEquals('Demo Barangay, Demo City, Demo Province', $payload['map']['address']);
+        $this->assertEquals('Agtangao, Bangued, Abra', $payload['map']['address']);
     }
 
     public function test_computed_payload_has_null_map_when_location_is_empty(): void

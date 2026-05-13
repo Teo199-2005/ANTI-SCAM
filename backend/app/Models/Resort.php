@@ -19,6 +19,7 @@ class Resort extends Model
         'address_province_psgc',
         'address_city_municipality_psgc',
         'address_barangay_psgc',
+        'address_barangay_name',
         'address_label',
         'contact_number',
         'logo_url',
@@ -38,8 +39,8 @@ class Resort extends Model
     {
         return [
             'is_publicly_listed' => 'boolean',
-            'is_vip'             => 'boolean',
-            'amenities'          => 'array',
+            'is_vip' => 'boolean',
+            'amenities' => 'array',
         ];
     }
 

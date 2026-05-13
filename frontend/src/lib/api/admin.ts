@@ -213,6 +213,7 @@ export async function adminOnboard(payload: {
   address_province_psgc?: string | null;
   address_city_municipality_psgc?: string | null;
   address_barangay_psgc?: string | null;
+  address_barangay_name?: string | null;
   address_label?: string | null;
   contact_number?: string;
   logo_url?: string;
@@ -446,6 +447,9 @@ export type AdminMarketerMonitorRow = {
   referral_code: string | null;
   joined_at: string | null;
   assigned_resorts_count: number;
+  /** Distinct owner orgs (tenants) with qualifying referral subscription payments — drives tier. */
+  referred_clients_count: number;
+  /** Distinct resorts that have had such a payment (can exceed clients). */
   referred_resorts_count: number;
   last_new_referred_resort_at: string | null;
   months_since_last_new_referred_resort: number | null;

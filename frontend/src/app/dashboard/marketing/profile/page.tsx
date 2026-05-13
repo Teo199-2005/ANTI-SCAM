@@ -46,7 +46,7 @@ export default function MarketingProfilePage() {
   const [mailingLocation, setMailingLocation] = useState<PhilippineLocationValue>({
     provinceCode: user?.mailing_province_psgc ?? null,
     cityCode: user?.mailing_city_municipality_psgc ?? null,
-    barangayCode: user?.mailing_barangay_psgc ?? null,
+    barangayName: user?.mailing_barangay_name ?? null,
   });
   const [tin, setTin] = useState("");
   const [saving, setSaving] = useState(false);
@@ -92,7 +92,7 @@ export default function MarketingProfilePage() {
       setMailingLocation({
         provinceCode: user.mailing_province_psgc ?? null,
         cityCode: user.mailing_city_municipality_psgc ?? null,
-        barangayCode: user.mailing_barangay_psgc ?? null,
+        barangayName: user.mailing_barangay_name ?? null,
       });
       setTin("");
       setGcashHolder(user.gcash_account_holder_name ?? "");
@@ -151,7 +151,8 @@ export default function MarketingProfilePage() {
         phone: phone.trim() || "",
         mailing_province_psgc: mailingLocation.provinceCode,
         mailing_city_municipality_psgc: mailingLocation.cityCode,
-        mailing_barangay_psgc: mailingLocation.barangayCode,
+        mailing_barangay_name: mailingLocation.barangayName?.trim() || "",
+        mailing_barangay_psgc: null,
         marketer_tin: tin.trim() || "",
       });
       await refreshUser();
@@ -479,6 +480,9 @@ export default function MarketingProfilePage() {
               <PhilippineLocationPicker
                 idPrefix="marketing-profile"
                 disabled={saving}
+                legacyBarangayCodeHint={Boolean(
+                  user?.mailing_barangay_psgc && !user?.mailing_barangay_name?.trim(),
+                )}
                 value={mailingLocation}
                 onChange={setMailingLocation}
               />

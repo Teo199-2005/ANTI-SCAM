@@ -19,7 +19,12 @@ export default function MarketingReferralsPage() {
       .then((s) => {
         if (cancelled) return;
         setReferralCode(s.referral_code);
-        setRegisterUrl(s.referral_share_register_url);
+        // Always tie the copied link to the site the marketer is actually using (avoids stale FRONTEND_URL / localhost).
+        if (s.referral_code) {
+          setRegisterUrl(`${window.location.origin.replace(/\/$/, "")}/register?ref=${encodeURIComponent(s.referral_code)}`);
+        } else {
+          setRegisterUrl(null);
+        }
         setHint(s.referral_subscribe_hint);
       })
       .catch(() => {

@@ -34,6 +34,7 @@ final class UserProfilePresenter
             $a['mailing_province_psgc'] = $user->mailing_province_psgc;
             $a['mailing_city_municipality_psgc'] = $user->mailing_city_municipality_psgc;
             $a['mailing_barangay_psgc'] = $user->mailing_barangay_psgc;
+            $a['mailing_barangay_name'] = $user->mailing_barangay_name;
             $a['mailing_location_label'] = $user->mailing_location_label;
             $a['marketer_mailing_address'] = $loc->userMailingDisplayLine($user);
             $a['marketer_tin_masked'] = $user->marketerTinMasked();

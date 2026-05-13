@@ -20,6 +20,7 @@ class ResortResource extends JsonResource
             'address_province_psgc' => $this->address_province_psgc,
             'address_city_municipality_psgc' => $this->address_city_municipality_psgc,
             'address_barangay_psgc' => $this->address_barangay_psgc,
+            'address_barangay_name' => $this->address_barangay_name,
             'address_label' => $this->address_label,
             'address_display' => $loc->resortDisplayLine($this->resource),
             'address' => $loc->resortDisplayLine($this->resource),

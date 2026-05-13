@@ -28,6 +28,7 @@ export type ResortItem = {
   address_province_psgc?: string | null;
   address_city_municipality_psgc?: string | null;
   address_barangay_psgc?: string | null;
+  address_barangay_name?: string | null;
   address_label?: string | null;
   contact_number: string | null;
   logo_url?: string | null;
@@ -98,6 +99,7 @@ export async function ownerOnboardResort(payload: {
   address_province_psgc?: string | null;
   address_city_municipality_psgc?: string | null;
   address_barangay_psgc?: string | null;
+  address_barangay_name?: string | null;
   address_label?: string | null;
   contact_number?: string;
   logo_url?: string;

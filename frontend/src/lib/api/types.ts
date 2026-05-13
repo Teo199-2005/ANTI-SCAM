@@ -63,6 +63,7 @@ export type AuthUser = {
   mailing_province_psgc?: string | null;
   mailing_city_municipality_psgc?: string | null;
   mailing_barangay_psgc?: string | null;
+  mailing_barangay_name?: string | null;
   mailing_location_label?: string | null;
   /** Resolved mailing line for display (PSGC names or legacy label) */
   marketer_mailing_address?: string | null;

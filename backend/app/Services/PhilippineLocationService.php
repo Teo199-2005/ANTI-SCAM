@@ -6,8 +6,10 @@ use App\Models\PsgcBarangay;
 use App\Models\PsgcCityMunicipality;
 use App\Models\PsgcProvince;
 use App\Models\Resort;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PhilippineLocationService
@@ -36,9 +38,55 @@ class PhilippineLocationService
             ->paginate($perPage, ['code', 'city_municipality_code', 'name']);
     }
 
+    /**
+     * Province + city + barangay PSGC codes only (legacy).
+     */
     public function isCompleteTriple(?string $province, ?string $city, ?string $barangay): bool
     {
         return filled($province) && filled($city) && filled($barangay);
+    }
+
+    /**
+     * Full postal address: province + city + either barangay label or barangay PSGC code.
+     */
+    public function isCompleteLocation(
+        ?string $provinceCode,
+        ?string $cityCode,
+        ?string $barangayName,
+        ?string $barangayPsgc,
+    ): bool {
+        if (! filled($provinceCode) || ! filled($cityCode)) {
+            return false;
+        }
+
+        return filled($barangayName) || filled($barangayPsgc);
+    }
+
+    public function isValidProvinceCityPair(?string $provinceCode, ?string $cityCode): bool
+    {
+        if (! filled($provinceCode) || ! filled($cityCode)) {
+            return false;
+        }
+
+        if (! Schema::hasTable('psgc_provinces') || ! Schema::hasTable('psgc_cities_municipalities')) {
+            return $this->looksLikePsgcCode($provinceCode) && $this->looksLikePsgcCode($cityCode);
+        }
+
+        if (! PsgcProvince::query()->exists()) {
+            return $this->looksLikePsgcCode($provinceCode) && $this->looksLikePsgcCode($cityCode);
+        }
+
+        $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
+        if ($city === null || $city->province_code !== $provinceCode) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function looksLikePsgcCode(string $code): bool
+    {
+        return (bool) preg_match('/^\d{7,12}$/', $code);
     }
 
     public function isValidHierarchy(?string $provinceCode, ?string $cityCode, ?string $barangayCode): bool
@@ -59,32 +107,56 @@ class PhilippineLocationService
 
     /**
      * Comma-separated line: Barangay, City/Municipality, Province.
+     *
+     * @param  ?string  $barangayName  Free-text barangay (preferred when set)
+     * @param  ?string  $barangayPsgc  Legacy PSGC barangay code
      */
-    public function formatFromCodes(?string $provinceCode, ?string $cityCode, ?string $barangayCode): ?string
-    {
-        if (! $this->isCompleteTriple($provinceCode, $cityCode, $barangayCode)) {
+    public function formatAddressLine(
+        ?string $provinceCode,
+        ?string $cityCode,
+        ?string $barangayName,
+        ?string $barangayPsgc,
+    ): ?string {
+        if (! $this->isCompleteLocation($provinceCode, $cityCode, $barangayName, $barangayPsgc)) {
             return null;
         }
 
-        $br = PsgcBarangay::query()->where('code', $barangayCode)->first();
         $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
         $prov = PsgcProvince::query()->where('code', $provinceCode)->first();
-        if ($br === null || $city === null || $prov === null) {
+        if ($city === null || $prov === null || $city->province_code !== $provinceCode) {
+            return null;
+        }
+
+        if (filled($barangayName)) {
+            return trim((string) $barangayName).', '.$city->name.', '.$prov->name;
+        }
+
+        $br = PsgcBarangay::query()->where('code', $barangayPsgc)->first();
+        if ($br === null) {
             return null;
         }
 
         return $br->name.', '.$city->name.', '.$prov->name;
     }
 
+    /**
+     * @deprecated Use formatAddressLine with barangay name + code parameters
+     */
+    public function formatFromCodes(?string $provinceCode, ?string $cityCode, ?string $barangayCode): ?string
+    {
+        return $this->formatAddressLine($provinceCode, $cityCode, null, $barangayCode);
+    }
+
     public function resortDisplayLine(Resort $resort): ?string
     {
-        $fromCodes = $this->formatFromCodes(
+        $fromParts = $this->formatAddressLine(
             $resort->address_province_psgc,
             $resort->address_city_municipality_psgc,
+            $resort->address_barangay_name ?? null,
             $resort->address_barangay_psgc,
         );
-        if ($fromCodes !== null) {
-            return $fromCodes;
+        if ($fromParts !== null) {
+            return $fromParts;
         }
 
         $label = $resort->address_label ?? null;
@@ -108,13 +180,14 @@ class PhilippineLocationService
     }
 
     /**
-     * When a valid triple is saved, overwrite the denormalized label for search and legacy display.
+     * When a valid location is saved, overwrite the denormalized label for search and legacy display.
      */
     public function syncResortAddressLabel(Resort $resort): void
     {
-        $formatted = $this->formatFromCodes(
+        $formatted = $this->formatAddressLine(
             $resort->address_province_psgc,
             $resort->address_city_municipality_psgc,
+            $resort->address_barangay_name ?? null,
             $resort->address_barangay_psgc,
         );
         if ($formatted !== null) {
@@ -122,11 +195,12 @@ class PhilippineLocationService
         }
     }
 
-    public function syncUserMailingLabel(\App\Models\User $user): void
+    public function syncUserMailingLabel(User $user): void
     {
-        $formatted = $this->formatFromCodes(
+        $formatted = $this->formatAddressLine(
             $user->mailing_province_psgc,
             $user->mailing_city_municipality_psgc,
+            $user->mailing_barangay_name ?? null,
             $user->mailing_barangay_psgc,
         );
         if ($formatted !== null) {
@@ -134,15 +208,16 @@ class PhilippineLocationService
         }
     }
 
-    public function userMailingDisplayLine(\App\Models\User $user): ?string
+    public function userMailingDisplayLine(User $user): ?string
     {
-        $fromCodes = $this->formatFromCodes(
+        $fromParts = $this->formatAddressLine(
             $user->mailing_province_psgc,
             $user->mailing_city_municipality_psgc,
+            $user->mailing_barangay_name ?? null,
             $user->mailing_barangay_psgc,
         );
-        if ($fromCodes !== null) {
-            return $fromCodes;
+        if ($fromParts !== null) {
+            return $fromParts;
         }
 
         $label = $user->mailing_location_label ?? null;
@@ -151,9 +226,56 @@ class PhilippineLocationService
     }
 
     /**
-     * @param  array{0: string, 1: string, 2: string}  $attributeKeys  province, city, barangay request keys
+     * Validates Philippine location fields on resorts / generic payloads.
+     *
+     * @param  array<int, string>  $attributeKeys  province, city, barangay_name, barangay_psgc
      *
      * @throws ValidationException
+     */
+    public function assertValidPhilippineLocationOrEmpty(
+        ?string $provinceCode,
+        ?string $cityCode,
+        ?string $barangayName,
+        ?string $barangayPsgc,
+        array $attributeKeys = ['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_name', 'address_barangay_psgc'],
+    ): void {
+        $barangayName = filled($barangayName) ? trim((string) $barangayName) : null;
+        $barangayPsgc = filled($barangayPsgc) ? trim((string) $barangayPsgc) : null;
+
+        $any = filled($provinceCode) || filled($cityCode) || filled($barangayName) || filled($barangayPsgc);
+        if (! $any) {
+            return;
+        }
+
+        if (! filled($provinceCode) || ! filled($cityCode)) {
+            throw ValidationException::withMessages([
+                $attributeKeys[0] => ['Select province and city or municipality together.'],
+            ]);
+        }
+
+        if (! filled($barangayName) && ! filled($barangayPsgc)) {
+            throw ValidationException::withMessages([
+                $attributeKeys[2] => ['Enter barangay.'],
+            ]);
+        }
+
+        if (! $this->isValidProvinceCityPair($provinceCode, $cityCode)) {
+            throw ValidationException::withMessages([
+                $attributeKeys[1] => ['The selected city or municipality does not belong to that province.'],
+            ]);
+        }
+
+        if (filled($barangayPsgc) && ! $this->isValidHierarchy($provinceCode, $cityCode, $barangayPsgc)) {
+            throw ValidationException::withMessages([
+                $attributeKeys[3] => ['The selected Philippine location is invalid.'],
+            ]);
+        }
+    }
+
+    /**
+     * @deprecated Use assertValidPhilippineLocationOrEmpty with barangay name + code
+     *
+     * @param  array{0: string, 1: string, 2: string}  $attributeKeys
      */
     public function assertValidTripleOrEmpty(
         ?string $provinceCode,
@@ -161,21 +283,12 @@ class PhilippineLocationService
         ?string $barangayCode,
         array $attributeKeys = ['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_psgc'],
     ): void {
-        $any = filled($provinceCode) || filled($cityCode) || filled($barangayCode);
-        if (! $any) {
-            return;
-        }
-
-        if (! $this->isCompleteTriple($provinceCode, $cityCode, $barangayCode)) {
-            throw ValidationException::withMessages([
-                $attributeKeys[0] => ['Select province, city or municipality, and barangay together.'],
-            ]);
-        }
-
-        if (! $this->isValidHierarchy($provinceCode, $cityCode, $barangayCode)) {
-            throw ValidationException::withMessages([
-                $attributeKeys[2] => ['The selected Philippine location is invalid.'],
-            ]);
-        }
+        $this->assertValidPhilippineLocationOrEmpty(
+            $provinceCode,
+            $cityCode,
+            null,
+            $barangayCode,
+            [$attributeKeys[0], $attributeKeys[1], $attributeKeys[2], $attributeKeys[2]],
+        );
     }
 }

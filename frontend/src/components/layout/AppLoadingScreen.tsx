@@ -3,10 +3,6 @@ import Logo from "@/components/layout/Logo";
 import { cn } from "@/lib/utils";
 
 type AppLoadingScreenProps = {
-  /**
-   * Only selects default submessage when `submessage` is omitted.
-   * Visuals are identical for all variants — edit `.app-loading-*` in `globals.css` once.
-   */
   variant?: "marketing" | "dashboard";
   message?: string;
   submessage?: string;
@@ -27,18 +23,13 @@ export default function AppLoadingScreen({
   return (
     <div
       className={cn(
-        "app-loading-shell relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-5 py-12 text-zinc-900 antialiased",
+        "relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-5 py-12 text-zinc-900 antialiased",
         className,
       )}
     >
-      <div className="app-loading-overlay pointer-events-none absolute inset-0" aria-hidden />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.42] motion-safe:animate-app-loading-sheen motion-reduce:animate-none app-loading-sheen-layer"
-      />
-      <div
-        aria-hidden
-        className="app-loading-grid-layer pointer-events-none absolute inset-0 opacity-[0.4] motion-reduce:opacity-20"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(13,30,66,0.06),transparent_55%)]"
       />
 
       <div
@@ -48,13 +39,20 @@ export default function AppLoadingScreen({
         aria-busy="true"
         aria-label={message}
       >
-        <div className="app-loading-panel w-full rounded-[1.75rem] px-8 py-9 motion-safe:animate-app-loading-enter motion-reduce:animate-none">
-          <div className="flex flex-col items-center gap-6">
-            <div className="app-loading-orbit" aria-hidden>
-              <div className="app-loading-orbit-glow" />
-              <div className="app-loading-orbit-track" />
-              <div className="app-loading-orbit-sweep" />
-              <div className="app-loading-orbit-core">
+        <div className="w-full rounded-[1.75rem] border border-zinc-200/80 bg-white/95 px-8 py-9 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-7">
+            {/* Explicit spinner: Tailwind animate-spin only — legacy .app-loading-* CSS was never wired */}
+            <div className="relative flex h-[8.5rem] w-[8.5rem] shrink-0 items-center justify-center" aria-hidden>
+              {/* PH flag colors around the ring: yellow (top) → red (right) → blue (bottom) */}
+              <div
+                className={cn(
+                  "absolute inset-0 rounded-full border-[5px] border-transparent",
+                  "border-t-yellow-400 border-r-red-500 border-b-blue-600",
+                  "motion-safe:animate-spin motion-reduce:border-zinc-300 motion-reduce:animate-none",
+                )}
+                style={{ animationDuration: "1s" }}
+              />
+              <div className="relative z-[1] flex items-center justify-center">
                 <Logo size="lg" />
               </div>
             </div>

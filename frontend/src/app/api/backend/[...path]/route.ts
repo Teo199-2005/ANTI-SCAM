@@ -47,6 +47,11 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
     Accept: "application/json",
   };
 
+  const browserOrigin = req.headers.get("origin");
+  if (browserOrigin) {
+    forwardHeaders.Origin = browserOrigin;
+  }
+
   // Preserve multipart boundary by forwarding the original content-type.
   // Reconstructing formData() in the proxy can corrupt file uploads.
   if (reqContentType && !["GET", "HEAD"].includes(req.method)) {

@@ -1,21 +1,53 @@
 import { publicClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 import type { PhilippineLocationRow } from "@/lib/locations/philippines";
+import axios from "axios";
 
 type BarangaysPageBody = ApiEnvelope<PhilippineLocationRow[]> & {
   meta?: { current_page: number; last_page: number; per_page: number; total: number };
 };
 
+/** Laravel JSON `message` from error responses (4xx/5xx) proxied through Next.js. */
+function readApiErrorMessage(err: unknown): string | null {
+  if (!axios.isAxiosError(err)) return null;
+  const body = err.response?.data;
+  if (body && typeof body === "object" && body !== null && "message" in body) {
+    const msg = (body as { message: unknown }).message;
+    return typeof msg === "string" && msg.trim() !== "" ? msg : null;
+  }
+  return null;
+}
+
 export async function fetchPhilippineProvinces(): Promise<PhilippineLocationRow[]> {
-  const { data } = await publicClient.get<ApiEnvelope<PhilippineLocationRow[]>>("/public/locations/provinces");
-  return data.data ?? [];
+  try {
+    const { data } = await publicClient.get<ApiEnvelope<PhilippineLocationRow[]>>("/public/locations/provinces");
+    if (!data.success) {
+      throw new Error(data.message ?? "Could not load provinces.");
+    }
+    return data.data ?? [];
+  } catch (e) {
+    const fromApi = readApiErrorMessage(e);
+    if (fromApi) throw new Error(fromApi);
+    if (e instanceof Error) throw e;
+    throw new Error("Could not load provinces.");
+  }
 }
 
 export async function fetchPhilippineCities(provinceCode: string): Promise<PhilippineLocationRow[]> {
-  const { data } = await publicClient.get<ApiEnvelope<PhilippineLocationRow[]>>(
-    `/public/locations/provinces/${encodeURIComponent(provinceCode)}/cities`,
-  );
-  return data.data ?? [];
+  try {
+    const { data } = await publicClient.get<ApiEnvelope<PhilippineLocationRow[]>>(
+      `/public/locations/provinces/${encodeURIComponent(provinceCode)}/cities`,
+    );
+    if (!data.success) {
+      throw new Error(data.message ?? "Could not load cities for the selected province.");
+    }
+    return data.data ?? [];
+  } catch (e) {
+    const fromApi = readApiErrorMessage(e);
+    if (fromApi) throw new Error(fromApi);
+    if (e instanceof Error) throw e;
+    throw new Error("Could not load cities for the selected province.");
+  }
 }
 
 export async function fetchPhilippineBarangaysPage(
@@ -23,12 +55,22 @@ export async function fetchPhilippineBarangaysPage(
   page = 1,
   perPage = 500,
 ): Promise<{ rows: PhilippineLocationRow[]; lastPage: number }> {
-  const { data } = await publicClient.get<BarangaysPageBody>(
-    `/public/locations/cities/${encodeURIComponent(cityCode)}/barangays`,
-    { params: { per_page: perPage, page } },
-  );
-  const lastPage = data.meta?.last_page ?? 1;
-  return { rows: data.data ?? [], lastPage };
+  try {
+    const { data } = await publicClient.get<BarangaysPageBody>(
+      `/public/locations/cities/${encodeURIComponent(cityCode)}/barangays`,
+      { params: { per_page: perPage, page } },
+    );
+    if (!data.success) {
+      throw new Error(data.message ?? "Could not load barangays for the selected city.");
+    }
+    const lastPage = data.meta?.last_page ?? 1;
+    return { rows: data.data ?? [], lastPage };
+  } catch (e) {
+    const fromApi = readApiErrorMessage(e);
+    if (fromApi) throw new Error(fromApi);
+    if (e instanceof Error) throw e;
+    throw new Error("Could not load barangays for the selected city.");
+  }
 }
 
 export async function fetchPhilippineBarangaysAll(cityCode: string): Promise<PhilippineLocationRow[]> {

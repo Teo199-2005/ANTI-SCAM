@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 const SORT_FIRST: Record<string, SortDir> = {
   name: "asc",
   assigned_resorts_count: "desc",
+  referred_clients_count: "desc",
   referred_resorts_count: "desc",
   months_since_last_new_referred_resort: "desc",
   joined_at: "desc",
@@ -131,6 +132,8 @@ export default function AdminMarketingMonitorPage() {
           );
         case "assigned_resorts_count":
           return compareNullable(a.assigned_resorts_count, b.assigned_resorts_count, sortDir);
+        case "referred_clients_count":
+          return compareNullable(a.referred_clients_count, b.referred_clients_count, sortDir);
         case "referred_resorts_count":
           return compareNullable(a.referred_resorts_count, b.referred_resorts_count, sortDir);
         case "months_since_last_new_referred_resort":
@@ -196,7 +199,7 @@ export default function AdminMarketingMonitorPage() {
       />
     ) : null;
 
-  const colSpan = 10;
+  const colSpan = 11;
 
   return (
     <div className="space-y-6">
@@ -206,9 +209,9 @@ export default function AdminMarketingMonitorPage() {
           Marketing monitor
         </h1>
         <p className="dash-page-sub">
-          Referral conversions, partner tier (by converting resorts), idle time since the last new resort client, paid
-          subscription volume, and commission balances. Tiers set the PHP credited per qualifying paid subscription
-          invoice. Sorted with the longest idle periods first.
+          Referral conversions, partner tier (by converting clients — one owner org per client), idle time since the last
+          new client, paid subscription volume, and commission balances. Tiers set the PHP credited per qualifying paid
+          subscription invoice. Sorted with the longest idle periods first.
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -315,10 +318,11 @@ export default function AdminMarketingMonitorPage() {
                       value: <span className="font-mono text-violet-800">{r.referral_code ?? "—"}</span>,
                     },
                     {
-                      label: "Assigned / referred resorts",
+                      label: "Assigned / clients / resorts billed",
                       value: (
                         <span>
-                          {r.assigned_resorts_count} assigned · <strong>{r.referred_resorts_count}</strong> referred
+                          {r.assigned_resorts_count} assigned · <strong>{r.referred_clients_count}</strong> clients ·{" "}
+                          <strong>{r.referred_resorts_count}</strong> resorts
                         </span>
                       ),
                     },
@@ -341,10 +345,10 @@ export default function AdminMarketingMonitorPage() {
                         <div className="space-y-1">
                           <IdleBadge
                             months={r.months_since_last_new_referred_resort}
-                            referredCount={r.referred_resorts_count}
+                            referredCount={r.referred_clients_count}
                           />
                           <div className="text-[11px] text-zinc-500">
-                            Last new resort: {fmtDate(r.last_new_referred_resort_at)}
+                            Last new client: {fmtDate(r.last_new_referred_resort_at)}
                           </div>
                         </div>
                       ),
@@ -376,7 +380,7 @@ export default function AdminMarketingMonitorPage() {
 
         <div className="hidden md:block">
           <DataTable
-            minWidthClass="min-w-[1180px]"
+            minWidthClass="min-w-[1260px]"
             caption={undefined}
             footer={paginationFooter ?? undefined}
             headers={
@@ -392,7 +396,16 @@ export default function AdminMarketingMonitorPage() {
                   className="text-center"
                 />
                 <SortableTh
-                  label="Referred"
+                  label="Clients"
+                  sortKey="referred_clients_count"
+                  activeKey={sortBy}
+                  direction={sortDir}
+                  onSort={onSort}
+                  align="center"
+                  className="text-center"
+                />
+                <SortableTh
+                  label="Resorts billed"
                   sortKey="referred_resorts_count"
                   activeKey={sortBy}
                   direction={sortDir}
@@ -478,6 +491,7 @@ export default function AdminMarketingMonitorPage() {
                     ) : null}
                   </td>
                   <td className="text-center tabular-nums">{r.assigned_resorts_count}</td>
+                  <td className="text-center tabular-nums font-semibold text-navy">{r.referred_clients_count}</td>
                   <td className="text-center tabular-nums font-medium">{r.referred_resorts_count}</td>
                   <td>
                     <div className="space-y-1">
@@ -497,7 +511,7 @@ export default function AdminMarketingMonitorPage() {
                   <td>
                     <IdleBadge
                       months={r.months_since_last_new_referred_resort}
-                      referredCount={r.referred_resorts_count}
+                      referredCount={r.referred_clients_count}
                     />
                     <div className="mt-1 text-[11px] text-zinc-500">
                       Last new: {fmtDate(r.last_new_referred_resort_at)}

@@ -14,7 +14,8 @@ type MarketingTiersInfoModalProps = {
   tierLadder: TierLadderEntry[];
   tierPolicy: string;
   marketerTier: MarketerTierInfo | null;
-  convertingResortsCount: number;
+  convertingClientsCount: number;
+  convertingResortsWithReferralCount?: number;
   loading?: boolean;
   title?: string;
 };
@@ -29,7 +30,8 @@ export default function MarketingTiersInfoModal({
   tierLadder,
   tierPolicy,
   marketerTier,
-  convertingResortsCount,
+  convertingClientsCount,
+  convertingResortsWithReferralCount = 0,
   loading,
   title = "Partner tier program",
 }: MarketingTiersInfoModalProps) {
@@ -96,8 +98,14 @@ export default function MarketingTiersInfoModal({
                     size="md"
                   />
                   <span className="text-sm text-zinc-700">
-                    <strong className="tabular-nums text-navy">{convertingResortsCount}</strong> converting{" "}
-                    {convertingResortsCount === 1 ? "resort" : "resorts"}
+                    <strong className="tabular-nums text-navy">{convertingClientsCount}</strong> converting{" "}
+                    {convertingClientsCount === 1 ? "client" : "clients"}
+                    {convertingResortsWithReferralCount > convertingClientsCount ? (
+                      <span className="text-zinc-500">
+                        {" "}
+                        ({convertingResortsWithReferralCount} resort{convertingResortsWithReferralCount === 1 ? "" : "s"} billed)
+                      </span>
+                    ) : null}
                   </span>
                 </div>
                 {marketerTier ? (
@@ -109,7 +117,7 @@ export default function MarketingTiersInfoModal({
                         {marketerTier.clientsToNextTier > 0 ? (
                           <>
                             Add <strong>{marketerTier.clientsToNextTier}</strong> more converting{" "}
-                            {marketerTier.clientsToNextTier === 1 ? "resort" : "resorts"} to reach the next tier (at{" "}
+                            {marketerTier.clientsToNextTier === 1 ? "client" : "clients"} to reach the next tier (at{" "}
                             {marketerTier.nextTierAt}).
                           </>
                         ) : (
@@ -120,8 +128,9 @@ export default function MarketingTiersInfoModal({
                   </p>
                 ) : (
                   <p className="mt-2 text-sm text-zinc-700">
-                    Earn your first tier when at least one resort you referred has a paid qualifying platform subscription
-                    invoice. Room add-on-only payments do not count.
+                    Earn your first tier when at least one resort-owner organization you referred has a paid qualifying
+                    platform subscription invoice. Renewals and extra resorts under the same owner still count as one
+                    client. Room add-on-only payments do not count.
                   </p>
                 )}
               </div>
@@ -133,7 +142,7 @@ export default function MarketingTiersInfoModal({
                     <thead className="bg-softCard text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                       <tr>
                         <th className="px-3 py-2">Tier</th>
-                        <th className="px-3 py-2">Converting resorts</th>
+                        <th className="px-3 py-2">Converting clients</th>
                         <th className="px-3 py-2 text-right">Per paid credit</th>
                       </tr>
                     </thead>

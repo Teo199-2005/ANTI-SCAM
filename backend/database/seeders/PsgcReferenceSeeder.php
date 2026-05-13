@@ -12,13 +12,14 @@ use Illuminate\Database\Seeder;
  */
 class PsgcReferenceSeeder extends Seeder
 {
-    public const DEMO_PROVINCE_CODE = '100000000001';
+    /** Aligned with PSA PSGC 2025-2Q / @jobuntux/psgc dataset (Abra, Bangued). */
+    public const DEMO_PROVINCE_CODE = '1400100000';
 
-    public const DEMO_CITY_CODE = '100000000002';
+    public const DEMO_CITY_CODE = '1400101000';
 
-    public const DEMO_BARANGAY_CODE = '100000000003';
+    public const DEMO_BARANGAY_CODE = '1400101001';
 
-    public const DEMO_BARANGAY_ALT_CODE = '100000000004';
+    public const DEMO_BARANGAY_ALT_CODE = '1400101002';
 
     public function run(): void
     {
@@ -26,7 +27,7 @@ class PsgcReferenceSeeder extends Seeder
 
         PsgcProvince::query()->upsert(
             [
-                ['code' => self::DEMO_PROVINCE_CODE, 'name' => 'Demo Province', 'created_at' => $now, 'updated_at' => $now],
+                ['code' => self::DEMO_PROVINCE_CODE, 'name' => 'Abra', 'created_at' => $now, 'updated_at' => $now],
             ],
             ['code'],
             ['name', 'updated_at'],
@@ -34,7 +35,7 @@ class PsgcReferenceSeeder extends Seeder
 
         PsgcCityMunicipality::query()->upsert(
             [
-                ['code' => self::DEMO_CITY_CODE, 'province_code' => self::DEMO_PROVINCE_CODE, 'name' => 'Demo City', 'created_at' => $now, 'updated_at' => $now],
+                ['code' => self::DEMO_CITY_CODE, 'province_code' => self::DEMO_PROVINCE_CODE, 'name' => 'Bangued', 'created_at' => $now, 'updated_at' => $now],
             ],
             ['code'],
             ['province_code', 'name', 'updated_at'],
@@ -42,8 +43,8 @@ class PsgcReferenceSeeder extends Seeder
 
         PsgcBarangay::query()->upsert(
             [
-                ['code' => self::DEMO_BARANGAY_CODE, 'city_municipality_code' => self::DEMO_CITY_CODE, 'name' => 'Demo Barangay', 'created_at' => $now, 'updated_at' => $now],
-                ['code' => self::DEMO_BARANGAY_ALT_CODE, 'city_municipality_code' => self::DEMO_CITY_CODE, 'name' => 'Alt Barangay', 'created_at' => $now, 'updated_at' => $now],
+                ['code' => self::DEMO_BARANGAY_CODE, 'city_municipality_code' => self::DEMO_CITY_CODE, 'name' => 'Agtangao', 'created_at' => $now, 'updated_at' => $now],
+                ['code' => self::DEMO_BARANGAY_ALT_CODE, 'city_municipality_code' => self::DEMO_CITY_CODE, 'name' => 'Angad', 'created_at' => $now, 'updated_at' => $now],
             ],
             ['code'],
             ['city_municipality_code', 'name', 'updated_at'],

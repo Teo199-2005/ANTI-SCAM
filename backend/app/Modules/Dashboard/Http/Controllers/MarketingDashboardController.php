@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\SubscriptionInvoice;
+use App\Models\User;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\MarketerTierService;
+use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -39,15 +42,16 @@ class MarketingDashboardController extends Controller
 
         $resortCount = DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count();
 
-        $convertingResortsCount = $this->marketerTiers->countConvertingResorts($marketerId);
-        $marketerTier = $this->marketerTiers->resolveTier($convertingResortsCount);
+        $convertingClientsCount = $this->marketerTiers->countConvertingClients($marketerId);
+        $convertingResortsWithReferralCount = $this->marketerTiers->countDistinctReferredResorts($marketerId);
+        $marketerTier = $this->marketerTiers->resolveTier($convertingClientsCount);
         $tierLadder = $this->marketerTiers->tierLadder();
         $tierPolicy = $this->marketerTiers->tierPolicySummary();
 
         $user = $request->user();
-        $frontend = rtrim((string) config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3000')), '/');
+        $frontend = $this->publicRegistrationBaseUrl($request);
         $code = $user->referral_code;
-        $shareRegister = $code !== null && $code !== '' ? "{$frontend}/register?ref={$code}" : null;
+        $shareRegister = $code !== null && $code !== '' ? "{$frontend}/register?ref=".rawurlencode((string) $code) : null;
         $subscribeHint = $code !== null && $code !== ''
             ? "Resort owners who enter code {$code} at checkout get their first month free (3, 6, or 12-month plans) — after completing their resort profile setup."
             : null;
@@ -62,7 +66,8 @@ class MarketingDashboardController extends Controller
             'releasedCommissionsGross' => (float) $releasedCommissionsGross,
             'payoutWithholdingRate' => $wh,
             'assignedResorts' => $resortCount,
-            'convertingResortsCount' => $convertingResortsCount,
+            'convertingClientsCount' => $convertingClientsCount,
+            'convertingResortsWithReferralCount' => $convertingResortsWithReferralCount,
             'marketerTier' => $marketerTier === null ? null : [
                 'tierKey' => $marketerTier['tier_key'],
                 'label' => $marketerTier['label'],
@@ -88,6 +93,122 @@ class MarketingDashboardController extends Controller
         ], 'Marketing stats');
     }
 
+    /**
+     * Resort-owner organizations (tenants) that have paid qualifying subscription invoices with this marketer's referral.
+     * Multiple invoices or resorts under the same tenant appear as one row; counts explain activity.
+     */
+    public function clients(Request $request)
+    {
+        $marketerId = $request->user()->id;
+        $perPage = min(50, max(5, (int) $request->integer('perPage', 15)));
+
+        $aggSub = DB::table('subscription_invoices as si')
+            ->where('si.marketer_id', $marketerId)
+            ->where('si.status', 'paid')
+            ->whereNotNull('si.paid_at')
+            ->whereNotNull('si.tenant_id')
+            ->where(function ($q): void {
+                $q->whereNull('si.plan')->orWhere('si.plan', 'not like', '%_room_addon%');
+            })
+            ->groupBy('si.tenant_id')
+            ->selectRaw(
+                'si.tenant_id, MIN(si.paid_at) as first_paid_at, MAX(si.paid_at) as last_paid_at, COUNT(*) as qualifying_invoice_count, COUNT(DISTINCT si.resort_id) as resort_count, SUM(si.amount) as total_subscription_php'
+            );
+
+        $paginator = DB::query()
+            ->fromSub($aggSub, 'agg')
+            ->join('tenants as t', 't.id', '=', 'agg.tenant_id')
+            ->orderByDesc('agg.last_paid_at')
+            ->selectRaw('agg.*, t.name as tenant_name, t.slug as tenant_slug')
+            ->paginate($perPage);
+
+        $tenantIds = $paginator->getCollection()->pluck('tenant_id')->map(static fn ($id): int => (int) $id)->all();
+        $owners = User::query()
+            ->whereIn('tenant_id', $tenantIds)
+            ->where('role', 'resort_owner')
+            ->orderBy('id')
+            ->get()
+            ->unique('tenant_id')
+            ->keyBy('tenant_id');
+
+        $paginator->getCollection()->transform(function ($row) use ($owners): array {
+            /** @var \stdClass $row */
+            $owner = $owners->get((int) $row->tenant_id);
+
+            return [
+                'tenant_id' => (int) $row->tenant_id,
+                'tenant_name' => (string) $row->tenant_name,
+                'tenant_slug' => (string) $row->tenant_slug,
+                'owner_name' => $owner?->name,
+                'owner_email' => $owner?->email,
+                'first_qualifying_paid_at' => $row->first_paid_at !== null
+                    ? Carbon::parse((string) $row->first_paid_at)->toIso8601String()
+                    : null,
+                'last_qualifying_paid_at' => $row->last_paid_at !== null
+                    ? Carbon::parse((string) $row->last_paid_at)->toIso8601String()
+                    : null,
+                'qualifying_subscription_invoices' => (int) $row->qualifying_invoice_count,
+                'referred_resorts_count' => (int) $row->resort_count,
+                'total_subscription_volume_php' => round((float) $row->total_subscription_php, 2),
+            ];
+        });
+
+        $paginator->appends($request->query());
+
+        return $this->successResponse(
+            [
+                'clients' => $paginator->items(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+                'tier_policy' => $this->marketerTiers->tierPolicySummary(),
+            ],
+            'Marketing clients',
+        );
+    }
+
+    /**
+     * Guest registration share links must use the real public site, not a stale dev default.
+     * When FRONTEND_URL still points at localhost but the dashboard is opened in production,
+     * prefer the browser Origin header (same session).
+     */
+    private function publicRegistrationBaseUrl(Request $request): string
+    {
+        $configured = rtrim((string) config('app.frontend_url', 'http://127.0.0.1:3000'), '/');
+        $origin = $request->headers->get('Origin');
+        if (! is_string($origin) || $origin === '') {
+            return $configured;
+        }
+
+        $origin = rtrim($origin, '/');
+        if (! str_starts_with($origin, 'http://') && ! str_starts_with($origin, 'https://')) {
+            return $configured;
+        }
+
+        $configuredHost = parse_url($configured, PHP_URL_HOST);
+        $originHost = parse_url($origin, PHP_URL_HOST);
+        if (! is_string($originHost) || $originHost === '') {
+            return $configured;
+        }
+
+        $localHosts = ['localhost', '127.0.0.1', '[::1]'];
+        $configuredIsLocal = in_array($configuredHost, $localHosts, true);
+        $originIsLocal = in_array($originHost, $localHosts, true);
+
+        if ($configuredIsLocal && ! $originIsLocal) {
+            return $origin;
+        }
+
+        if (is_string($configuredHost) && strcasecmp($originHost, $configuredHost) === 0) {
+            return $origin;
+        }
+
+        return $configured;
+    }
+
     public function assignedResorts(Request $request)
     {
         $marketerId = $request->user()->id;
@@ -102,14 +223,16 @@ class MarketingDashboardController extends Controller
                 'resorts.address_province_psgc',
                 'resorts.address_city_municipality_psgc',
                 'resorts.address_barangay_psgc',
+                'resorts.address_barangay_name',
                 'resorts.is_publicly_listed',
                 'resorts.is_vip',
             )
             ->get()
             ->map(function ($row): array {
-                $display = app(\App\Services\PhilippineLocationService::class)->formatFromCodes(
+                $display = app(PhilippineLocationService::class)->formatAddressLine(
                     $row->address_province_psgc,
                     $row->address_city_municipality_psgc,
+                    $row->address_barangay_name ?? null,
                     $row->address_barangay_psgc,
                 ) ?? (filled($row->address_label) ? (string) $row->address_label : null);
 
@@ -130,7 +253,7 @@ class MarketingDashboardController extends Controller
         $marketerId = $request->user()->id;
         $perPage = (int) $request->integer('perPage', 12);
 
-        $commissions = Commission::with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'releases'])
+        $commissions = Commission::with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc,address_barangay_name', 'releases'])
             ->where('marketer_id', $marketerId)
             ->latest()
             ->paginate($perPage);

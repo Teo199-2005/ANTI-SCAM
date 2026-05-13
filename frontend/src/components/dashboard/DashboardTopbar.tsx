@@ -409,7 +409,8 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     tierLadder={marketingStats?.tierLadder ?? []}
                     tierPolicy={marketingStats?.tierPolicy ?? ""}
                     marketerTier={marketingStats?.marketerTier ?? null}
-                    convertingResortsCount={marketingStats?.convertingResortsCount ?? 0}
+                    convertingClientsCount={marketingStats?.convertingClientsCount ?? 0}
+                    convertingResortsWithReferralCount={marketingStats?.convertingResortsWithReferralCount ?? 0}
                     loading={marketingStatsLoading}
                   />
                 ) : null}

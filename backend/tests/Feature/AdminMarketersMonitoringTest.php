@@ -92,6 +92,7 @@ class AdminMarketersMonitoringTest extends TestCase
         $res = $this->getJson('/api/v1/admin/marketers/monitoring');
         $res->assertSuccessful()
             ->assertJsonPath('data.rows.0.id', $marketer->id)
+            ->assertJsonPath('data.rows.0.referred_clients_count', 1)
             ->assertJsonPath('data.rows.0.referred_resorts_count', 1)
             ->assertJsonPath('data.rows.0.marketer_tier_key', 'silver')
             ->assertJsonPath('data.rows.0.per_payment_php', 150)

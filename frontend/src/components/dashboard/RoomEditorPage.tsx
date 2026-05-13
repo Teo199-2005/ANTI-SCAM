@@ -11,6 +11,14 @@ import {
   sanitizeRoomNameInput,
 } from "@/lib/inputRestrictions";
 import {
+  buildStoredAmenitiesArray,
+  displayInclusionLabel,
+  encodeCustomInclusion,
+  parseStoredAmenities,
+  splitCustomInclusionInput,
+  STANDARD_INCLUSION_OPTIONS,
+} from "@/lib/roomInclusions";
+import {
   AlignLeft,
   ArrowLeft,
   CircleDollarSign,
@@ -18,6 +26,7 @@ import {
   Image as ImageIcon,
   Layers,
   ScrollText,
+  Star,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -39,52 +48,12 @@ type FormState = {
   bed_count: number;
   bed_type: string;
   inclusions: string[];
+  custom_inclusions_enabled: boolean;
+  custom_inclusions_text: string;
   amenities: string[];
   rules: string;
   status: RoomStatus;
 };
-
-const INCLUSION_OPTIONS = [
-  "WiFi",
-  "Hot Shower",
-  "Air Conditioning",
-  "TV",
-  "Mini Fridge",
-  "Breakfast Included",
-  "Parking",
-  "Pool Access",
-  "Jacuzzi",
-  "Balcony",
-  "Toiletries",
-  "Room Service",
-];
-
-function parseAmenitiesMeta(amenities: string[]) {
-  let bedCount = 1;
-  let bedType = "Double";
-  const inclusions: string[] = [];
-  const others: string[] = [];
-
-  for (const item of amenities) {
-    if (item.startsWith("BED_COUNT:")) {
-      const parsed = Number(item.replace("BED_COUNT:", "").trim());
-      if (Number.isFinite(parsed) && parsed > 0) bedCount = parsed;
-      continue;
-    }
-    if (item.startsWith("BED_TYPE:")) {
-      const parsed = item.replace("BED_TYPE:", "").trim();
-      if (parsed) bedType = parsed;
-      continue;
-    }
-    if (INCLUSION_OPTIONS.includes(item)) {
-      inclusions.push(item);
-    } else {
-      others.push(item);
-    }
-  }
-
-  return { bedCount, bedType, inclusions, others };
-}
 
 const initialForm: FormState = {
   resort_id: 0,
@@ -95,6 +64,8 @@ const initialForm: FormState = {
   bed_count: 1,
   bed_type: "Double",
   inclusions: [],
+  custom_inclusions_enabled: false,
+  custom_inclusions_text: "",
   amenities: [],
   rules: "",
   status: "active",
@@ -138,7 +109,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
         if (!room) {
           setError("Room not found.");
         } else {
-          const parsedAmenities = parseAmenitiesMeta(Array.isArray(room.amenities) ? room.amenities : []);
+          const parsedAmenities = parseStoredAmenities(Array.isArray(room.amenities) ? room.amenities : []);
           setForm({
             resort_id: room.resort_id ?? first.id,
             name: room.name ?? "",
@@ -148,6 +119,8 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
             bed_count: parsedAmenities.bedCount,
             bed_type: parsedAmenities.bedType,
             inclusions: parsedAmenities.inclusions,
+            custom_inclusions_enabled: parsedAmenities.customInclusionsEnabled,
+            custom_inclusions_text: parsedAmenities.customInclusionsText,
             amenities: parsedAmenities.others,
             rules: room.rules ?? "",
             status: (room.status as RoomStatus) ?? "active",
@@ -168,6 +141,9 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
     if (key === "name" && typeof value === "string") next = sanitizeRoomNameInput(value) as FormState[K];
     if (key === "bed_type" && typeof value === "string") next = sanitizeRoomNameInput(value, 80) as FormState[K];
     if (key === "rules" && typeof value === "string") next = sanitizeLongText(value) as FormState[K];
+    if (key === "custom_inclusions_text" && typeof value === "string") {
+      next = sanitizeLongText(value, 2000) as FormState[K];
+    }
     setForm((prev) => ({ ...prev, [key]: next }));
   };
 
@@ -176,8 +152,6 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
     if (!form.resort_id) return;
     setSaving(true);
     try {
-      const normalizedInclusions = Array.from(new Set(form.inclusions));
-      const normalizedAmenities = Array.from(new Set(form.amenities.filter(Boolean)));
       const payload = {
         resort_id: form.resort_id,
         name: form.name,
@@ -185,12 +159,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
         capacity: form.capacity,
         units: form.units,
         base_price: form.base_price,
-        amenities: [
-          `BED_COUNT:${form.bed_count}`,
-          `BED_TYPE:${form.bed_type}`,
-          ...normalizedInclusions,
-          ...normalizedAmenities,
-        ],
+        amenities: buildStoredAmenitiesArray(form),
         rules: form.rules || null,
         status: form.status,
       };
@@ -301,8 +270,12 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
 
         <div className="rounded-xl border border-softBorder bg-white p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Common inclusions</p>
+          <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+            Missing an option? Enable &quot;Custom inclusion&quot; below and type your own — it shows with a star icon on
+            your public listing.
+          </p>
           <div className="flex flex-wrap gap-2">
-            {INCLUSION_OPTIONS.map((item) => {
+            {STANDARD_INCLUSION_OPTIONS.map((item) => {
               const checked = form.inclusions.includes(item);
               return (
                 <label
@@ -330,6 +303,54 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
               );
             })}
           </div>
+          <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-softBorder bg-softGray/20 px-3 py-2 text-xs">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-softBorder accent-skyBlue"
+              checked={form.custom_inclusions_enabled}
+              onChange={(e) => update("custom_inclusions_enabled", e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold text-zinc-800">Custom inclusion</span>
+              <span className="mt-0.5 block text-[11px] font-normal text-zinc-500">
+                One label per line. Displayed with a{" "}
+                <Star size={10} className="inline-block align-[-0.1em] text-amber-500" aria-hidden /> star icon.
+              </span>
+            </span>
+          </label>
+          {form.custom_inclusions_enabled ? (
+            <div className="mt-2">
+              <label htmlFor="room-editor-custom-inclusions" className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                Your inclusion labels
+              </label>
+              <textarea
+                id="room-editor-custom-inclusions"
+                rows={3}
+                className="w-full resize-y rounded-xl border border-softBorder bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-skyBlue focus:outline-none focus:ring-2 focus:ring-skyBlue/20"
+                placeholder={"e.g. Kayak rental\nOutdoor kitchen"}
+                value={form.custom_inclusions_text}
+                onChange={(e) => update("custom_inclusions_text", e.target.value)}
+                autoComplete="off"
+              />
+              {splitCustomInclusionInput(form.custom_inclusions_text).length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {splitCustomInclusionInput(form.custom_inclusions_text).map((line, idx) => {
+                    const token = encodeCustomInclusion(line);
+                    if (!token) return null;
+                    return (
+                      <span
+                        key={`cust-${idx}-${token}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2 py-0.5 text-[11px] font-medium text-amber-950"
+                      >
+                        <Star size={11} className="shrink-0 text-amber-500" aria-hidden />
+                        {displayInclusionLabel(token)}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <label className={inputWrap}>

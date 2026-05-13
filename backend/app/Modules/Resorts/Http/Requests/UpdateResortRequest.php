@@ -11,7 +11,7 @@ class UpdateResortRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
-        foreach (['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_psgc'] as $key) {
+        foreach (['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_psgc', 'address_barangay_name'] as $key) {
             if (! $this->has($key)) {
                 continue;
             }
@@ -48,6 +48,7 @@ class UpdateResortRequest extends FormRequest
     {
         /** @var Resort $resort */
         $resort = $this->route('resort');
+
         return $this->user()?->can('update', $resort) ?? false;
     }
 
@@ -59,6 +60,7 @@ class UpdateResortRequest extends FormRequest
             'address_province_psgc' => ['nullable', 'string', 'max:12'],
             'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
             'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
+            'address_barangay_name' => ['nullable', 'string', 'max:180'],
             'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
@@ -78,9 +80,10 @@ class UpdateResortRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $v): void {
-            app(PhilippineLocationService::class)->assertValidTripleOrEmpty(
+            app(PhilippineLocationService::class)->assertValidPhilippineLocationOrEmpty(
                 $this->input('address_province_psgc'),
                 $this->input('address_city_municipality_psgc'),
+                $this->input('address_barangay_name'),
                 $this->input('address_barangay_psgc'),
             );
         });

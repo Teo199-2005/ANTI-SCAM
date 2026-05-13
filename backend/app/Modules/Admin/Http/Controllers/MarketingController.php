@@ -57,7 +57,25 @@ class MarketingController extends Controller
 
         $marketers = $marketerQuery->withCount('assignedResorts')->orderBy('name')->get();
 
-        $conversionSub = DB::table('subscription_invoices')
+        $clientConversionSub = DB::table('subscription_invoices')
+            ->select('marketer_id', 'tenant_id', DB::raw('MIN(paid_at) as first_paid'))
+            ->where('status', 'paid')
+            ->whereNotNull('paid_at')
+            ->whereNotNull('marketer_id')
+            ->whereNotNull('tenant_id')
+            ->where(function ($q): void {
+                $q->whereNull('plan')->orWhere('plan', 'not like', '%_room_addon%');
+            })
+            ->groupBy('marketer_id', 'tenant_id');
+
+        $referralStats = DB::query()
+            ->fromSub($clientConversionSub, 'conv')
+            ->selectRaw('marketer_id, COUNT(*) as referred_clients_count, MAX(first_paid) as last_new_referred_resort_at')
+            ->groupBy('marketer_id')
+            ->get()
+            ->keyBy('marketer_id');
+
+        $resortConversionSub = DB::table('subscription_invoices')
             ->select('marketer_id', 'resort_id', DB::raw('MIN(paid_at) as first_paid'))
             ->where('status', 'paid')
             ->whereNotNull('paid_at')
@@ -68,9 +86,9 @@ class MarketingController extends Controller
             })
             ->groupBy('marketer_id', 'resort_id');
 
-        $referralStats = DB::query()
-            ->fromSub($conversionSub, 'conv')
-            ->selectRaw('marketer_id, COUNT(*) as referred_resorts_count, MAX(first_paid) as last_new_referred_resort_at')
+        $resortReferralStats = DB::query()
+            ->fromSub($resortConversionSub, 'rcv')
+            ->selectRaw('marketer_id, COUNT(*) as referred_resorts_count')
             ->groupBy('marketer_id')
             ->get()
             ->keyBy('marketer_id');
@@ -100,11 +118,13 @@ class MarketingController extends Controller
         $rows = [];
         foreach ($marketers as $m) {
             $ref = $referralStats->get($m->id);
+            $resortRef = $resortReferralStats->get($m->id);
             $act = $activityStats->get($m->id);
             $com = $commissionStats->get($m->id);
 
-            $referredCount = $ref ? (int) $ref->referred_resorts_count : 0;
-            $tierResolved = $this->marketerTiers->resolveTier($referredCount);
+            $referredClientsCount = $ref ? (int) $ref->referred_clients_count : 0;
+            $referredResortsCount = $resortRef ? (int) $resortRef->referred_resorts_count : 0;
+            $tierResolved = $this->marketerTiers->resolveTier($referredClientsCount);
             $lastNewRaw = $ref?->last_new_referred_resort_at ?? null;
             $lastNewAt = $lastNewRaw ? Carbon::parse($lastNewRaw) : null;
 
@@ -123,7 +143,8 @@ class MarketingController extends Controller
                 'referral_code' => $m->referral_code,
                 'joined_at' => $m->created_at?->toIso8601String(),
                 'assigned_resorts_count' => (int) $m->assigned_resorts_count,
-                'referred_resorts_count' => $referredCount,
+                'referred_clients_count' => $referredClientsCount,
+                'referred_resorts_count' => $referredResortsCount,
                 'last_new_referred_resort_at' => $lastNewAt?->toIso8601String(),
                 'months_since_last_new_referred_resort' => $monthsSinceNew,
                 'last_any_referral_payment_at' => isset($act->last_any_referral_payment_at)
@@ -155,7 +176,7 @@ class MarketingController extends Controller
             'rows' => $rows,
             'meta' => [
                 'generated_at' => $now->toIso8601String(),
-                'new_client_definition' => 'Distinct resort with first qualifying paid subscription invoice (status=paid, not a room-addon plan) where marketer_id matches.',
+                'new_client_definition' => 'Converting client = distinct resort-owner organization (tenant) with at least one paid qualifying subscription invoice attributed to the marketer. Multiple resorts or renewals under the same tenant still count as one client for tiers. Distinct resorts with referral payments is shown separately.',
                 'tier_ladder' => $this->marketerTiers->tierLadder(),
                 'tier_policy' => $this->marketerTiers->tierPolicySummary(),
             ],

@@ -22,6 +22,7 @@ import {
   Plus,
   Settings,
   TrendingUp,
+  UserRound,
   Users,
   Webhook,
   X,
@@ -80,6 +81,7 @@ const marketingGroups: NavGroup[] = [
     items: [
       { href: "/dashboard/marketing", label: "Overview", icon: TrendingUp, exact: true },
       { href: "/dashboard/marketing/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/dashboard/marketing/clients", label: "Clients", icon: UserRound },
       { href: "/dashboard/marketing/referrals", label: "Referrals & links", icon: Link2 },
     ],
   },

@@ -279,6 +279,7 @@ class AuthController extends Controller
             'mailing_province_psgc',
             'mailing_city_municipality_psgc',
             'mailing_barangay_psgc',
+            'mailing_barangay_name',
             'mailing_location_label',
             'marketer_tin',
             'marketer_bank_name',
@@ -290,6 +291,7 @@ class AuthController extends Controller
                 'mailing_province_psgc' => ['nullable', 'string', 'max:12'],
                 'mailing_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
                 'mailing_barangay_psgc' => ['nullable', 'string', 'max:12'],
+                'mailing_barangay_name' => ['nullable', 'string', 'max:180'],
                 'mailing_location_label' => ['nullable', 'string', 'max:512'],
                 'marketer_tin' => ['nullable', 'string', 'max:32'],
                 'marketer_bank_name' => ['nullable', 'string', 'max:120'],
@@ -304,15 +306,19 @@ class AuthController extends Controller
             $finalC = array_key_exists('mailing_city_municipality_psgc', $kycIn)
                 ? (filled($kycIn['mailing_city_municipality_psgc']) ? trim((string) $kycIn['mailing_city_municipality_psgc']) : null)
                 : $user->mailing_city_municipality_psgc;
+            $finalBn = array_key_exists('mailing_barangay_name', $kycIn)
+                ? (filled($kycIn['mailing_barangay_name']) ? trim((string) $kycIn['mailing_barangay_name']) : null)
+                : $user->mailing_barangay_name;
             $finalB = array_key_exists('mailing_barangay_psgc', $kycIn)
                 ? (filled($kycIn['mailing_barangay_psgc']) ? trim((string) $kycIn['mailing_barangay_psgc']) : null)
                 : $user->mailing_barangay_psgc;
 
-            $this->locations->assertValidTripleOrEmpty(
+            $this->locations->assertValidPhilippineLocationOrEmpty(
                 $finalP,
                 $finalC,
+                $finalBn,
                 $finalB,
-                ['mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc'],
+                ['mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_name', 'mailing_barangay_psgc'],
             );
 
             if (array_key_exists('mailing_province_psgc', $kycIn)) {
@@ -320,6 +326,9 @@ class AuthController extends Controller
             }
             if (array_key_exists('mailing_city_municipality_psgc', $kycIn)) {
                 $kycPayload['mailing_city_municipality_psgc'] = $finalC;
+            }
+            if (array_key_exists('mailing_barangay_name', $kycIn)) {
+                $kycPayload['mailing_barangay_name'] = $finalBn;
             }
             if (array_key_exists('mailing_barangay_psgc', $kycIn)) {
                 $kycPayload['mailing_barangay_psgc'] = $finalB;

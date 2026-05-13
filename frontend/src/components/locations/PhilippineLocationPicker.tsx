@@ -1,17 +1,13 @@
 "use client";
 
-import {
-  fetchPhilippineBarangaysAll,
-  fetchPhilippineCities,
-  fetchPhilippineProvinces,
-} from "@/lib/api/locations";
 import type { PhilippineLocationRow } from "@/lib/locations/philippines";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { listMuncities, listProvinces } from "@jobuntux/psgc";
+import { useMemo, useState } from "react";
 
 export type PhilippineLocationValue = {
   provinceCode: string | null;
   cityCode: string | null;
-  barangayCode: string | null;
+  barangayName: string | null;
 };
 
 type Props = {
@@ -19,6 +15,8 @@ type Props = {
   onChange: (next: PhilippineLocationValue) => void;
   disabled?: boolean;
   idPrefix?: string;
+  /** Shown when the API still has a legacy barangay PSGC code but no free-text name */
+  legacyBarangayCodeHint?: boolean;
 };
 
 function filterRows(rows: PhilippineLocationRow[], q: string): PhilippineLocationRow[] {
@@ -27,102 +25,59 @@ function filterRows(rows: PhilippineLocationRow[], q: string): PhilippineLocatio
   return rows.filter((r) => r.name.toLowerCase().includes(needle) || r.code.includes(needle));
 }
 
-export function PhilippineLocationPicker({ value, onChange, disabled, idPrefix = "ph-loc" }: Props) {
-  const [provinces, setProvinces] = useState<PhilippineLocationRow[]>([]);
-  const [cities, setCities] = useState<PhilippineLocationRow[]>([]);
-  const [barangays, setBarangays] = useState<PhilippineLocationRow[]>([]);
+export function PhilippineLocationPicker({
+  value,
+  onChange,
+  disabled,
+  idPrefix = "ph-loc",
+  legacyBarangayCodeHint,
+}: Props) {
   const [pQ, setPQ] = useState("");
   const [cQ, setCQ] = useState("");
-  const [bQ, setBQ] = useState("");
-  const [loadingProvinces, setLoadingProvinces] = useState(true);
-  const [loadingCities, setLoadingCities] = useState(false);
-  const [loadingBarangays, setLoadingBarangays] = useState(false);
-  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoadingProvinces(true);
-      setLoadErr(null);
-      try {
-        const list = await fetchPhilippineProvinces();
-        if (!cancelled) setProvinces(list);
-      } catch {
-        if (!cancelled) setLoadErr("Could not load provinces. Check your connection and try again.");
-      } finally {
-        if (!cancelled) setLoadingProvinces(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const provinces = useMemo((): PhilippineLocationRow[] => {
+    const raw = listProvinces();
+    const rows = raw.map((p) => ({
+      code: p.psgcCode,
+      name: p.provName.trim(),
+    }));
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    return rows;
   }, []);
 
-  const loadCities = useCallback(async (provinceCode: string | null) => {
-    setCities([]);
-    setBarangays([]);
-    if (!provinceCode) return;
-    setLoadingCities(true);
-    setLoadErr(null);
-    try {
-      const list = await fetchPhilippineCities(provinceCode);
-      setCities(list);
-    } catch {
-      setLoadErr("Could not load cities for the selected province.");
-    } finally {
-      setLoadingCities(false);
-    }
-  }, []);
+  const selectedProvDef = useMemo(() => {
+    if (!value.provinceCode) return undefined;
+    return listProvinces().find((p) => p.psgcCode === value.provinceCode);
+  }, [value.provinceCode]);
 
-  const loadBarangays = useCallback(async (cityCode: string | null) => {
-    setBarangays([]);
-    if (!cityCode) return;
-    setLoadingBarangays(true);
-    setLoadErr(null);
-    try {
-      const list = await fetchPhilippineBarangaysAll(cityCode);
-      setBarangays(list);
-    } catch {
-      setLoadErr("Could not load barangays for the selected city.");
-    } finally {
-      setLoadingBarangays(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCities(value.provinceCode);
-  }, [value.provinceCode, loadCities]);
-
-  useEffect(() => {
-    void loadBarangays(value.cityCode);
-  }, [value.cityCode, loadBarangays]);
+  const cities = useMemo((): PhilippineLocationRow[] => {
+    if (!selectedProvDef?.provCode) return [];
+    const raw = listMuncities(selectedProvDef.provCode);
+    const rows = raw.map((m) => ({
+      code: m.psgcCode,
+      name: m.munCityName.trim(),
+    }));
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    return rows;
+  }, [selectedProvDef]);
 
   const pFiltered = useMemo(() => filterRows(provinces, pQ), [provinces, pQ]);
   const cFiltered = useMemo(() => filterRows(cities, cQ), [cities, cQ]);
-  const bFiltered = useMemo(() => filterRows(barangays, bQ), [barangays, bQ]);
 
   const onProvincePick = (code: string) => {
     const c = code === "" ? null : code;
-    onChange({ provinceCode: c, cityCode: null, barangayCode: null });
+    onChange({ provinceCode: c, cityCode: null, barangayName: value.barangayName });
     setCQ("");
-    setBQ("");
   };
 
   const onCityPick = (code: string) => {
     const c = code === "" ? null : code;
-    onChange({ ...value, cityCode: c, barangayCode: null });
-    setBQ("");
-  };
-
-  const onBarangayPick = (code: string) => {
-    const c = code === "" ? null : code;
-    onChange({ ...value, barangayCode: c });
+    onChange({ ...value, cityCode: c });
   };
 
   return (
     <div className="space-y-3">
-      {loadErr ? <p className="text-xs text-rose-600">{loadErr}</p> : null}
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         <div>
           <label htmlFor={`${idPrefix}-prov-filter`} className="mb-1 block text-xs font-semibold text-zinc-600">
             Province
@@ -133,17 +88,17 @@ export function PhilippineLocationPicker({ value, onChange, disabled, idPrefix =
             placeholder="Search province…"
             value={pQ}
             onChange={(e) => setPQ(e.target.value)}
-            disabled={disabled || loadingProvinces}
+            disabled={disabled}
             autoComplete="off"
           />
           <select
             id={`${idPrefix}-prov`}
             className="dash-input"
-            disabled={disabled || loadingProvinces}
+            disabled={disabled}
             value={value.provinceCode ?? ""}
             onChange={(e) => onProvincePick(e.target.value)}
           >
-            <option value="">{loadingProvinces ? "Loading…" : "Select province"}</option>
+            <option value="">Select province</option>
             {pFiltered.map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
@@ -161,17 +116,17 @@ export function PhilippineLocationPicker({ value, onChange, disabled, idPrefix =
             placeholder="Search city…"
             value={cQ}
             onChange={(e) => setCQ(e.target.value)}
-            disabled={disabled || !value.provinceCode || loadingCities}
+            disabled={disabled || !value.provinceCode}
             autoComplete="off"
           />
           <select
             id={`${idPrefix}-city`}
             className="dash-input"
-            disabled={disabled || !value.provinceCode || loadingCities}
+            disabled={disabled || !value.provinceCode}
             value={value.cityCode ?? ""}
             onChange={(e) => onCityPick(e.target.value)}
           >
-            <option value="">{loadingCities ? "Loading…" : "Select city / municipality"}</option>
+            <option value="">{value.provinceCode ? "Select city / municipality" : "Select province first"}</option>
             {cFiltered.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name}
@@ -179,34 +134,30 @@ export function PhilippineLocationPicker({ value, onChange, disabled, idPrefix =
             ))}
           </select>
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}-brgy-filter`} className="mb-1 block text-xs font-semibold text-zinc-600">
-            Barangay
-          </label>
-          <input
-            id={`${idPrefix}-brgy-filter`}
-            className="dash-input mb-1.5"
-            placeholder="Search barangay…"
-            value={bQ}
-            onChange={(e) => setBQ(e.target.value)}
-            disabled={disabled || !value.cityCode || loadingBarangays}
-            autoComplete="off"
-          />
-          <select
-            id={`${idPrefix}-brgy`}
-            className="dash-input"
-            disabled={disabled || !value.cityCode || loadingBarangays}
-            value={value.barangayCode ?? ""}
-            onChange={(e) => onBarangayPick(e.target.value)}
-          >
-            <option value="">{loadingBarangays ? "Loading…" : "Select barangay"}</option>
-            {bFiltered.map((b) => (
-              <option key={b.code} value={b.code}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      </div>
+      <div>
+        <label htmlFor={`${idPrefix}-brgy`} className="mb-1 block text-xs font-semibold text-zinc-600">
+          Barangay
+        </label>
+        <input
+          id={`${idPrefix}-brgy`}
+          type="text"
+          className="dash-input"
+          placeholder="Enter barangay…"
+          maxLength={180}
+          value={value.barangayName ?? ""}
+          disabled={disabled || !value.cityCode}
+          autoComplete="address-level4"
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange({ ...value, barangayName: v === "" ? null : v });
+          }}
+        />
+        {legacyBarangayCodeHint ? (
+          <p className="mt-1 text-xs text-zinc-500">
+            Your address used an older barangay code. Enter the barangay name above to confirm your location.
+          </p>
+        ) : null}
       </div>
     </div>
   );

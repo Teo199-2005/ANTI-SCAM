@@ -60,7 +60,9 @@ type FormState = {
   description: string;
   address_province_psgc: string | null;
   address_city_municipality_psgc: string | null;
+  /** Legacy PSGC barangay code (read-only for hint); new saves use address_barangay_name */
   address_barangay_psgc: string | null;
+  address_barangay_name: string | null;
   contact_number: string;
   is_publicly_listed: boolean;
   cancellation_policy: string;
@@ -158,6 +160,7 @@ export default function ResortProfilePage() {
           address_province_psgc: first.address_province_psgc ?? null,
           address_city_municipality_psgc: first.address_city_municipality_psgc ?? null,
           address_barangay_psgc: first.address_barangay_psgc ?? null,
+          address_barangay_name: first.address_barangay_name ?? null,
           contact_number: first.contact_number ?? "",
           is_publicly_listed: first.is_publicly_listed,
           cancellation_policy: (raw.cancellation_policy as string) ?? "",
@@ -227,6 +230,7 @@ export default function ResortProfilePage() {
         address_province_psgc: first.address_province_psgc ?? null,
         address_city_municipality_psgc: first.address_city_municipality_psgc ?? null,
         address_barangay_psgc: first.address_barangay_psgc ?? null,
+        address_barangay_name: first.address_barangay_name ?? null,
         contact_number: first.contact_number ?? "",
         is_publicly_listed: first.is_publicly_listed,
         cancellation_policy: (raw.cancellation_policy as string) ?? "",
@@ -371,6 +375,7 @@ export default function ResortProfilePage() {
               address_province_psgc: resort.address_province_psgc ?? null,
               address_city_municipality_psgc: resort.address_city_municipality_psgc ?? null,
               address_barangay_psgc: resort.address_barangay_psgc ?? null,
+              address_barangay_name: resort.address_barangay_name ?? null,
               facebook_url: resort.facebook_url ?? "",
               instagram_url: resort.instagram_url ?? "",
               tiktok_url: resort.tiktok_url ?? "",
@@ -394,7 +399,8 @@ export default function ResortProfilePage() {
         description: form.description || null,
         address_province_psgc: form.address_province_psgc,
         address_city_municipality_psgc: form.address_city_municipality_psgc,
-        address_barangay_psgc: form.address_barangay_psgc,
+        address_barangay_name: form.address_barangay_name?.trim() || null,
+        address_barangay_psgc: null,
         contact_number: form.contact_number || null,
         logo_url: form.logo_url || null,
         background_image_url: form.background_image_url || null,
@@ -758,15 +764,16 @@ export default function ResortProfilePage() {
             <div className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
               <MapPin size={13} className="text-zinc-500" />
               Philippine location <RequiredBadge />
-              <span className="ml-1.5 font-normal text-zinc-400">(province, city or municipality, barangay — used for maps and search)</span>
+              <span className="ml-1.5 font-normal text-zinc-400">(province, city or municipality, barangay — used for maps and search; data from PSA PSGC)</span>
             </div>
             <PhilippineLocationPicker
               idPrefix="resort-profile"
               disabled={saving}
+              legacyBarangayCodeHint={Boolean(form.address_barangay_psgc && !form.address_barangay_name?.trim())}
               value={{
                 provinceCode: form.address_province_psgc,
                 cityCode: form.address_city_municipality_psgc,
-                barangayCode: form.address_barangay_psgc,
+                barangayName: form.address_barangay_name,
               }}
               onChange={(next: PhilippineLocationValue) => {
                 setForm((prev) =>
@@ -775,7 +782,7 @@ export default function ResortProfilePage() {
                         ...prev,
                         address_province_psgc: next.provinceCode,
                         address_city_municipality_psgc: next.cityCode,
-                        address_barangay_psgc: next.barangayCode,
+                        address_barangay_name: next.barangayName,
                       }
                     : prev,
                 );
