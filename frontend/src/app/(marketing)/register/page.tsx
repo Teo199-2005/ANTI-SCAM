@@ -96,6 +96,7 @@ function RegisterPageInner() {
   const refFromQuery = searchParams.get("ref") ?? searchParams.get("referral") ?? "";
 
   useEffect(() => {
+    if (isGuestFromResort) return;
     const normalized = sanitizeReferralCodeInput(refFromQuery);
     if (!normalized) return;
     let cancelled = false;
@@ -122,7 +123,7 @@ function RegisterPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [refFromQuery]);
+  }, [refFromQuery, isGuestFromResort]);
 
   const clearAppliedReferral = () => {
     setAppliedReferral(null);
@@ -198,8 +199,8 @@ function RegisterPageInner() {
     isGuestFromResort && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
 
   return (
-    <AuthSplitShell resortBranding={isGuestFromResort && resortBrand ? resortBrand : null}>
-      {mounted && referralVerifyModalOpen
+    <AuthSplitShell guestResortContext={isGuestFromResort}>
+      {mounted && referralVerifyModalOpen && !isGuestFromResort
         ? createPortal(
             <div
               className="fixed inset-0 z-[400] flex items-center justify-center bg-zinc-900/45 p-4 backdrop-blur-[2px]"
@@ -460,56 +461,58 @@ function RegisterPageInner() {
             />
           </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <label htmlFor="register-referral" className="text-[11px] font-semibold text-zinc-700">
-                Referral code <span className="font-normal text-zinc-500">(optional)</span>
-              </label>
-              {appliedReferral ? (
+          {!isGuestFromResort ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="register-referral" className="text-[11px] font-semibold text-zinc-700">
+                  Referral code <span className="font-normal text-zinc-500">(optional)</span>
+                </label>
+                {appliedReferral ? (
+                  <button
+                    type="button"
+                    onClick={clearAppliedReferral}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-clOcean hover:bg-clOcean/10"
+                  >
+                    <X className="h-3 w-3" aria-hidden />
+                    Change
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  id="register-referral"
+                  suppressHydrationWarning
+                  className={cn(authInput, "min-w-0 flex-1 font-mono uppercase tracking-wide")}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={Boolean(appliedReferral)}
+                  value={referralDraft}
+                  onChange={(e) => setReferralDraft(sanitizeReferralCodeInput(e.target.value))}
+                  placeholder="e.g. RODRIGUEZ8391"
+                  maxLength={32}
+                />
                 <button
                   type="button"
-                  onClick={clearAppliedReferral}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-clOcean hover:bg-clOcean/10"
+                  onClick={() => void applyReferralForCode(referralDraft)}
+                  disabled={Boolean(appliedReferral) || referralVerifyModalOpen}
+                  className="shrink-0 rounded-lg border border-clOcean/30 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-clOcean shadow-sm transition hover:bg-clSeafoam/50 disabled:pointer-events-none disabled:opacity-50"
                 >
-                  <X className="h-3 w-3" aria-hidden />
-                  Change
+                  Apply
                 </button>
+              </div>
+              {appliedReferral ? (
+                <p className="text-[11px] font-medium text-emerald-700">
+                  Applied: <span className="font-mono">{appliedReferral.code}</span>
+                  <span className="text-zinc-600"> — {appliedReferral.marketerName}</span>
+                </p>
+              ) : null}
+              {referralFieldError && !appliedReferral ? (
+                <p role="status" className="text-[11px] font-medium text-red-700">
+                  {referralFieldError}
+                </p>
               ) : null}
             </div>
-            <div className="flex gap-2">
-              <input
-                id="register-referral"
-                suppressHydrationWarning
-                className={cn(authInput, "min-w-0 flex-1 font-mono uppercase tracking-wide")}
-                autoComplete="off"
-                spellCheck={false}
-                disabled={Boolean(appliedReferral)}
-                value={referralDraft}
-                onChange={(e) => setReferralDraft(sanitizeReferralCodeInput(e.target.value))}
-                placeholder="e.g. RODRIGUEZ8391"
-                maxLength={32}
-              />
-              <button
-                type="button"
-                onClick={() => void applyReferralForCode(referralDraft)}
-                disabled={Boolean(appliedReferral) || referralVerifyModalOpen}
-                className="shrink-0 rounded-lg border border-clOcean/30 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-clOcean shadow-sm transition hover:bg-clSeafoam/50 disabled:pointer-events-none disabled:opacity-50"
-              >
-                Apply
-              </button>
-            </div>
-            {appliedReferral ? (
-              <p className="text-[11px] font-medium text-emerald-700">
-                Applied: <span className="font-mono">{appliedReferral.code}</span>
-                <span className="text-zinc-600"> — {appliedReferral.marketerName}</span>
-              </p>
-            ) : null}
-            {referralFieldError && !appliedReferral ? (
-              <p role="status" className="text-[11px] font-medium text-red-700">
-                {referralFieldError}
-              </p>
-            ) : null}
-          </div>
+          ) : null}
 
           <label className="flex items-start gap-2 rounded-lg border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-2 text-[11px] leading-snug text-zinc-600 max-lg:bg-white/80">
             <input
@@ -546,7 +549,7 @@ function RegisterPageInner() {
           </Link>
         </p>
 
-        <AuthPageBrandTagline className="mt-3 border-t-0 pt-2 md:mt-2 md:pt-2" />
+        {!isGuestFromResort ? <AuthPageBrandTagline className="mt-3 border-t-0 pt-2 md:mt-2 md:pt-2" /> : null}
       </div>
     </AuthSplitShell>
   );

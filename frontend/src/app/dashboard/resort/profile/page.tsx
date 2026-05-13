@@ -614,9 +614,13 @@ export default function ResortProfilePage() {
             <div className="flex flex-wrap items-center gap-3">
               {form.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={laravelPublicUrl(form.logo_url)} alt="Resort logo" className="h-20 w-20 rounded-xl border border-softBorder object-contain bg-white" />
+                <img
+                  src={laravelPublicUrl(form.logo_url)}
+                  alt="Resort logo"
+                  className="h-28 w-28 rounded-xl border border-softBorder bg-white object-contain sm:h-32 sm:w-32"
+                />
               ) : (
-                <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1 text-center text-[10px] font-medium leading-tight text-rose-500">
+                <div className="flex h-28 w-28 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1.5 text-center text-[10px] font-medium leading-tight text-rose-500 sm:h-32 sm:w-32">
                   <span>No logo</span>
                   <span className="mt-1 text-[9px] font-normal text-rose-400">Preferred 512×512 px</span>
                 </div>
@@ -641,10 +645,10 @@ export default function ResortProfilePage() {
                 <img
                   src={laravelPublicUrl(form.background_image_url)}
                   alt="Background"
-                  className="h-24 w-44 rounded-xl border border-softBorder bg-zinc-100 object-contain"
+                  className="h-28 w-52 rounded-xl border border-softBorder bg-zinc-100 object-contain sm:h-32 sm:w-60"
                 />
               ) : (
-                <div className="flex h-20 w-36 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-1.5 text-center text-[10px] font-medium leading-tight text-rose-500">
+                <div className="flex h-28 w-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 px-2 text-center text-[10px] font-medium leading-tight text-rose-500 sm:h-32 sm:w-60">
                   <span>No image</span>
                   <span className="mt-1 text-[9px] font-normal text-rose-400">Any aspect ratio</span>
                 </div>

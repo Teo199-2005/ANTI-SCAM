@@ -239,11 +239,13 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
             ) : (
               <Logo size="sm" className="border-white/20 bg-white/15 shadow-soft-sm backdrop-blur-md" />
             )}
-            <div className="min-w-0 leading-tight">
+            <div className="flex min-w-0 flex-col gap-0.5 leading-tight">
               <BrandWordmark tone="onDark" size="sm" className="leading-tight" />
-              <span className="block truncate text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                {role === "guest" && user?.home_resort?.name ? user.home_resort.name : "Console"}
-              </span>
+              {role === "guest" && user?.home_resort?.name ? (
+                <span className="block truncate text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                  {user.home_resort.name}
+                </span>
+              ) : null}
             </div>
           </Link>
 

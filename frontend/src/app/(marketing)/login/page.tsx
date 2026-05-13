@@ -129,7 +129,7 @@ function LoginPageContent() {
 
   return (
     <>
-    <AuthSplitShell resortBranding={isGuestFromResort && resortBrand ? resortBrand : null}>
+    <AuthSplitShell guestResortContext={isGuestFromResort}>
       <div className={loginCardClass}>
         {isGuestFromResort ? (
           <ResortGuestAuthSessionCallout
@@ -302,10 +302,10 @@ function LoginPageContent() {
           </Link>
         </p>
 
-        <AuthPageBrandTagline />
+        {!isGuestFromResort ? <AuthPageBrandTagline /> : null}
       </div>
     </AuthSplitShell>
-    <DemoQuickLogin variant="floating" onLoginAs={onDemoLogin} />
+    {!isGuestFromResort ? <DemoQuickLogin variant="floating" onLoginAs={onDemoLogin} /> : null}
     </>
   );
 }

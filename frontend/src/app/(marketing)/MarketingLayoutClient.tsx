@@ -1,5 +1,6 @@
 "use client";
 
+import { ResortGuestPublicFooter } from "@/components/auth/ResortGuestPublicFooter";
 import AppLoadingScreen from "@/components/layout/AppLoadingScreen";
 import Footer from "@/components/layout/Footer";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
@@ -66,6 +67,17 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
       <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-white">
         <main className="relative z-0 min-w-0 shrink-0 grow-0">{children}</main>
         <Footer />
+      </div>
+    );
+  }
+
+  const resortSlugForGuestAuth = searchParams.get("resort")?.trim() ?? "";
+
+  if (allowAuthWhileSignedIn && resortSlugForGuestAuth) {
+    return (
+      <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[#f4f7fb]">
+        <main className="relative z-0 min-w-0 flex-1">{children}</main>
+        <ResortGuestPublicFooter resortSlug={resortSlugForGuestAuth} />
       </div>
     );
   }

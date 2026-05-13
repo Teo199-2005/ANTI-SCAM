@@ -7,18 +7,13 @@ import {
   AUTH_SHELL_CLEAR_NAV_MOBILE_PT,
   isAuthSplitShellPath,
 } from "@/lib/authMarketingNavOverlay";
-import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/layout/Logo";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 const BRAND_HERO_SRC = "/login.png";
-
-export type AuthResortBranding = {
-  name: string;
-  logoUrl: string | null;
-};
 
 export const AUTH_MOBILE_FORM_CHROME =
   "lg:contents max-lg:w-full max-lg:rounded-[1.4rem] max-lg:border max-lg:border-clOcean/25 max-lg:bg-gradient-to-b max-lg:from-[#dfeaf6] max-lg:via-white max-lg:to-[#f4f7fb] max-lg:p-1 max-lg:shadow-[0_24px_60px_-34px_rgba(13,30,66,0.55),0_0_0_1px_rgba(255,255,255,0.55)_inset] max-lg:ring-1 max-lg:ring-white/60";
@@ -31,47 +26,43 @@ export const AUTH_MARKETING_CARD =
 
 type AuthSplitShellProps = {
   children: ReactNode;
-  /** Guest auth from a resort listing — enables split layout on register + resort imagery. */
-  resortBranding?: AuthResortBranding | null;
+  /**
+   * Guest signup/sign-in opened from `/resort/{slug}` (`?resort=` on login/register).
+   * Single centered column + platform header; parent layout hides marketing nav/footer.
+   */
+  guestResortContext?: boolean;
 };
 
-function ResortHeroVisual({ branding }: { branding: AuthResortBranding }) {
-  const logoAbs = branding.logoUrl ? laravelPublicUrl(branding.logoUrl) : "";
-  if (logoAbs) {
-    return (
-      <div className="relative flex h-full min-h-[12rem] w-full flex-col items-center justify-center gap-3 rounded-2xl bg-white/95 p-6 shadow-inner shadow-zinc-900/10">
-        <div className="relative h-28 w-28 shrink-0 sm:h-32 sm:w-32">
-          <Image
-            src={logoAbs}
-            alt={`${branding.name} logo`}
-            fill
-            className="object-contain"
-            sizes="(max-width: 1024px) 40vw, 20vw"
-            priority
-            unoptimized
-          />
-        </div>
-        <p className="max-w-[16rem] text-center font-heading text-sm font-semibold text-navy sm:text-base">{branding.name}</p>
-        <p className="text-center text-[11px] text-zinc-500">Guest sign-in · Anti-Scam PH</p>
-      </div>
-    );
-  }
+/**
+ * Single-column layout for resort guest auth (no marketing navbar in parent — light top padding).
+ */
+function ResortGuestCenteredShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-navy/90 to-primaryBlue px-6 py-8 text-center shadow-inner">
-      <p className="font-heading text-lg font-semibold text-white sm:text-xl">{branding.name}</p>
-      <p className="text-[11px] text-white/75">Guest account · Anti-Scam PH</p>
+    <div className="auth-paper-bg relative min-h-0 flex-1">
+      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl sm:px-6 sm:pb-10 sm:pt-8">
+        <header className="mb-6 flex flex-col items-center gap-1.5 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Logo size="sm" className="border-zinc-200/90 bg-white shadow-sm ring-1 ring-zinc-100" />
+            <BrandWordmark tone="onLight" size="sm" className="leading-tight" />
+          </div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">Verified resort platform</p>
+        </header>
+
+        <div className="flex flex-1 flex-col justify-center">
+          <div className={cn(AUTH_MOBILE_FORM_CHROME, "lg:block")}>{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
 
 /**
- * Split auth layout: patterned left column + full-height branding image on large screens.
+ * Split auth layout for default marketing login/register (two panels on large screens).
  */
-export function AuthSplitShell({ children, resortBranding = null }: AuthSplitShellProps) {
+function DefaultSplitShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const clearFixedNav = isAuthSplitShellPath(pathname);
-  const hasResortBrand = Boolean(resortBranding?.name?.trim());
-  const registerCentered = (pathname === "/register" || pathname.startsWith("/register/")) && !hasResortBrand;
+  const registerCentered = pathname === "/register" || pathname.startsWith("/register/");
 
   return (
     <div className="auth-paper-bg relative min-h-screen">
@@ -89,33 +80,25 @@ export function AuthSplitShell({ children, resortBranding = null }: AuthSplitShe
             )}
           >
             <div className="relative h-[min(38svh,13.5rem)] min-h-[11.5rem] w-full overflow-hidden rounded-2xl sm:h-[min(36svh,15rem)] sm:min-h-[12.5rem]">
-              {hasResortBrand && resortBranding ? (
-                <div className="h-full w-full overflow-hidden rounded-2xl">
-                  <ResortHeroVisual branding={resortBranding} />
-                </div>
-              ) : (
-                <>
-                  <Image
-                    src={BRAND_HERO_SRC}
-                    alt="Anti-Scam PH — safe resort bookings"
-                    fill
-                    className="object-cover object-[center_15%]"
-                    sizes="100vw"
-                    priority
-                  />
-                  <div
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1628]/55 via-transparent to-transparent"
-                    aria-hidden
-                  />
-                </>
-              )}
+              <Image
+                src={BRAND_HERO_SRC}
+                alt="Anti-Scam PH — safe resort bookings"
+                fill
+                className="object-cover object-[center_15%]"
+                sizes="100vw"
+                priority
+              />
+              <div
+                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1628]/55 via-transparent to-transparent"
+                aria-hidden
+              />
             </div>
             <div className="mt-2.5 space-y-1 px-1 sm:mt-3">
               <div className="flex justify-center">
                 <BrandWordmark tone="onDark" size="sm" className="items-center" />
               </div>
               <p className="mx-auto max-w-[20rem] text-center text-[11px] leading-snug text-white/70">
-                {hasResortBrand ? "Book with verified safeguards · Philippines" : "Verify. Check. Protect. · Philippines"}
+                Verify. Check. Protect. · Philippines
               </p>
             </div>
           </div>
@@ -151,9 +134,7 @@ export function AuthSplitShell({ children, resortBranding = null }: AuthSplitShe
               registerCentered && "max-lg:mt-0 max-lg:rounded-none max-lg:shadow-none lg:min-h-0 lg:py-8 xl:py-10",
             )}
           >
-            <div
-              className={cn("mx-auto w-full max-w-md pb-1 lg:max-w-lg", registerCentered && "lg:max-w-2xl")}
-            >
+            <div className={cn("mx-auto w-full max-w-md pb-1 lg:max-w-lg", registerCentered && "lg:max-w-2xl")}>
               <div className={AUTH_MOBILE_FORM_CHROME}>{children}</div>
             </div>
           </div>
@@ -173,18 +154,14 @@ export function AuthSplitShell({ children, resortBranding = null }: AuthSplitShe
               )}
             >
               <div className="relative h-full w-full min-h-0">
-                {hasResortBrand && resortBranding ? (
-                  <ResortHeroVisual branding={resortBranding} />
-                ) : (
-                  <Image
-                    src={BRAND_HERO_SRC}
-                    alt="Anti-Scam PH — safe travels, verified resorts"
-                    fill
-                    sizes="50vw"
-                    className="object-contain object-center"
-                    priority
-                  />
-                )}
+                <Image
+                  src={BRAND_HERO_SRC}
+                  alt="Anti-Scam PH — safe travels, verified resorts"
+                  fill
+                  sizes="50vw"
+                  className="object-contain object-center"
+                  priority
+                />
               </div>
             </div>
           </aside>
@@ -192,4 +169,12 @@ export function AuthSplitShell({ children, resortBranding = null }: AuthSplitShe
       </div>
     </div>
   );
+}
+
+export function AuthSplitShell({ children, guestResortContext = false }: AuthSplitShellProps) {
+  if (guestResortContext) {
+    return <ResortGuestCenteredShell>{children}</ResortGuestCenteredShell>;
+  }
+
+  return <DefaultSplitShell>{children}</DefaultSplitShell>;
 }
