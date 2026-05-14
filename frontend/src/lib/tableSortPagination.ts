@@ -24,9 +24,13 @@ export function nextSort(
 export function extractLaravelMeta(payload: unknown): LaravelTableMeta | null {
   if (!payload || typeof payload !== "object") return null;
   const p = payload as Record<string, unknown>;
+  /** API Resources wrap meta; raw LengthAwarePaginator JSON is flat on the payload */
   const meta = p.meta;
-  if (!meta || typeof meta !== "object") return null;
-  const m = meta as Record<string, unknown>;
+  const m =
+    meta && typeof meta === "object"
+      ? (meta as Record<string, unknown>)
+      : (p.current_page !== undefined || p.last_page !== undefined ? p : null);
+  if (!m) return null;
   const current_page = typeof m.current_page === "number" ? m.current_page : 1;
   const last_page = typeof m.last_page === "number" ? m.last_page : 1;
   const per_page = typeof m.per_page === "number" ? m.per_page : 10;

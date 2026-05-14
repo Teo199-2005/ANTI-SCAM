@@ -17,9 +17,9 @@ import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { syncPendingSubscriptionInvoice } from "@/lib/api/subscription";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, ReceiptText, TrendingUp } from "lucide-react";
+import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, ReceiptText, RefreshCw, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -104,31 +104,34 @@ export default function ResortOverviewPage() {
     notifyTopbar();
   }, [pushToast]);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const now = new Date();
-        const [statsResult, calendarResult] = await Promise.allSettled([
-          getResortStats(),
-          getResortBookingCalendar(now.getFullYear(), now.getMonth() + 1),
-        ]);
-        if (statsResult.status !== "fulfilled") {
-          throw new Error("stats_failed");
-        }
-        setStats(statsResult.value);
-        setCalendarReservations(
-          calendarResult.status === "fulfilled" ? calendarResult.value.reservations : [],
-        );
-        setError(null);
-      } catch (err) {
-        setError("Unable to load resort dashboard stats.");
-      } finally {
-        setLoading(false);
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const now = new Date();
+      const [statsResult, calendarResult] = await Promise.allSettled([
+        getResortStats(),
+        getResortBookingCalendar(now.getFullYear(), now.getMonth() + 1),
+      ]);
+      if (statsResult.status !== "fulfilled") {
+        throw new Error("stats_failed");
       }
-    };
-    void load();
+      setStats(statsResult.value);
+      setCalendarReservations(
+        calendarResult.status === "fulfilled" ? calendarResult.value.reservations : [],
+      );
+      setError(null);
+    } catch {
+      setError(
+        "We could not load your dashboard. This is usually a brief network or server hiccup — try again in a moment.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   if (loading) {
     return (
@@ -145,8 +148,17 @@ export default function ResortOverviewPage() {
 
   if (error || !stats) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-800">
-        {error ?? "No data available."}
+      <div className="space-y-4 rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900">
+        <p className="text-sm leading-relaxed">{error ?? "No data available."}</p>
+        <button
+          type="button"
+          onClick={() => void loadDashboard()}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-5 py-2.5 text-sm font-semibold text-white shadow-card transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden />
+          Try again
+        </button>
       </div>
     );
   }

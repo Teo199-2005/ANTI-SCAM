@@ -7,10 +7,53 @@
  * Auth calls  → /api/auth/...     (Next.js BFF routes that set/clear the httpOnly cookie)
  * All other   → /api/backend/...  (Next.js proxy that injects cookie token as Bearer)
  *
- * This prevents token theft via XSS because JavaScript has no access to rs_session cookie.
- */
-import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+ * GET requests on apiClient, publicClient, and authClient automatically retry up to 3 times
+ * on transient failures (timeouts, connection drops, 408/425/429, 5xx). Mutating methods are never retried.
+import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
+import { isTransientRequestFailure } from "@/lib/api/withAxiosRetries";
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & { __getTransientRetryCount?: number };
+
+const GET_TRANSIENT_RETRY_DELAYS_MS = [350, 800, 1600];
+const GET_TRANSIENT_RETRY_MAX_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Retries failed GET requests on transient errors (timeouts, 5xx, network loss).
+ * POST/PUT/PATCH/DELETE are never retried here to avoid duplicate side effects.
+ */
+function attachTransientGetRetryInterceptor(instance: AxiosInstance, options?: { onFinal401?: boolean }): void {
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error: AxiosError) => {
+      const cfg = error.config as RetryableRequestConfig | undefined;
+
+      if (cfg && (cfg.method ?? "get").toLowerCase() === "get" && isTransientRequestFailure(error)) {
+        const attempt = cfg.__getTransientRetryCount ?? 0;
+        if (attempt < GET_TRANSIENT_RETRY_MAX_ATTEMPTS - 1) {
+          cfg.__getTransientRetryCount = attempt + 1;
+          const delay = GET_TRANSIENT_RETRY_DELAYS_MS[attempt] ?? GET_TRANSIENT_RETRY_DELAYS_MS.at(-1) ?? 1000;
+          await sleep(delay);
+          return instance.request(cfg);
+        }
+      }
+
+      if (options?.onFinal401 !== false && error.response?.status === 401) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("auth:expired"));
+        }
+      }
+
+      return Promise.reject(error);
+    },
+  );
+}
 
 // ── Public catalog client (no auth required) ──────────────────────────────────
 // Browser: same-origin `/api/public/*` → Next route proxies to Laravel (production has no `/api/v1` on nginx).
@@ -38,6 +81,8 @@ publicClient.interceptors.request.use((config) => {
   return config;
 });
 
+attachTransientGetRetryInterceptor(publicClient, { onFinal401: false });
+
 // ── Authenticated API client ──────────────────────────────────────────────────
 // Routes through /api/backend proxy → Next.js reads httpOnly cookie → injects Bearer.
 export const apiClient = axios.create({
@@ -55,23 +100,10 @@ export const authClient = axios.create({
   withCredentials: true,
 });
 
-// ── Response interceptors ─────────────────────────────────────────────────────
-function attachResponseInterceptor(client: typeof apiClient) {
-  client.interceptors.response.use(
-    (response) => response,
-    (error: AxiosError) => {
-      if (error.response?.status === 401) {
-        // Session expired — let auth context handle redirect.
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("auth:expired"));
-        }
-      }
-      return Promise.reject(error);
-    },
-  );
-}
+attachTransientGetRetryInterceptor(authClient, { onFinal401: false });
 
-attachResponseInterceptor(apiClient);
+// ── Authenticated Laravel proxy: GET retries + session signal on 401 ─────────
+attachTransientGetRetryInterceptor(apiClient);
 
 // ── Multipart helper ──────────────────────────────────────────────────────────
 // Override Content-Type for FormData so the proxy doesn't accidentally set JSON.

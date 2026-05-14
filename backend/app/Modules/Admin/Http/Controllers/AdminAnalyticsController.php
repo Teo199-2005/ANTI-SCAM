@@ -5,9 +5,10 @@ namespace App\Modules\Admin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Resort;
+use App\Support\QueryDateParts;
+use App\Support\CacheSafe;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdminAnalyticsController extends Controller
@@ -24,7 +25,7 @@ class AdminAnalyticsController extends Controller
 
         $cacheKey = "dashboard:admin_analytics:{$resortId}:{$year}:{$month}:{$minRevenue}:{$maxRevenue}";
 
-        $payload = Cache::remember($cacheKey, now()->addSeconds(60), function () use (
+        $payload = CacheSafe::remember($cacheKey, now()->addSeconds(60), function () use (
             $resortId, $year, $month, $minRevenue, $maxRevenue
         ) {
             // ── Base scoped query builder ───────────────────────────────────────
@@ -70,14 +71,16 @@ class AdminAnalyticsController extends Controller
                 ->get();
 
             // ── Monthly summary (all 12 months for the selected year) ───────────
+            $monthNumExpr = QueryDateParts::monthNumberExpression();
+            $monthGrpExpr = QueryDateParts::monthNumberGroupExpression();
             $monthlyRows = (clone $base)
                 ->selectRaw("
-                    CAST(strftime('%m', created_at) AS INTEGER) as month_num,
+                    {$monthNumExpr} as month_num,
                     COUNT(*) as reservations_count,
                     SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as revenue,
                     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_count
                 ")
-                ->groupBy(DB::raw("strftime('%m', created_at)"))
+                ->groupBy(DB::raw($monthGrpExpr))
                 ->orderBy('month_num')
                 ->get();
 

@@ -7,16 +7,14 @@ use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\CacheSafe;
 use App\Shared\Traits\ApiResponseTrait;
-use Illuminate\Support\Facades\Cache;
-
-class AdminStatsController extends Controller
 {
     use ApiResponseTrait;
 
     public function stats()
     {
-        $payload = Cache::remember('dashboard:admin_stats', now()->addSeconds(45), function () {
+        $payload = CacheSafe::remember('dashboard:admin_stats', now()->addSeconds(45), function () {
             $recentReservations = Reservation::withoutGlobalScopes()
                 ->with(['room:id,name', 'resort:id,name'])
                 ->latest()

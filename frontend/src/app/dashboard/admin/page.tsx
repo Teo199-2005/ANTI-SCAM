@@ -1,11 +1,10 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
-import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
 import StatCard from "@/components/dashboard/StatCard";
 import { getAdminStats, AdminStats } from "@/lib/api/admin";
-import { color, kpiTone, rgb, shadowKpiTint } from "@/lib/design-tokens";
-import { listResorts, ResortItem } from "@/lib/api/resort";
+import { color, kpiTone } from "@/lib/design-tokens";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,9 +13,7 @@ import {
   Clock3,
   DollarSign,
   Globe2,
-  MapPin,
   TrendingUp,
-  User,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -36,14 +33,10 @@ function percent(value: number, total: number): number {
   return Math.round((value / total) * 100);
 }
 
-type ResortItemExt = ResortItem & { owner_name?: string };
-
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resorts, setResorts] = useState<ResortItemExt[]>([]);
-  const [resortsLoading, setResortsLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -56,18 +49,7 @@ export default function AdminOverviewPage() {
         setLoading(false);
       }
     };
-    const loadResorts = async () => {
-      try {
-        const res = await listResorts({ perPage: 50 });
-        setResorts((res.data ?? []) as ResortItemExt[]);
-      } catch (err) {
-        // non-critical
-      } finally {
-        setResortsLoading(false);
-      }
-    };
     void load();
-    void loadResorts();
   }, []);
 
   if (loading) {
@@ -216,173 +198,6 @@ export default function AdminOverviewPage() {
         </div>
         </DashCard>
       </div>
-
-      {/* ── Resorts list ─────────────────────────────────────── */}
-      <DashCard className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="inline-flex rounded-lg bg-navy/10 p-2 ring-1 ring-navy/10">
-              <Building2 size={16} className="text-navy" />
-            </div>
-            <div>
-              <h2 className="font-dash text-base font-semibold text-navy">Resorts</h2>
-              <p className="text-xs text-zinc-500">{stats.totalResorts} registered</p>
-            </div>
-          </div>
-          <Link href="/dashboard/admin/resorts" className="dash-btn-sm">
-            Manage all
-          </Link>
-        </div>
-
-        {resortsLoading ? (
-          <>
-            <div className="md:hidden p-4"><DashMobileTableSkeleton rows={3} /></div>
-            <div className="hidden md:block space-y-2 p-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-4 rounded-xl bg-softGray p-3">
-                  <div className="h-4 w-1/4 animate-pulse rounded bg-zinc-200" />
-                  <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-200" />
-                  <div className="h-4 w-1/5 animate-pulse rounded bg-zinc-200" />
-                </div>
-              ))}
-            </div>
-          </>
-        ) : resorts.length === 0 ? (
-          <p className="px-6 py-8 text-sm text-zinc-500">No resorts registered yet.</p>
-        ) : (
-          <>
-            <div className="md:hidden space-y-3 p-4">
-              {resorts.map((resort, idx) => (
-                <DashMobileTableCard
-                  key={resort.id}
-                  title={
-                    <span>
-                      <span className="text-zinc-400">#{idx + 1}</span> {resort.name}
-                    </span>
-                  }
-                  fields={[
-                    {
-                      label: "Address",
-                      value: resort.address ? (
-                        <span className="inline-flex items-start gap-1 text-zinc-600">
-                          <MapPin size={12} className="mt-0.5 shrink-0 text-zinc-400" />
-                          {resort.address}
-                        </span>
-                      ) : (
-                        "—"
-                      ),
-                    },
-                    {
-                      label: "Owner",
-                      value: resort.owner_name ? (
-                        <span className="inline-flex items-center gap-1 text-zinc-700">
-                          <User size={12} className="shrink-0 text-zinc-400" />
-                          {resort.owner_name}
-                        </span>
-                      ) : (
-                        "—"
-                      ),
-                    },
-                    {
-                      label: "Subscription",
-                      value: resort.subscription ? (
-                        <span
-                          className={
-                            resort.subscription.status === "active"
-                              ? "dash-badge-emerald"
-                              : resort.subscription.status === "suspended"
-                                ? "dash-badge-rose"
-                                : "dash-badge-amber"
-                          }
-                        >
-                          {resort.subscription.plan}
-                        </span>
-                      ) : (
-                        "—"
-                      ),
-                    },
-                    {
-                      label: "Listed",
-                      value: resort.is_publicly_listed ? (
-                        <span className="dash-badge-emerald">Listed</span>
-                      ) : (
-                        <span className="dash-badge-slate">Unlisted</span>
-                      ),
-                    },
-                  ]}
-                  actions={
-                    <Link href="/dashboard/admin/resorts" className="dash-btn-sm w-full justify-center">
-                      Manage resorts
-                    </Link>
-                  }
-                />
-              ))}
-            </div>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="dash-table">
-                <thead>
-                  <tr>
-                    <th className="w-10">#</th>
-                    <th>Resort Name</th>
-                    <th>Area / Address</th>
-                    <th>Agent / Owner</th>
-                    <th>Subscription</th>
-                    <th>Listed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resorts.map((resort, idx) => (
-                    <tr key={resort.id}>
-                      <td className="text-xs text-zinc-400">{idx + 1}</td>
-                      <td className="font-semibold text-navy">{resort.name}</td>
-                      <td>
-                        {resort.address ? (
-                          <span className="inline-flex items-center gap-1 text-zinc-600">
-                            <MapPin size={12} className="shrink-0 text-zinc-400" />
-                            {resort.address}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-400">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {resort.owner_name ? (
-                          <span className="inline-flex items-center gap-1 text-zinc-700">
-                            <User size={12} className="shrink-0 text-zinc-400" />
-                            {resort.owner_name}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-400">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {resort.subscription ? (
-                          <span className={
-                            resort.subscription.status === "active"    ? "dash-badge-emerald" :
-                            resort.subscription.status === "suspended" ? "dash-badge-rose"    :
-                            "dash-badge-amber"
-                          }>
-                            {resort.subscription.plan}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-400">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {resort.is_publicly_listed ? (
-                          <span className="dash-badge-emerald">Listed</span>
-                        ) : (
-                          <span className="dash-badge-slate">Unlisted</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </DashCard>
 
       <DashCard className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">

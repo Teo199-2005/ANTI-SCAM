@@ -28,6 +28,7 @@ class AdminSubscriptionOverviewController extends Controller
                 'address_province_psgc',
                 'address_city_municipality_psgc',
                 'address_barangay_psgc',
+                'address_barangay_name',
                 'address_label',
                 'contact_number',
                 'logo_url',
