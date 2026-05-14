@@ -9,11 +9,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building, Menu, Shield, Users, X } from "lucide-react";
+import { Building, Gift, Menu, Shield, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { ResortGrowthRewardsProgramModal } from "@/components/layout/ResortGrowthRewardsProgramModal";
 import { VerifyResortComingSoonModal } from "@/components/layout/VerifyResortComingSoonModal";
 
 const GOLD = "#f5a623";
@@ -56,6 +57,7 @@ export function MarketingPremiumNavbar({ mode }: Props) {
   const { user, loading } = useAuth();
   const [mobileNav, setMobileNav] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
+  const [programOpen, setProgramOpen] = useState(false);
 
   useEffect(() => {
     setMobileNav(false);
@@ -242,6 +244,17 @@ export function MarketingPremiumNavbar({ mode }: Props) {
           >
             Contact
           </Link>
+          <button
+            type="button"
+            className={cn(verifyButtonClass(), "font-semibold")}
+            style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+            onClick={() => setProgramOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={programOpen}
+          >
+            <Gift className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} aria-hidden />
+            Program
+          </button>
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -342,6 +355,18 @@ export function MarketingPremiumNavbar({ mode }: Props) {
           >
             Contact
           </Link>
+          <button
+            type="button"
+            className={mobileRowClass(false)}
+            style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+            onClick={() => {
+              setMobileNav(false);
+              setProgramOpen(true);
+            }}
+          >
+            <Gift className="h-4 w-4 shrink-0" style={{ color: GOLD }} aria-hidden />
+            Program
+          </button>
           {!loading && user ? (
             <Link
               href="/dashboard"
@@ -376,6 +401,7 @@ export function MarketingPremiumNavbar({ mode }: Props) {
     <>
       <header className={headerShell}>{inner}</header>
       <VerifyResortComingSoonModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
+      <ResortGrowthRewardsProgramModal open={programOpen} onClose={() => setProgramOpen(false)} />
     </>
   );
 }
