@@ -100,14 +100,19 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
     return NextResponse.json(data, { status: backendRes.status });
   }
 
-  // Non-JSON response (e.g. HTML error page from unexpected exceptions)
+  // Non-JSON response (e.g. HTML error page, Cloudflare challenge, or nginx body)
   const text = await backendRes.text();
   if (!backendRes.ok) {
     console.error(`[BFF proxy] Non-JSON error from backend (${backendRes.status}):`, text.slice(0, 500));
-    return NextResponse.json(
-      { success: false, message: `Server error (${backendRes.status}). Check API logs.` },
-      { status: backendRes.status }
-    );
+    const lower = text.toLowerCase();
+    const looksCfChallenge =
+      lower.includes("cloudflare") &&
+      (lower.includes("checking your browser") || lower.includes("cf-mitigated") || lower.includes("challenge"));
+    const message =
+      backendRes.status === 403 && looksCfChallenge
+        ? "Request blocked (403) before the API — often a Cloudflare WAF or bot challenge. Open Security → Events in Cloudflare, or try again in the browser after the site check completes."
+        : `Server error (${backendRes.status}). Check API logs.`;
+    return NextResponse.json({ success: false, message }, { status: backendRes.status });
   }
   return new NextResponse(text, {
     status: backendRes.status,

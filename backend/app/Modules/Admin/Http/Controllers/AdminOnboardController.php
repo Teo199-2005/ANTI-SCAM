@@ -12,11 +12,10 @@ use App\Services\EmailNotificationService;
 use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\MultipartUploadHints;
+use App\Support\StoredMedia;
 use App\Support\TenantPublicIdentifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AdminOnboardController extends Controller
@@ -152,10 +151,11 @@ class AdminOnboardController extends Controller
             'logo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:12288'],
         ]);
 
-        $path = $request->file('logo')->store('resort-logos', 'public');
+        $disk = StoredMedia::disk();
+        $path = $request->file('logo')->store('resort-logos', $disk);
 
         return $this->successResponse([
-            'logo_url' => '/storage/'.$path,
+            'logo_url' => StoredMedia::publicUrlForPath($path),
         ], 'Resort logo uploaded');
     }
 
@@ -295,13 +295,11 @@ class AdminOnboardController extends Controller
             return $this->errorResponse('No resort found for this account.', null, 404);
         }
 
-        if ($resort->logo_url && str_starts_with((string) $resort->logo_url, '/storage/')) {
-            $relative = substr((string) $resort->logo_url, strlen('/storage/'));
-            Storage::disk('public')->delete($relative);
-        }
+        StoredMedia::deleteIfPresent($resort->logo_url);
 
-        $path = $uploaded->store('resort-logos', 'public');
-        $logoUrl = '/storage/'.$path;
+        $disk = StoredMedia::disk();
+        $path = $uploaded->store('resort-logos', $disk);
+        $logoUrl = StoredMedia::publicUrlForPath($path);
 
         $resort->update(['logo_url' => $logoUrl]);
 

@@ -174,6 +174,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
 
   useEffect(() => {
     if (!showSubscribeModal) {
+      // Closing the modal is also done at the start of "Subscribe now" before the invoice API returns.
+      // Do not wipe referral state during that in-flight checkout or Xendit can get no referral (wrong amount).
+      if (subscribeInFlightRef.current) {
+        return;
+      }
       setReferralCode("");
       setAppliedReferralCode(null);
       setReferralReadiness(null);
@@ -244,15 +249,17 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     if (subscribeInFlightRef.current) return;
     subscribeInFlightRef.current = true;
     setSubscribingNow(true);
+    const referralForCheckout = appliedReferralCode ?? undefined;
+    const durationForCheckout = selectedDuration;
     setShowSubscribeModal(false);
     try {
       const result = await createSubscriptionInvoice(
         false,
         undefined,
-        appliedReferralCode ?? undefined,
+        referralForCheckout,
         "monthly",
         undefined,
-        selectedDuration,
+        durationForCheckout,
         typeof window !== "undefined" ? window.location.origin : undefined,
       );
       window.location.href = result.invoice_url;

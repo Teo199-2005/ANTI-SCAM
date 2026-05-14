@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\RoomImage;
 use App\Shared\Traits\ApiResponseTrait;
+use App\Support\StoredMedia;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -19,6 +20,7 @@ class RoomImageController extends Controller
     public function index(Room $room)
     {
         $this->authorizeRoom($room);
+
         return $this->successResponse(
             $room->images()->orderBy('sort_order')->get()->map(fn (RoomImage $img) => $this->format($img)),
             'Room images fetched'
@@ -60,14 +62,14 @@ class RoomImageController extends Controller
         Validator::make(
             ['images' => $files],
             [
-                'images'   => ['array', 'min:1', 'max:5'],
+                'images' => ['array', 'min:1', 'max:5'],
                 // 25600 KB = 25 MB — keep in sync with RESORT_ROOM_PHOTO_MAX_BYTES and PHP upload limits.
                 'images.*' => ['image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
             ],
             [
                 'images.*.image' => 'Each file must be a readable image.',
                 'images.*.mimes' => 'Use JPEG, PNG, WebP, GIF, BMP, or TIFF.',
-                'images.*.max'   => 'Each image may be up to 25 MB.',
+                'images.*.max' => 'Each image may be up to 25 MB.',
             ],
         )->validate();
 
@@ -80,20 +82,21 @@ class RoomImageController extends Controller
 
         $tenantId = TenantContext::tenantId() ?? $request->user()?->tenant_id;
 
+        $disk = StoredMedia::disk();
         $created = [];
         foreach ($files as $file) {
             /** @var UploadedFile $file */
-            $path      = $file->store("rooms/{$room->id}", 'public');
+            $path = $file->store("rooms/{$room->id}", $disk);
             $isPrimary = $room->images()->count() === 0 && count($created) === 0;
 
             $img = RoomImage::create([
-                'room_id'       => $room->id,
-                'tenant_id'     => $tenantId,
-                'path'          => $path,
-                'disk'          => 'public',
+                'room_id' => $room->id,
+                'tenant_id' => $tenantId,
+                'path' => $path,
+                'disk' => $disk,
                 'original_name' => $file->getClientOriginalName(),
-                'sort_order'    => $room->images()->count(),
-                'is_primary'    => $isPrimary,
+                'sort_order' => $room->images()->count(),
+                'is_primary' => $isPrimary,
             ]);
             $created[] = $this->format($img);
         }
@@ -107,6 +110,7 @@ class RoomImageController extends Controller
         $this->authorizeImage($room, $image);
         Storage::disk($image->disk)->delete($image->path);
         $image->delete();
+
         return $this->successResponse(null, 'Image deleted');
     }
 
@@ -116,6 +120,7 @@ class RoomImageController extends Controller
         $this->authorizeImage($room, $image);
         $room->images()->update(['is_primary' => false]);
         $image->update(['is_primary' => true]);
+
         return $this->successResponse($this->format($image->refresh()), 'Primary image updated');
     }
 
@@ -128,7 +133,7 @@ class RoomImageController extends Controller
 
     private function authorizeRoom(Room $room): void
     {
-        $user     = auth()->user();
+        $user = auth()->user();
         $tenantId = TenantContext::tenantId() ?? $user?->tenant_id;
 
         if ($tenantId && $room->tenant_id !== $tenantId) {
@@ -185,11 +190,11 @@ class RoomImageController extends Controller
     private function format(RoomImage $img): array
     {
         return [
-            'id'            => $img->id,
-            'url'           => Storage::disk($img->disk)->url($img->path),
+            'id' => $img->id,
+            'url' => Storage::disk($img->disk)->url($img->path),
             'original_name' => $img->original_name,
-            'sort_order'    => $img->sort_order,
-            'is_primary'    => (bool) $img->is_primary,
+            'sort_order' => $img->sort_order,
+            'is_primary' => (bool) $img->is_primary,
         ];
     }
 }

@@ -7,8 +7,8 @@ use App\Models\Resort;
 use App\Services\LandingReadinessService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\MultipartUploadHints;
+use App\Support\StoredMedia;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class ResortLandingPageController extends Controller
 {
@@ -40,21 +40,21 @@ class ResortLandingPageController extends Controller
             return $this->errorResponse('No resort found for this account.', null, 404);
         }
 
-        $owner   = $this->readiness->resolveOwner($resort);
-        $check   = $this->readiness->check($resort);
+        $owner = $this->readiness->resolveOwner($resort);
+        $check = $this->readiness->check($resort);
         $payload = $check['is_ready']
             ? $this->readiness->computePayload($resort, $owner)
             : null;
 
         return $this->successResponse([
-            'subdomain'           => $resort->tenant?->subdomain,
-            'resort_id'           => $resort->id,
+            'subdomain' => $resort->tenant?->subdomain,
+            'resort_id' => $resort->id,
             'subscription_status' => $resort->subscription?->status,
-            'subscription_plan'   => $resort->subscription?->plan,
+            'subscription_plan' => $resort->subscription?->plan,
             'subscription_end_at' => $resort->subscription?->billing_cycle_end?->toDateString(),
-            'is_ready'            => $check['is_ready'],
-            'missing_fields'      => $check['missing_fields'],
-            'computed'            => $payload,
+            'is_ready' => $check['is_ready'],
+            'missing_fields' => $check['missing_fields'],
+            'computed' => $payload,
         ], 'Landing page config fetched');
     }
 
@@ -108,14 +108,11 @@ class ResortLandingPageController extends Controller
             return $this->errorResponse('No resort found for this account.', null, 404);
         }
 
-        // Delete old background image if stored locally
-        if ($resort->background_image_url && str_starts_with((string) $resort->background_image_url, '/storage/')) {
-            $relative = substr((string) $resort->background_image_url, strlen('/storage/'));
-            Storage::disk('public')->delete($relative);
-        }
+        StoredMedia::deleteIfPresent($resort->background_image_url);
 
-        $path = $uploaded->store('resort-backgrounds', 'public');
-        $url  = '/storage/' . $path;
+        $disk = StoredMedia::disk();
+        $path = $uploaded->store('resort-backgrounds', $disk);
+        $url = StoredMedia::publicUrlForPath($path);
 
         $resort->update(['background_image_url' => $url]);
 
@@ -134,8 +131,8 @@ class ResortLandingPageController extends Controller
         }
 
         $request->validate([
-            'image'    => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
-            'images'   => ['nullable', 'array', 'min:1', 'max:6'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
+            'images' => ['nullable', 'array', 'min:1', 'max:6'],
             'images.*' => ['image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
         ]);
 
@@ -156,14 +153,15 @@ class ResortLandingPageController extends Controller
             return $this->errorResponse('Please select at least one image to upload.', null, 422);
         }
 
+        $disk = StoredMedia::disk();
         $urls = [];
         foreach ($uploaded as $file) {
-            $path   = $file->store('resort-landing', 'public');
-            $urls[] = '/storage/' . $path;
+            $path = $file->store('resort-landing', $disk);
+            $urls[] = StoredMedia::publicUrlForPath($path);
         }
 
         return $this->successResponse([
-            'url'  => $urls[0] ?? null,
+            'url' => $urls[0] ?? null,
             'urls' => $urls,
         ], count($urls) > 1 ? 'Images uploaded' : 'Image uploaded');
     }

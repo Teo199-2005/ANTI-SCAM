@@ -15,10 +15,10 @@ use App\Shared\Traits\ApiResponseTrait;
 use App\Support\GcashAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
 use App\Support\PlatformPasswordRules;
+use App\Support\StoredMedia;
 use App\Support\UserProfilePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -464,8 +464,9 @@ class AuthController extends Controller
 
         $this->deleteStoredMarketingGovIdDocument($user);
 
-        $path = $request->file('document')->store('marketing_gov_ids/'.$user->id, 'public');
-        $user->update(['marketer_gov_id_document_url' => '/storage/'.$path]);
+        $disk = StoredMedia::disk();
+        $path = $request->file('document')->store('marketing_gov_ids/'.$user->id, $disk);
+        $user->update(['marketer_gov_id_document_url' => StoredMedia::publicUrlForPath($path)]);
 
         return $this->successResponse([
             'user' => UserProfilePresenter::toArray($user->fresh()),
@@ -505,14 +506,11 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        // Delete previous avatar if it was a stored file.
-        if ($user->avatar_url && str_starts_with($user->avatar_url, '/storage/')) {
-            $oldPath = str_replace('/storage/', 'public/', $user->avatar_url);
-            Storage::delete($oldPath);
-        }
+        StoredMedia::deleteIfPresent($user->avatar_url);
 
-        $path = $request->file('avatar')->store('avatars', 'public');
-        $user->update(['avatar_url' => '/storage/'.$path]);
+        $disk = StoredMedia::disk();
+        $path = $request->file('avatar')->store('avatars', $disk);
+        $user->update(['avatar_url' => StoredMedia::publicUrlForPath($path)]);
 
         return $this->successResponse(['avatar_url' => $user->avatar_url], 'Avatar updated');
     }
@@ -570,9 +568,6 @@ class AuthController extends Controller
 
     private function deleteStoredMarketingGovIdDocument(User $user): void
     {
-        if ($user->marketer_gov_id_document_url && str_starts_with((string) $user->marketer_gov_id_document_url, '/storage/')) {
-            $oldPath = str_replace('/storage/', 'public/', (string) $user->marketer_gov_id_document_url);
-            Storage::delete($oldPath);
-        }
+        StoredMedia::deleteIfPresent($user->marketer_gov_id_document_url);
     }
 }

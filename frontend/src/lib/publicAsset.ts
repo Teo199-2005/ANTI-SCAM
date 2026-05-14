@@ -23,8 +23,9 @@ function publicAssetOrigin(): string {
  * (avoids `publicAssetOrigin()` differing: server uses Laravel origin, browser may use
  * `window.location.origin` on some hosts).
  *
+ * **Absolute HTTPS URLs** (e.g. Cloudflare R2 public domain): returned unchanged for `img src`.
+ *
  * **Other paths / full URLs:** still resolved with {@link publicAssetOrigin} where applicable.
- */
 export function laravelPublicUrl(path: string | null | undefined): string {
   if (!path) return "";
 
