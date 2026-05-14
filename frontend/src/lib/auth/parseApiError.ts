@@ -188,6 +188,10 @@ export function parseApiErrorMessage(error: unknown, fallback = "Something went 
 
     if (error.response?.status === 401) return "Your session expired. Please sign in again.";
     if (error.response?.status === 403) return "You are not allowed to do that.";
+    if (error.response?.status === 500)
+      return typeof data?.message === "string" && data.message.trim() !== ""
+        ? data.message.trim()
+        : "The server hit an error while signing you in. Check Laravel logs, database migrations (including personal_access_tokens), and APP_KEY on the VPS.";
     if (error.response?.status === 404) return "We could not find that. It may have been removed.";
     if (error.response?.status === 413)
       return "That file is too large for the server. Try a smaller image, or use a compressed JPEG or WebP.";

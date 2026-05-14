@@ -1,4 +1,5 @@
 import { authBffJsonHeaders } from "@/lib/api/authBffProxyHeaders";
+import { readBackendResponseJson } from "@/lib/api/backendFetchJson";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { shouldAttachLoginProxyDiagnostics } from "@/lib/isLocalDevRequest";
 import { NextRequest, NextResponse } from "next/server";
@@ -35,7 +36,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const payload = (await backendRes.json()) as {
+  const { parsed, parseFailed, status } = await readBackendResponseJson(backendRes);
+
+  if (parseFailed) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Sign-in service returned an unexpected response. Check that Laravel is reachable and Nginx routes /api/v1 to PHP.",
+        ...loginDevHint(req),
+      },
+      { status: 502 },
+    );
+  }
+
+  const payload = parsed as {
     success?: boolean;
     message?: string;
     errors?: Record<string, string[]>;
@@ -55,7 +70,7 @@ export async function POST(req: NextRequest) {
         ...(payload.errors ? { errors: payload.errors } : {}),
         ...loginDevHint(req),
       },
-      { status: backendRes.status >= 400 ? backendRes.status : 422 },
+      { status: status >= 400 ? status : 422 },
     );
   }
 

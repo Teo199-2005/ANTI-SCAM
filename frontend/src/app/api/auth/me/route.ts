@@ -1,3 +1,4 @@
+import { readBackendResponseJson } from "@/lib/api/backendFetchJson";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 import { rsSessionClearCookieOptions } from "../sessionCookieSecure";
@@ -20,6 +21,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, message: "API unreachable." }, { status: 502 });
   }
 
+  const { parsed, parseFailed, status } = await readBackendResponseJson(backendRes);
+
+  if (parseFailed || status >= 500) {
+    return NextResponse.json(
+      { success: false, message: "Account service is temporarily unavailable. Please try again." },
+      { status: 503 },
+    );
+  }
+
   if (!backendRes.ok) {
     // Token invalid or expired — clear it
     const res = NextResponse.json({ success: false, message: "Session expired." }, { status: 401 });
@@ -27,9 +37,9 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  const payload = await backendRes.json();
+  const payload = parsed as { data?: unknown };
   // Normalise to { user: AuthUser } so AuthContext.refreshUser can read data.data.user
   // (The login BFF wraps the user the same way; /auth/me backend returns the bare user in data)
-  const userPayload = payload.data ?? payload;
+  const userPayload = payload.data ?? parsed;
   return NextResponse.json({ success: true, data: { user: userPayload } });
 }
