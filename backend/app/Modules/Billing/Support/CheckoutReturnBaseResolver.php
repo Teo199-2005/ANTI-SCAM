@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Support;
 
+use Illuminate\Support\Facades\Log;
+
 /**
  * Resolves the SPA origin used in Xendit success/failure redirects.
  * Defaults to FRONTEND_URL; the client may send checkout_return_base (browser origin)
@@ -34,6 +36,14 @@ final class CheckoutReturnBaseResolver
         }
         $host = strtolower((string) $parts['host']);
         if (! $this->isAllowedCheckoutReturnHost($host)) {
+            if (config('app.env') !== 'local') {
+                Log::warning('checkout_return_base rejected; using app.frontend_url for Xendit redirects', [
+                    'requested' => $trimmed,
+                    'host' => $host,
+                    'fallback' => $default,
+                ]);
+            }
+
             return $default;
         }
         $port = isset($parts['port']) ? ':'.(int) $parts['port'] : '';
@@ -66,6 +76,18 @@ final class CheckoutReturnBaseResolver
                 if (is_string($h) && strcasecmp($host, $h) === 0) {
                     return true;
                 }
+            }
+        }
+
+        // Same public host as Laravel APP_URL (common when FRONTEND_URL was left at localhost on the VPS).
+        $appHost = parse_url((string) config('app.url', ''), PHP_URL_HOST);
+        if (is_string($appHost) && $appHost !== '') {
+            $appHost = strtolower($appHost);
+            if (strcasecmp($host, $appHost) === 0) {
+                return true;
+            }
+            if (str_ends_with($host, '.'.$appHost)) {
+                return true;
             }
         }
 

@@ -107,12 +107,26 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
     const lower = text.toLowerCase();
     const looksCfChallenge =
       lower.includes("cloudflare") &&
-      (lower.includes("checking your browser") || lower.includes("cf-mitigated") || lower.includes("challenge"));
+      (lower.includes("checking your browser") ||
+        lower.includes("cf-mitigated") ||
+        lower.includes("challenge") ||
+        lower.includes("cf-ray") ||
+        lower.includes("__cf_bm"));
+    const cfOpsHint =
+      "Request blocked (403) before Laravel — usually the Next.js server is calling your public site through Cloudflare (HTML challenge). On the VPS, set LARAVEL_API_BASE_URL to an internal URL (e.g. http://127.0.0.1:8080/api/v1 per deployment/nginx-laravel-loopback.example.conf), not https://your-domain/.... Then pm2 restart the frontend with --update-env. In Cloudflare: Security → Events if you must use the public URL.";
+    const cfUserMessage =
+      "We could not reach the booking system from the app server (connection blocked). Please try again in a moment. If this continues, contact support — the host may need an internal API URL for the dashboard.";
     const message =
       backendRes.status === 403 && looksCfChallenge
-        ? "Request blocked (403) before Laravel — usually the Next.js server is calling your public site through Cloudflare (HTML challenge). On the VPS, set LARAVEL_API_BASE_URL to an internal URL (e.g. http://127.0.0.1:8080/api/v1 per deployment/nginx-laravel-loopback.example.conf), not https://your-domain/.... Then pm2 restart the frontend with --update-env. In Cloudflare: Security → Events if you must use the public URL."
+        ? process.env.NODE_ENV === "production"
+          ? cfUserMessage
+          : cfOpsHint
         : `Server error (${backendRes.status}). Check API logs.`;
-    return NextResponse.json({ success: false, message }, { status: backendRes.status });
+    const body: Record<string, unknown> = { success: false, message };
+    if (backendRes.status === 403 && looksCfChallenge && process.env.NODE_ENV === "production") {
+      body.code = "bff_upstream_cloudflare_html";
+    }
+    return NextResponse.json(body, { status: backendRes.status });
   }
   return new NextResponse(text, {
     status: backendRes.status,

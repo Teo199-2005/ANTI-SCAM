@@ -526,8 +526,6 @@ export default function ResortRoomsPage() {
               and complete <strong>Create my resort workspace</strong> (tenant + first resort). Then return here to add rooms.
             </p>
           </div>
-        ) : error ? (
-          <p className="mt-3 text-sm text-rose-700">{error}</p>
         ) : null}
       </div>
 
