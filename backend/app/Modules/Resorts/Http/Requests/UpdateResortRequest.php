@@ -11,7 +11,7 @@ class UpdateResortRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
-        foreach (['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_psgc', 'address_barangay_name'] as $key) {
+        foreach (['address_province_psgc', 'address_city_municipality_psgc', 'address_barangay_psgc', 'address_barangay_name', 'address_street_line'] as $key) {
             if (! $this->has($key)) {
                 continue;
             }
@@ -61,6 +61,9 @@ class UpdateResortRequest extends FormRequest
             'address_city_municipality_psgc' => ['nullable', 'string', 'max:12'],
             'address_barangay_psgc' => ['nullable', 'string', 'max:12'],
             'address_barangay_name' => ['nullable', 'string', 'max:180'],
+            'address_street_line' => ['nullable', 'string', 'max:255'],
+            'map_latitude' => ['nullable', 'numeric', 'between:4.2,21.3'],
+            'map_longitude' => ['nullable', 'numeric', 'between:116.4,127.2'],
             'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
@@ -86,6 +89,14 @@ class UpdateResortRequest extends FormRequest
                 $this->input('address_barangay_name'),
                 $this->input('address_barangay_psgc'),
             );
+
+            $lat = $this->input('map_latitude');
+            $lng = $this->input('map_longitude');
+            $latEmpty = $lat === null || $lat === '';
+            $lngEmpty = $lng === null || $lng === '';
+            if ($latEmpty xor $lngEmpty) {
+                $v->errors()->add('map_latitude', 'Provide both latitude and longitude, or clear both.');
+            }
         });
     }
 }

@@ -45,7 +45,19 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // Render all API exceptions as consistent JSON envelopes.
         $exceptions->render(function (Throwable $e, Request $request) {
-            if (! $request->expectsJson() && ! str_starts_with($request->getPathInfo(), '/api')) {
+            // Always return JSON for API traffic. Some reverse proxies expose PATH_INFO as `/v1/...`
+            // (without the `/api` prefix); relying only on getPathInfo() can yield HTML error pages
+            // for abort(403) while the SPA still sent Accept: application/json.
+            $pathInfo = $request->getPathInfo();
+            $path = $request->path();
+            $isLikelyApiRequest =
+                $request->expectsJson()
+                || str_starts_with($pathInfo, '/api')
+                || str_starts_with($pathInfo, '/v1/')
+                || str_starts_with((string) $path, 'api/')
+                || str_starts_with((string) $path, 'v1/');
+
+            if (! $isLikelyApiRequest) {
                 return null; // Let web routes render HTML as usual.
             }
 

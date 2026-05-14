@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
+import { isAxiosError } from "axios";
 
 type SubscriptionInvoicePayload = {
   id: number;
@@ -46,8 +47,32 @@ function normalizeInvoice(raw: SubscriptionInvoicePayload): SubscriptionInvoice 
   };
 }
 
+const OWNER_PAY_INVOICE_PATH = "/resort-owner/subscriptions/pay-invoice";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** One retry: duplicate POST is safe when backend reuses an existing pending gateway invoice. */
+function shouldRetrySubscriptionInvoiceOnce(err: unknown): boolean {
+  if (!isAxiosError(err)) {
+    return false;
+  }
+  if (!err.response) {
+    return true;
+  }
+  const s = err.response.status;
+  return s === 408 || s === 425 || s === 429 || s === 502 || s === 503 || s === 504;
+}
+
+/**
+ * Start subscription checkout (Xendit). Uses the owner-scoped route so the server resolves
+ * the resort from the session tenant (same source as the landing page), avoiding 403s from
+ * a wrong or stale resort id in the URL.
+ */
 export async function createSubscriptionInvoice(
-  resortId: number,
   force = false,
   paymentMethod?: string,
   referralCode?: string,
@@ -57,19 +82,28 @@ export async function createSubscriptionInvoice(
   /** Same host as the dashboard session (e.g. window.location.origin) so Xendit returns to the correct cookie jar. */
   checkoutReturnBase?: string,
 ): Promise<{ invoice_url: string }> {
-  const { data } = await apiClient.post<ApiEnvelope<{ invoice_url: string }>>(
-    `/resorts/${resortId}/subscriptions/pay-invoice`,
-    {
-      force,
-      payment_method: paymentMethod ?? null,
-      referral_code: referralCode ?? null,
-      billing_scope: billingScope ?? "monthly",
-      room_addon_quantity: roomAddonQuantity ?? 1,
-      subscription_duration_months: subscriptionDurationMonths ?? 1,
-      checkout_return_base: checkoutReturnBase ?? null,
-    },
-  );
-  return data.data;
+  const body = {
+    force,
+    payment_method: paymentMethod ?? null,
+    referral_code: referralCode ?? null,
+    billing_scope: billingScope ?? "monthly",
+    room_addon_quantity: roomAddonQuantity ?? 1,
+    subscription_duration_months: subscriptionDurationMonths ?? 1,
+    checkout_return_base: checkoutReturnBase ?? null,
+  };
+
+  const postOnce = () =>
+    apiClient.post<ApiEnvelope<{ invoice_url: string }>>(OWNER_PAY_INVOICE_PATH, body).then((r) => r.data.data);
+
+  try {
+    return await postOnce();
+  } catch (e) {
+    if (shouldRetrySubscriptionInvoiceOnce(e)) {
+      await sleep(450);
+      return await postOnce();
+    }
+    throw e;
+  }
 }
 
 export async function triggerSubscriptionInvoice(
@@ -102,4 +136,3 @@ export async function syncPendingSubscriptionInvoice(
   }
   return data.data;
 }
-

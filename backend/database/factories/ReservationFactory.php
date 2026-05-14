@@ -44,6 +44,7 @@ class ReservationFactory extends Factory
             'resort_id' => $room->resort_id,
             'room_id' => $room->id,
             'client_id' => $client->id,
+            'booking_source' => 'online',
             'reference_no' => 'RS-'.strtoupper(Str::random(8)),
             'check_in_date' => $checkIn->toDateString(),
             'check_out_date' => $checkOut->toDateString(),

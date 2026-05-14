@@ -91,7 +91,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={toast.id}
             role="status"
             aria-live="polite"
-            className={`dash-toast-item pointer-events-auto overflow-hidden rounded-2xl p-4 font-dash backdrop-blur-md transition-all duration-300 motion-reduce:transition-none ${toneClass(toast.tone)} ${
+            className={`dash-toast-item pointer-events-auto overflow-hidden rounded-2xl p-4 font-dash transition-all duration-300 motion-reduce:transition-none ${toneClass(toast.tone)} ${
               toast.visible
                 ? "translate-x-0 translate-y-0 opacity-100"
                 : "translate-y-3 opacity-0 max-sm:translate-x-0 sm:-translate-y-2 sm:translate-x-4"

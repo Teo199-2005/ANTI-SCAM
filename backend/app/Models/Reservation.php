@@ -16,6 +16,7 @@ class Reservation extends Model
         'resort_id',
         'room_id',
         'client_id',
+        'booking_source',
         'guest_name',
         'guest_email',
         'guest_phone',

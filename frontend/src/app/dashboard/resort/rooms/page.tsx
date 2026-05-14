@@ -327,7 +327,6 @@ export default function ResortRoomsPage() {
     setPayingForRoomSlot(true);
     try {
       const result = await createSubscriptionInvoice(
-        resort.id,
         false,
         undefined,
         undefined,

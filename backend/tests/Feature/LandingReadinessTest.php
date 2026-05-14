@@ -202,6 +202,41 @@ class LandingReadinessTest extends TestCase
         $this->assertEquals('Agtangao, Bangued, Abra', $payload['map']['address']);
     }
 
+    public function test_computed_payload_map_prefers_coordinates_over_text_query(): void
+    {
+        $tenant = $this->makeTenant();
+        $resort = $this->makeResort($tenant, [
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'map_latitude' => 14.5995,
+            'map_longitude' => 120.9842,
+        ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
+
+        $payload = $this->service->computePayload($resort, null);
+
+        $this->assertStringContainsString('14.5995', $payload['map']['embedUrl'] ?? '');
+        $this->assertStringContainsString('120.9842', $payload['map']['embedUrl'] ?? '');
+    }
+
+    public function test_computed_payload_map_address_includes_street_prefix(): void
+    {
+        $tenant = $this->makeTenant();
+        $resort = $this->makeResort($tenant, [
+            'address_street_line' => 'Blk 1 Lot 5',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+        ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
+
+        $payload = $this->service->computePayload($resort, null);
+
+        $this->assertStringStartsWith('Blk 1 Lot 5,', $payload['map']['address'] ?? '');
+        $this->assertStringContainsString(rawurlencode('Blk 1 Lot 5'), (string) ($payload['map']['embedUrl'] ?? ''));
+    }
+
     public function test_computed_payload_has_null_map_when_location_is_empty(): void
     {
         $tenant = $this->makeTenant();

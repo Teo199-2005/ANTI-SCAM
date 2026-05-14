@@ -240,10 +240,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     setSubscribingNow(true);
     setShowSubscribeModal(false);
     try {
-      const ownerLanding = await getOwnerLandingPage();
-      const resortId = ownerLanding.resort_id;
       const result = await createSubscriptionInvoice(
-        resortId,
         false,
         undefined,
         appliedReferralCode ?? undefined,

@@ -384,6 +384,23 @@ body {
   @apply mb-1 px-2 font-dash text-dash-xs font-medium text-zinc-600;
 }
 
+/* ── Toast stack (dashboard) — solid card, no backdrop blur ─── */
+.dash-toast-item {
+  @apply border border-slate-200/85 bg-gradient-to-b from-white to-softCard text-zinc-900 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/70;
+}
+.dash-toast-item.dash-toast--success {
+  @apply border-emerald-200/95;
+}
+.dash-toast-item.dash-toast--error {
+  @apply border-rose-200/95;
+}
+.dash-toast-item.dash-toast--warning {
+  @apply border-amber-200/95;
+}
+.dash-toast-item.dash-toast--info {
+  @apply border-sky-200/95;
+}
+
 } /* end @layer components */
 
 /* ═══════════════════════════════════════════════════════════════

@@ -29,6 +29,10 @@ export type ResortItem = {
   address_city_municipality_psgc?: string | null;
   address_barangay_psgc?: string | null;
   address_barangay_name?: string | null;
+  /** Street / building line (optional). */
+  address_street_line?: string | null;
+  map_latitude?: number | null;
+  map_longitude?: number | null;
   address_label?: string | null;
   contact_number: string | null;
   logo_url?: string | null;

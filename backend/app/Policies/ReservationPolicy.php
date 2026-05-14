@@ -30,6 +30,32 @@ class ReservationPolicy
         return in_array($user->role, ['admin', 'client', 'user', 'guest'], true);
     }
 
+    /** Walk-in / desk bookings created by the resort owner (no payment gateway). */
+    public function createManual(User $user): bool
+    {
+        return $user->role === 'resort_owner';
+    }
+
+    public function updateManual(User $user, Reservation $reservation): bool
+    {
+        if ($user->role !== 'resort_owner') {
+            return false;
+        }
+
+        return (int) $user->tenant_id === (int) $reservation->tenant_id
+            && ($reservation->booking_source ?? 'online') === 'manual';
+    }
+
+    public function cancelByResort(User $user, Reservation $reservation): bool
+    {
+        if ($user->role !== 'resort_owner') {
+            return false;
+        }
+
+        return (int) $user->tenant_id === (int) $reservation->tenant_id
+            && ($reservation->booking_source ?? 'online') === 'manual';
+    }
+
     public function cancel(User $user, Reservation $reservation): bool
     {
         return $user->role === 'admin'

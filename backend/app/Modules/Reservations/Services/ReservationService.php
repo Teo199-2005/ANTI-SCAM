@@ -7,7 +7,9 @@ use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Room;
 use App\Models\SystemSetting;
+use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
+use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -25,6 +27,43 @@ class ReservationService
         }
 
         return max(0, (float) config('reservations.default_reservation_fee', 500));
+    }
+
+    /**
+     * Count reservations that block a new stay for the same room (pending_payment + confirmed).
+     */
+    public function countBlockingOverlaps(
+        int $tenantId,
+        int $roomId,
+        DateTimeInterface|string $checkIn,
+        DateTimeInterface|string $checkOut,
+        ?int $excludeReservationId = null,
+    ): int {
+        $checkInStr = $checkIn instanceof DateTimeInterface
+            ? $checkIn->format('Y-m-d')
+            : (string) $checkIn;
+        $checkOutStr = $checkOut instanceof DateTimeInterface
+            ? $checkOut->format('Y-m-d')
+            : (string) $checkOut;
+
+        $q = Reservation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('room_id', $roomId)
+            ->whereIn('status', ['pending_payment', 'confirmed'])
+            ->where(function ($query) use ($checkInStr, $checkOutStr): void {
+                $query
+                    ->whereBetween('check_in_date', [$checkInStr, $checkOutStr])
+                    ->orWhereBetween('check_out_date', [$checkInStr, $checkOutStr])
+                    ->orWhere(function ($inner) use ($checkInStr, $checkOutStr): void {
+                        $inner->where('check_in_date', '<=', $checkInStr)
+                            ->where('check_out_date', '>=', $checkOutStr);
+                    });
+            });
+        if ($excludeReservationId !== null) {
+            $q->where('id', '!=', $excludeReservationId);
+        }
+
+        return $q->lockForUpdate()->count();
     }
 
     public function createFromLock(array $payload): Reservation
@@ -71,21 +110,13 @@ class ReservationService
                 throw new RuntimeException('Selected room does not belong to the chosen resort.');
             }
 
-            $overlapCount = Reservation::query()
-                ->where('tenant_id', $tenantId)
-                ->where('room_id', $lock->room_id)
-                ->whereIn('status', ['pending_payment', 'confirmed'])
-                ->where(function ($query) use ($lock): void {
-                    $query
-                        ->whereBetween('check_in_date', [$lock->check_in_date, $lock->check_out_date])
-                        ->orWhereBetween('check_out_date', [$lock->check_in_date, $lock->check_out_date])
-                        ->orWhere(function ($q) use ($lock): void {
-                            $q->where('check_in_date', '<=', $lock->check_in_date)
-                                ->where('check_out_date', '>=', $lock->check_out_date);
-                        });
-                })
-                ->lockForUpdate()
-                ->count();
+            $overlapCount = $this->countBlockingOverlaps(
+                $tenantId,
+                (int) $lock->room_id,
+                $lock->check_in_date,
+                $lock->check_out_date,
+                null,
+            );
 
             $units = max(1, (int) ($room->units ?? 1));
 
@@ -99,6 +130,7 @@ class ReservationService
                 'resort_id' => $resortId,
                 'room_id' => $lock->room_id,
                 'client_id' => $payload['client_id'] ?? null,
+                'booking_source' => 'online',
                 'reference_no' => 'RSV-'.strtoupper(Str::random(10)),
                 'check_in_date' => $lock->check_in_date->toDateString(),
                 'check_out_date' => $lock->check_out_date->toDateString(),
@@ -123,6 +155,207 @@ class ReservationService
 
             return $reservation->refresh();
         });
+    }
+
+    public function createManualForResort(User $owner, array $validated): Reservation
+    {
+        return DB::transaction(function () use ($owner, $validated) {
+            $tenantId = (int) $owner->tenant_id;
+            $resortId = (int) $validated['resort_id'];
+            $roomId = (int) $validated['room_id'];
+
+            $resort = Resort::withoutGlobalScopes()
+                ->where('id', $resortId)
+                ->where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->first();
+            if (! $resort) {
+                throw new RuntimeException('Resort not found for your account.');
+            }
+
+            $room = Room::withoutGlobalScopes()
+                ->where('id', $roomId)
+                ->where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->first();
+            if (! $room || (int) $room->resort_id !== $resortId) {
+                throw new RuntimeException('Room does not belong to this resort.');
+            }
+
+            $checkIn = (string) $validated['check_in_date'];
+            $checkOut = (string) $validated['check_out_date'];
+
+            $overlapCount = $this->countBlockingOverlaps($tenantId, $roomId, $checkIn, $checkOut, null);
+            $units = max(1, (int) ($room->units ?? 1));
+            if ($overlapCount >= $units) {
+                throw new RuntimeException('Those dates overlap an existing booking for this room.');
+            }
+
+            $fee = array_key_exists('reservation_fee', $validated) && $validated['reservation_fee'] !== null
+                ? (float) $validated['reservation_fee']
+                : self::reservationFeeAmount();
+
+            $reservation = Reservation::create([
+                'tenant_id' => $tenantId,
+                'resort_id' => $resortId,
+                'room_id' => $roomId,
+                'client_id' => null,
+                'booking_source' => 'manual',
+                'guest_name' => (string) $validated['guest_name'],
+                'guest_email' => isset($validated['guest_email']) ? (string) $validated['guest_email'] : null,
+                'guest_phone' => isset($validated['guest_phone']) ? (string) $validated['guest_phone'] : null,
+                'reference_no' => 'RSV-'.strtoupper(Str::random(10)),
+                'check_in_date' => $checkIn,
+                'check_out_date' => $checkOut,
+                'guest_count' => (int) $validated['guest_count'],
+                'reservation_fee' => max(0, $fee),
+                'total_amount' => (float) $validated['total_amount'],
+                'status' => 'confirmed',
+                'xendit_invoice_id' => null,
+                'xendit_payment_status' => 'paid',
+                'reserved_at' => now(),
+            ]);
+
+            $this->audits->log(
+                'reservation_created_manual',
+                'reservation',
+                $reservation->id,
+                null,
+                $reservation->only(['status', 'booking_source', 'reservation_fee', 'xendit_payment_status']),
+                []
+            );
+
+            return $reservation->refresh();
+        });
+    }
+
+    public function updateManual(Reservation $reservation, User $owner, array $validated): Reservation
+    {
+        if (($reservation->booking_source ?? 'online') !== 'manual') {
+            throw new RuntimeException('Only manual reservations can be edited here.');
+        }
+        if ($reservation->status !== 'confirmed') {
+            throw new RuntimeException('Only confirmed manual reservations can be edited.');
+        }
+        if ($reservation->check_out_date->toDateString() < now()->toDateString()) {
+            throw new RuntimeException('Cannot edit a reservation after check-out.');
+        }
+
+        return DB::transaction(function () use ($reservation, $owner, $validated) {
+            $tenantId = (int) $owner->tenant_id;
+            if ((int) $reservation->tenant_id !== $tenantId) {
+                throw new RuntimeException('Reservation does not belong to your resort.');
+            }
+
+            $resortId = (int) $reservation->resort_id;
+            $roomId = array_key_exists('room_id', $validated)
+                ? (int) $validated['room_id']
+                : (int) $reservation->room_id;
+
+            $room = Room::withoutGlobalScopes()
+                ->where('id', $roomId)
+                ->where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->first();
+            if (! $room || (int) $room->resort_id !== $resortId) {
+                throw new RuntimeException('Room does not belong to this resort.');
+            }
+
+            $checkIn = array_key_exists('check_in_date', $validated)
+                ? (string) $validated['check_in_date']
+                : $reservation->check_in_date->toDateString();
+            $checkOut = array_key_exists('check_out_date', $validated)
+                ? (string) $validated['check_out_date']
+                : $reservation->check_out_date->toDateString();
+
+            $overlapCount = $this->countBlockingOverlaps($tenantId, $roomId, $checkIn, $checkOut, (int) $reservation->id);
+            $units = max(1, (int) ($room->units ?? 1));
+            if ($overlapCount >= $units) {
+                throw new RuntimeException('Those dates overlap an existing booking for this room.');
+            }
+
+            $oldValues = $reservation->only([
+                'room_id', 'check_in_date', 'check_out_date', 'guest_count', 'guest_name', 'guest_email', 'guest_phone',
+                'total_amount', 'reservation_fee',
+            ]);
+
+            $updates = [
+                'room_id' => $roomId,
+                'check_in_date' => $checkIn,
+                'check_out_date' => $checkOut,
+            ];
+            if (array_key_exists('guest_name', $validated)) {
+                $updates['guest_name'] = (string) $validated['guest_name'];
+            }
+            if (array_key_exists('guest_email', $validated)) {
+                $updates['guest_email'] = $validated['guest_email'] !== null && $validated['guest_email'] !== ''
+                    ? (string) $validated['guest_email']
+                    : null;
+            }
+            if (array_key_exists('guest_phone', $validated)) {
+                $updates['guest_phone'] = $validated['guest_phone'] !== null && $validated['guest_phone'] !== ''
+                    ? (string) $validated['guest_phone']
+                    : null;
+            }
+            if (array_key_exists('guest_count', $validated)) {
+                $updates['guest_count'] = (int) $validated['guest_count'];
+            }
+            if (array_key_exists('total_amount', $validated)) {
+                $updates['total_amount'] = (float) $validated['total_amount'];
+            }
+            if (array_key_exists('reservation_fee', $validated)) {
+                $updates['reservation_fee'] = $validated['reservation_fee'] !== null
+                    ? max(0, (float) $validated['reservation_fee'])
+                    : $reservation->reservation_fee;
+            }
+
+            $reservation->update($updates);
+
+            $this->audits->log(
+                'reservation_updated_manual',
+                'reservation',
+                $reservation->id,
+                $oldValues,
+                $reservation->only([
+                    'room_id', 'check_in_date', 'check_out_date', 'guest_count', 'guest_name', 'guest_email', 'guest_phone',
+                    'total_amount', 'reservation_fee',
+                ]),
+                []
+            );
+
+            return $reservation->refresh();
+        });
+    }
+
+    public function cancelByResort(Reservation $reservation, ?string $reason = null): Reservation
+    {
+        if (($reservation->booking_source ?? 'online') !== 'manual') {
+            throw new RuntimeException('Only manual reservations can be cancelled this way.');
+        }
+        if (! in_array($reservation->status, ['pending_payment', 'confirmed'], true)) {
+            throw new RuntimeException('Reservation is not eligible for cancellation.');
+        }
+
+        $oldValues = $reservation->only(['status', 'refund_status']);
+        $reservation->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancellation_reason' => $reason,
+            'refund_status' => config('reservations.reservation_fee_non_refundable', true)
+                ? 'non_refundable_fee_retained'
+                : 'refunded',
+        ]);
+
+        $this->audits->log(
+            'reservation_cancelled_by_resort',
+            'reservation',
+            $reservation->id,
+            $oldValues,
+            $reservation->only(['status', 'refund_status']),
+            ['reason' => $reason]
+        );
+
+        return $reservation->refresh();
     }
 
     public function cancelByClient(Reservation $reservation, int $clientId, ?string $reason = null): Reservation

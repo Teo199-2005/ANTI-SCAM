@@ -1,7 +1,11 @@
 "use client";
 
 import { apiClient } from "@/lib/api/client";
+import type { ApiEnvelope } from "@/lib/api/types";
+import { listResorts } from "@/lib/api/resort";
+import type { ResortItem } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import DashModal from "@/components/dash/DashModal";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DataTable from "@/components/shared/DataTable";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
@@ -14,8 +18,22 @@ import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { useToast } from "@/components/shared/ToastProvider";
-import { CheckCircle2, ChevronDown, ChevronUp, Filter, ReceiptText, UserX } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { CheckCircle2, ChevronDown, ChevronUp, Filter, Pencil, Plus, ReceiptText, UserX, XCircle } from "lucide-react";
+import { Fragment, useCallback, useEffect, useState } from "react";
+
+type RoomRow = { id: number; resort_id: number; name: string; status: string };
+
+type ManualFormState = {
+  roomId: number | "";
+  checkIn: string;
+  checkOut: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  guestCount: number;
+  totalAmount: string;
+  reservationFee: string;
+};
 
 type ReservationRow = {
   id: number;
@@ -27,6 +45,10 @@ type ReservationRow = {
   reservationFee: number;
   totalAmount: number;
   xenditPaymentStatus: string | null;
+  bookingSource: string;
+  guestName: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
   room?: { id: number; name: string };
   client?: { id: number; name: string; email: string };
 };
@@ -76,6 +98,25 @@ function normalizeReservation(raw: Record<string, unknown>): ReservationRow {
         : raw.xendit_payment_status != null
           ? String(raw.xendit_payment_status)
           : null,
+    bookingSource: String(raw.bookingSource ?? raw.booking_source ?? "online"),
+    guestName:
+      raw.guestName != null
+        ? String(raw.guestName)
+        : raw.guest_name != null
+          ? String(raw.guest_name)
+          : null,
+    guestEmail:
+      raw.guestEmail != null
+        ? String(raw.guestEmail)
+        : raw.guest_email != null
+          ? String(raw.guest_email)
+          : null,
+    guestPhone:
+      raw.guestPhone != null
+        ? String(raw.guestPhone)
+        : raw.guest_phone != null
+          ? String(raw.guest_phone)
+          : null,
     room:
       roomRaw && typeof roomRaw.id !== "undefined"
         ? { id: Number(roomRaw.id), name: String(roomRaw.name ?? "") }
@@ -91,6 +132,18 @@ function normalizeReservation(raw: Record<string, unknown>): ReservationRow {
   };
 }
 
+function guestDisplayName(row: ReservationRow): string {
+  if (row.client?.name) return row.client.name;
+  if (row.guestName) return row.guestName;
+  return "—";
+}
+
+function guestDisplayEmail(row: ReservationRow): string {
+  if (row.client?.email) return row.client.email;
+  if (row.guestEmail) return row.guestEmail;
+  return "—";
+}
+
 const statusBadge: Record<string, string> = {
   confirmed: "dash-badge-emerald",
   pending_payment: "dash-badge-amber",
@@ -99,6 +152,34 @@ const statusBadge: Record<string, string> = {
   no_show: "dash-badge-rose",
   completed: "dash-badge-navy",
 };
+
+function emptyManualForm(): ManualFormState {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const tomorrowIso = tomorrow.toISOString().slice(0, 10);
+  return {
+    roomId: "",
+    checkIn: todayIso,
+    checkOut: tomorrowIso,
+    guestName: "",
+    guestEmail: "",
+    guestPhone: "",
+    guestCount: 2,
+    totalAmount: "",
+    reservationFee: "",
+  };
+}
+
+function canEditManual(row: ReservationRow): boolean {
+  if (row.bookingSource !== "manual" || row.status !== "confirmed") return false;
+  const out = row.checkOutDate.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(out) && out >= new Date().toISOString().slice(0, 10);
+}
+
+function canCancelManual(row: ReservationRow): boolean {
+  return row.bookingSource === "manual" && (row.status === "confirmed" || row.status === "pending_payment");
+}
 
 export default function ResortReservationsPage() {
   const { pushToast } = useToast();
@@ -114,6 +195,157 @@ export default function ResortReservationsPage() {
   const [perPage, setPerPage] = useState(15);
   const [sortBy, setSortBy] = useState<string>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [resort, setResort] = useState<ResortItem | null>(null);
+  const [roomOpts, setRoomOpts] = useState<{ id: number; name: string }[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [editManualId, setEditManualId] = useState<number | null>(null);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualForm, setManualForm] = useState<ManualFormState>(() => emptyManualForm());
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await listResorts({ perPage: 5 });
+        setResort(r.data[0] ?? null);
+      } catch {
+        setResort(null);
+      }
+    })();
+  }, []);
+
+  const loadRoomOpts = useCallback(async (resortId: number) => {
+    setRoomsLoading(true);
+    try {
+      const { data } = await apiClient.get<ApiEnvelope<{ data?: RoomRow[] } | RoomRow[]>>("/rooms", {
+        params: { resort_id: resortId, perPage: 100, sort_by: "name", sort_dir: "asc" },
+      });
+      const payload = data.data;
+      const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      setRoomOpts(
+        rows
+          .filter((room) => Number(room.resort_id) === resortId && room.status === "active")
+          .map((room) => ({ id: room.id, name: room.name })),
+      );
+    } catch {
+      setRoomOpts([]);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
+  const openManualCreate = async () => {
+    if (!resort?.id) {
+      pushToast({ title: "No resort", description: "Create a resort workspace first.", tone: "error" });
+      return;
+    }
+    setEditManualId(null);
+    setManualForm(emptyManualForm());
+    await loadRoomOpts(resort.id);
+    setManualOpen(true);
+  };
+
+  const openManualEdit = async (row: ReservationRow) => {
+    if (!resort?.id) return;
+    setEditManualId(row.id);
+    setManualForm({
+      roomId: row.room?.id ?? "",
+      checkIn: row.checkInDate.slice(0, 10),
+      checkOut: row.checkOutDate.slice(0, 10),
+      guestName: row.guestName ?? "",
+      guestEmail: row.guestEmail ?? "",
+      guestPhone: row.guestPhone ?? "",
+      guestCount: row.guestCount,
+      totalAmount: String(row.totalAmount),
+      reservationFee: String(row.reservationFee),
+    });
+    await loadRoomOpts(resort.id);
+    setManualOpen(true);
+  };
+
+  const submitManual = async () => {
+    if (!resort?.id) return;
+    if (!manualForm.roomId) {
+      pushToast({ title: "Room required", description: "Choose a room for this stay.", tone: "error" });
+      return;
+    }
+    if (!manualForm.guestName.trim()) {
+      pushToast({ title: "Guest name required", tone: "error" });
+      return;
+    }
+    const total = Number(manualForm.totalAmount);
+    if (!Number.isFinite(total) || total < 0) {
+      pushToast({ title: "Invalid total", description: "Enter a valid total amount.", tone: "error" });
+      return;
+    }
+    setManualSaving(true);
+    try {
+      if (editManualId == null) {
+        const body: Record<string, unknown> = {
+          resort_id: resort.id,
+          room_id: manualForm.roomId,
+          check_in_date: manualForm.checkIn,
+          check_out_date: manualForm.checkOut,
+          guest_name: manualForm.guestName.trim(),
+          guest_email: manualForm.guestEmail.trim() || null,
+          guest_phone: manualForm.guestPhone.trim() || null,
+          guest_count: manualForm.guestCount,
+          total_amount: total,
+        };
+        const feeNum = Number(manualForm.reservationFee);
+        if (manualForm.reservationFee.trim() !== "" && Number.isFinite(feeNum)) {
+          body.reservation_fee = feeNum;
+        }
+        await apiClient.post("/reservations/manual", body);
+        pushToast({ title: "Reservation created", tone: "success" });
+      } else {
+        const body: Record<string, unknown> = {
+          room_id: manualForm.roomId,
+          check_in_date: manualForm.checkIn,
+          check_out_date: manualForm.checkOut,
+          guest_name: manualForm.guestName.trim(),
+          guest_email: manualForm.guestEmail.trim() || null,
+          guest_phone: manualForm.guestPhone.trim() || null,
+          guest_count: manualForm.guestCount,
+          total_amount: total,
+        };
+        const feeNum = Number(manualForm.reservationFee);
+        if (manualForm.reservationFee.trim() !== "") {
+          body.reservation_fee = Number.isFinite(feeNum) ? feeNum : null;
+        }
+        await apiClient.patch(`/reservations/${editManualId}/manual`, body);
+        pushToast({ title: "Reservation updated", tone: "success" });
+      }
+      setManualOpen(false);
+      await load(appliedStatus, page, perPage, sortBy, sortDir);
+    } catch (err) {
+      pushToast({
+        title: editManualId == null ? "Could not create" : "Could not update",
+        description: parseApiErrorMessage(err, "Check the form and try again."),
+        tone: "error",
+      });
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
+  const cancelManualReservation = async (id: number) => {
+    if (!window.confirm("Cancel this manual reservation?")) return;
+    setLifecycleBusyId(id);
+    try {
+      await apiClient.post(`/reservations/${id}/cancel-by-resort`, {});
+      pushToast({ title: "Reservation cancelled", tone: "success" });
+      await load(appliedStatus, page, perPage, sortBy, sortDir);
+    } catch (err) {
+      pushToast({
+        title: "Cancel failed",
+        description: parseApiErrorMessage(err, "Could not cancel reservation."),
+        tone: "error",
+      });
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  };
 
   const load = async (st: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
@@ -216,7 +448,7 @@ export default function ResortReservationsPage() {
         </p>
       </div>
 
-      <div className="dash-card dash-filter-bar items-stretch p-4 md:items-end">
+      <div className="dash-card dash-filter-bar flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end">
         <div className="min-w-48 flex-1">
           <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Status filter</label>
           <select className="dash-input" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -232,6 +464,10 @@ export default function ResortReservationsPage() {
         <button type="button" className="dash-btn-primary" onClick={() => applyFilter()}>
           <Filter size={14} />
           Apply
+        </button>
+        <button type="button" className="dash-btn-sm border border-navy/20 bg-softCard text-navy" onClick={() => void openManualCreate()}>
+          <Plus size={14} />
+          Manual reservation
         </button>
       </div>
 
@@ -281,10 +517,10 @@ export default function ResortReservationsPage() {
                             <span className="font-semibold text-zinc-500">Room</span> {item.room?.name ?? "—"}
                           </p>
                           <p>
-                            <span className="font-semibold text-zinc-500">Guest</span> {item.client?.name ?? "—"}
+                            <span className="font-semibold text-zinc-500">Guest</span> {guestDisplayName(item)}
                           </p>
                           <p>
-                            <span className="font-semibold text-zinc-500">Email</span> {item.client?.email ?? "—"}
+                            <span className="font-semibold text-zinc-500">Email</span> {guestDisplayEmail(item)}
                           </p>
                           <p>
                             <span className="font-semibold text-zinc-500">Reservation fee</span>{" "}
@@ -294,6 +530,31 @@ export default function ResortReservationsPage() {
                             <span className="font-semibold text-zinc-500">Payment</span>{" "}
                             {item.xenditPaymentStatus ?? "pending"}
                           </p>
+                          {canEditManual(item) || canCancelManual(item) ? (
+                            <div className="mt-2 flex flex-col gap-2">
+                              {canEditManual(item) ? (
+                                <button
+                                  type="button"
+                                  className="dash-btn-sm flex w-full items-center justify-center gap-1.5 border border-sky-200 bg-sky-50 text-navy"
+                                  onClick={() => void openManualEdit(item)}
+                                >
+                                  <Pencil size={14} />
+                                  Edit manual
+                                </button>
+                              ) : null}
+                              {canCancelManual(item) ? (
+                                <button
+                                  type="button"
+                                  disabled={lifecycleBusyId === item.id}
+                                  className="dash-btn-sm flex w-full items-center justify-center gap-1.5 border border-rose-200 bg-rose-50 text-rose-900"
+                                  onClick={() => void cancelManualReservation(item.id)}
+                                >
+                                  <XCircle size={14} />
+                                  {lifecycleBusyId === item.id ? "Cancelling…" : "Cancel reservation"}
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
                           {lifecycle ? (
                             <div className="mt-3 flex flex-col gap-2">
                               <button
@@ -372,6 +633,27 @@ export default function ResortReservationsPage() {
                           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           Details
                         </button>
+                        {canEditManual(item) ? (
+                          <button
+                            type="button"
+                            className="dash-btn-sm border border-sky-200 bg-sky-50 text-navy"
+                            onClick={() => void openManualEdit(item)}
+                          >
+                            <Pencil size={14} />
+                            Edit
+                          </button>
+                        ) : null}
+                        {canCancelManual(item) ? (
+                          <button
+                            type="button"
+                            className="dash-btn-sm border border-rose-200 bg-rose-50 text-rose-900"
+                            disabled={lifecycleBusyId === item.id}
+                            onClick={() => void cancelManualReservation(item.id)}
+                          >
+                            <XCircle size={14} />
+                            Cancel
+                          </button>
+                        ) : null}
                         {lifecycle ? (
                           <>
                             <button
@@ -405,10 +687,10 @@ export default function ResortReservationsPage() {
                             Room: <span className="font-medium text-zinc-900">{item.room?.name ?? "—"}</span>
                           </p>
                           <p>
-                            Guest: <span className="font-medium text-zinc-900">{item.client?.name ?? "—"}</span>
+                            Guest: <span className="font-medium text-zinc-900">{guestDisplayName(item)}</span>
                           </p>
                           <p>
-                            Email: <span className="font-medium text-zinc-900">{item.client?.email ?? "—"}</span>
+                            Email: <span className="font-medium text-zinc-900">{guestDisplayEmail(item)}</span>
                           </p>
                           <p>
                             Reservation fee:{" "}
@@ -418,6 +700,30 @@ export default function ResortReservationsPage() {
                             Payment status:{" "}
                             <span className="font-medium text-zinc-900">{item.xenditPaymentStatus ?? "pending"}</span>
                           </p>
+                          {canEditManual(item) || canCancelManual(item) ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {canEditManual(item) ? (
+                                <button
+                                  type="button"
+                                  className="dash-btn-sm border border-sky-200 bg-sky-50 text-navy"
+                                  onClick={() => void openManualEdit(item)}
+                                >
+                                  <Pencil size={14} className="inline" /> Edit manual
+                                </button>
+                              ) : null}
+                              {canCancelManual(item) ? (
+                                <button
+                                  type="button"
+                                  className="dash-btn-sm border border-rose-200 bg-rose-50 text-rose-900"
+                                  disabled={lifecycleBusyId === item.id}
+                                  onClick={() => void cancelManualReservation(item.id)}
+                                >
+                                  <XCircle size={14} className="inline" />{" "}
+                                  {lifecycleBusyId === item.id ? "Cancelling…" : "Cancel reservation"}
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
                           {lifecycle ? (
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button
@@ -448,6 +754,128 @@ export default function ResortReservationsPage() {
           </AsyncStatePanel>
         </DataTable>
       </div>
+
+      <DashModal
+        open={manualOpen}
+        onClose={() => {
+          if (!manualSaving) setManualOpen(false);
+        }}
+        title={editManualId == null ? "Add manual reservation" : "Edit manual reservation"}
+        description="Desk or phone bookings — stored as confirmed with no Xendit invoice."
+      >
+        <div className="grid max-h-[min(70vh,32rem)] gap-3 overflow-y-auto pr-1 text-sm">
+          {roomsLoading ? <p className="text-xs text-zinc-500">Loading rooms…</p> : null}
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600">Room</label>
+            <select
+              className="dash-input w-full"
+              value={manualForm.roomId === "" ? "" : String(manualForm.roomId)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setManualForm((f) => ({ ...f, roomId: v === "" ? "" : Number(v) }));
+              }}
+            >
+              <option value="">{roomOpts.length ? "Select room" : "No active rooms"}</option>
+              {roomOpts.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600">Check-in</label>
+              <input
+                type="date"
+                className="dash-input w-full"
+                value={manualForm.checkIn}
+                onChange={(e) => setManualForm((f) => ({ ...f, checkIn: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600">Check-out</label>
+              <input
+                type="date"
+                className="dash-input w-full"
+                value={manualForm.checkOut}
+                onChange={(e) => setManualForm((f) => ({ ...f, checkOut: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600">Guest name</label>
+            <input
+              className="dash-input w-full"
+              value={manualForm.guestName}
+              onChange={(e) => setManualForm((f) => ({ ...f, guestName: e.target.value }))}
+              placeholder="Guest or party name"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600">Email (optional)</label>
+              <input
+                type="email"
+                className="dash-input w-full"
+                value={manualForm.guestEmail}
+                onChange={(e) => setManualForm((f) => ({ ...f, guestEmail: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600">Phone (optional)</label>
+              <input
+                className="dash-input w-full"
+                value={manualForm.guestPhone}
+                onChange={(e) => setManualForm((f) => ({ ...f, guestPhone: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600">Guest count</label>
+              <input
+                type="number"
+                min={1}
+                className="dash-input w-full"
+                value={manualForm.guestCount}
+                onChange={(e) => setManualForm((f) => ({ ...f, guestCount: Math.max(1, Number(e.target.value) || 1) }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600">Total (PHP)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                className="dash-input w-full"
+                value={manualForm.totalAmount}
+                onChange={(e) => setManualForm((f) => ({ ...f, totalAmount: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600">Reservation fee (optional override)</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="dash-input w-full"
+              value={manualForm.reservationFee}
+              onChange={(e) => setManualForm((f) => ({ ...f, reservationFee: e.target.value }))}
+              placeholder="Leave blank for platform default"
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-softBorder pt-3">
+            <button type="button" className="dash-btn-sm border border-zinc-200 bg-white" disabled={manualSaving} onClick={() => setManualOpen(false)}>
+              Close
+            </button>
+            <button type="button" className="dash-btn-primary" disabled={manualSaving} onClick={() => void submitManual()}>
+              {manualSaving ? "Saving…" : editManualId == null ? "Create" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      </DashModal>
     </div>
   );
 }

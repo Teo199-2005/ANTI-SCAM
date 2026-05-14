@@ -215,7 +215,7 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->postJson("/api/v1/resorts/{$resort->id}/subscriptions/pay-invoice", [
+        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 3,
             'referral_code' => 'TESTCODE001',
@@ -241,7 +241,7 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->postJson("/api/v1/resorts/{$resort->id}/subscriptions/pay-invoice", [
+        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 1,
             'referral_code' => 'TESTCODE001',
@@ -267,7 +267,7 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->postJson("/api/v1/resorts/{$resort->id}/subscriptions/pay-invoice", [
+        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 3,
             'referral_code' => 'TESTCODE001',
@@ -297,7 +297,7 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->postJson("/api/v1/resorts/{$resort->id}/subscriptions/pay-invoice", [
+        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 12,
             'referral_code' => 'TESTCODE001',
@@ -324,7 +324,7 @@ class ReferralFirstMonthFreeTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $response = $this->postJson("/api/v1/resorts/{$resort->id}/subscriptions/pay-invoice", [
+        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 12,
         ]);

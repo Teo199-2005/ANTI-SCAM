@@ -23,6 +23,7 @@ use App\Modules\Billing\Http\Controllers\XenditPayoutWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditWebhookController;
 use App\Modules\Dashboard\Http\Controllers\DashboardController;
 use App\Modules\Dashboard\Http\Controllers\MarketingDashboardController;
+use App\Modules\Guests\Http\Controllers\GuestPortalController;
 use App\Modules\Public\Http\Controllers\PublicCatalogController;
 use App\Modules\Public\Http\Controllers\PublicLocationController;
 use App\Modules\Public\Http\Controllers\ReferralValidationController;
@@ -32,7 +33,6 @@ use App\Modules\Reservations\Http\Controllers\StaffNoteController;
 use App\Modules\Resorts\Http\Controllers\DiscountCodeController;
 use App\Modules\Resorts\Http\Controllers\ResortController;
 use App\Modules\Resorts\Http\Controllers\ResortGuestController;
-use App\Modules\Guests\Http\Controllers\GuestPortalController;
 use App\Modules\Resorts\Http\Controllers\ResortLandingPageController;
 use App\Modules\Rooms\Http\Controllers\RoomController;
 use App\Modules\Rooms\Http\Controllers\RoomImageController;
@@ -194,6 +194,11 @@ Route::prefix('v1')->group(function (): void {
         });
 
         // Reservations
+        Route::middleware('role:resort_owner')->group(function (): void {
+            Route::post('/reservations/manual', [ReservationController::class, 'storeManual']);
+            Route::patch('/reservations/{reservation}/manual', [ReservationController::class, 'updateManual']);
+            Route::post('/reservations/{reservation}/cancel-by-resort', [ReservationController::class, 'cancelByResort']);
+        });
         Route::get('/reservations', [ReservationController::class, 'index']);
         Route::get('/reservations/{reservation}', [ReservationController::class, 'show']);
         Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel']);
@@ -216,6 +221,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/resort-owner/landing-page', [ResortLandingPageController::class, 'show']);
             Route::post('/resort-owner/landing-page/upload-bg-image', [ResortLandingPageController::class, 'uploadBgImage']);
             Route::post('/resort-owner/landing-page/upload-image', [ResortLandingPageController::class, 'uploadImage']);
+            Route::post('/resort-owner/subscriptions/pay-invoice', [SubscriptionInvoiceController::class, 'createForOwner']);
         });
 
         // Resources

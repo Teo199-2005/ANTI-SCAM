@@ -167,16 +167,33 @@ class PhilippineLocationService
             $fromParts = null;
         }
         if ($fromParts !== null) {
-            return $fromParts;
+            return $this->prefixResortStreetLine($resort, $fromParts);
         }
 
         $label = $resort->address_label ?? null;
         $label = is_string($label) ? trim($label) : '';
         if ($label !== '' && ! $this->isPlaceholderDemoLocationLine($label)) {
-            return $label;
+            return $this->prefixResortStreetLine($resort, $label);
         }
 
-        return null;
+        $streetOnly = $this->trimmedStreetLine($resort);
+
+        return $streetOnly !== '' ? $streetOnly : null;
+    }
+
+    private function trimmedStreetLine(Resort $resort): string
+    {
+        $street = $resort->address_street_line ?? null;
+        $street = is_string($street) ? trim($street) : '';
+
+        return $street;
+    }
+
+    private function prefixResortStreetLine(Resort $resort, string $line): string
+    {
+        $street = $this->trimmedStreetLine($resort);
+
+        return $street !== '' ? "{$street}, {$line}" : $line;
     }
 
     /**

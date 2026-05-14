@@ -140,4 +140,64 @@ class ResortProfilePersistenceTest extends TestCase
         $this->assertSame('teo', $tenant->subdomain);
         $this->assertSame('teo', $tenant->slug);
     }
+
+    public function test_put_resort_persists_street_line_and_map_pin(): void
+    {
+        $this->seed(PsgcReferenceSeeder::class);
+
+        $tenant = Tenant::create([
+            'name' => 'Map Tenant',
+            'slug' => 'map-tenant',
+            'subdomain' => 'maptenant',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Map Resort',
+            'description' => 'Before',
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_CITY_CODE,
+            'address_barangay_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+            'address_label' => null,
+            'contact_number' => '+63000000000',
+            'is_publicly_listed' => true,
+        ]);
+
+        Subscription::create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'plan' => 'basic',
+            'base_price' => 2000,
+            'included_rooms' => 3,
+            'extra_room_fee' => 300,
+            'active_room_count' => 0,
+            'total_monthly_fee' => 2000,
+            'status' => 'active',
+            'billing_cycle_start' => now()->startOfMonth()->toDateString(),
+            'billing_cycle_end' => now()->endOfMonth()->toDateString(),
+            'next_due_date' => now()->endOfMonth()->toDateString(),
+        ]);
+
+        $owner = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'resort_owner',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->putJson("/api/v1/resorts/{$resort->id}", [
+            'address_street_line' => '123 Beach Road',
+            'map_latitude' => 14.5,
+            'map_longitude' => 120.9,
+        ]);
+
+        $response->assertOk();
+
+        $resort->refresh();
+
+        $this->assertSame('123 Beach Road', $resort->address_street_line);
+        $this->assertEquals(14.5, (float) $resort->map_latitude);
+        $this->assertEquals(120.9, (float) $resort->map_longitude);
+    }
 }

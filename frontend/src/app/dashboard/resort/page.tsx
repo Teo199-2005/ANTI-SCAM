@@ -136,10 +136,10 @@ export default function ResortOverviewPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-28 animate-pulse rounded-2xl bg-navy/20" />
-        <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
+        <div className="h-20 animate-pulse rounded-2xl bg-navy/20" />
+        <div className="grid grid-cols-2 gap-2.5 md:gap-3 md:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 animate-pulse rounded-2xl bg-softCard/80 shadow-card md:h-36" />
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-softCard/80 shadow-card md:h-28" />
           ))}
         </div>
       </div>
@@ -220,13 +220,13 @@ export default function ResortOverviewPage() {
       </div>
 
       {/* ── KPI stat cards (2×2 phone → 4 across md+) ────────── */}
-      <div className="grid min-w-0 grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
-        <StatCard compact label="Active rooms"    value={stats.activeRooms}    icon={DoorOpen}       iconTone="sky" />
-        <StatCard compact label="Locked bookings" value={stats.lockedBookings} icon={LockKeyhole}    iconTone="amber" />
-        <StatCard compact label="Confirmed today" value={stats.confirmedToday} icon={CalendarCheck2} iconTone="emerald" />
+      <div className="grid min-w-0 grid-cols-2 gap-2.5 md:gap-3 md:grid-cols-4">
+        <StatCard compact dense label="Active rooms"    value={stats.activeRooms}    icon={DoorOpen}       iconTone="sky" />
+        <StatCard compact dense label="Locked bookings" value={stats.lockedBookings} icon={LockKeyhole}    iconTone="amber" />
+        <StatCard compact dense label="Confirmed today" value={stats.confirmedToday} icon={CalendarCheck2} iconTone="emerald" />
         {/* Occupancy ring */}
         <div
-          className="relative overflow-hidden rounded-2xl bg-softCard p-4 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-5"
+          className="relative overflow-hidden rounded-2xl bg-softCard p-3 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-3.5"
           style={{ boxShadow: shadowKpiTint(rgb.navy, 0.14) }}
         >
           <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl" style={{ background: color.brand.navy }} />
@@ -235,26 +235,28 @@ export default function ResortOverviewPage() {
             className="pointer-events-none absolute inset-0 rounded-2xl"
             style={{ background: `rgba(${rgb.navy}, 0.03)` }}
           />
-          <p className="relative font-dash text-[11px] font-medium leading-tight text-zinc-600 md:text-dash-xs">Occupancy rate</p>
-          <div className="relative mt-2 flex items-center justify-between gap-2 md:mt-3 md:gap-4">
-            <div className="shrink-0 scale-[0.82] md:scale-100">
+          <p className="relative font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Occupancy rate</p>
+          <div className="relative mt-1.5 flex items-center justify-between gap-2 md:mt-2 md:gap-3">
+            <div className="shrink-0">
               <ProgressRing
                 value={roomsInUsePct}
+                size={56}
+                strokeWidth={6}
                 color={color.brand.navy}
                 trackColor={`rgba(${rgb.navy}, 0.12)`}
               />
             </div>
-            <p className="font-dash text-xl font-bold tabular-nums text-navy md:text-dash-3xl">{roomsInUsePct}%</p>
+            <p className="font-dash text-base font-bold tabular-nums text-navy md:text-lg">{roomsInUsePct}%</p>
           </div>
         </div>
       </div>
 
       {/* ── Revenue metrics (2×2 phone → 3 across md+) ───────── */}
       {(stats.totalReservationFees !== undefined || stats.totalGrossBookings !== undefined) && (
-        <div className="grid min-w-0 grid-cols-2 gap-3 md:gap-4 md:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-2 gap-2.5 md:gap-3 md:grid-cols-3">
           {/* Fees collected */}
           <div
-            className="relative overflow-hidden rounded-2xl bg-softCard p-4 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-5"
+            className="relative overflow-hidden rounded-2xl bg-softCard p-3 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-3.5"
             style={{ boxShadow: shadowKpiTint(rgb.success, 0.14) }}
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl" style={{ background: color.semantic.success }} />
@@ -263,21 +265,21 @@ export default function ResortOverviewPage() {
               className="pointer-events-none absolute inset-0 rounded-2xl"
               style={{ background: `rgba(${rgb.success}, 0.04)` }}
             />
-            <div className="relative mb-2 flex items-center gap-2 md:mb-3">
-              <div className="inline-flex shrink-0 rounded-lg p-1.5 md:p-2" style={{ background: color.semantic.success }}>
-                <BadgeDollarSign size={14} className="text-white" />
+            <div className="relative mb-1.5 flex items-center gap-1.5 md:mb-2">
+              <div className="inline-flex shrink-0 rounded-lg p-1 md:p-1.5" style={{ background: color.semantic.success }}>
+                <BadgeDollarSign size={12} className="text-white" />
               </div>
-              <p className="min-w-0 font-dash text-[11px] font-medium leading-tight text-zinc-600 md:text-dash-xs">Fees collected</p>
+              <p className="min-w-0 font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Fees collected</p>
             </div>
-            <p className="relative break-words font-dash text-lg font-bold leading-tight text-navy md:text-2xl">
+            <p className="relative break-words font-dash text-base font-bold leading-tight text-navy md:text-lg">
               ₱{Number(stats.totalReservationFees ?? 0).toLocaleString()}
             </p>
-            <p className="relative mt-1 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Reservation fees paid to date</p>
+            <p className="relative mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Reservation fees paid to date</p>
           </div>
 
           {/* Gross bookings */}
           <div
-            className="relative overflow-hidden rounded-2xl bg-softCard p-4 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-5"
+            className="relative overflow-hidden rounded-2xl bg-softCard p-3 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:p-3.5"
             style={{ boxShadow: shadowKpiTint(rgb.accent, 0.14) }}
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl" style={{ background: color.brand.accentHover }} />
@@ -286,21 +288,21 @@ export default function ResortOverviewPage() {
               className="pointer-events-none absolute inset-0 rounded-2xl"
               style={{ background: `rgba(${rgb.accent}, 0.04)` }}
             />
-            <div className="relative mb-2 flex items-center gap-2 md:mb-3">
-              <div className="inline-flex shrink-0 rounded-lg p-1.5 md:p-2" style={{ background: color.brand.accentHover }}>
-                <TrendingUp size={14} className="text-white" />
+            <div className="relative mb-1.5 flex items-center gap-1.5 md:mb-2">
+              <div className="inline-flex shrink-0 rounded-lg p-1 md:p-1.5" style={{ background: color.brand.accentHover }}>
+                <TrendingUp size={12} className="text-white" />
               </div>
-              <p className="min-w-0 font-dash text-[11px] font-medium leading-tight text-zinc-600 md:text-dash-xs">Gross bookings</p>
+              <p className="min-w-0 font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Gross bookings</p>
             </div>
-            <p className="relative break-words font-dash text-lg font-bold leading-tight text-navy md:text-2xl">
+            <p className="relative break-words font-dash text-base font-bold leading-tight text-navy md:text-lg">
               ₱{Number(stats.totalGrossBookings ?? 0).toLocaleString()}
             </p>
-            <p className="relative mt-1 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Total booking value (all time)</p>
+            <p className="relative mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Total booking value (all time)</p>
           </div>
 
           {/* Revenue this month */}
           <div
-            className="relative col-span-2 overflow-hidden rounded-2xl bg-softCard p-4 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:col-span-1 md:p-5"
+            className="relative col-span-2 overflow-hidden rounded-2xl bg-softCard p-3 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 md:col-span-1 md:p-3.5"
             style={{ boxShadow: shadowKpiTint(rgb.sky500, 0.14) }}
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl" style={{ background: color.data.skyBright }} />
@@ -309,16 +311,16 @@ export default function ResortOverviewPage() {
               className="pointer-events-none absolute inset-0 rounded-2xl"
               style={{ background: `rgba(${rgb.sky500}, 0.04)` }}
             />
-            <div className="relative mb-2 flex items-center gap-2 md:mb-3">
-              <div className="inline-flex shrink-0 rounded-lg p-1.5 md:p-2" style={{ background: color.data.skyBright }}>
-                <ReceiptText size={14} className="text-white" />
+            <div className="relative mb-1.5 flex items-center gap-1.5 md:mb-2">
+              <div className="inline-flex shrink-0 rounded-lg p-1 md:p-1.5" style={{ background: color.data.skyBright }}>
+                <ReceiptText size={12} className="text-white" />
               </div>
-              <p className="min-w-0 font-dash text-[11px] font-medium leading-tight text-zinc-600 md:text-dash-xs">Revenue this month</p>
+              <p className="min-w-0 font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Revenue this month</p>
             </div>
-            <p className="relative break-words font-dash text-lg font-bold leading-tight text-navy md:text-2xl">
+            <p className="relative break-words font-dash text-base font-bold leading-tight text-navy md:text-lg">
               ₱{Number(stats.revenueThisMonth ?? 0).toLocaleString()}
             </p>
-            <p className="relative mt-1 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Confirmed bookings · current month</p>
+            <p className="relative mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Confirmed bookings · current month</p>
           </div>
         </div>
       )}

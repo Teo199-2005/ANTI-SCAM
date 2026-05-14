@@ -3,15 +3,18 @@
 namespace App\Modules\Reservations\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Reservation;
 use App\Modules\Billing\Services\BookingPaymentReconciliationService;
 use App\Modules\Reservations\Http\Requests\AdminOverrideReservationRequest;
+use App\Modules\Reservations\Http\Requests\CancelReservationByResortRequest;
 use App\Modules\Reservations\Http\Requests\CancelReservationRequest;
+use App\Modules\Reservations\Http\Requests\StoreManualReservationRequest;
 use App\Modules\Reservations\Http\Requests\StoreReservationRequest;
+use App\Modules\Reservations\Http\Requests\UpdateManualReservationRequest;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
 use App\Modules\Reservations\Services\ReservationService;
-use App\Models\Reservation;
-use App\Support\SafeSort;
 use App\Shared\Traits\ApiResponseTrait;
+use App\Support\SafeSort;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -51,9 +54,30 @@ class ReservationController extends Controller
             return $this->errorResponse($exception->getMessage(), ['reservation' => ['lock_invalid']], 409);
         }
 
-        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
+        $reservation->loadMissing([
+            'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',
+            'room:id,name',
+            'client:id,name,email',
+        ]);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation created', 201);
+    }
+
+    public function storeManual(StoreManualReservationRequest $request)
+    {
+        try {
+            $reservation = $this->service->createManualForResort($request->user(), $request->validated());
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), ['reservation' => ['manual_create_failed']], 409);
+        }
+
+        $reservation->loadMissing([
+            'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',
+            'room:id,name',
+            'client:id,name,email',
+        ]);
+
+        return $this->successResponse(new ReservationResource($reservation), 'Manual reservation created', 201);
     }
 
     public function index()
@@ -63,14 +87,14 @@ class ReservationController extends Controller
         $user = auth()->user();
         $this->bookingPaymentReconciliation->syncPendingInvoicePaymentsForBooker($user);
 
-        $query   = Reservation::withoutGlobalScopes()
-            ->with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
-        $status  = request()->string('status')->value();
+        $query = Reservation::withoutGlobalScopes()
+            ->with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name', 'client:id,name,email']);
+        $status = request()->string('status')->value();
         $dateFrom = request()->string('dateFrom')->value();
-        $dateTo  = request()->string('dateTo')->value();
-        $search  = request()->string('search')->value();
+        $dateTo = request()->string('dateTo')->value();
+        $search = request()->string('search')->value();
         $perPage = (int) request()->integer('perPage', 10);
-        $sortBy  = request()->string('sort_by')->value();
+        $sortBy = request()->string('sort_by')->value();
         $sortDir = request()->string('sort_dir')->value();
 
         if ($status) {
@@ -88,7 +112,9 @@ class ReservationController extends Controller
         if ($search) {
             $query->where(function ($inner) use ($search): void {
                 $inner->where('reference_no', 'like', "%{$search}%")
-                    ->orWhere('xendit_invoice_id', 'like', "%{$search}%");
+                    ->orWhere('xendit_invoice_id', 'like', "%{$search}%")
+                    ->orWhere('guest_name', 'like', "%{$search}%")
+                    ->orWhere('guest_email', 'like', "%{$search}%");
             });
         }
 
@@ -120,9 +146,47 @@ class ReservationController extends Controller
     {
         $this->authorize('view', $reservation);
 
-        $reservation->loadMissing(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
+        $reservation->loadMissing([
+            'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',
+            'room:id,name',
+            'client:id,name,email',
+        ]);
 
         return $this->successResponse(new ReservationResource($reservation), 'Reservation details');
+    }
+
+    public function updateManual(UpdateManualReservationRequest $request, Reservation $reservation)
+    {
+        try {
+            $reservation = $this->service->updateManual($reservation, $request->user(), $request->validated());
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), ['reservation' => ['manual_update_failed']], 409);
+        }
+
+        $reservation->loadMissing([
+            'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',
+            'room:id,name',
+            'client:id,name,email',
+        ]);
+
+        return $this->successResponse(new ReservationResource($reservation), 'Manual reservation updated');
+    }
+
+    public function cancelByResort(Reservation $reservation, CancelReservationByResortRequest $request)
+    {
+        try {
+            $reservation = $this->service->cancelByResort($reservation, $request->validated('reason'));
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_cancel']], 409);
+        }
+
+        $reservation->loadMissing([
+            'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',
+            'room:id,name',
+            'client:id,name,email',
+        ]);
+
+        return $this->successResponse(new ReservationResource($reservation), 'Reservation cancelled');
     }
 
     public function cancel(Reservation $reservation, CancelReservationRequest $request)

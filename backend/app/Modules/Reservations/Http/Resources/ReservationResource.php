@@ -19,6 +19,10 @@ class ReservationResource extends JsonResource
             'resortId' => $this->resort_id,
             'roomId' => $this->room_id,
             'clientId' => $this->client_id,
+            'bookingSource' => $this->booking_source ?? 'online',
+            'guestName' => $this->guest_name,
+            'guestEmail' => $this->guest_email,
+            'guestPhone' => $this->guest_phone,
             'checkInDate' => $this->check_in_date?->toDateString(),
             'checkOutDate' => $this->check_out_date?->toDateString(),
             'guestCount' => $this->guest_count,
@@ -46,6 +50,16 @@ class ReservationResource extends JsonResource
                     'id' => $this->room->id,
                     'name' => $this->room->name,
                 ],
+            ),
+            'client' => $this->when(
+                $this->relationLoaded('client'),
+                fn (): ?array => $this->client
+                    ? [
+                        'id' => $this->client->id,
+                        'name' => $this->client->name,
+                        'email' => $this->client->email,
+                    ]
+                    : null,
             ),
         ];
     }

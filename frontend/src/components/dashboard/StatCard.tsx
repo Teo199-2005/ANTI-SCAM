@@ -15,6 +15,8 @@ type StatCardProps = {
   subtitle?: string;
   /** Tighter padding + type scale for 2-column mobile grids */
   compact?: boolean;
+  /** Extra-compact row height (e.g. resort overview KPI strip) */
+  dense?: boolean;
 };
 
 function shadowForRgb(rgbStr: string): string {
@@ -34,6 +36,7 @@ export default function StatCard({
   trendValue,
   subtitle,
   compact = false,
+  dense = false,
 }: StatCardProps) {
   const tone = kpiTone[iconTone];
   const resting = shadowForRgb(tone.rgb);
@@ -43,7 +46,11 @@ export default function StatCard({
     <div
       className={cn(
         "relative flex flex-col overflow-hidden rounded-2xl border border-white/40 bg-gradient-to-b from-softCard via-softCard to-metalFace",
-        compact ? "gap-2 p-3.5 md:gap-dash-4 md:p-5" : "gap-dash-4 p-5",
+        dense
+          ? "gap-1 p-2.5 md:gap-1.5 md:p-3"
+          : compact
+            ? "gap-2 p-3.5 md:gap-dash-4 md:p-5"
+            : "gap-dash-4 p-5",
         "motion-safe:transition-[box-shadow,transform] motion-safe:duration-200 motion-reduce:transition-none",
         "hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
         "motion-safe:animate-dash-soft-pop motion-reduce:animate-none",
@@ -67,11 +74,17 @@ export default function StatCard({
 
       <div className="relative flex items-start justify-between">
         <div
-          className={cn("inline-flex rounded-xl", compact ? "p-2 md:p-3" : "p-3")}
+          className={cn(
+            "inline-flex rounded-xl",
+            dense ? "p-1.5 md:p-2" : compact ? "p-2 md:p-3" : "p-3",
+          )}
           style={{ background: tone.accent }}
         >
           <Icon
-            className={cn("text-white", compact ? "h-4 w-4 md:h-[18px] md:w-[18px]" : "h-[18px] w-[18px]")}
+            className={cn(
+              "text-white",
+              dense ? "h-3.5 w-3.5 md:h-4 md:w-4" : compact ? "h-4 w-4 md:h-[18px] md:w-[18px]" : "h-[18px] w-[18px]",
+            )}
             strokeWidth={2}
             aria-hidden
           />
@@ -96,16 +109,28 @@ export default function StatCard({
       </div>
 
       <div className="relative min-w-0">
-        <p className={cn("font-medium text-zinc-600", compact ? "text-[11px] leading-tight md:text-dash-xs" : "text-dash-xs")}>
+        <p
+          className={cn(
+            "font-medium text-zinc-600",
+            dense ? "text-[10px] leading-tight md:text-[11px]" : compact ? "text-[11px] leading-tight md:text-dash-xs" : "text-dash-xs",
+          )}
+        >
           {label}
         </p>
         {subtitle ? (
-          <p className={cn("mt-0.5 text-zinc-500", compact ? "text-[10px] md:text-dash-xs" : "text-dash-xs")}>{subtitle}</p>
+          <p
+            className={cn(
+              "mt-0.5 text-zinc-500",
+              dense ? "text-[9px] md:text-[10px]" : compact ? "text-[10px] md:text-dash-xs" : "text-dash-xs",
+            )}
+          >
+            {subtitle}
+          </p>
         ) : null}
         <p
           className={cn(
-            "mt-1.5 font-dash font-bold leading-none text-navy",
-            compact ? "text-xl md:text-dash-3xl" : "text-dash-3xl",
+            "font-dash font-bold leading-none text-navy",
+            dense ? "mt-1 text-base md:text-lg" : compact ? "mt-1.5 text-xl md:text-dash-3xl" : "mt-1.5 text-dash-3xl",
           )}
         >
           {value}

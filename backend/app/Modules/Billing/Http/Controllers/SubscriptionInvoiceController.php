@@ -12,7 +12,6 @@ use App\Services\LandingReadinessService;
 use App\Services\MarketingReferralCodeService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class SubscriptionInvoiceController extends Controller
@@ -23,6 +22,21 @@ class SubscriptionInvoiceController extends Controller
         private readonly XenditSubscriptionInvoiceService $service,
         private readonly XenditSubscriptionWebhookService $subscriptionWebhook,
     ) {}
+
+    /**
+     * POST /resort-owner/subscriptions/pay-invoice
+     * Same as {@see create} but resolves the resort from the authenticated owner’s tenant,
+     * avoiding mismatches when the client URL used a stale or wrong resort id.
+     */
+    public function createForOwner(Request $request)
+    {
+        $resort = $this->resolveResortForAuthenticatedOwner($request);
+        if (! $resort) {
+            return $this->errorResponse('No resort found for this account.', null, 404);
+        }
+
+        return $this->create($request, $resort);
+    }
 
     public function index(Request $request, Resort $resort)
     {
@@ -291,5 +305,18 @@ class SubscriptionInvoiceController extends Controller
         if ($user->role !== 'resort_owner' || (int) $user->tenant_id !== (int) $resort->tenant_id) {
             abort(403, 'You are not allowed to access this resource.');
         }
+    }
+
+    private function resolveResortForAuthenticatedOwner(Request $request): ?Resort
+    {
+        $user = $request->user();
+        if (! $user || $user->tenant_id === null) {
+            return null;
+        }
+
+        return Resort::withoutGlobalScopes()
+            ->with(['tenant', 'subscription', 'rooms.images'])
+            ->where('tenant_id', $user->tenant_id)
+            ->first();
     }
 }

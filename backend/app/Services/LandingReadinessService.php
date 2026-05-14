@@ -83,14 +83,23 @@ class LandingReadinessService
             }
         }
 
-        // Google Maps embed URL (no API key needed for basic search embed)
+        // Google Maps embed URL (no API key needed for basic search / coordinate embed)
         $mapEmbedUrl = null;
         $mapSearchUrl = null;
-        $mapQuery = $this->locations->resortMapQueryString($resort);
-        if ($mapQuery !== null) {
-            $encoded = rawurlencode($mapQuery);
-            $mapEmbedUrl = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
-            $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$encoded}";
+        $lat = $resort->map_latitude;
+        $lng = $resort->map_longitude;
+        if ($lat !== null && $lng !== null && $lat !== '' && $lng !== '') {
+            $latS = (string) $lat;
+            $lngS = (string) $lng;
+            $mapEmbedUrl = "https://maps.google.com/maps?q={$latS},{$lngS}&ll={$latS},{$lngS}&z=17&output=embed";
+            $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$latS},{$lngS}";
+        } else {
+            $mapQuery = $this->locations->resortMapQueryString($resort);
+            if ($mapQuery !== null) {
+                $encoded = rawurlencode($mapQuery);
+                $mapEmbedUrl = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
+                $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$encoded}";
+            }
         }
 
         return [

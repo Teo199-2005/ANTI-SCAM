@@ -51,8 +51,11 @@ import {
   sanitizePhoneInput,
 } from "@/lib/inputRestrictions";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const ResortMapPinPicker = dynamic(() => import("@/components/resort-profile/ResortMapPinPicker"), { ssr: false });
 
 type FormState = {
   id: number;
@@ -63,6 +66,9 @@ type FormState = {
   /** Legacy PSGC barangay code (read-only for hint); new saves use address_barangay_name */
   address_barangay_psgc: string | null;
   address_barangay_name: string | null;
+  address_street_line: string;
+  map_latitude: number | null;
+  map_longitude: number | null;
   contact_number: string;
   is_publicly_listed: boolean;
   cancellation_policy: string;
@@ -161,6 +167,9 @@ export default function ResortProfilePage() {
           address_city_municipality_psgc: first.address_city_municipality_psgc ?? null,
           address_barangay_psgc: first.address_barangay_psgc ?? null,
           address_barangay_name: first.address_barangay_name ?? null,
+          address_street_line: first.address_street_line ?? "",
+          map_latitude: first.map_latitude != null ? Number(first.map_latitude) : null,
+          map_longitude: first.map_longitude != null ? Number(first.map_longitude) : null,
           contact_number: first.contact_number ?? "",
           is_publicly_listed: first.is_publicly_listed,
           cancellation_policy: (raw.cancellation_policy as string) ?? "",
@@ -231,6 +240,9 @@ export default function ResortProfilePage() {
         address_city_municipality_psgc: first.address_city_municipality_psgc ?? null,
         address_barangay_psgc: first.address_barangay_psgc ?? null,
         address_barangay_name: first.address_barangay_name ?? null,
+        address_street_line: first.address_street_line ?? "",
+        map_latitude: first.map_latitude != null ? Number(first.map_latitude) : null,
+        map_longitude: first.map_longitude != null ? Number(first.map_longitude) : null,
         contact_number: first.contact_number ?? "",
         is_publicly_listed: first.is_publicly_listed,
         cancellation_policy: (raw.cancellation_policy as string) ?? "",
@@ -332,6 +344,9 @@ export default function ResortProfilePage() {
         case "representative_email":
           next = sanitizeEmailTyping(value).toLowerCase() as FormState[K];
           break;
+        case "address_street_line":
+          next = sanitizeLongText(value, 255) as FormState[K];
+          break;
         case "description":
         case "cancellation_policy":
           next = sanitizeLongText(value) as FormState[K];
@@ -374,6 +389,9 @@ export default function ResortProfilePage() {
               address_city_municipality_psgc: resort.address_city_municipality_psgc ?? null,
               address_barangay_psgc: resort.address_barangay_psgc ?? null,
               address_barangay_name: resort.address_barangay_name ?? null,
+              address_street_line: resort.address_street_line ?? "",
+              map_latitude: resort.map_latitude != null ? Number(resort.map_latitude) : null,
+              map_longitude: resort.map_longitude != null ? Number(resort.map_longitude) : null,
               facebook_url: resort.facebook_url ?? "",
               instagram_url: resort.instagram_url ?? "",
               tiktok_url: resort.tiktok_url ?? "",
@@ -399,6 +417,9 @@ export default function ResortProfilePage() {
         address_city_municipality_psgc: form.address_city_municipality_psgc,
         address_barangay_name: form.address_barangay_name?.trim() || null,
         address_barangay_psgc: null,
+        address_street_line: form.address_street_line?.trim() || null,
+        map_latitude: form.map_latitude,
+        map_longitude: form.map_longitude,
         contact_number: form.contact_number || null,
         logo_url: form.logo_url || null,
         background_image_url: form.background_image_url || null,
@@ -786,6 +807,40 @@ export default function ResortProfilePage() {
                 );
               }}
             />
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="resort-street" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+              <MapPin size={13} className="text-zinc-500" />
+              Street / building line
+            </label>
+            <input
+              id="resort-street"
+              className="dash-input"
+              value={form.address_street_line}
+              onChange={(e) => onChange("address_street_line", e.target.value)}
+              placeholder="House number, street, subdivision (optional)"
+            />
+            <p className="mt-1 text-[11px] text-zinc-400">Shown before your PSA location on maps and your landing page address line.</p>
+          </div>
+          <div className="md:col-span-2 space-y-2 rounded-xl border border-softBorder bg-softCard/40 p-4">
+            <p className="text-xs font-semibold text-zinc-600">Map pin</p>
+            <ResortMapPinPicker
+              apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+              latitude={form.map_latitude}
+              longitude={form.map_longitude}
+              disabled={saving}
+              onPinChange={(lat, lng) => {
+                setForm((prev) => (prev ? { ...prev, map_latitude: lat, map_longitude: lng } : prev));
+              }}
+            />
+            <button
+              type="button"
+              className="dash-btn-sm border border-zinc-200 bg-white text-zinc-700"
+              disabled={saving || (form.map_latitude == null && form.map_longitude == null)}
+              onClick={() => setForm((prev) => (prev ? { ...prev, map_latitude: null, map_longitude: null } : prev))}
+            >
+              Clear map pin
+            </button>
           </div>
           <div className="md:col-span-2">
             <label htmlFor="resort-description" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
