@@ -97,8 +97,8 @@ export default function StaffReservationsPage() {
         },
       });
       const payload = data.data;
-      const rawList = payload?.data ?? [];
-      setReservations(rawList.map((r) => normalizeReservation(r as Record<string, unknown>)));
+      const rawList = (Array.isArray(payload) ? payload : (payload?.data ?? [])) as Record<string, unknown>[];
+      setReservations(rawList.map((r) => normalizeReservation(r)));
       setMeta(extractLaravelMeta(payload));
     } catch (err: unknown) {
       setReservations([]);

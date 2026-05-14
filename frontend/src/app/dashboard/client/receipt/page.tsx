@@ -64,12 +64,25 @@ function ReceiptContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) { setError("No reservation ID provided."); setLoading(false); return; }
-    apiClient
-      .get<ApiEnvelope<ReservationApi>>(`/reservations/${id}`)
-      .then(({ data }) => setReservation(normalizeReservation(data.data)))
-      .catch(() => setError("Reservation not found or access denied."))
-      .finally(() => setLoading(false));
+    if (!id) {
+      setError("No reservation ID provided.");
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<ApiEnvelope<ReservationApi>>(`/reservations/${id}`);
+        if (!cancelled) setReservation(normalizeReservation(data.data));
+      } catch {
+        if (!cancelled) setError("Reservation not found or access denied.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (loading) return <div className="dash-card p-10 text-center text-zinc-500">Loading receipt…</div>;

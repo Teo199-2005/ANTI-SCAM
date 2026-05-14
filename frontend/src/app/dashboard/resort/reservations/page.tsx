@@ -128,8 +128,8 @@ export default function ResortReservationsPage() {
         },
       });
       const payload = data.data;
-      const rawList = payload?.data ?? [];
-      setRows(rawList.map((r) => normalizeReservation(r as Record<string, unknown>)));
+      const rawList = (Array.isArray(payload) ? payload : (payload?.data ?? [])) as Record<string, unknown>[];
+      setRows(rawList.map((r) => normalizeReservation(r)));
       setMeta(extractLaravelMeta(payload));
       setError(null);
     } catch (err) {

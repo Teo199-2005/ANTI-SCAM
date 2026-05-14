@@ -63,7 +63,7 @@ export default function ClientReviewsPage() {
         const { data } = await apiClient.get<Paginated>("/reservations", {
           params: { status: "completed", perPage: 50 },
         });
-        const rows = data.data?.data ?? [];
+        const rows = (data.data?.data ?? []) as ReservationRow[];
         setEligible(rows.filter((r) => !hasReviewForReservation(userId, r.id)));
       } catch (err) {
         setError("Could not load completed stays.");

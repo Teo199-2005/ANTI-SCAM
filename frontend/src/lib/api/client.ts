@@ -9,6 +9,7 @@
  *
  * GET requests on apiClient, publicClient, and authClient automatically retry up to 3 times
  * on transient failures (timeouts, connection drops, 408/425/429, 5xx). Mutating methods are never retried.
+ */
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { isTransientRequestFailure } from "@/lib/api/withAxiosRetries";

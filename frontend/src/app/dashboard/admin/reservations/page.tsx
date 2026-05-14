@@ -103,8 +103,8 @@ export default function AdminReservationsPage() {
         },
       });
       const payload = data.data;
-      const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
-      setReservations(rows.map((r) => normalizeAdminReservation(r as Record<string, unknown>)));
+      const rows = (Array.isArray(payload) ? payload : (payload?.data ?? [])) as Record<string, unknown>[];
+      setReservations(rows.map((r) => normalizeAdminReservation(r)));
       setMeta(extractLaravelMeta(payload));
       setError(null);
     } catch (err) {
