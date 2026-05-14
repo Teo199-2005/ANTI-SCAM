@@ -56,6 +56,31 @@ type AuthEnvelope = {
 const ME_ATTEMPTS = 3;
 const ME_TIMEOUT_MS = 20_000;
 
+/** One retry after a short pause — masks brief nginx/Node upstream 502s after restarts or load blips. */
+async function postAuthEnvelopeWithTransientRetry(
+  url: "/login" | "/register",
+  body: unknown,
+): Promise<AuthEnvelope> {
+  const run = () => authClient.post<AuthEnvelope>(url, body);
+  try {
+    const { data } = await run();
+    return data;
+  } catch (err) {
+    if (!axios.isAxiosError(err)) throw err;
+    const status = err.response?.status;
+    const retryable =
+      status === 502 ||
+      status === 503 ||
+      status === 504 ||
+      err.code === "ECONNABORTED" ||
+      (typeof err.message === "string" && err.message.toLowerCase().includes("network"));
+    if (!retryable) throw err;
+    await new Promise((r) => setTimeout(r, 480));
+    const { data } = await run();
+    return data;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginLockRef.current = true;
       bumpAuthEpoch();
       try {
-        const { data } = await authClient.post<AuthEnvelope>("/login", { email, password });
+        const data = await postAuthEnvelopeWithTransientRetry("/login", { email, password });
         if (!data.success || !data.data?.user) {
           throw new Error(data.message ?? "Login failed.");
         }
@@ -171,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }): Promise<AuthUser> => {
       bumpAuthEpoch();
       try {
-        const { data } = await authClient.post<AuthEnvelope>("/register", input);
+        const data = await postAuthEnvelopeWithTransientRetry("/register", input);
         if (!data.success || !data.data?.user) {
           throw new Error(data.message ?? "Registration failed.");
         }
