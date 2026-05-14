@@ -806,21 +806,25 @@ export default function ResortProfilePage() {
                     : prev,
                 );
               }}
+              barangayRowEnd={
+                <>
+                  <label htmlFor="resort-street" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                    <MapPin size={13} className="text-zinc-500" />
+                    Street / building line
+                  </label>
+                  <input
+                    id="resort-street"
+                    className="dash-input"
+                    value={form.address_street_line}
+                    onChange={(e) => onChange("address_street_line", e.target.value)}
+                    placeholder="House number, street, subdivision (optional)"
+                  />
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    Shown before your PSA location on maps and your landing page address line.
+                  </p>
+                </>
+              }
             />
-          </div>
-          <div className="md:col-span-2">
-            <label htmlFor="resort-street" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
-              <MapPin size={13} className="text-zinc-500" />
-              Street / building line
-            </label>
-            <input
-              id="resort-street"
-              className="dash-input"
-              value={form.address_street_line}
-              onChange={(e) => onChange("address_street_line", e.target.value)}
-              placeholder="House number, street, subdivision (optional)"
-            />
-            <p className="mt-1 text-[11px] text-zinc-400">Shown before your PSA location on maps and your landing page address line.</p>
           </div>
           <div className="md:col-span-2 space-y-2 rounded-xl border border-softBorder bg-softCard/40 p-4">
             <p className="text-xs font-semibold text-zinc-600">Map pin</p>

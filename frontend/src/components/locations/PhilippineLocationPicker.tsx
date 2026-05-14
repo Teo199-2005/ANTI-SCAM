@@ -2,6 +2,7 @@
 
 import type { PhilippineLocationRow } from "@/lib/locations/philippines";
 import { listMuncities, listProvinces } from "@jobuntux/psgc";
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 
 export type PhilippineLocationValue = {
@@ -17,6 +18,8 @@ type Props = {
   idPrefix?: string;
   /** Shown when the API still has a legacy barangay PSGC code but no free-text name */
   legacyBarangayCodeHint?: boolean;
+  /** Renders in the same row as Barangay on md+ (e.g. street line on resort profile). */
+  barangayRowEnd?: ReactNode;
 };
 
 export function PhilippineLocationPicker({
@@ -25,6 +28,7 @@ export function PhilippineLocationPicker({
   disabled,
   idPrefix = "ph-loc",
   legacyBarangayCodeHint,
+  barangayRowEnd,
 }: Props) {
   const provinces = useMemo((): PhilippineLocationRow[] => {
     const raw = listProvinces();
@@ -104,30 +108,60 @@ export function PhilippineLocationPicker({
           </select>
         </div>
       </div>
-      <div>
-        <label htmlFor={`${idPrefix}-brgy`} className="mb-1 block text-xs font-semibold text-zinc-600">
-          Barangay
-        </label>
-        <input
-          id={`${idPrefix}-brgy`}
-          type="text"
-          className="dash-input"
-          placeholder="Enter barangay…"
-          maxLength={180}
-          value={value.barangayName ?? ""}
-          disabled={disabled || !value.cityCode}
-          autoComplete="address-level4"
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange({ ...value, barangayName: v === "" ? null : v });
-          }}
-        />
-        {legacyBarangayCodeHint ? (
-          <p className="mt-1 text-xs text-zinc-500">
-            Your address used an older barangay code. Enter the barangay name above to confirm your location.
-          </p>
-        ) : null}
-      </div>
+      {barangayRowEnd ? (
+        <div className="grid gap-3 md:grid-cols-2 md:items-start">
+          <div className="min-w-0">
+            <label htmlFor={`${idPrefix}-brgy`} className="mb-1 block text-xs font-semibold text-zinc-600">
+              Barangay
+            </label>
+            <input
+              id={`${idPrefix}-brgy`}
+              type="text"
+              className="dash-input"
+              placeholder="Enter barangay…"
+              maxLength={180}
+              value={value.barangayName ?? ""}
+              disabled={disabled || !value.cityCode}
+              autoComplete="address-level4"
+              onChange={(e) => {
+                const v = e.target.value;
+                onChange({ ...value, barangayName: v === "" ? null : v });
+              }}
+            />
+            {legacyBarangayCodeHint ? (
+              <p className="mt-1 text-xs text-zinc-500">
+                Your address used an older barangay code. Enter the barangay name above to confirm your location.
+              </p>
+            ) : null}
+          </div>
+          <div className="min-w-0">{barangayRowEnd}</div>
+        </div>
+      ) : (
+        <div>
+          <label htmlFor={`${idPrefix}-brgy`} className="mb-1 block text-xs font-semibold text-zinc-600">
+            Barangay
+          </label>
+          <input
+            id={`${idPrefix}-brgy`}
+            type="text"
+            className="dash-input"
+            placeholder="Enter barangay…"
+            maxLength={180}
+            value={value.barangayName ?? ""}
+            disabled={disabled || !value.cityCode}
+            autoComplete="address-level4"
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange({ ...value, barangayName: v === "" ? null : v });
+            }}
+          />
+          {legacyBarangayCodeHint ? (
+            <p className="mt-1 text-xs text-zinc-500">
+              Your address used an older barangay code. Enter the barangay name above to confirm your location.
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
