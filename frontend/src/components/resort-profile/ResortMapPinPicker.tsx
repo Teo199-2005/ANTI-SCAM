@@ -5,12 +5,20 @@ import { useEffect, useRef, useState } from "react";
 
 const PH_CENTER = { lat: 14.5995, lng: 120.9842 };
 
+/** Minimal shape returned by `@googlemaps/js-api-loader` `load()` (typed loosely for Geocoder). */
+type GoogleMapsNs = { maps: typeof google.maps };
+
 export type ResortMapPinPickerProps = {
   apiKey: string | undefined;
   latitude: number | null;
   longitude: number | null;
   onPinChange: (lat: number | null, lng: number | null) => void;
   disabled?: boolean;
+  /**
+   * When province + city/municipality are selected (e.g. "City of Cauayan, Isabela, Philippines"),
+   * the map pans here so owners can drop a pin nearby. Requires Geocoding API on the same browser key.
+   */
+  regionGeocodeQuery?: string | null;
 };
 
 type WindowWithGmAuth = Window & { gm_authFailure?: () => void };
@@ -40,15 +48,25 @@ function buildMapsReferrerPasteList(pageOrigin: string): string {
 /**
  * Draggable marker + map click to set coordinates. Requires Maps JavaScript API key.
  */
-export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinChange, disabled }: ResortMapPinPickerProps) {
+export default function ResortMapPinPicker({
+  apiKey,
+  latitude,
+  longitude,
+  onPinChange,
+  disabled,
+  regionGeocodeQuery,
+}: ResortMapPinPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
+  const googleNsRef = useRef<GoogleMapsNs | null>(null);
   const onPinChangeRef = useRef(onPinChange);
   const prevGmAuthFailureRef = useRef<(() => void) | undefined>(undefined);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [pageOrigin, setPageOrigin] = useState<string>("");
   const [referrerCopied, setReferrerCopied] = useState(false);
+  /** Incremented each time the map instance is created (Geocoder effect waits for a real map). */
+  const [mapEpoch, setMapEpoch] = useState(0);
 
   onPinChangeRef.current = onPinChange;
 
@@ -80,6 +98,7 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
       );
       mapRef.current = null;
       markerRef.current = null;
+      googleNsRef.current = null;
       if (containerRef.current) {
         containerRef.current.innerHTML = "";
       }
@@ -87,17 +106,18 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
 
     void loader
       .load()
-      .then((google) => {
+      .then((googleNs) => {
         if (cancelled || !containerRef.current) return;
+        googleNsRef.current = googleNs as GoogleMapsNs;
 
         const hasPin =
           latitude != null && longitude != null && Number.isFinite(latitude) && Number.isFinite(longitude);
         const center = hasPin ? { lat: latitude as number, lng: longitude as number } : PH_CENTER;
 
-        const map = new google.maps.Map(containerRef.current, {
+        const map = new googleNs.maps.Map(containerRef.current, {
           center,
           zoom: hasPin ? 16 : 6,
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          mapTypeId: googleNs.maps.MapTypeId.ROADMAP,
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: true,
@@ -109,26 +129,26 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
           if (cancelled || !mapRef.current) return;
           const m = mapRef.current;
           const c = m.getCenter();
-          google.maps.event.trigger(m, "resize");
+          googleNs.maps.event.trigger(m, "resize");
           if (c) m.setCenter(c);
         };
-        google.maps.event.addListenerOnce(map, "idle", bumpLayout);
+        googleNs.maps.event.addListenerOnce(map, "idle", bumpLayout);
         requestAnimationFrame(() => requestAnimationFrame(bumpLayout));
         window.setTimeout(bumpLayout, 120);
         window.setTimeout(bumpLayout, 450);
 
         const el = containerRef.current;
         if (el && typeof ResizeObserver !== "undefined") {
-          let roT: ReturnType<typeof setTimeout> | undefined;
+          let roT: number | undefined;
           resizeObserver = new ResizeObserver(() => {
             if (cancelled) return;
-            if (roT) clearTimeout(roT);
+            if (roT !== undefined) window.clearTimeout(roT);
             roT = window.setTimeout(() => bumpLayout(), 80);
           });
           resizeObserver.observe(el);
         }
 
-        const marker = new google.maps.Marker({
+        const marker = new googleNs.maps.Marker({
           position: hasPin ? center : undefined,
           map: hasPin ? map : undefined,
           draggable: !disabled,
@@ -151,6 +171,8 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
           if (!p) return;
           onPinChangeRef.current(p.lat(), p.lng());
         });
+
+        setMapEpoch((n) => n + 1);
       })
       .catch(() => {
         if (cancelled) return;
@@ -165,10 +187,42 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
       resizeObserver = null;
       markerRef.current = null;
       mapRef.current = null;
+      googleNsRef.current = null;
       w.gm_authFailure = prevGmAuthFailureRef.current;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init map once per mount / key
   }, [apiKey, disabled]);
+
+  /** Pan map to selected province + city (PSGC resolved to a geocode query). */
+  useEffect(() => {
+    const q = regionGeocodeQuery?.trim();
+    if (!q || mapEpoch === 0) return;
+
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      const map = mapRef.current;
+      const g = googleNsRef.current;
+      if (!map || !g || cancelled) return;
+
+      const geocoder = new g.maps.Geocoder();
+      void geocoder.geocode({ address: q }, (results, status) => {
+        if (cancelled || !mapRef.current) return;
+        if (status !== "OK" || !results?.[0]?.geometry?.location) return;
+        const loc = results[0].geometry.location;
+        mapRef.current.panTo(loc);
+        const z = mapRef.current.getZoom();
+        if (z !== undefined && z < 11) {
+          mapRef.current.setZoom(12);
+        }
+        g.maps.event.trigger(mapRef.current, "resize");
+      });
+    }, 420);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [regionGeocodeQuery, mapEpoch]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -205,6 +259,12 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
     <div className="space-y-2">
       <p className="text-xs text-zinc-500">
         Click the map or drag the pin to set the exact location shown on your public page.
+        {regionGeocodeQuery?.trim() ? (
+          <span className="mt-1 block text-[11px] text-zinc-400">
+            The map recenters on your selected city/municipality when both are chosen (enable{" "}
+            <strong>Geocoding API</strong> on the same browser key if it stays on the Philippines view).
+          </span>
+        ) : null}
       </p>
       {mapLoadError ? (
         <div className="rounded-xl border border-rose-200/90 bg-rose-50/95 px-3 py-3 text-xs text-rose-950">

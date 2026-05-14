@@ -53,7 +53,8 @@ import {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { buildPhilippinesGeocodeQuery } from "@/lib/locations/buildPhilippinesGeocodeQuery";
 
 const ResortMapPinPicker = dynamic(() => import("@/components/resort-profile/ResortMapPinPicker"), { ssr: false });
 
@@ -119,6 +120,11 @@ export default function ResortProfilePage() {
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   /** Same readiness rules as the public `/resort/{slug}` page (includes active room + photo). */
   const [ownerLanding, setOwnerLanding] = useState<OwnerLandingPageResponse | null>(null);
+
+  const mapRegionGeocodeQuery = useMemo(() => {
+    if (!form) return null;
+    return buildPhilippinesGeocodeQuery(form.address_province_psgc, form.address_city_municipality_psgc);
+  }, [form?.address_province_psgc, form?.address_city_municipality_psgc]);
 
   const publicLink =
     subdomain && typeof window !== "undefined" ? resortPublicLandingPageUrl(subdomain) : "";
@@ -833,6 +839,7 @@ export default function ResortProfilePage() {
               latitude={form.map_latitude}
               longitude={form.map_longitude}
               disabled={saving}
+              regionGeocodeQuery={mapRegionGeocodeQuery}
               onPinChange={(lat, lng) => {
                 setForm((prev) => (prev ? { ...prev, map_latitude: lat, map_longitude: lng } : prev));
               }}
