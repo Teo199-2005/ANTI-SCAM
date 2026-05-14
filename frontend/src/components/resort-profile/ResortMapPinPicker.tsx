@@ -149,14 +149,21 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
           <p className="mt-1.5 leading-relaxed">{mapLoadError}</p>
           <ul className="mt-2 list-inside list-disc space-y-0.5 text-[11px] text-rose-900/95">
             <li>
-              Google Cloud → APIs &amp; Services → enable <strong>Maps JavaScript API</strong> and ensure billing is
-              active.
+              <strong>RefererNotAllowedMapError</strong> (console): the browser origin does not match your API key’s
+              HTTP referrer allowlist. Add{" "}
+              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code> — the trailing{" "}
+              <code className="rounded bg-white/70 px-1">/*</code> is required so paths like{" "}
+              <code className="rounded bg-white/70 px-1">/dashboard/resort/profile</code> are allowed. Use{" "}
+              <code className="rounded bg-white/70 px-1">http</code> not <code className="rounded bg-white/70 px-1">https</code>{" "}
+              for local dev. Also add <code className="rounded bg-white/70 px-1">http://127.0.0.1:3000/*</code> if you open the app via 127.0.0.1.
             </li>
             <li>
-              Key restrictions → HTTP referrers: add your origins, e.g.{" "}
-              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code>,{" "}
-              <code className="rounded bg-white/70 px-1">http://*.localhost:3000/*</code> for tenant subdomains, and
-              production <code className="rounded bg-white/70 px-1">https://anti-scamph.com/*</code>.
+              Tenant subdomains: <code className="rounded bg-white/70 px-1">http://*.localhost:3000/*</code>. Production:{" "}
+              <code className="rounded bg-white/70 px-1">https://anti-scamph.com/*</code>.
+            </li>
+            <li>
+              Google Cloud → APIs &amp; Services → enable <strong>Maps JavaScript API</strong> and ensure billing is
+              active.
             </li>
             <li>
               After editing <code className="rounded bg-white/70 px-1">.env.local</code>, restart{" "}
