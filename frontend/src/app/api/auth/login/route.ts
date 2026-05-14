@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message:
-          "Sign-in could not reach the API from this server. Set LARAVEL_API_BASE_URL to your Laravel /api/v1 base (see frontend/.env.example) and restart Node/PM2.",
+        code: "bff_upstream_fetch_failed",
+        message: `Sign-in could not reach Laravel at ${BACKEND} (${detail}). Set LARAVEL_API_BASE_URL on the server; if .env.production looks correct, remove or fix frontend/.env.local — it overrides .env.production for the same keys. Then pm2 restart.`,
         ...loginDevHint(req),
       },
       { status: 502 },
