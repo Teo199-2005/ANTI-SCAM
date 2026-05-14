@@ -15,6 +15,11 @@ export type ResortMapPinPickerProps = {
 
 type WindowWithGmAuth = Window & { gm_authFailure?: () => void };
 
+function isTenantLocalhostHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h.endsWith(".localhost") && h !== "localhost";
+}
+
 /**
  * Draggable marker + map click to set coordinates. Requires Maps JavaScript API key.
  */
@@ -25,8 +30,14 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
   const onPinChangeRef = useRef(onPinChange);
   const prevGmAuthFailureRef = useRef<(() => void) | undefined>(undefined);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+  const [pageOrigin, setPageOrigin] = useState<string>("");
 
   onPinChangeRef.current = onPinChange;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setPageOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (!apiKey || !containerRef.current) return;
@@ -40,8 +51,13 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
     prevGmAuthFailureRef.current = w.gm_authFailure;
     w.gm_authFailure = () => {
       if (cancelled) return;
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const host = typeof window !== "undefined" ? window.location.hostname : "";
+      const tenantLocal = isTenantLocalhostHostname(host);
       setMapLoadError(
-        "Google rejected this Maps key (referrer, API not enabled, or billing). Fix the key in Google Cloud Console — your profile still saves without the map.",
+        tenantLocal
+          ? `Google blocked the map: your browser is on ${origin}, not plain localhost. "http://localhost:3000/*" does not cover ${host}. Add "http://*.localhost:3000/*" (or "${origin}/*") to your Maps API key referrers in Google Cloud, then wait a few minutes and refresh.`
+          : "Google rejected this Maps key (referrer, API not enabled, or billing). Fix the key in Google Cloud Console — your profile still saves without the map.",
       );
       mapRef.current = null;
       markerRef.current = null;
@@ -175,19 +191,39 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
         <div className="rounded-xl border border-rose-200/90 bg-rose-50/95 px-3 py-3 text-xs text-rose-950">
           <p className="font-semibold">Map unavailable</p>
           <p className="mt-1.5 leading-relaxed">{mapLoadError}</p>
+          {(() => {
+            try {
+              if (!pageOrigin) return null;
+              const host = new URL(pageOrigin).hostname;
+              if (!isTenantLocalhostHostname(host)) return null;
+              return (
+                <p className="mt-2 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 py-2 text-[11px] font-medium leading-snug text-amber-950">
+                  Detected host <code className="rounded bg-white/80 px-1 font-mono">{host}</code>: add referrer{" "}
+                  <code className="rounded bg-white/80 px-1 font-mono">http://*.localhost:3000/*</code> (port must match
+                  yours). Plain <code className="rounded bg-white/80 px-1 font-mono">http://localhost:3000/*</code> alone
+                  is not enough for <code className="rounded bg-white/80 px-1 font-mono">*.localhost</code> URLs.
+                </p>
+              );
+            } catch {
+              return null;
+            }
+          })()}
           <ul className="mt-2 list-inside list-disc space-y-0.5 text-[11px] text-rose-900/95">
             <li>
-              <strong>RefererNotAllowedMapError</strong> (console): the browser origin does not match your API key’s
-              HTTP referrer allowlist. Add{" "}
-              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code> — the trailing{" "}
-              <code className="rounded bg-white/70 px-1">/*</code> is required so paths like{" "}
-              <code className="rounded bg-white/70 px-1">/dashboard/resort/profile</code> are allowed. Use{" "}
-              <code className="rounded bg-white/70 px-1">http</code> not <code className="rounded bg-white/70 px-1">https</code>{" "}
-              for local dev. Also add <code className="rounded bg-white/70 px-1">http://127.0.0.1:3000/*</code> if you open the app via 127.0.0.1.
+              <strong>Tenant / subdomain dev</strong> (e.g. <code className="rounded bg-white/70 px-1">anything.localhost:3000</code>
+              ): add{" "}
+              <code className="rounded bg-white/70 px-1">http://*.localhost:3000/*</code> — required in addition to{" "}
+              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code> if you use both URL styles.
             </li>
             <li>
-              Tenant subdomains: <code className="rounded bg-white/70 px-1">http://*.localhost:3000/*</code>. Production:{" "}
-              <code className="rounded bg-white/70 px-1">https://anti-scamph.com/*</code>.
+              <strong>RefererNotAllowedMapError</strong> on plain localhost: add{" "}
+              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code> (with trailing{" "}
+              <code className="rounded bg-white/70 px-1">/*</code>), <code className="rounded bg-white/70 px-1">http</code> not{" "}
+              <code className="rounded bg-white/70 px-1">https</code> for local HTTP. Add{" "}
+              <code className="rounded bg-white/70 px-1">http://127.0.0.1:3000/*</code> if you use 127.0.0.1.
+            </li>
+            <li>
+              Production: <code className="rounded bg-white/70 px-1">https://anti-scamph.com/*</code>.
             </li>
             <li>
               Google Cloud → APIs &amp; Services → enable <strong>Maps JavaScript API</strong> and ensure billing is
