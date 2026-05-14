@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
@@ -50,14 +50,25 @@ export default function DashModal({
   const titleId = useId();
   const descId = useId();
   const prevActive = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const [mounted, setMounted] = useState(false);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!open || !panelRef.current) return;
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    prevActive.current = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!panelRef.current) return;
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -75,19 +86,9 @@ export default function DashModal({
         e.preventDefault();
         first.focus();
       }
-    },
-    [open, onClose]
-  );
+    };
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    prevActive.current = document.activeElement as HTMLElement | null;
-    document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
 
     const t = window.requestAnimationFrame(() => {
       const root = panelRef.current;
@@ -95,17 +96,21 @@ export default function DashModal({
       const preferred = initialFocusSelector
         ? root.querySelector<HTMLElement>(initialFocusSelector)
         : null;
-      const focusables = getFocusableElements(root);
-      (preferred ?? focusables[0])?.focus();
+      const focusables = getFocusableElements(root).filter((el) => !el.closest("[data-dash-modal-initial-skip]"));
+      const initial =
+        preferred && root.contains(preferred) && !preferred.closest("[data-dash-modal-initial-skip]")
+          ? preferred
+          : focusables[0];
+      initial?.focus();
     });
 
     return () => {
       window.cancelAnimationFrame(t);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
       prevActive.current?.focus?.();
     };
-  }, [open, handleKeyDown, initialFocusSelector]);
+  }, [open, initialFocusSelector]);
 
   if (!open || !mounted) return null;
 
@@ -114,7 +119,7 @@ export default function DashModal({
       className="fixed inset-0 z-[100] flex items-end justify-center overflow-x-hidden overflow-y-auto overscroll-y-contain bg-zinc-900/45 p-0 motion-safe:transition-opacity motion-safe:duration-150 motion-reduce:transition-none md:items-center md:p-4"
       role="presentation"
       onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) onCloseRef.current();
       }}
     >
       <div
@@ -149,7 +154,8 @@ export default function DashModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            data-dash-modal-initial-skip
+            onClick={() => onCloseRef.current()}
             aria-label="Close dialog"
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-softBorder bg-softCard text-zinc-500 shadow-dash-btn-sm transition hover:border-zinc-300 hover:bg-softGray hover:text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue focus-visible:ring-offset-2 md:h-9 md:w-9 md:min-h-0 md:min-w-0"
           >
