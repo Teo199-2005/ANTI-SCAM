@@ -29,9 +29,16 @@ export async function POST(req: NextRequest) {
       headers: authBffJsonHeaders(req),
       body: JSON.stringify(body),
     });
-  } catch {
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(`[auth/login] upstream fetch failed → ${BACKEND}/auth/login (${detail})`);
     return NextResponse.json(
-      { success: false, message: "API unreachable. Try again.", ...loginDevHint(req) },
+      {
+        success: false,
+        message:
+          "Sign-in could not reach the API from this server. Set LARAVEL_API_BASE_URL to your Laravel /api/v1 base (see frontend/.env.example) and restart Node/PM2.",
+        ...loginDevHint(req),
+      },
       { status: 502 },
     );
   }
