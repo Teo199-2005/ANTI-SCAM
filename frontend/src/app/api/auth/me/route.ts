@@ -3,9 +3,8 @@ import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 import { rsSessionClearCookieOptions } from "../sessionCookieSecure";
 
-const BACKEND = serverLaravelApiV1BaseUrl();
-
 export async function GET(req: NextRequest) {
+  const BACKEND = serverLaravelApiV1BaseUrl();
   const token = req.cookies.get("rs_session")?.value;
 
   if (!token) {

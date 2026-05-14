@@ -8,14 +8,13 @@
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
-
 /** Room/logo multipart can exceed default serverless limits on some hosts. */
 export const maxDuration = 180;
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 async function proxy(req: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const BACKEND = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
   const resolved = await context.params;
   const rawPath = resolved?.path;
   const segments = Array.isArray(rawPath) ? rawPath : rawPath != null ? [String(rawPath)] : [];

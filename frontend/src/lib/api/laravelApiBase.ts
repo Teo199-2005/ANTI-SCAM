@@ -45,6 +45,9 @@ export function laravelApiV1BaseUrl(): string {
 /**
  * Next.js Route Handlers only — prefers server-side `LARAVEL_API_BASE_URL` so `.env.local`
  * changes apply without rebuilding client bundles (fixes recurring “demo login works after rebuild” confusion).
+ *
+ * Call this **inside** each request handler (not at module load). Next may inline `process.env` at build
+ * for route modules; reading here per request picks up `.env.production` after VPS edits + `pm2 restart`.
  */
 export function serverLaravelApiV1BaseUrl(): string {
   const raw =

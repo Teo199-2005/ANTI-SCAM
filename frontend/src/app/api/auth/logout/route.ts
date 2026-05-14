@@ -2,9 +2,8 @@ import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 import { rsSessionClearCookieOptions } from "../sessionCookieSecure";
 
-const BACKEND = serverLaravelApiV1BaseUrl();
-
 export async function POST(req: NextRequest) {
+  const BACKEND = serverLaravelApiV1BaseUrl();
   const token = req.cookies.get("rs_session")?.value;
 
   // Fire-and-forget: revoke the backend token if we have it

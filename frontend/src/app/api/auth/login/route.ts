@@ -5,16 +5,16 @@ import { shouldAttachLoginProxyDiagnostics } from "@/lib/isLocalDevRequest";
 import { NextRequest, NextResponse } from "next/server";
 import { rsSessionCookieOptions } from "../sessionCookieSecure";
 
-const BACKEND = serverLaravelApiV1BaseUrl();
-
 function loginDevHint(req: NextRequest): { devHint: string } | Record<string, never> {
   if (!shouldAttachLoginProxyDiagnostics(req)) return {};
+  const backend = serverLaravelApiV1BaseUrl();
   return {
-    devHint: `BFF → ${BACKEND}/auth/login. If email/password are correct but login fails, the API database may have no demo users: run (from backend/) php artisan db:seed --class=DemoLoginAccountsSeeder. Point the BFF at your API with LARAVEL_API_BASE_URL in frontend/.env.local (e.g. http://127.0.0.1:8000/api/v1).`,
+    devHint: `BFF → ${backend}/auth/login. If email/password are correct but login fails, the API database may have no demo users: run (from backend/) php artisan db:seed --class=DemoLoginAccountsSeeder. Point the BFF at your API with LARAVEL_API_BASE_URL in frontend/.env.local (e.g. http://127.0.0.1:8000/api/v1).`,
   };
 }
 
 export async function POST(req: NextRequest) {
+  const BACKEND = serverLaravelApiV1BaseUrl();
   let body: unknown;
   try {
     body = await req.json();

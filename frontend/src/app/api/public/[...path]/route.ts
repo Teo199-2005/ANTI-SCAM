@@ -1,8 +1,6 @@
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
-
 type Ctx = { params: Promise<{ path: string[] }> };
 
 /**
@@ -10,6 +8,7 @@ type Ctx = { params: Promise<{ path: string[] }> };
  * Browser `publicClient` uses `/api/public/...` so production works without nginx exposing `/api/v1`.
  */
 async function proxy(req: NextRequest, context: Ctx, method: string): Promise<NextResponse> {
+  const BACKEND = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
   const { path } = await context.params;
   const segments = Array.isArray(path) ? path : [];
   if (segments.length === 0) {

@@ -2,9 +2,8 @@ import { authBffJsonHeaders } from "@/lib/api/authBffProxyHeaders";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = serverLaravelApiV1BaseUrl();
-
 export async function POST(req: NextRequest) {
+  const BACKEND = serverLaravelApiV1BaseUrl();
   let body: unknown;
   try {
     body = await req.json();
