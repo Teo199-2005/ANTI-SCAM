@@ -110,7 +110,7 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
       (lower.includes("checking your browser") || lower.includes("cf-mitigated") || lower.includes("challenge"));
     const message =
       backendRes.status === 403 && looksCfChallenge
-        ? "Request blocked (403) before the API — often a Cloudflare WAF or bot challenge. Open Security → Events in Cloudflare, or try again in the browser after the site check completes."
+        ? "Request blocked (403) before Laravel — usually the Next.js server is calling your public site through Cloudflare (HTML challenge). On the VPS, set LARAVEL_API_BASE_URL to an internal URL (e.g. http://127.0.0.1:8080/api/v1 per deployment/nginx-laravel-loopback.example.conf), not https://your-domain/.... Then pm2 restart the frontend with --update-env. In Cloudflare: Security → Events if you must use the public URL."
         : `Server error (${backendRes.status}). Check API logs.`;
     return NextResponse.json({ success: false, message }, { status: backendRes.status });
   }

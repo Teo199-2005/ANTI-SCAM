@@ -204,6 +204,15 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       pushToast({ title: "Referral code required", description: "Enter a referral code first.", tone: "warning" });
       return;
     }
+    // Same code already verified this session — avoid duplicate API calls / double toasts when Verify is clicked repeatedly.
+    if (appliedReferralCode === normalized && appliedMarketerName) {
+      pushToast({
+        title: "Already verified",
+        description: "This code is already applied. Change the code if you need a different partner.",
+        tone: "info",
+      });
+      return;
+    }
     referralVerifyInFlightRef.current = true;
     setReferralInlineError(null);
     setApplyingReferral(true);
@@ -224,10 +233,10 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       clearPendingReferralSignup();
       const ready = result.readiness?.is_ready ?? false;
       pushToast({
-        title: "Referral code verified",
+        title: "Referral applied",
         description: ready
-          ? `Code verified with ${result.marketer_name}. Your first month is free on 3, 6, or 12-month plans.`
-          : `Code verified with ${result.marketer_name}. Complete your resort profile to unlock the first-month-free promo.`,
+          ? `Partner: ${result.marketer_name}. First month free on 3, 6, or 12-month plans when you subscribe.`
+          : `Partner: ${result.marketer_name}. Complete your resort profile to unlock the first-month-free promo.`,
         tone: ready ? "success" : "warning",
       });
     } catch (err) {
@@ -654,7 +663,21 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   <button
                     type="button"
                     onClick={() => void applyReferral()}
-                    disabled={applyingReferral}
+                    disabled={
+                      applyingReferral ||
+                      Boolean(
+                        appliedReferralCode &&
+                          referralCode.trim().toUpperCase() === appliedReferralCode &&
+                          appliedMarketerName,
+                      )
+                    }
+                    title={
+                      appliedReferralCode &&
+                      referralCode.trim().toUpperCase() === appliedReferralCode &&
+                      appliedMarketerName
+                        ? "This code is already verified. Edit the field to use a different code."
+                        : undefined
+                    }
                     className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl border border-softBorder bg-white px-4 text-xs font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60 sm:min-h-0 sm:w-auto sm:min-w-[108px] sm:self-stretch sm:py-2 sm:text-sm"
                   >
                     {applyingReferral ? (
