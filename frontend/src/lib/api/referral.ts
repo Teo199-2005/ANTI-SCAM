@@ -1,4 +1,4 @@
-import { publicClient } from "@/lib/api/client";
+import { apiClient, publicClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 
 export type ReadinessPayload = {
@@ -14,6 +14,14 @@ export async function validateReferralCode(code: string, resortId: number): Prom
   const { data } = await publicClient.post<ApiEnvelope<ReferralValidateResult>>("/public/referrals/validate", {
     code: code.trim().toUpperCase(),
     resort_id: resortId,
+  });
+  return data.data;
+}
+
+/** Dashboard (authenticated): one round-trip; server resolves the owner resort. */
+export async function validateReferralCodeAsOwner(code: string): Promise<ReferralValidateResult> {
+  const { data } = await apiClient.post<ApiEnvelope<ReferralValidateResult>>("/resort-owner/referrals/validate", {
+    code: code.trim().toUpperCase(),
   });
   return data.data;
 }

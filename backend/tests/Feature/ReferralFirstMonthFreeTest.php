@@ -197,6 +197,27 @@ class ReferralFirstMonthFreeTest extends TestCase
         $this->assertContains('room_with_image', $response->json('data.readiness.missing_fields'));
     }
 
+    public function test_resort_owner_referrals_validate_resolves_readiness_without_resort_id(): void
+    {
+        $tenant = $this->makeTenant();
+        $owner = $this->makeResortOwner($tenant);
+        $marketer = $this->makeMarketer($tenant);
+        $resort = $this->makeResort($tenant);
+        $this->addRoomWithImage($resort);
+        $this->assignMarketerToResort($marketer, $resort);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->postJson('/api/v1/resort-owner/referrals/validate', [
+            'code' => 'TESTCODE001',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.valid', true);
+        $response->assertJsonPath('data.code', 'TESTCODE001');
+        $response->assertJsonPath('data.readiness.is_ready', true);
+    }
+
     // ─── Invoice creation: gate checks ───────────────────────────────────────
 
     public function test_referral_checkout_blocked_when_profile_incomplete(): void

@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/shared/ToastProvider";
 import { createSubscriptionInvoice } from "@/lib/api/subscription";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
-import { validateReferralCode } from "@/lib/api/referral";
+import { validateReferralCodeAsOwner } from "@/lib/api/referral";
 import type { ReadinessPayload } from "@/lib/api/referral";
 import { clearPendingReferralSignup, readPendingReferralSignup } from "@/lib/pendingReferralSignup";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -17,7 +17,7 @@ import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import { AlertCircle, Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 function segmentLabel(segment: string): string {
@@ -79,6 +79,8 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const [referralInlineError, setReferralInlineError] = useState<string | null>(null);
   const [applyingReferral, setApplyingReferral] = useState(false);
   const [subscribingNow, setSubscribingNow] = useState(false);
+  const referralVerifyInFlightRef = useRef(false);
+  const subscribeInFlightRef = useRef(false);
   const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
   const [subscriptionInfo, setSubscriptionInfo] = useState<OwnerSubscriptionInfo | null>(null);
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
@@ -191,16 +193,17 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   }, [showSubscribeModal]);
 
   const applyReferral = async () => {
+    if (referralVerifyInFlightRef.current) return;
     const normalized = referralCode.trim().toUpperCase();
     if (!normalized) {
       pushToast({ title: "Referral code required", description: "Enter a referral code first.", tone: "warning" });
       return;
     }
+    referralVerifyInFlightRef.current = true;
     setReferralInlineError(null);
     setApplyingReferral(true);
     try {
-      const landing = await getOwnerLandingPage();
-      const result = await validateReferralCode(normalized, landing.resort_id);
+      const result = await validateReferralCodeAsOwner(normalized);
       if (!result.valid) {
         setReferralInlineError(result.message);
         pushToast({
@@ -231,12 +234,15 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         tone: "error",
       });
     } finally {
+      referralVerifyInFlightRef.current = false;
       setApplyingReferral(false);
     }
   };
 
   const subscribeNow = async () => {
     if (!user || user.role !== "resort_owner") return;
+    if (subscribeInFlightRef.current) return;
+    subscribeInFlightRef.current = true;
     setSubscribingNow(true);
     setShowSubscribeModal(false);
     try {
@@ -257,6 +263,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         tone: "error",
       });
       setSubscribingNow(false);
+      subscribeInFlightRef.current = false;
     }
   };
 

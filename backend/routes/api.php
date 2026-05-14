@@ -221,6 +221,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/resort-owner/landing-page', [ResortLandingPageController::class, 'show']);
             Route::post('/resort-owner/landing-page/upload-bg-image', [ResortLandingPageController::class, 'uploadBgImage']);
             Route::post('/resort-owner/landing-page/upload-image', [ResortLandingPageController::class, 'uploadImage']);
+            Route::post('/resort-owner/referrals/validate', [ReferralValidationController::class, 'validateForOwner']);
             Route::post('/resort-owner/subscriptions/pay-invoice', [SubscriptionInvoiceController::class, 'createForOwner']);
         });
 
