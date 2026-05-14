@@ -37,7 +37,9 @@ const subtitleSize: Record<BrandWordmarkSize, string> = {
 };
 
 /**
- * Product wordmark: **Anti-** / **Scam** / **PH** (navy · alert red · navy), uppercase.
+ * Product wordmark: **Anti-** / **Scam** / **PH**, uppercase.
+ * On light backgrounds: navy · alert red (`clScamWordmark`) · navy.
+ * On dark backgrounds: uniform light text (no red accent) for legibility in footers and navy strips.
  * Default: Montserrat (`font-nav`). With `displayHeading`, Poppins (`font-pop`) for landing typography.
  */
 export function BrandWordmark({
@@ -50,6 +52,7 @@ export function BrandWordmark({
   displayHeading = false,
 }: BrandWordmarkProps) {
   const navy = tone === "onLight" ? "text-navy" : "text-white";
+  const scamSegmentClass = tone === "onLight" ? "text-clScamWordmark" : navy;
   const subColor = tone === "onLight" ? "text-zinc-500" : "text-white/65";
 
   return (
@@ -67,7 +70,7 @@ export function BrandWordmark({
         )}
       >
         <span className={navy}>Anti-</span>
-        <span className="text-clScamWordmark">Scam</span>
+        <span className={scamSegmentClass}>Scam</span>
         <span className={navy}> PH</span>
       </span>
       {subtitle ? (
