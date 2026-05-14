@@ -34,6 +34,7 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
     setMapLoadError(null);
     const loader = new Loader({ apiKey, version: "weekly" });
     let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
 
     const w = window as WindowWithGmAuth;
     prevGmAuthFailureRef.current = w.gm_authFailure;
@@ -61,11 +62,36 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
         const map = new google.maps.Map(containerRef.current, {
           center,
           zoom: hasPin ? 16 : 6,
+          mapTypeId: google.maps.MapTypeId.ROADMAP,
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: true,
         });
         mapRef.current = map;
+
+        /** Gray map fix: tiles often fail until the map knows the real container size (layout / dynamic import). */
+        const bumpLayout = () => {
+          if (cancelled || !mapRef.current) return;
+          const m = mapRef.current;
+          const c = m.getCenter();
+          google.maps.event.trigger(m, "resize");
+          if (c) m.setCenter(c);
+        };
+        google.maps.event.addListenerOnce(map, "idle", bumpLayout);
+        requestAnimationFrame(() => requestAnimationFrame(bumpLayout));
+        window.setTimeout(bumpLayout, 120);
+        window.setTimeout(bumpLayout, 450);
+
+        const el = containerRef.current;
+        if (el && typeof ResizeObserver !== "undefined") {
+          let roT: ReturnType<typeof setTimeout> | undefined;
+          resizeObserver = new ResizeObserver(() => {
+            if (cancelled) return;
+            if (roT) clearTimeout(roT);
+            roT = window.setTimeout(() => bumpLayout(), 80);
+          });
+          resizeObserver.observe(el);
+        }
 
         const marker = new google.maps.Marker({
           position: hasPin ? center : undefined,
@@ -100,6 +126,8 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
 
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       markerRef.current = null;
       mapRef.current = null;
       w.gm_authFailure = prevGmAuthFailureRef.current;
