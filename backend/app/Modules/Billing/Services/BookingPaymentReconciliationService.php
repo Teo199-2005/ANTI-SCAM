@@ -3,6 +3,7 @@
 namespace App\Modules\Billing\Services;
 
 use App\Models\Reservation;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -40,6 +41,43 @@ class BookingPaymentReconciliationService
                     }
                 }
             });
+
+        return $updated;
+    }
+
+    /**
+     * Poll Xendit for the current user's outstanding booking invoices (webhook may be missing locally
+     * or delayed). Call from reservation list endpoints so the dashboard matches paid checkout quickly.
+     *
+     * @return int Number of reservations confirmed from this poll
+     */
+    public function syncPendingInvoicePaymentsForBooker(User $user, int $limit = 8): int
+    {
+        if (! in_array($user->role, ['guest', 'client', 'user'], true)) {
+            return 0;
+        }
+
+        $q = Reservation::withoutGlobalScopes()
+            ->where('client_id', $user->id)
+            ->where('status', 'pending_payment')
+            ->whereNotNull('xendit_invoice_id')
+            ->where(function ($inner): void {
+                $inner->where('xendit_payment_status', 'pending')
+                    ->orWhereNull('xendit_payment_status');
+            });
+
+        if ($user->role === 'guest' && $user->home_resort_id) {
+            $q->where('resort_id', (int) $user->home_resort_id);
+        } elseif (in_array($user->role, ['client', 'user'], true)) {
+            $q->where('tenant_id', (int) $user->tenant_id);
+        }
+
+        $updated = 0;
+        foreach ($q->orderByDesc('id')->limit(max(1, min(25, $limit)))->get() as $reservation) {
+            if ($this->reconcileReservation($reservation)) {
+                $updated++;
+            }
+        }
 
         return $updated;
     }

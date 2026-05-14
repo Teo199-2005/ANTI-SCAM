@@ -121,4 +121,83 @@ class GuestCheckoutInvoiceTest extends TestCase
 
         $this->assertSame('inv_new_2', $reservation->fresh()->xendit_invoice_id);
     }
+
+    public function test_invoice_redirect_urls_use_checkout_return_base_when_allowed(): void
+    {
+        config(['services.xendit.secret_key' => 'xnd_development_test_key', 'app.frontend_url' => 'http://127.0.0.1:3000']);
+
+        $tenant = Tenant::create([
+            'name' => 'Sub Tenant',
+            'slug' => 'sub-tenant',
+            'subdomain' => 'azure-sands-1',
+            'status' => 'active',
+        ]);
+
+        $guest = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'guest',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Azure Sands',
+            'is_publicly_listed' => true,
+        ]);
+
+        $room = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'name' => 'Deluxe',
+            'code' => 'D1',
+            'status' => 'active',
+            'base_price' => 2000,
+            'capacity' => 2,
+        ]);
+
+        $reservation = Reservation::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'room_id' => $room->id,
+            'client_id' => $guest->id,
+            'reference_no' => 'RSV-SUB-HOST-1',
+            'check_in_date' => now()->addDays(2)->toDateString(),
+            'check_out_date' => now()->addDays(3)->toDateString(),
+            'guest_count' => 2,
+            'reservation_fee' => 500,
+            'total_amount' => 2000,
+            'status' => 'pending_payment',
+            'xendit_invoice_id' => null,
+            'xendit_payment_status' => 'pending',
+            'reserved_at' => null,
+        ]);
+
+        Http::fake([
+            'https://api.xendit.co/v2/invoices' => Http::response([
+                'id' => 'inv_sub_host',
+                'invoice_url' => 'https://checkout.xendit.co/sub-host',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($guest);
+
+        $origin = 'http://azure-sands-1.localhost:3000';
+        $response = $this->postJson("/api/v1/reservations/{$reservation->id}/invoice", [
+            'checkout_return_base' => $origin,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.invoice_url', 'https://checkout.xendit.co/sub-host');
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) use ($origin): bool {
+            if ($request->url() !== 'https://api.xendit.co/v2/invoices') {
+                return false;
+            }
+            $data = $request->data();
+            $success = (string) ($data['success_redirect_url'] ?? '');
+            $failure = (string) ($data['failure_redirect_url'] ?? '');
+
+            return str_contains($success, $origin.'/dashboard/guest/history')
+                && str_contains($failure, $origin.'/dashboard/guest/history');
+        });
+    }
 }

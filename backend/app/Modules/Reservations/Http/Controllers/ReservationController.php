@@ -3,6 +3,7 @@
 namespace App\Modules\Reservations\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Billing\Services\BookingPaymentReconciliationService;
 use App\Modules\Reservations\Http\Requests\AdminOverrideReservationRequest;
 use App\Modules\Reservations\Http\Requests\CancelReservationRequest;
 use App\Modules\Reservations\Http\Requests\StoreReservationRequest;
@@ -18,7 +19,10 @@ class ReservationController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly ReservationService $service) {}
+    public function __construct(
+        private readonly ReservationService $service,
+        private readonly BookingPaymentReconciliationService $bookingPaymentReconciliation,
+    ) {}
 
     public function store(StoreReservationRequest $request)
     {
@@ -56,7 +60,9 @@ class ReservationController extends Controller
     {
         $this->authorize('viewAny', Reservation::class);
 
-        $user    = auth()->user();
+        $user = auth()->user();
+        $this->bookingPaymentReconciliation->syncPendingInvoicePaymentsForBooker($user);
+
         $query   = Reservation::withoutGlobalScopes()
             ->with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name']);
         $status  = request()->string('status')->value();

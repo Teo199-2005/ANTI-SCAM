@@ -352,8 +352,6 @@ export default function ResortProfilePage() {
   };
 
   const landingReady = Boolean(ownerLanding?.is_ready);
-  const landingMissingLabels =
-    ownerLanding?.missing_fields?.map((k) => LANDING_MISSING_FIELD_LABELS[k] ?? k) ?? [];
   const emailVerified = Boolean(user?.email_verified_at);
 
   const refreshOwnerLanding = async () => {
@@ -557,21 +555,17 @@ export default function ResortProfilePage() {
       {form && ownerLanding && !landingReady && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <span>
-            Your public landing page is not live yet. Still needed:{" "}
-            <strong>{landingMissingLabels.join(", ")}</strong>.{" "}
-            {ownerLanding.missing_fields?.includes("room_with_image") ? (
-              <>
-                Add photos under{" "}
-                <Link href="/dashboard/resort/rooms" className="font-semibold underline">
-                  Rooms
-                </Link>
-                .
-              </>
-            ) : (
-              "Fill these in and save to unlock your public page."
-            )}
-          </span>
+          <div>
+            <p>
+              Your public landing page is not live yet. Complete the items below, then <strong>Save profile</strong>{" "}
+              (and add room photos under <Link href="/dashboard/resort/rooms">Rooms</Link> if listed).
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 font-medium">
+              {(ownerLanding.missing_fields ?? []).map((k) => (
+                <li key={k}>{LANDING_MISSING_FIELD_LABELS[k] ?? k}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
       {form && landingReady && (

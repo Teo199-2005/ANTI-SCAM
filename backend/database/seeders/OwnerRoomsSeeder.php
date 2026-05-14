@@ -46,6 +46,12 @@ class OwnerRoomsSeeder extends Seeder
             ]
         );
         app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
+        $resort->refresh();
+        if ($resort->address_label === null || trim((string) $resort->address_label) === '') {
+            $resort->forceFill([
+                'address_label' => 'Tagaytay City, Cavite, Philippines',
+            ])->saveQuietly();
+        }
 
         $starterRooms = [
             [

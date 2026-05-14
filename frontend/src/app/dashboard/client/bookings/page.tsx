@@ -1,5 +1,6 @@
 "use client";
 
+import BookingPaymentReturnModal from "@/components/dashboard/BookingPaymentReturnModal";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DataTable from "@/components/shared/DataTable";
 import {
@@ -16,7 +17,8 @@ import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { BadgeCheck, CalendarDays, Clock, Search, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Reservation = {
   id: number;
@@ -52,7 +54,7 @@ const statusBadge: Record<string, string> = {
   completed: "dash-badge-navy",
 };
 
-export default function BookingHistoryPage() {
+function ClientBookingsContent() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -300,5 +302,52 @@ export default function BookingHistoryPage() {
         </DataTable>
       </div>
     </div>
+  );
+}
+
+function ClientBookingsWithPaymentReturn() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [contentKey, setContentKey] = useState(0);
+  const from = searchParams.get("from");
+  const fromPayment = from === "payment";
+  const fromPaymentFailed = from === "payment_failed";
+  const paymentReturnId = searchParams.get("reservation_id");
+  const paymentReturnRef = searchParams.get("ref");
+  const paymentModalOpen = Boolean(paymentReturnId && (fromPayment || fromPaymentFailed));
+  const paymentModalFlow = fromPaymentFailed ? "failed" : "success";
+
+  const stripPaymentReturnQuery = useCallback(() => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.delete("from");
+    sp.delete("reservation_id");
+    sp.delete("ref");
+    const next = sp.toString();
+    router.replace(next ? `${pathname}?${next}` : pathname);
+    setContentKey((k) => k + 1);
+  }, [pathname, router, searchParams]);
+
+  return (
+    <>
+      {paymentReturnId ? (
+        <BookingPaymentReturnModal
+          open={paymentModalOpen}
+          onClose={stripPaymentReturnQuery}
+          flow={paymentModalFlow}
+          reservationId={paymentReturnId}
+          refFallback={paymentReturnRef}
+        />
+      ) : null}
+      <ClientBookingsContent key={contentKey} />
+    </>
+  );
+}
+
+export default function BookingHistoryPage() {
+  return (
+    <Suspense fallback={<div className="space-y-6 p-6 text-sm text-zinc-500">Loading…</div>}>
+      <ClientBookingsWithPaymentReturn />
+    </Suspense>
   );
 }

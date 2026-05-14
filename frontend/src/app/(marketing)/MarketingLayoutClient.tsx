@@ -8,8 +8,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   isAuthMarketingNavOverlayPath,
   isAuthSplitShellPath,
+  isResortGuestBookingFlowPath,
+  isSignedInAllowedMarketingPath,
   MARKETING_OVERLAY_MAIN_TOP_PAD_CLASS,
 } from "@/lib/authMarketingNavOverlay";
+import { ResortGuestBookingFlowLayout } from "@/components/layout/ResortGuestBookingFlowLayout";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
@@ -31,9 +34,15 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const allowAuthWhileSignedIn = useMemo(
+  const isGuestResortAuthPath = useMemo(
     () => guestResortAuthFromSearch(pathname, searchParams.get("resort")),
     [pathname, searchParams],
+  );
+
+  /** Resort ?resort= login/register OR checkout / payment return — do not bounce signed-in users to /dashboard. */
+  const allowMarketingWhileSignedIn = useMemo(
+    () => isGuestResortAuthPath || isSignedInAllowedMarketingPath(pathname),
+    [isGuestResortAuthPath, pathname],
   );
 
   const fixedOverlayNav = isAuthMarketingNavOverlayPath(pathname);
@@ -41,10 +50,10 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
   const marketingHomeFullBleed = pathname === "/";
 
   useEffect(() => {
-    if (!loading && user && !allowAuthWhileSignedIn) {
+    if (!loading && user && !allowMarketingWhileSignedIn) {
       router.replace("/dashboard");
     }
-  }, [allowAuthWhileSignedIn, loading, router, user]);
+  }, [allowMarketingWhileSignedIn, loading, router, user]);
 
   if (loading) {
     return (
@@ -52,7 +61,7 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
     );
   }
 
-  if (user && !allowAuthWhileSignedIn) {
+  if (user && !allowMarketingWhileSignedIn) {
     return (
       <AppLoadingScreen
         variant="marketing"
@@ -73,13 +82,17 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
 
   const resortSlugForGuestAuth = searchParams.get("resort")?.trim() ?? "";
 
-  if (allowAuthWhileSignedIn && resortSlugForGuestAuth) {
+  if (isGuestResortAuthPath && resortSlugForGuestAuth) {
     return (
       <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[#f4f7fb]">
         <main className="relative z-0 min-w-0 flex-1">{children}</main>
         <ResortGuestPublicFooter resortSlug={resortSlugForGuestAuth} />
       </div>
     );
+  }
+
+  if (isResortGuestBookingFlowPath(pathname)) {
+    return <ResortGuestBookingFlowLayout>{children}</ResortGuestBookingFlowLayout>;
   }
 
   const marketingNavMode = isAuthSplitShellPath(pathname) ? "auth-overlay" : "marketing-solid";

@@ -1,35 +1,77 @@
 "use client";
 
 import PageContainer from "@/components/layout/PageContainer";
+import { useAuth } from "@/contexts/AuthContext";
 import { getReservation, ReservationDetail } from "@/lib/api/payment";
-import { BadgeCheck, CalendarDays, CreditCard, Home } from "lucide-react";
+import { getPublicResort } from "@/lib/api/public";
+import {
+  postPaymentBookingsHref,
+  postPaymentBookingsLabel,
+  postPaymentResortLandingOrDashboardHref,
+  postPaymentResortLandingOrDashboardLabel,
+} from "@/lib/postPaymentDashboardLinks";
+import { BadgeCheck, CalendarDays, CreditCard, LayoutDashboard, ReceiptText } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 
-export default function ConfirmationPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: resortId } = use(params);
+export default function ConfirmationPage() {
+  const { id: resortIdParam } = useParams();
+  const resortId = String(resortIdParam ?? "");
   const searchParams     = useSearchParams();
   const reservationId    = searchParams.get("reservation_id");
   const ref              = searchParams.get("ref");
+  const { user, loading: authLoading } = useAuth();
 
   const [reservation, setReservation] = useState<ReservationDetail | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [resortSlug, setResortSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!reservationId) { setLoading(false); return; }
-    const load = async () => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      let slug: string | null = null;
       try {
-        const data = await getReservation(Number(reservationId));
-        setReservation(data);
-      } catch {
-        // fall through — use ref from query param
+        if (reservationId) {
+          try {
+            const data = await getReservation(Number(reservationId));
+            if (!cancelled) setReservation(data);
+            try {
+              const pr = await getPublicResort(data.resortId);
+              slug = pr.slug?.trim() || null;
+            } catch {
+              /* ignore */
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!slug && resortId) {
+          const n = Number(resortId);
+          if (Number.isFinite(n) && n > 0) {
+            try {
+              const pr = await getPublicResort(n);
+              slug = pr.slug?.trim() || null;
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        if (!cancelled) setResortSlug(slug);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    void load();
-  }, [reservationId]);
+  }, [reservationId, resortId]);
+
+  const bookingsHref = postPaymentBookingsHref(user?.role, authLoading, "success");
+  const bookingsLabel = postPaymentBookingsLabel(user?.role, authLoading);
+  const secondaryHref = postPaymentResortLandingOrDashboardHref(resortSlug, user?.role, authLoading);
+  const secondaryLabel = postPaymentResortLandingOrDashboardLabel(resortSlug, user?.role, authLoading);
 
   const status = reservation?.status ?? "pending_payment";
   const isPaid = status === "confirmed";
@@ -85,18 +127,16 @@ export default function ConfirmationPage({ params }: { params: Promise<{ id: str
           ) : null}
 
           <div className="mt-8 flex flex-col gap-3">
-            <Link
-              href={`/resorts/${resortId}`}
-              className="glass-inline-btn justify-center text-navy"
-            >
-              <Home size={15} />
-              Back to Resort
+            <Link href={bookingsHref} className="glass-inline-btn justify-center text-navy">
+              <ReceiptText size={15} />
+              {bookingsLabel}
             </Link>
             <Link
-              href="/dashboard/client/bookings"
+              href={secondaryHref}
               className="rounded-full border border-white/30 bg-gradient-to-r from-slateBlue/90 to-navy/90 px-5 py-2.5 text-sm font-semibold text-white shadow-soft backdrop-blur-md transition hover:from-slateBlue hover:to-navy"
             >
-              View My Bookings →
+              <LayoutDashboard size={15} className="mr-2 inline" />
+              {secondaryLabel}
             </Link>
           </div>
         </div>

@@ -19,8 +19,14 @@ class XenditInvoiceController extends Controller
     {
         $this->authorize('view', $reservation);
 
+        $checkoutReturnBase = $request->input('checkout_return_base');
+        $checkoutReturnBase = is_string($checkoutReturnBase) ? trim($checkoutReturnBase) : null;
+        if ($checkoutReturnBase === '') {
+            $checkoutReturnBase = null;
+        }
+
         try {
-            $result = $this->service->resolveGuestCheckoutInvoice($reservation, $request->user());
+            $result = $this->service->resolveGuestCheckoutInvoice($reservation, $request->user(), $checkoutReturnBase);
         } catch (RuntimeException $e) {
             $status = str_contains($e->getMessage(), 'not awaiting payment') ? 409 : 502;
 

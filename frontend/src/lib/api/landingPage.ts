@@ -85,6 +85,11 @@ export type OwnerLandingPageResponse = {
 
 // ── Public landing page types ────────────────────────────────────────────────
 
+export type PublicAdminLandingEmbed = {
+  enabled: boolean;
+  youtubeVideoId: string | null;
+};
+
 export type PublicResortLandingPayload = {
   id: number;
   slug: string;
@@ -104,6 +109,8 @@ export type PublicResortLandingPayload = {
   gallery: string[];
   footer: LandingComputedFooter;
   map: LandingComputedMap;
+  /** Platform-controlled intro video on public resort landing (admin-configured). */
+  adminLandingEmbed?: PublicAdminLandingEmbed;
 };
 
 // ── API functions ────────────────────────────────────────────────────────────
@@ -185,5 +192,10 @@ export async function getPublicResortBySubdomain(subdomain: string): Promise<
   if (!body?.success || !body.data) {
     return { ok: false, status: res.status, message: body?.message ?? "Unable to load resort." };
   }
-  return { ok: true, data: body.data };
+  const raw = body.data as PublicResortLandingPayload;
+  const data: PublicResortLandingPayload = {
+    ...raw,
+    adminLandingEmbed: raw.adminLandingEmbed ?? { enabled: false, youtubeVideoId: null },
+  };
+  return { ok: true, data };
 }

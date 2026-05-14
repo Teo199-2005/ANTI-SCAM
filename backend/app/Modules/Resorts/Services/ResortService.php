@@ -21,6 +21,7 @@ class ResortService
     {
         $query = Resort::query()
             ->with('subscription')
+            ->with('tenant:id,subdomain')
             ->withCount('rooms');
 
         if ($search) {

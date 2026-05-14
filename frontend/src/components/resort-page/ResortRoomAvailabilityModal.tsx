@@ -33,7 +33,7 @@ type Props = {
   onClose: () => void;
   roomId: number;
   roomName: string;
-  /** Dates selected in the parent room modal (verified by “Verify selected stay”). */
+  /** Dates selected in the parent room modal (checked with “Check full stay for these dates”). */
   checkIn: string;
   checkOut: string;
 };
@@ -185,8 +185,8 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
         </div>
 
         <p className="mb-3 text-xs leading-relaxed text-zinc-600">
-          Green nights can start a <strong>one-night</strong> stay; red is sold out or blocked for that start night.
-          Your full stay is checked below with your selected check-in and check-out.
+          Colors show a quick <strong>one-night</strong> availability probe from each date (open vs blocked for that
+          single night only — not the nightly rate). Confirm your <strong>full</strong> stay with the button below.
         </p>
 
         <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3">
@@ -245,11 +245,11 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
                       } ${selected && st !== "past" ? "ring-2 ring-navy ring-offset-1" : ""}`}
                       title={
                         st === "free"
-                          ? "Available for a 1-night stay starting this date"
+                          ? "Room can start a one-night stay on this date"
                           : st === "busy"
-                            ? "Not available for a 1-night stay starting this date"
+                            ? "Room cannot start a one-night stay on this date (booked, blocked, or on hold)"
                             : st === "unknown"
-                              ? "Could not load"
+                              ? "Could not verify — try changing month or reopening this calendar"
                               : ""
                       }
                     >
@@ -275,7 +275,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
           >
             {rangeChecking ? <Loader2 size={16} className="animate-spin" /> : null}
-            Verify selected stay
+            Check full stay for these dates
           </button>
           {rangeResult === "available" ? (
             <p className="mt-2 text-sm font-medium text-emerald-700">These dates are available for booking.</p>
@@ -294,16 +294,32 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           ) : null}
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-zinc-500">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-200" /> Free (1 night)
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-sm bg-rose-200" /> Unavailable
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-sm bg-amber-100" /> Unknown
-          </span>
+        <div
+          className="mt-3 space-y-2 rounded-lg border border-zinc-200/80 bg-white/80 p-3 text-[11px] leading-snug text-zinc-600"
+          role="list"
+          aria-label="Calendar color meanings"
+        >
+          <div className="flex gap-2" role="listitem">
+            <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm bg-emerald-200" aria-hidden />
+            <span>
+              <span className="font-semibold text-zinc-800">Available (one-night)</span> — that night can start a
+              one-night booking. This is availability only, not “free” pricing.
+            </span>
+          </div>
+          <div className="flex gap-2" role="listitem">
+            <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm bg-rose-200" aria-hidden />
+            <span>
+              <span className="font-semibold text-zinc-800">Not available (one-night)</span> — booked, blocked, or on
+              hold for that one-night starting window.
+            </span>
+          </div>
+          <div className="flex gap-2" role="listitem">
+            <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm bg-amber-100" aria-hidden />
+            <span>
+              <span className="font-semibold text-zinc-800">Could not verify</span> — the one-night check failed
+              (network or server). Change month or reopen this calendar to retry.
+            </span>
+          </div>
         </div>
       </div>
     </div>,

@@ -44,6 +44,7 @@ export const apiClient = axios.create({
   baseURL: "/api/backend",
   headers: { Accept: "application/json", "Content-Type": "application/json" },
   timeout: 15_000,
+  withCredentials: true,
 });
 
 // Auth client — calls Next.js BFF auth routes, not the Laravel backend directly.

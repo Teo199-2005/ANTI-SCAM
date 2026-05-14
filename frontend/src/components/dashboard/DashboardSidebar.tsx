@@ -24,6 +24,7 @@ import {
   TrendingUp,
   UserRound,
   Users,
+  Video,
   Webhook,
   X,
 } from "lucide-react";
@@ -58,6 +59,7 @@ const adminGroups: NavGroup[] = [
     label: "Management",
     items: [
       { href: "/dashboard/admin/resorts",       label: "Resorts",       icon: Building2 },
+      { href: "/dashboard/admin/landing-embed", label: "Landing intro video", icon: Video },
       { href: "/dashboard/admin/users",          label: "Users",         icon: Users },
       { href: "/dashboard/admin/marketing-monitor", label: "Marketing partners", icon: Activity },
       { href: "/dashboard/admin/reservations",   label: "Reservations",  icon: CalendarDays },
@@ -240,12 +242,16 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
               <Logo size="sm" className="border-white/20 bg-white/15 shadow-soft-sm backdrop-blur-md" />
             )}
             <div className="flex min-w-0 flex-col gap-0.5 leading-tight">
-              <BrandWordmark tone="onDark" size="sm" className="leading-tight" />
               {role === "guest" && user?.home_resort?.name ? (
-                <span className="block truncate text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                  {user.home_resort.name}
-                </span>
-              ) : null}
+                <>
+                  <span className="truncate font-pop text-[15px] font-extrabold uppercase tracking-[0.06em] text-white sm:text-base">
+                    {user.home_resort.name}
+                  </span>
+                  <BrandWordmark tone="onDark" size="2xs" className="leading-tight" />
+                </>
+              ) : (
+                <BrandWordmark tone="onDark" size="sm" className="leading-tight" />
+              )}
             </div>
           </Link>
 

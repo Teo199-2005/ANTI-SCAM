@@ -2,7 +2,7 @@ import { authBffJsonHeaders } from "@/lib/api/authBffProxyHeaders";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { shouldAttachLoginProxyDiagnostics } from "@/lib/isLocalDevRequest";
 import { NextRequest, NextResponse } from "next/server";
-import { sessionCookieSecure } from "../sessionCookieSecure";
+import { rsSessionCookieOptions } from "../sessionCookieSecure";
 
 const BACKEND = serverLaravelApiV1BaseUrl();
 
@@ -61,13 +61,7 @@ export async function POST(req: NextRequest) {
 
   const res = NextResponse.json({ success: true, data: { user: payload.data.user } });
 
-  res.cookies.set("rs_session", payload.data.token, {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: sessionCookieSecure(req),
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  });
+  res.cookies.set("rs_session", payload.data.token, rsSessionCookieOptions(req));
 
   return res;
 }

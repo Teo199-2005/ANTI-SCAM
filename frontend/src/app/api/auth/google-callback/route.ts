@@ -7,7 +7,7 @@
  * to httpOnly cookie and then the URL is replaced.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { sessionCookieSecure } from "../sessionCookieSecure";
+import { rsSessionCookieOptions } from "../sessionCookieSecure";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -18,13 +18,7 @@ export async function GET(req: NextRequest) {
 
   const res = NextResponse.redirect(new URL("/dashboard", req.url));
 
-  res.cookies.set("rs_session", token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: sessionCookieSecure(req),
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  res.cookies.set("rs_session", token, rsSessionCookieOptions(req));
 
   return res;
 }

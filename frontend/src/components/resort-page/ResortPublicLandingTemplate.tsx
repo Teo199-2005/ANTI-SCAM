@@ -1,21 +1,21 @@
 import { ResortLandingFooter } from "@/components/resort-page/ResortLandingFooter";
 import { ResortLandingHero } from "@/components/resort-page/ResortLandingHero";
 import { ResortLandingMap } from "@/components/resort-page/ResortLandingMap";
-import { ResortLandingMobileStickyNav } from "@/components/resort-page/ResortLandingMobileStickyNav";
-import { ResortLandingOverview } from "@/components/resort-page/ResortLandingOverview";
 import { ResortLandingStoryGallery } from "@/components/resort-page/ResortLandingStoryGallery";
 import { ResortLandingTrustStrip } from "@/components/resort-page/ResortLandingTrustStrip";
+import { ResortPublicNavbar } from "@/components/resort-page/ResortPublicNavbar";
 import {
   resortLandingSectionChain,
   resortLandingSurfaceFor,
 } from "@/components/resort-page/resortLandingSurface";
 import { ResortRoomsSection } from "@/components/resort-page/ResortRoomsSection";
 import type { PublicResortLandingPayload } from "@/lib/api/landingPage";
+import { normalizeResortAmenities } from "@/lib/resortAmenities";
 
 /**
  * Composes all public resort landing sections (`/resort/[slug]`).
  * - Desktop layout lives in each section’s `lg:` / `md:` rules (unchanged intent).
- * - Mobile-only chrome: bottom safe-area padding + `ResortLandingMobileStickyNav` (`lg:hidden`).
+ * - Mobile: section links and auth live in `ResortPublicNavbar` (hamburger); no duplicate bottom bar.
  */
 
 type Props = {
@@ -23,15 +23,25 @@ type Props = {
 };
 
 export function ResortPublicLandingTemplate({ data }: Props) {
-  const resortAmenities = Array.isArray(data.amenities) ? data.amenities : [];
+  const adminEmbed = data.adminLandingEmbed ?? { enabled: false, youtubeVideoId: null };
+  const resortAmenities = normalizeResortAmenities(data.amenities);
 
-  const hasAbout = Boolean(data.about.body?.trim());
+  const hasAbout = Boolean(data.about.body?.trim()) || resortAmenities.length > 0;
   const hasRooms = data.rooms.length > 0;
   const hasMap = Boolean(data.map.embedUrl);
   const sectionChain = resortLandingSectionChain({ hasAbout, hasRooms, hasMap });
+  const heroSecondaryCta =
+    hasAbout ? { href: "#about" as const, label: "About" } : hasMap ? { href: "#map" as const, label: "Find us" } : null;
 
   return (
-    <main className="resort-landing-shell max-lg:pb-28 lg:pb-0">
+    <main className="resort-landing-shell scroll-pt-[4.75rem] pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-0">
+      <ResortPublicNavbar
+        resortName={data.name}
+        logoUrl={data.logoUrl ?? data.hero.logoUrl}
+        listingSlug={data.slug}
+        hasAbout={hasAbout}
+        hasMap={hasMap}
+      />
       <ResortLandingHero
         resortName={data.name}
         logoUrl={data.hero.logoUrl}
@@ -39,22 +49,13 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         heading={data.hero.heading}
         ctaLabel="Explore rooms"
         ctaHref="#rooms"
+        secondaryCta={heroSecondaryCta}
         isVip={data.isVip}
         facebookUrl={data.hero.facebookUrl ?? null}
         instagramUrl={data.hero.instagramUrl ?? null}
         tiktokUrl={data.hero.tiktokUrl ?? null}
-        listingSlug={data.slug}
+        adminEmbed={adminEmbed}
       />
-
-      <div className="w-full border-t border-white/10 border-b border-zinc-800/80 resort-landing-trust-strip-shell py-8 max-lg:py-9 sm:py-9">
-        <div className="resort-landing-container px-4 sm:px-6 md:px-8 lg:px-10">
-          <ResortLandingTrustStrip />
-        </div>
-      </div>
-
-      {hasAbout ? (
-        <ResortLandingStoryGallery about={data.about} surface={resortLandingSurfaceFor(sectionChain, "about")} />
-      ) : null}
 
       <ResortRoomsSection
         rooms={data.rooms}
@@ -62,21 +63,19 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         surface={resortLandingSurfaceFor(sectionChain, "rooms")}
       />
 
-      <ResortLandingOverview
-        resortName={data.name}
-        listingSlug={data.slug}
-        logoUrl={data.logoUrl ?? data.hero.logoUrl}
-        contactNumber={data.contactNumber}
-        address={data.address}
-        amenities={resortAmenities}
-        cancellationPolicy={data.cancellationPolicy ?? null}
-        surface={resortLandingSurfaceFor(sectionChain, "overview")}
-        description={data.description ?? null}
-        roomsCount={data.rooms.length}
-        isVip={data.isVip}
-        contactEmail={data.footer.contactEmail ?? null}
-        mapSearchUrl={data.map.searchUrl ?? null}
-      />
+      <div className="w-full border-t border-zinc-200/50 border-b border-zinc-800/80 resort-landing-trust-strip-shell py-8 max-lg:py-9 sm:py-9">
+        <div className="resort-landing-container px-4 sm:px-6 md:px-8 lg:px-10">
+          <ResortLandingTrustStrip />
+        </div>
+      </div>
+
+      {hasAbout ? (
+        <ResortLandingStoryGallery
+          about={data.about}
+          amenities={resortAmenities}
+          surface={resortLandingSurfaceFor(sectionChain, "about")}
+        />
+      ) : null}
 
       <ResortLandingMap
         resortName={data.name}
@@ -85,8 +84,6 @@ export function ResortPublicLandingTemplate({ data }: Props) {
       />
 
       <ResortLandingFooter footer={data.footer} resortName={data.name} />
-
-      <ResortLandingMobileStickyNav showMapLink={hasMap} listingSlug={data.slug} />
     </main>
   );
 }

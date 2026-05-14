@@ -9,6 +9,7 @@ use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Tenant;
 use App\Services\LandingReadinessService;
 use App\Services\PhilippineLocationService;
+use App\Support\YoutubeVideoId;
 use App\Services\RoomOccupancyService;
 use App\Shared\Traits\ApiResponseTrait;
 
@@ -76,10 +77,16 @@ class PublicCatalogController extends Controller
             abort(404, 'Resort is not publicly listed.');
         }
 
+        $resort->loadMissing('tenant');
         $rooms = $this->roomsForResort($resort);
+        $slug = $resort->tenant?->subdomain;
+        $slug = is_string($slug) ? trim($slug) : '';
+        $slug = $slug !== '' ? $slug : null;
 
         return $this->successResponse([
             'id'            => $resort->id,
+            'slug'          => $slug,
+            'tenantId'      => $resort->tenant_id,
             'name'          => $resort->name,
             'description'   => $resort->description,
             'address'       => $this->locations->resortDisplayLine($resort),
@@ -87,6 +94,7 @@ class PublicCatalogController extends Controller
             'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
             'addressBarangayPsgc' => $resort->address_barangay_psgc,
             'contactNumber' => $resort->contact_number,
+            'logoUrl'       => $resort->logo_url,
             'isVip'         => (bool) $resort->is_vip,
             'rooms'         => $rooms,
         ], 'Resort detail fetched');
@@ -171,6 +179,11 @@ class PublicCatalogController extends Controller
             ->values()
             ->all();
 
+        $embedVideoId = null;
+        if ($resort->admin_landing_embed_enabled) {
+            $embedVideoId = YoutubeVideoId::parse($resort->admin_landing_youtube_url);
+        }
+
         return $this->successResponse([
             'id'                   => $resort->id,
             'slug'                 => $slug,
@@ -192,6 +205,10 @@ class PublicCatalogController extends Controller
             'gallery'              => $payload['gallery'],
             'footer'               => $payload['footer'],
             'map'                  => $payload['map'],
+            'adminLandingEmbed'    => [
+                'enabled' => (bool) $resort->admin_landing_embed_enabled && $embedVideoId !== null,
+                'youtubeVideoId' => $embedVideoId,
+            ],
         ], 'Resort landing page fetched');
     }
 

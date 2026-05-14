@@ -30,6 +30,8 @@ export type PublicResort = {
   description: string | null;
   address: string | null;
   contactNumber: string | null;
+  /** Public resort detail (by id or slug) — resort logo path when set. */
+  logoUrl?: string | null;
   images?: { id: number; url: string; caption?: string | null }[];
   rooms: PublicRoom[];
 };

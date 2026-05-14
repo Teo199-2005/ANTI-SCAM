@@ -8,18 +8,23 @@ use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Room;
 use App\Models\User;
+use App\Modules\Billing\Services\BookingPaymentReconciliationService;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
 use App\Modules\Reservations\Services\ReservationService;
 use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class GuestPortalController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly PhilippineLocationService $locations) {}
+    public function __construct(
+        private readonly PhilippineLocationService $locations,
+        private readonly BookingPaymentReconciliationService $bookingPaymentReconciliation,
+    ) {}
 
     private function assertGuest(Request $request): User
     {
@@ -57,20 +62,31 @@ class GuestPortalController extends Controller
     {
         $user = $this->assertGuest($request);
         $rooms = Room::withoutGlobalScopes()
+            ->with('images')
             ->where('resort_id', $user->home_resort_id)
             ->where('status', 'active')
             ->get()
-            ->map(fn (Room $room): array => [
-                'id' => $room->id,
-                'name' => $room->name,
-                'code' => $room->code,
-                'capacity' => $room->capacity,
-                'units' => max(1, (int) ($room->units ?? 1)),
-                'basePrice' => $room->base_price,
-                'amenities' => $room->amenities ?? [],
-                'status' => $room->status,
-                'reservationFee' => ReservationService::reservationFeeAmount(),
-            ]);
+            ->map(function (Room $room): array {
+                $imageUrls = $room->images
+                    ->sortBy(fn ($img): array => [($img->is_primary ? 0 : 1), (int) $img->sort_order])
+                    ->map(fn ($img): string => Storage::disk($img->disk)->url($img->path))
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'code' => $room->code,
+                    'capacity' => $room->capacity,
+                    'units' => max(1, (int) ($room->units ?? 1)),
+                    'basePrice' => $room->base_price,
+                    'amenities' => $room->amenities ?? [],
+                    'rules' => $room->rules,
+                    'images' => $imageUrls,
+                    'status' => $room->status,
+                    'reservationFee' => ReservationService::reservationFeeAmount(),
+                ];
+            });
 
         return $this->successResponse($rooms, 'Rooms fetched');
     }
@@ -78,6 +94,8 @@ class GuestPortalController extends Controller
     public function reservations(Request $request)
     {
         $user = $this->assertGuest($request);
+        $this->bookingPaymentReconciliation->syncPendingInvoicePaymentsForBooker($user);
+
         $when = $request->string('when')->value() ?: 'upcoming';
         $today = now()->toDateString();
 

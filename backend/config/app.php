@@ -68,7 +68,8 @@ return [
     |
     | Optional comma-separated hostnames. Xendit success/failure redirects use
     | FRONTEND_URL by default; the SPA may send checkout_return_base (origin)
-    | so the redirect matches the host where the session cookie was set.
+    | on subscription pay-invoice and reservation invoice requests so the redirect
+    | matches the host where the session cookie was set.
     | localhost, 127.0.0.1, *.localhost, and FRONTEND_URL's host are always allowed.
     |
     */

@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ReconcileBookingInvoicePaymentsTest extends TestCase
@@ -77,6 +78,75 @@ class ReconcileBookingInvoicePaymentsTest extends TestCase
         ]);
 
         $this->artisan('payments:reconcile-booking-invoices')->assertSuccessful();
+
+        $reservation->refresh();
+        $this->assertSame('paid', $reservation->xendit_payment_status);
+        $this->assertSame('confirmed', $reservation->status);
+    }
+
+    public function test_reservations_index_polls_xendit_and_confirms_pending_for_guest(): void
+    {
+        Mail::fake();
+
+        config(['services.xendit.secret_key' => 'xnd_development_test_key']);
+
+        $tenant = Tenant::create([
+            'name' => 'Rec Guest Tenant',
+            'slug' => 'rec-guest',
+            'subdomain' => 'recg',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Rec Guest Resort',
+            'is_publicly_listed' => true,
+        ]);
+
+        $guest = User::factory()->create([
+            'tenant_id' => null,
+            'role' => 'guest',
+            'home_resort_id' => $resort->id,
+        ]);
+
+        $room = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'name' => 'Rec Guest Room',
+            'code' => 'RG1',
+            'status' => 'active',
+            'base_price' => 2000,
+            'capacity' => 2,
+        ]);
+
+        $reservation = Reservation::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'room_id' => $room->id,
+            'client_id' => $guest->id,
+            'reference_no' => 'RSV-RECON-GUEST-LIST',
+            'check_in_date' => now()->addDays(2)->toDateString(),
+            'check_out_date' => now()->addDays(3)->toDateString(),
+            'guest_count' => 2,
+            'reservation_fee' => 500,
+            'total_amount' => 2000,
+            'status' => 'pending_payment',
+            'xendit_invoice_id' => 'inv_reconcile_guest_list_1',
+            'xendit_payment_status' => 'pending',
+            'reserved_at' => null,
+        ]);
+
+        Http::fake([
+            'https://api.xendit.co/v2/invoices/*' => Http::response([
+                'id' => 'inv_reconcile_guest_list_1',
+                'external_id' => 'RSV-RECON-GUEST-LIST',
+                'status' => 'PAID',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($guest);
+
+        $this->getJson('/api/v1/reservations?perPage=10')->assertOk();
 
         $reservation->refresh();
         $this->assertSame('paid', $reservation->xendit_payment_status);

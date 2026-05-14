@@ -8,12 +8,34 @@ export type InvoiceResult = {
   resumed?: boolean;
 };
 
+/**
+ * Browser origin for Xendit return URLs (same host as auth cookies).
+ * Use from client components before `createPaymentInvoice` / redirect to checkout.
+ */
+export function paymentCheckoutReturnBase(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.location.origin;
+}
+
 /** Create a Xendit invoice for a reservation. Returns the payment URL to redirect the user to. */
-export async function createPaymentInvoice(reservationId: number): Promise<InvoiceResult> {
+export async function createPaymentInvoice(
+  reservationId: number,
+  options?: { checkoutReturnBase?: string | null },
+): Promise<InvoiceResult> {
+  const payload: Record<string, unknown> = {};
+  const base = options?.checkoutReturnBase?.trim();
+  if (base) {
+    payload.checkout_return_base = base;
+  }
   const { data } = await apiClient.post<ApiEnvelope<InvoiceResult>>(
-    `/reservations/${reservationId}/invoice`
+    `/reservations/${reservationId}/invoice`,
+    payload,
   );
-  return data.data;
+  const inner = data?.data;
+  if (!inner || typeof inner !== "object") {
+    throw new Error("Payment service returned an empty response. Please try again.");
+  }
+  return inner;
 }
 
 export type ReservationDetail = {

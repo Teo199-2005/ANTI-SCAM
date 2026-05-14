@@ -4,7 +4,7 @@ import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import DashCard from "@/components/dash/DashCard";
 import { apiClient } from "@/lib/api/client";
 import { BadgeCheck, CalendarDays, CreditCard, Download, Printer } from "lucide-react";
-import { Suspense, use, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Reservation = {

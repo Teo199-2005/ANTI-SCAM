@@ -11,6 +11,7 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeReferralCodeInput } from "@/lib/inputRestrictions";
 import { getMarketingStats, type MarketingStats } from "@/lib/api/marketing";
 import { formatRoleLabel } from "@/lib/utils";
+import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
 import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import { AlertCircle, Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
@@ -273,6 +274,15 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         >
           <Menu size={16} />
         </button>
+
+        {user?.role === "guest" && user?.home_resort?.name ? (
+          <div className="min-w-0 flex-1 md:hidden">
+            <p className="truncate font-pop text-sm font-extrabold uppercase leading-tight tracking-[0.05em] text-navy">
+              {user.home_resort.name}
+            </p>
+            <BrandWordmark tone="onLight" size="2xs" className="mt-0.5 block leading-tight" />
+          </div>
+        ) : null}
 
         <nav
           aria-label="Breadcrumb"

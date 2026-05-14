@@ -6,7 +6,8 @@ import { apiClient } from "@/lib/api/client";
 import { sanitizeLongText } from "@/lib/inputRestrictions";
 import { AlertTriangle, ChevronLeft, Loader2, MessageSquare, Send } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type Reservation = {
   id: number;
@@ -56,8 +57,9 @@ function normalizeStaffNote(note: RawStaffNote): StaffNote {
   };
 }
 
-export default function StaffReservationDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function StaffReservationDetailPage() {
+  const { id: idParam } = useParams();
+  const id = String(idParam ?? "");
   const { pushToast } = useToast();
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [notes, setNotes] = useState<StaffNote[]>([]);

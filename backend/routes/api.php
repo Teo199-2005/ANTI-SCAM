@@ -6,6 +6,7 @@ use App\Modules\Admin\Http\Controllers\AdminAnalyticsController;
 use App\Modules\Admin\Http\Controllers\AdminFinanceController;
 use App\Modules\Admin\Http\Controllers\AdminMailHealthController;
 use App\Modules\Admin\Http\Controllers\AdminOnboardController;
+use App\Modules\Admin\Http\Controllers\AdminResortLandingEmbedController;
 use App\Modules\Admin\Http\Controllers\AdminStatsController;
 use App\Modules\Admin\Http\Controllers\AdminSubscriptionOverviewController;
 use App\Modules\Admin\Http\Controllers\MarketingController;
@@ -143,6 +144,8 @@ Route::prefix('v1')->group(function (): void {
 
             // VIP badge management
             Route::post('/admin/resorts/{resort}/vip', [VipController::class, 'setVip']);
+
+            Route::patch('/admin/resorts/{resort}/landing-embed', [AdminResortLandingEmbedController::class, 'update']);
 
             // Suspension / grace lists
             Route::get('/admin/suspensions', [SuspensionController::class, 'index']);

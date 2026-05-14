@@ -158,6 +158,27 @@ class LandingReadinessTest extends TestCase
         $this->assertContains('room_with_image', $result['missing_fields']);
     }
 
+    public function test_location_not_missing_when_barangay_text_set_but_city_province_rows_absent(): void
+    {
+        $tenant = $this->makeTenant();
+        // Codes are syntactically valid PSGC-like digits but intentionally absent from seeded tables,
+        // matching browsers that use a different PSGC dataset than the Laravel DB.
+        $resort = $this->makeResort($tenant, [
+            'address_province_psgc' => '099990000000',
+            'address_city_municipality_psgc' => '099990000001',
+            'address_barangay_psgc' => null,
+            'address_barangay_name' => 'District 1',
+            'contact_number' => null,
+            'logo_url' => null,
+            'background_image_url' => null,
+        ]);
+        app(PhilippineLocationService::class)->syncResortAddressLabel($resort);
+
+        $result = $this->service->check($resort);
+
+        $this->assertNotContains('location', $result['missing_fields']);
+    }
+
     // ─── Payload composition ─────────────────────────────────────────────────
 
     public function test_computed_payload_contains_map_urls_for_valid_address(): void

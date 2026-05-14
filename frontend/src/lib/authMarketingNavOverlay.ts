@@ -42,3 +42,20 @@ export const AUTH_SHELL_CLEAR_NAV_DESKTOP_ASIDE_PT =
 
 export const AUTH_SHELL_CLEAR_NAV_DESKTOP_FORM_PT =
   "lg:pt-[max(1rem,calc(env(safe-area-inset-top)+5rem))] xl:pt-[max(1.25rem,calc(env(safe-area-inset-top)+5.15rem))]";
+
+/**
+ * Signed-in users completing a booking must stay on these marketing routes; otherwise
+ * {@link MarketingLayoutClient} would send them to `/dashboard` before checkout or after Xendit.
+ */
+export function isSignedInAllowedMarketingPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/payment/success" || pathname === "/payment/failed") return true;
+  return /^\/resorts\/[^/]+\/(checkout|confirmation)$/.test(pathname);
+}
+
+/** Guest checkout / confirmation / Xendit return — use resort landing chrome instead of platform marketing nav. */
+export function isResortGuestBookingFlowPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/payment/success" || pathname === "/payment/failed") return true;
+  return /^\/resorts\/[^/]+\/(checkout|confirmation)$/.test(pathname);
+}

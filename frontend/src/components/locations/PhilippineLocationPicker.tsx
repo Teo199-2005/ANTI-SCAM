@@ -2,7 +2,7 @@
 
 import type { PhilippineLocationRow } from "@/lib/locations/philippines";
 import { listMuncities, listProvinces } from "@jobuntux/psgc";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 export type PhilippineLocationValue = {
   provinceCode: string | null;
@@ -19,12 +19,6 @@ type Props = {
   legacyBarangayCodeHint?: boolean;
 };
 
-function filterRows(rows: PhilippineLocationRow[], q: string): PhilippineLocationRow[] {
-  const needle = q.trim().toLowerCase();
-  if (!needle) return rows;
-  return rows.filter((r) => r.name.toLowerCase().includes(needle) || r.code.includes(needle));
-}
-
 export function PhilippineLocationPicker({
   value,
   onChange,
@@ -32,9 +26,6 @@ export function PhilippineLocationPicker({
   idPrefix = "ph-loc",
   legacyBarangayCodeHint,
 }: Props) {
-  const [pQ, setPQ] = useState("");
-  const [cQ, setCQ] = useState("");
-
   const provinces = useMemo((): PhilippineLocationRow[] => {
     const raw = listProvinces();
     const rows = raw.map((p) => ({
@@ -61,13 +52,9 @@ export function PhilippineLocationPicker({
     return rows;
   }, [selectedProvDef]);
 
-  const pFiltered = useMemo(() => filterRows(provinces, pQ), [provinces, pQ]);
-  const cFiltered = useMemo(() => filterRows(cities, cQ), [cities, cQ]);
-
   const onProvincePick = (code: string) => {
     const c = code === "" ? null : code;
     onChange({ provinceCode: c, cityCode: null, barangayName: value.barangayName });
-    setCQ("");
   };
 
   const onCityPick = (code: string) => {
@@ -79,18 +66,9 @@ export function PhilippineLocationPicker({
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <label htmlFor={`${idPrefix}-prov-filter`} className="mb-1 block text-xs font-semibold text-zinc-600">
+          <label htmlFor={`${idPrefix}-prov`} className="mb-1 block text-xs font-semibold text-zinc-600">
             Province
           </label>
-          <input
-            id={`${idPrefix}-prov-filter`}
-            className="dash-input mb-1.5"
-            placeholder="Search province…"
-            value={pQ}
-            onChange={(e) => setPQ(e.target.value)}
-            disabled={disabled}
-            autoComplete="off"
-          />
           <select
             id={`${idPrefix}-prov`}
             className="dash-input"
@@ -99,7 +77,7 @@ export function PhilippineLocationPicker({
             onChange={(e) => onProvincePick(e.target.value)}
           >
             <option value="">Select province</option>
-            {pFiltered.map((p) => (
+            {provinces.map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
               </option>
@@ -107,18 +85,9 @@ export function PhilippineLocationPicker({
           </select>
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-city-filter`} className="mb-1 block text-xs font-semibold text-zinc-600">
+          <label htmlFor={`${idPrefix}-city`} className="mb-1 block text-xs font-semibold text-zinc-600">
             City / municipality
           </label>
-          <input
-            id={`${idPrefix}-city-filter`}
-            className="dash-input mb-1.5"
-            placeholder="Search city…"
-            value={cQ}
-            onChange={(e) => setCQ(e.target.value)}
-            disabled={disabled || !value.provinceCode}
-            autoComplete="off"
-          />
           <select
             id={`${idPrefix}-city`}
             className="dash-input"
@@ -127,7 +96,7 @@ export function PhilippineLocationPicker({
             onChange={(e) => onCityPick(e.target.value)}
           >
             <option value="">{value.provinceCode ? "Select city / municipality" : "Select province first"}</option>
-            {cFiltered.map((c) => (
+            {cities.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name}
               </option>

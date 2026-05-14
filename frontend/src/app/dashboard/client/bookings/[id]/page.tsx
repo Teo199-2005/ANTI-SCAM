@@ -2,11 +2,12 @@
 
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
-import { getReservation, cancelReservation, ReservationDetail, createPaymentInvoice } from "@/lib/api/payment";
+import { getReservation, cancelReservation, ReservationDetail, createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { BadgeCheck, CalendarDays, ChevronLeft, CreditCard, Printer, XCircle } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -17,8 +18,9 @@ const statusBadge: Record<string, string> = {
   completed:       "dash-badge-navy",
 };
 
-export default function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function BookingDetailPage() {
+  const { id: idParam } = useParams();
+  const id = String(idParam ?? "");
   const [reservation, setReservation] = useState<ReservationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +65,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const onPayNow = async () => {
     if (!reservation) return;
     try {
-      const invoice = await createPaymentInvoice(reservation.id);
+      const invoice = await createPaymentInvoice(reservation.id, {
+        checkoutReturnBase: paymentCheckoutReturnBase(),
+      });
       if (invoice.already_confirmed) {
         pushToast({ title: "Payment recorded", description: "Your booking is confirmed.", tone: "success" });
         const data = await getReservation(id);

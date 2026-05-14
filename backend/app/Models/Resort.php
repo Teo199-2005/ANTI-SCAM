@@ -33,6 +33,8 @@ class Resort extends Model
         'amenities',
         'is_publicly_listed',
         'is_vip',
+        'admin_landing_embed_enabled',
+        'admin_landing_youtube_url',
     ];
 
     protected function casts(): array
@@ -40,6 +42,7 @@ class Resort extends Model
         return [
             'is_publicly_listed' => 'boolean',
             'is_vip' => 'boolean',
+            'admin_landing_embed_enabled' => 'boolean',
             'amenities' => 'array',
         ];
     }

@@ -1,35 +1,86 @@
 "use client";
 
 import PageContainer from "@/components/layout/PageContainer";
+import { useAuth } from "@/contexts/AuthContext";
+import { getPublicResort } from "@/lib/api/public";
 import { getReservation, ReservationDetail } from "@/lib/api/payment";
-import { BadgeCheck, CalendarDays, Home, ReceiptText } from "lucide-react";
+import {
+  postPaymentBookingsHref,
+  postPaymentBookingsLabel,
+  postPaymentDashboardReturnHref,
+  postPaymentResortLandingOrDashboardHref,
+  postPaymentResortLandingOrDashboardLabel,
+} from "@/lib/postPaymentDashboardLinks";
+import { BadgeCheck, CalendarDays, LayoutDashboard, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 function PaymentSuccessContent() {
-  const searchParams  = useSearchParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const reservationId = searchParams.get("reservation_id");
-  const ref           = searchParams.get("ref");
+  const ref = searchParams.get("ref");
+  const { user, loading: authLoading } = useAuth();
 
   const [reservation, setReservation] = useState<ReservationDetail | null>(null);
-  const [loading, setLoading]         = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [resortSlug, setResortSlug] = useState<string | null>(null);
+
+  const dashboardReturnHref =
+    !authLoading && reservationId
+      ? postPaymentDashboardReturnHref(user?.role, "success", {
+          reservationId,
+          ref,
+        })
+      : null;
 
   useEffect(() => {
-    if (!reservationId) { setLoading(false); return; }
+    if (dashboardReturnHref) {
+      router.replace(dashboardReturnHref);
+    }
+  }, [dashboardReturnHref, router]);
+
+  useEffect(() => {
+    if (!reservationId || dashboardReturnHref) {
+      if (!reservationId) setLoading(false);
+      return;
+    }
     const load = async () => {
       try {
         const data = await getReservation(Number(reservationId));
         setReservation(data);
-      } catch { /* fall through */ }
-      finally { setLoading(false); }
+        try {
+          const pr = await getPublicResort(data.resortId);
+          setResortSlug(pr.slug?.trim() || null);
+        } catch {
+          setResortSlug(null);
+        }
+      } catch {
+        /* fall through */
+      } finally {
+        setLoading(false);
+      }
     };
     void load();
-  }, [reservationId]);
+  }, [reservationId, dashboardReturnHref]);
+
+  const bookingsHref = postPaymentBookingsHref(user?.role, authLoading, "success");
+  const bookingsLabel = postPaymentBookingsLabel(user?.role, authLoading);
+  const secondaryHref = postPaymentResortLandingOrDashboardHref(resortSlug, user?.role, authLoading);
+  const secondaryLabel = postPaymentResortLandingOrDashboardLabel(resortSlug, user?.role, authLoading);
 
   const paymentState = reservation?.xenditPaymentStatus ?? "pending";
   const isConfirmed = reservation?.status === "confirmed" && paymentState === "paid";
   const isProcessing = !reservation || (!isConfirmed && paymentState === "pending");
+
+  if (dashboardReturnHref) {
+    return (
+      <PageContainer className="section-padding">
+        <div className="soft-panel mx-auto max-w-lg p-10 text-center text-zinc-600">Continuing to your dashboard…</div>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer className="section-padding">
@@ -71,16 +122,16 @@ function PaymentSuccessContent() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
-            <Link href="/dashboard/client/bookings" className="glass-inline-btn justify-center text-navy">
+            <Link href={bookingsHref} className="glass-inline-btn justify-center text-navy">
               <ReceiptText size={15} />
-              My Bookings
+              {bookingsLabel}
             </Link>
             <Link
-              href="/"
+              href={secondaryHref}
               className="rounded-full border border-white/30 bg-gradient-to-r from-slateBlue/90 to-navy/90 px-5 py-2.5 text-sm font-semibold text-white shadow-soft backdrop-blur-md transition hover:from-slateBlue hover:to-navy"
             >
-              <Home size={14} className="mr-2 inline" />
-              Back to Home
+              <LayoutDashboard size={14} className="mr-2 inline" />
+              {secondaryLabel}
             </Link>
           </div>
         </div>

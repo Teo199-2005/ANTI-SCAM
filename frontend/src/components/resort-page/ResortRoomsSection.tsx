@@ -1,112 +1,25 @@
 "use client";
 
 /**
- * Public resort rooms grid + booking modal. Desktop: responsive CSS grid (`sm:` / `lg:`).
- * Narrow viewports: horizontal snap carousel (`max-lg:`) for thumb-friendly browsing.
+ * Public resort rooms grid + booking modal.
+ * Desktop (lg+): max 3 tiles per row; mobile: 2×2 grid (4 tiles). Additional rooms live behind a subtle “View more rooms” disclosure.
  */
 
 import type { LandingComputedRoom } from "@/lib/api/landingPage";
 import {
   BedDouble,
-  CalendarDays,
-  Car,
-  Coffee,
+  ChevronDown,
   ImageOff,
-  Loader2,
-  ShieldCheck,
-  ShowerHead,
-  Snowflake,
-  Star,
-  Tv,
   Users,
-  Waves,
-  Wifi,
-  X,
-  type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { checkRoomAvailability } from "@/lib/api/public";
-import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
-import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
-import { ResortRoomAvailabilityModal } from "@/components/resort-page/ResortRoomAvailabilityModal";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { ResortRoomDetailsBookingModal } from "@/components/resort-page/ResortRoomDetailsBookingModal";
 import ScrollReveal from "@/components/shared/ScrollReveal";
-import { useToast } from "@/components/shared/ToastProvider";
-import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
 import { laravelPublicUrl } from "@/lib/publicAsset";
-import { createPortal } from "react-dom";
+import { amenityMeta, extractRoomMeta, formatPhpPerNight } from "@/lib/roomPreviewDisplay";
 import type { ResortLandingSurface } from "@/components/resort-page/resortLandingSurface";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
-
-function extractRoomMeta(amenities: string[]) {
-  const bedCountRaw = amenities.find((a) => a.startsWith("BED_COUNT:"))?.split(":")[1] ?? null;
-  const bedTypeRaw = amenities.find((a) => a.startsWith("BED_TYPE:"))?.split(":")[1] ?? null;
-  const bedCount = bedCountRaw ? Number(bedCountRaw) : null;
-  const bedType = bedTypeRaw ?? null;
-  const visibleAmenities = amenities.filter(
-    (a) => !a.startsWith("BED_COUNT:") && !a.startsWith("BED_TYPE:"),
-  );
-  return { bedCount, bedType, visibleAmenities };
-}
-
-function amenityMeta(label: string): { icon: LucideIcon } {
-  if (isCustomInclusionToken(label)) return { icon: Star };
-  const display = displayInclusionLabel(label);
-  const normalized = display.toLowerCase();
-  if (normalized.includes("wifi")) return { icon: Wifi };
-  if (normalized.includes("shower")) return { icon: ShowerHead };
-  if (normalized.includes("air")) return { icon: Snowflake };
-  if (normalized.includes("tv") || normalized.includes("netflix")) return { icon: Tv };
-  if (normalized.includes("pool") || normalized.includes("jacuzzi")) return { icon: Waves };
-  if (normalized.includes("breakfast") || normalized.includes("drink")) return { icon: Coffee };
-  if (normalized.includes("parking")) return { icon: Car };
-  return { icon: ShieldCheck };
-}
-
-function todayIsoLocal(): string {
-  const d = new Date();
-  d.setHours(12, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
-}
-
-function addDaysIso(iso: string, days: number): string {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Default 1-night stay starting tomorrow (valid for checkout page). */
-function defaultStayDates(): { checkIn: string; checkOut: string } {
-  const checkIn = addDaysIso(todayIsoLocal(), 1);
-  const checkOut = addDaysIso(checkIn, 1);
-  return { checkIn, checkOut };
-}
-
-function formatPhp(amount: number): string {
-  const n = Number(amount);
-  if (!Number.isFinite(n)) return "—";
-  const hasFraction = Math.abs(n % 1) > 1e-9;
-  return `₱${n.toLocaleString("en-PH", {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function formatPhpPerNight(amount: number): string {
-  const core = formatPhp(amount);
-  if (core === "—") return "—";
-  return `${core}/night`;
-}
-
-function buildCheckoutHref(resortId: number, roomId: number, checkIn: string, checkOut: string): string {
-  const q = new URLSearchParams({
-    roomId: String(roomId),
-    checkIn,
-    checkOut,
-    resortId: String(resortId),
-  });
-  return `/resorts/${resortId}/checkout?${q.toString()}`;
-}
 
 type Props = {
   rooms: LandingComputedRoom[];
@@ -114,57 +27,114 @@ type Props = {
   surface: ResortLandingSurface;
 };
 
-export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
-  const router = useRouter();
-  const { pushToast } = useToast();
-  const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
-  const [activeImage, setActiveImage] = useState(0);
-  const [mounted, setMounted] = useState(false);
-  const [modalCheckIn, setModalCheckIn] = useState(() => defaultStayDates().checkIn);
-  const [modalCheckOut, setModalCheckOut] = useState(() => defaultStayDates().checkOut);
-  const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const [bookChecking, setBookChecking] = useState(false);
-  const availabilityOpenRef = useRef(false);
-  availabilityOpenRef.current = availabilityOpen;
+type RoomPreviewTileProps = {
+  room: LandingComputedRoom;
+  onSelect: (room: LandingComputedRoom) => void;
+  revealDelay?: number;
+  className?: string;
+};
 
-  const selectedMeta = useMemo(
-    () => (selectedRoom ? extractRoomMeta(selectedRoom.amenities) : null),
-    [selectedRoom],
+function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPreviewTileProps) {
+  const primaryImage = room.images[0];
+  const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities);
+
+  return (
+    <ScrollReveal delayMs={revealDelay} direction="up" className={className}>
+      <article
+        className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white p-0 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect(room)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect(room);
+          }
+        }}
+      >
+        {primaryImage ? (
+          <div className="relative aspect-[2/1] w-full overflow-hidden bg-zinc-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={laravelPublicUrl(primaryImage)}
+              alt={room.name}
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy/10 via-transparent to-transparent" />
+          </div>
+        ) : (
+          <div className="flex aspect-[2/1] w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-zinc-100 to-zinc-200 text-[11px] text-zinc-500">
+            <ImageOff size={14} />
+            <span>No photo yet</span>
+          </div>
+        )}
+
+        <div className="flex flex-1 flex-col p-3">
+          <h3 className="min-h-0 text-left font-heading text-sm font-semibold leading-tight text-navy line-clamp-2">
+            {room.name}
+          </h3>
+
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">
+              <Users size={10} className="shrink-0 text-zinc-500" aria-hidden />
+              {room.capacity} {room.capacity === 1 ? "guest" : "guests"}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2 py-px text-[10px] font-semibold text-zinc-800">
+              {formatPhpPerNight(room.basePrice)}
+            </span>
+            {bedCount ? (
+              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">
+                <BedDouble size={10} className="shrink-0 text-zinc-500" aria-hidden />
+                {bedCount} {bedCount === 1 ? "bed" : "beds"}
+              </span>
+            ) : null}
+            {bedType ? (
+              <span className="inline-flex items-center rounded-full border border-zinc-200/90 bg-white px-2 py-px text-[10px] font-medium text-zinc-700">
+                {bedType}
+              </span>
+            ) : null}
+          </div>
+
+          {visibleAmenities.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap content-start gap-1">
+              {visibleAmenities.slice(0, 4).map((a) => {
+                const meta = amenityMeta(a);
+                const Icon = meta.icon;
+                return (
+                  <span
+                    key={a}
+                    className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-white/90 px-1.5 py-px text-[9px] font-medium text-zinc-700"
+                  >
+                    <Icon size={9} className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`} aria-hidden />
+                    {displayInclusionLabel(a)}
+                  </span>
+                );
+              })}
+              {visibleAmenities.length > 4 && (
+                <span className="rounded-full border border-zinc-200 px-1.5 py-px text-[9px] text-zinc-400">
+                  +{visibleAmenities.length - 4} more
+                </span>
+              )}
+            </div>
+          )}
+
+          <p className="mt-2 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+            {room.rules?.trim() || "Comfortable stay with guest-first amenities."}
+          </p>
+
+          <div className="mt-2 border-t border-zinc-200/90 pt-2">
+            <span className="inline-flex w-full items-center justify-center rounded-lg bg-navy px-3 py-1.5 text-[11px] font-semibold text-white transition group-hover:bg-navy/90">
+              View room details
+            </span>
+          </div>
+        </div>
+      </article>
+    </ScrollReveal>
   );
+}
 
-  const todayStr = useMemo(() => todayIsoLocal(), []);
-  const checkOutMin = modalCheckIn ? addDaysIso(modalCheckIn, 1) : addDaysIso(todayStr, 1);
-  const datesValid =
-    Boolean(modalCheckIn && modalCheckOut) &&
-    modalCheckOut > modalCheckIn &&
-    modalCheckIn >= todayStr;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedRoom) return;
-    setActiveImage(0);
-    const { checkIn, checkOut } = defaultStayDates();
-    setModalCheckIn(checkIn);
-    setModalCheckOut(checkOut);
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (availabilityOpenRef.current) {
-        setAvailabilityOpen(false);
-        return;
-      }
-      setSelectedRoom(null);
-    };
-    window.addEventListener("keydown", onEscape);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onEscape);
-      document.body.style.overflow = "";
-      setAvailabilityOpen(false);
-    };
-  }, [selectedRoom]);
+export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
+  const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
 
   if (rooms.length === 0) return null;
 
@@ -172,345 +142,90 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
   const revealDir = surface === "even" ? "down" : "up";
 
   return (
-    <section id="rooms" className={`resort-landing-section scroll-mt-24 border-t border-zinc-200/70 ${band}`}>
+    <section
+      id="rooms"
+      className={`resort-landing-section !py-5 sm:!py-6 lg:!py-7 scroll-mt-24 border-t border-zinc-200/70 ${band}`}
+    >
       <ScrollReveal className="resort-landing-container" direction={revealDir} delayMs={50}>
-        <p className="resort-landing-muted">Stay with us</p>
-        <h2 className="font-pop mt-1 text-2xl font-extrabold tracking-tight text-navy sm:text-3xl md:text-4xl">
+        <p className="resort-landing-muted text-[10px] tracking-[0.12em]">Stay with us</p>
+        <h2 className="font-pop mt-0.5 text-xl font-extrabold tracking-tight text-navy sm:text-2xl">
           Our rooms
         </h2>
-        <p className="mt-3 max-w-2xl text-pretty text-sm leading-relaxed text-zinc-600 max-lg:max-w-[22rem]">
+        <p className="mt-1.5 max-w-2xl text-pretty text-xs leading-snug text-zinc-600 max-lg:max-w-[20rem]">
           Choose an accommodation and pick your dates to book with a secure online reservation fee.
         </p>
-        <div className="mt-4 h-px max-w-md bg-gradient-to-r from-zinc-400/70 via-zinc-200/80 to-transparent" />
+        <div className="mt-2 h-px max-w-sm bg-gradient-to-r from-zinc-400/70 via-zinc-200/80 to-transparent" />
 
-        <div className="max-lg:-mx-4 max-lg:overflow-x-auto max-lg:px-4 max-lg:pb-2 max-lg:snap-x max-lg:snap-mandatory max-lg:[scrollbar-width:thin] lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0">
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 max-lg:mt-8 max-lg:flex max-lg:w-max max-lg:flex-nowrap max-lg:gap-4 lg:mt-10">
-          {rooms.map((room) => {
-            const primaryImage = room.images[0];
-            const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities);
-            return (
-              <ScrollReveal key={room.id} delayMs={Math.min(220, (room.id % 4) * 70)} direction="up">
-                <article
-                  className="resort-landing-card group flex w-[min(18.5rem,calc(100vw-2.5rem))] shrink-0 snap-center flex-col overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-md max-lg:min-h-[20rem] lg:min-h-0 lg:w-auto lg:shrink-0"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedRoom(room)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedRoom(room);
-                    }
-                  }}
-                >
-                {primaryImage ? (
-                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={laravelPublicUrl(primaryImage)}
-                      alt={room.name}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy/10 via-transparent to-transparent" />
-                  </div>
-                ) : (
-                  <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-zinc-100 to-zinc-200 text-sm text-zinc-500">
-                    <ImageOff size={18} />
-                    <span>No photo yet</span>
-                  </div>
-                )}
-
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="min-h-[3.1rem] text-left font-heading text-base font-semibold leading-6 text-navy line-clamp-2">
-                    {room.name}
-                  </h3>
-
-                  <div className="mt-2 min-h-[2rem] flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-0.5 text-xs font-medium text-zinc-800">
-                      <Users size={12} className="shrink-0 text-zinc-500" aria-hidden />
-                      {room.capacity} {room.capacity === 1 ? "guest" : "guests"}
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2.5 py-0.5 text-xs font-semibold text-zinc-800">
-                      {formatPhpPerNight(room.basePrice)}
-                    </span>
-                    {bedCount ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-0.5 text-xs font-medium text-zinc-800">
-                        <BedDouble size={12} className="shrink-0 text-zinc-500" aria-hidden />
-                        {bedCount} {bedCount === 1 ? "bed" : "beds"}
-                      </span>
-                    ) : null}
-                    {bedType ? (
-                      <span className="inline-flex items-center rounded-full border border-zinc-200/90 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-700">
-                        {bedType}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {visibleAmenities.length > 0 && (
-                    <div className="mt-2 min-h-[3.75rem] flex flex-wrap content-start gap-1.5">
-                      {visibleAmenities.slice(0, 4).map((a) => (
-                        (() => {
-                          const meta = amenityMeta(a);
-                          const Icon = meta.icon;
-                          return (
-                            <span
-                              key={a}
-                              className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-zinc-700"
-                            >
-                              <Icon size={11} className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`} aria-hidden />
-                              {displayInclusionLabel(a)}
-                            </span>
-                          );
-                        })()
-                      ))}
-                      {visibleAmenities.length > 4 && (
-                        <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] text-zinc-400">
-                          +{visibleAmenities.length - 4} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <p className="mt-3 min-h-[2.5rem] text-xs leading-relaxed text-zinc-500 line-clamp-2">
-                    {room.rules?.trim() || "Comfortable stay with guest-first amenities."}
-                  </p>
-
-                  <div className="mt-auto border-t border-zinc-200/90 pt-4">
-                    <span className="inline-flex w-full items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white transition group-hover:bg-navy/90">
-                      View room details
-                    </span>
-                  </div>
-                </div>
-                </article>
-              </ScrollReveal>
-            );
-          })}
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+          {rooms.slice(0, 3).map((room, i) => (
+            <RoomPreviewTile
+              key={room.id}
+              room={room}
+              onSelect={setSelectedRoom}
+              revealDelay={Math.min(220, (room.id % 4) * 70 + i * 24)}
+            />
+          ))}
+          {rooms[3] ? (
+            <RoomPreviewTile
+              key={rooms[3].id}
+              room={rooms[3]}
+              onSelect={setSelectedRoom}
+              revealDelay={Math.min(220, (rooms[3].id % 4) * 70)}
+              className="lg:hidden"
+            />
+          ) : null}
         </div>
-        </div>
+
+        {rooms.length > 3 ? (
+          <details
+            className={cn(
+              "group mt-3 w-full border-0 bg-transparent p-0",
+              rooms.length === 4 && "hidden lg:block",
+            )}
+          >
+            <summary className="mx-auto flex w-full max-w-md cursor-pointer list-none items-center justify-center gap-1.5 rounded-full border border-zinc-200/60 bg-zinc-50/40 py-2 text-[11px] font-medium text-zinc-500 shadow-none transition hover:border-zinc-300/80 hover:bg-zinc-100/60 hover:text-zinc-700 marker:content-none [&::-webkit-details-marker]:hidden">
+              <ChevronDown
+                size={14}
+                className="shrink-0 text-zinc-400 transition duration-200 group-open:rotate-180"
+                aria-hidden
+              />
+              <span>View more rooms</span>
+              <span className="tabular-nums text-zinc-400">
+                <span className="lg:hidden">({rooms.length - 4})</span>
+                <span className="hidden lg:inline">({rooms.length - 3})</span>
+              </span>
+            </summary>
+            <div className="mt-3 border-t border-zinc-200/60 pt-3">
+              <div className="hidden grid-cols-3 gap-3 lg:grid">
+                {rooms.slice(3).map((room, i) => (
+                  <RoomPreviewTile
+                    key={room.id}
+                    room={room}
+                    onSelect={setSelectedRoom}
+                    revealDelay={80 + i * 40}
+                  />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:hidden">
+                {rooms.slice(4).map((room, i) => (
+                  <RoomPreviewTile
+                    key={room.id}
+                    room={room}
+                    onSelect={setSelectedRoom}
+                    revealDelay={80 + i * 40}
+                  />
+                ))}
+              </div>
+            </div>
+          </details>
+        ) : null}
       </ScrollReveal>
 
-      {mounted && selectedRoom
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[220] flex items-center justify-center bg-zinc-950/72 p-3 md:p-6"
-              onClick={() => setSelectedRoom(null)}
-            >
-              <div
-                className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="grid max-h-[92vh] grid-cols-1 overflow-y-auto lg:grid-cols-2">
-              <div className="flex flex-col border-b border-zinc-200 bg-zinc-100 lg:border-b-0 lg:border-r">
-                <div className="aspect-[16/10] w-full bg-zinc-200">
-                  {selectedRoom.images[activeImage] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={laravelPublicUrl(selectedRoom.images[activeImage])}
-                      alt={selectedRoom.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-zinc-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <ImageOff size={20} />
-                        <span className="text-sm">No room image available</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {selectedRoom.images.length > 1 ? (
-                  <div className="grid grid-cols-4 gap-2 p-3">
-                    {selectedRoom.images.slice(0, 8).map((img, idx) => (
-                      <button
-                        type="button"
-                        key={`${img}-${idx}`}
-                        onClick={() => setActiveImage(idx)}
-                        className={`overflow-hidden rounded-lg border ${activeImage === idx ? "border-navy" : "border-zinc-200"}`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={laravelPublicUrl(img)} alt="" className="h-16 w-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="border-t border-zinc-200 bg-zinc-50/95 p-3 md:p-4">
-                  <div className="rounded-xl border border-sky-200/80 bg-sky-50/80 p-3">
-                    <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-900">
-                      <CalendarDays size={14} className="shrink-0" />
-                      Stay dates
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="block text-[11px] font-medium text-zinc-600">
-                        Check-in
-                        <input
-                          type="date"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
-                          min={todayStr}
-                          value={modalCheckIn}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setModalCheckIn(v);
-                            if (!v) return;
-                            const minOut = addDaysIso(v, 1);
-                            setModalCheckOut((prev) => (prev <= v ? minOut : prev));
-                          }}
-                        />
-                      </label>
-                      <label className="block text-[11px] font-medium text-zinc-600">
-                        Check-out
-                        <input
-                          type="date"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
-                          min={checkOutMin}
-                          value={modalCheckOut}
-                          onChange={(e) => setModalCheckOut(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    {!datesValid ? (
-                      <p className="mt-2 text-[11px] text-amber-800">Choose check-out after check-in (from today onward).</p>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      disabled={!datesValid || bookChecking}
-                      onClick={async () => {
-                        if (!datesValid || !selectedRoom) return;
-                        setBookChecking(true);
-                        try {
-                          const r = await checkRoomAvailability(Number(selectedRoom.id), modalCheckIn, modalCheckOut);
-                          if (!r.available) {
-                            pushToast({
-                              title: "Those dates are not available",
-                              description:
-                                "This room is already booked, on hold, or blocked for part of your stay. Try other dates or open Check availability for a calendar view.",
-                              tone: "error",
-                            });
-                            return;
-                          }
-                          router.push(buildCheckoutHref(resortId, selectedRoom.id, modalCheckIn, modalCheckOut));
-                        } catch (err) {
-                          pushToast({
-                            title: "Could not verify availability",
-                            description: parseApiErrorMessage(err, "Check your connection and try again."),
-                            tone: "error",
-                          });
-                        } finally {
-                          setBookChecking(false);
-                        }
-                      }}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${
-                        datesValid
-                          ? "bg-navy text-white hover:bg-navy/90 disabled:opacity-80"
-                          : "cursor-not-allowed bg-zinc-200 text-zinc-500"
-                      }`}
-                    >
-                      {bookChecking ? <Loader2 size={16} className="animate-spin shrink-0" aria-hidden /> : null}
-                      Book now
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAvailabilityOpen(true)}
-                      className="inline-flex items-center justify-center rounded-xl border border-navy/20 bg-white px-4 py-2.5 text-sm font-semibold text-navy shadow-sm hover:bg-zinc-50"
-                    >
-                      Check availability
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-b from-white to-zinc-50/45 p-5 md:p-6">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-heading text-2xl font-bold text-navy">{selectedRoom.name}</h3>
-                    <p className="mt-1 text-sm text-zinc-500">Accommodation details modal</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRoom(null)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                    aria-label="Close room details"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 shadow-sm">
-                    <p className="text-xs text-zinc-500">Price per night</p>
-                    <p className="font-bold text-emerald-800">{formatPhp(selectedRoom.basePrice)}</p>
-                  </div>
-                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <p className="text-xs text-zinc-500">Maximum guests</p>
-                    <p className="inline-flex items-center gap-1 font-semibold text-navy">
-                      <Users size={13} />
-                      {selectedRoom.capacity}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <p className="text-xs text-zinc-500">Bed type</p>
-                    <p className="font-semibold text-navy">{selectedMeta?.bedType ?? "Standard"}</p>
-                  </div>
-                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <p className="text-xs text-zinc-500">Beds</p>
-                    <p className="font-semibold text-navy">{selectedMeta?.bedCount ?? 1}</p>
-                  </div>
-                </div>
-
-                {selectedMeta?.visibleAmenities.length ? (
-                  <div className="mb-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Inclusions</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedMeta.visibleAmenities.map((a) => {
-                        const meta = amenityMeta(a);
-                        const Icon = meta.icon;
-                        return (
-                          <span
-                            key={a}
-                            className="inline-flex items-center gap-1 rounded-full border border-zinc-200/90 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-700"
-                          >
-                            <Icon
-                              size={12}
-                              className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`}
-                              aria-hidden
-                            />
-                            {displayInclusionLabel(a)}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mb-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</p>
-                  <p className="text-sm leading-relaxed text-zinc-700">
-                    {selectedRoom.rules?.trim()
-                      ? selectedRoom.rules
-                      : "Enjoy a relaxing and secure stay with complete comfort and guest-first hospitality."}
-                  </p>
-                </div>
-
-                <ReservationFeeBreakdownPanel totalPhp={RESERVATION_FEE_REFERENCE_TOTAL} variant="compact" className="mb-0" />
-              </div>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-      {mounted && selectedRoom && availabilityOpen ? (
-        <ResortRoomAvailabilityModal
-          open={availabilityOpen}
-          onClose={() => setAvailabilityOpen(false)}
-          roomId={selectedRoom.id}
-          roomName={selectedRoom.name}
-          checkIn={modalCheckIn}
-          checkOut={modalCheckOut}
-        />
-      ) : null}
+      <ResortRoomDetailsBookingModal
+        room={selectedRoom}
+        resortId={resortId}
+        onClose={() => setSelectedRoom(null)}
+      />
     </section>
   );
 }

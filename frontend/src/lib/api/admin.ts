@@ -206,6 +206,16 @@ export async function setResortVip(resortId: number, isVip: boolean, reason?: st
   await apiClient.post(`/admin/resorts/${resortId}/vip`, { is_vip: isVip, reason });
 }
 
+export async function updateAdminResortLandingEmbed(
+  resortId: number,
+  payload: { admin_landing_embed_enabled: boolean; admin_landing_youtube_url?: string | null },
+): Promise<{ admin_landing_embed_enabled: boolean; admin_landing_youtube_url: string | null }> {
+  const { data } = await apiClient.patch<
+    ApiEnvelope<{ admin_landing_embed_enabled: boolean; admin_landing_youtube_url: string | null }>
+  >(`/admin/resorts/${resortId}/landing-embed`, payload);
+  return data.data;
+}
+
 export async function adminOnboard(payload: {
   tenant_name: string;
   resort_name: string;

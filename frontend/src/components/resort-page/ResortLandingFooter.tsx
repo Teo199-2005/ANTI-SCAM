@@ -82,11 +82,6 @@ export function ResortLandingFooter({ footer, resortName }: Props) {
                       Rooms on this page
                     </a>
                   </li>
-                  <li>
-                    <a href="#info" className="inline-flex items-center gap-2 transition hover:text-amber-200">
-                      Overview &amp; amenities
-                    </a>
-                  </li>
                 </ul>
               </div>
               <div>

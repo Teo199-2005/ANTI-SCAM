@@ -1,6 +1,6 @@
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
-import { sessionCookieSecure } from "../sessionCookieSecure";
+import { rsSessionClearCookieOptions } from "../sessionCookieSecure";
 
 const BACKEND = serverLaravelApiV1BaseUrl();
 
@@ -20,13 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ success: true });
-  res.cookies.set("rs_session", "", {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: sessionCookieSecure(req),
-    path: "/",
-    maxAge: 0,
-  });
+  res.cookies.set("rs_session", "", rsSessionClearCookieOptions(req));
 
   return res;
 }

@@ -11,7 +11,11 @@ const baseSecurityHeaders: { key: string; value: string }[] = [
 ];
 
 const nextConfig: NextConfig = {
-  // Keep tracing rooted to this app (avoids parent-folder lockfile noise without pulling in long spaced paths).
+  /**
+   * Lock the tracing root to this app directory. If a parent folder (e.g. the user profile)
+   * contains another `package-lock.json`, Next.js may otherwise pick that as the workspace root,
+   * which can break server bundles and chunk resolution (missing `./NNNN.js` under `.next/server`).
+   */
   outputFileTracingRoot: path.join(__dirname),
 
   // Avoid build failures when ESLint CLI options drift from eslint-config-next (CI / Linux).

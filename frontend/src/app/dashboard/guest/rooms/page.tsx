@@ -1,9 +1,13 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import { ResortRoomDetailsBookingModal } from "@/components/resort-page/ResortRoomDetailsBookingModal";
+import type { LandingComputedRoom } from "@/lib/api/landingPage";
 import { apiClient } from "@/lib/api/client";
-import { Heart, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { laravelPublicUrl } from "@/lib/publicAsset";
+import { amenityMeta, extractRoomMeta, formatPhp, formatPhpPerNight } from "@/lib/roomPreviewDisplay";
+import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
+import { BedDouble, Heart, ImageOff, Loader2, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 type RoomRow = {
@@ -12,13 +16,29 @@ type RoomRow = {
   code: string;
   capacity: number;
   basePrice: number;
+  amenities: string[];
+  rules: string | null;
+  images: string[];
   reservationFee: number;
 };
 
-type GuestResort = { slug: string };
+type GuestResort = { id: number; slug: string };
+
+function roomRowToLanding(r: RoomRow): LandingComputedRoom {
+  return {
+    id: r.id,
+    name: r.name,
+    capacity: r.capacity,
+    basePrice: Number(r.basePrice),
+    amenities: r.amenities ?? [],
+    rules: r.rules,
+    images: r.images ?? [],
+  };
+}
 
 export default function GuestRoomsPage() {
-  const [slug, setSlug] = useState<string | null>(null);
+  const [resort, setResort] = useState<GuestResort | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
   const [rooms, setRooms] = useState<RoomRow[]>([]);
   const [favIds, setFavIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -32,7 +52,8 @@ export default function GuestRoomsPage() {
         apiClient.get<{ success: boolean; data: RoomRow[] }>("/guest/rooms"),
         apiClient.get<{ success: boolean; data: unknown }>("/guest/favorites"),
       ]);
-      setSlug(rResort.data.data?.slug ?? null);
+      const d = rResort.data.data;
+      setResort(d?.id != null && d.slug != null ? { id: d.id, slug: d.slug } : null);
       setRooms(Array.isArray(rRooms.data.data) ? rRooms.data.data : []);
       const raw = rFav.data.data;
       const favList = Array.isArray(raw) ? raw : [];
@@ -40,6 +61,7 @@ export default function GuestRoomsPage() {
     } catch {
       setRooms([]);
       setFavIds(new Set());
+      setResort(null);
     } finally {
       setLoading(false);
     }
@@ -49,7 +71,9 @@ export default function GuestRoomsPage() {
     void load();
   }, [load]);
 
-  const toggleFav = async (roomId: number) => {
+  const toggleFav = async (e: React.MouseEvent, roomId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
     setBusyId(roomId);
     try {
       if (favIds.has(roomId)) {
@@ -83,40 +107,136 @@ export default function GuestRoomsPage() {
         <DashCard className="p-8 text-center text-zinc-500">No active rooms are available right now.</DashCard>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rooms.map((room) => (
-            <DashCard key={room.id} className="flex flex-col p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-dash text-base font-semibold text-navy">{room.name}</h2>
-                  <p className="text-xs text-zinc-500">{room.code}</p>
-                </div>
-                <button
-                  type="button"
-                  aria-label={favIds.has(room.id) ? "Remove from favorites" : "Add to favorites"}
-                  className="rounded-lg border border-softBorder p-2 text-rose-500 transition hover:bg-rose-50"
-                  disabled={busyId === room.id}
-                  onClick={() => void toggleFav(room.id)}
-                >
-                  {busyId === room.id ? (
-                    <Loader2 className="animate-spin" size={16} />
-                  ) : (
-                    <Heart size={16} className={favIds.has(room.id) ? "fill-current" : ""} />
-                  )}
-                </button>
-              </div>
-              <p className="mt-2 text-sm text-zinc-600">Up to {room.capacity} guests</p>
-              <p className="mt-1 text-sm font-semibold text-emerald-700">From ₱{Number(room.basePrice).toLocaleString()}</p>
-              <p className="text-xs text-zinc-500">Reservation fee ₱{Number(room.reservationFee).toLocaleString()}</p>
-              <Link
-                href={slug ? `/resort/${encodeURIComponent(slug)}` : "/"}
-                className="mt-auto pt-4 text-xs font-semibold text-clOcean hover:underline"
+          {rooms.map((room) => {
+            const primaryImage = room.images[0];
+            const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities ?? []);
+            return (
+              <article
+                key={room.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`${room.name}. Open room details and booking.`}
+                className="group flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white p-0 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                onClick={() => setSelectedRoom(roomRowToLanding(room))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedRoom(roomRowToLanding(room));
+                  }
+                }}
               >
-                Open resort landing →
-              </Link>
-            </DashCard>
-          ))}
+                <div className="relative aspect-[2/1] w-full overflow-hidden bg-zinc-100">
+                  {primaryImage ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={laravelPublicUrl(primaryImage)}
+                        alt={room.name}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy/10 via-transparent to-transparent" />
+                    </>
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-zinc-100 to-zinc-200 text-[11px] text-zinc-500">
+                      <ImageOff size={14} />
+                      <span>No photo yet</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={favIds.has(room.id) ? "Remove from favorites" : "Add to favorites"}
+                    className="absolute right-2 top-2 z-10 rounded-lg border border-white/80 bg-white/90 p-2 text-rose-500 shadow-sm backdrop-blur-sm transition hover:bg-white"
+                    disabled={busyId === room.id}
+                    onClick={(e) => void toggleFav(e, room.id)}
+                  >
+                    {busyId === room.id ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Heart size={16} className={favIds.has(room.id) ? "fill-current" : ""} />
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex flex-1 flex-col p-3">
+                  <h2 className="min-h-0 text-left font-heading text-sm font-semibold leading-tight text-navy line-clamp-2">
+                    {room.name}
+                  </h2>
+                  {room.code ? <p className="mt-0.5 text-[10px] text-zinc-400">{room.code}</p> : null}
+
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">
+                      <Users size={10} className="shrink-0 text-zinc-500" aria-hidden />
+                      {room.capacity} {room.capacity === 1 ? "guest" : "guests"}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2 py-px text-[10px] font-semibold text-zinc-800">
+                      {formatPhpPerNight(Number(room.basePrice))}
+                    </span>
+                    {bedCount ? (
+                      <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">
+                        <BedDouble size={10} className="shrink-0 text-zinc-500" aria-hidden />
+                        {bedCount} {bedCount === 1 ? "bed" : "beds"}
+                      </span>
+                    ) : null}
+                    {bedType ? (
+                      <span className="inline-flex items-center rounded-full border border-zinc-200/90 bg-white px-2 py-px text-[10px] font-medium text-zinc-700">
+                        {bedType}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {visibleAmenities.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap content-start gap-1">
+                      {visibleAmenities.slice(0, 4).map((a) => {
+                        const meta = amenityMeta(a);
+                        const Icon = meta.icon;
+                        return (
+                          <span
+                            key={a}
+                            className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-white/90 px-1.5 py-px text-[9px] font-medium text-zinc-700"
+                          >
+                            <Icon
+                              size={9}
+                              className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`}
+                              aria-hidden
+                            />
+                            {displayInclusionLabel(a)}
+                          </span>
+                        );
+                      })}
+                      {visibleAmenities.length > 4 && (
+                        <span className="rounded-full border border-zinc-200 px-1.5 py-px text-[9px] text-zinc-400">
+                          +{visibleAmenities.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="mt-2 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+                    {room.rules?.trim() || "Comfortable stay with guest-first amenities."}
+                  </p>
+                  <p className="mt-1 text-[10px] text-zinc-400">
+                    Reservation fee {formatPhp(Number(room.reservationFee))}
+                  </p>
+
+                  <div className="mt-2 border-t border-zinc-200/90 pt-2">
+                    <span className="inline-flex w-full items-center justify-center rounded-lg border border-emerald-600/90 bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition group-hover:bg-emerald-700">
+                      Book now
+                    </span>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
+
+      {resort ? (
+        <ResortRoomDetailsBookingModal
+          room={selectedRoom}
+          resortId={resort.id}
+          onClose={() => setSelectedRoom(null)}
+        />
+      ) : null}
     </div>
   );
 }

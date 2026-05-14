@@ -16,7 +16,8 @@ APP_URL=https://your-api-domain.com
 Notes:
 - `XENDIT_SECRET_KEY` must never be exposed to frontend code.
 - `XENDIT_WEBHOOK_TOKEN` must match the token configured in Xendit dashboard.
-- `FRONTEND_URL` drives invoice success/failure redirects.
+- `FRONTEND_URL` is the default origin for booking and subscription invoice success/failure redirects when the browser does not send `checkout_return_base`.
+- The Next.js app sends `checkout_return_base` (current `window.location.origin`) on reservation and subscription checkout so Xendit returns users to the **same host** as their session (e.g. tenant subdomain or production domain). Subdomains of `FRONTEND_URL`'s host, `*.localhost`, and optional `CHECKOUT_RETURN_HOSTS` are allowed server-side.
 - `APP_URL` is used for your public API URL and webhook endpoint.
 
 ## 2) Xendit Dashboard webhook

@@ -46,7 +46,7 @@ class ResortController extends Controller
 
     public function show(Resort $resort)
     {
-        $resort->load('subscription')->loadCount('rooms');
+        $resort->load('tenant:id,subdomain')->load('subscription')->loadCount('rooms');
         return $this->successResponse(new ResortResource($resort), 'Resort details');
     }
 

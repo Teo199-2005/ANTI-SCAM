@@ -1,12 +1,13 @@
 "use client";
 
+import BookingPaymentReturnModal from "@/components/dashboard/BookingPaymentReturnModal";
 import DashCard from "@/components/dash/DashCard";
 import Button from "@/components/ui/Button";
 import { apiClient } from "@/lib/api/client";
-import { createPaymentInvoice } from "@/lib/api/payment";
+import { createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
 type ReservationRow = {
@@ -28,8 +29,20 @@ function extractRows(payload: unknown): ReservationRow[] {
 }
 
 function GuestHistoryInner() {
+  const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const when = searchParams.get("when") === "past" ? "past" : "upcoming";
+  const from = searchParams.get("from");
+  const fromPayment = from === "payment";
+  const fromPaymentFailed = from === "payment_failed";
+  const paymentReturnId = searchParams.get("reservation_id");
+  const paymentReturnRef = searchParams.get("ref");
+  const paymentModalOpen = Boolean(
+    paymentReturnId && (fromPayment || fromPaymentFailed),
+  );
+  const paymentModalFlow = fromPaymentFailed ? "failed" : "success";
+
   const [rows, setRows] = useState<ReservationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState<number | null>(null);
@@ -48,14 +61,41 @@ function GuestHistoryInner() {
     }
   }, [when]);
 
+  const stripPaymentReturnQuery = useCallback(() => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.delete("from");
+    sp.delete("reservation_id");
+    sp.delete("ref");
+    const next = sp.toString();
+    router.replace(next ? `${pathname}?${next}` : pathname);
+    void load();
+  }, [pathname, router, searchParams, load]);
+
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void load();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [load]);
 
   const onPay = async (id: number) => {
     setPayingId(id);
     try {
-      const result = await createPaymentInvoice(id);
+      const result = await createPaymentInvoice(id, { checkoutReturnBase: paymentCheckoutReturnBase() });
+      if (result.already_confirmed) {
+        await load();
+        return;
+      }
       if (result.invoice_url) {
         window.location.href = result.invoice_url;
       }
@@ -78,6 +118,16 @@ function GuestHistoryInner() {
 
   return (
     <div className="space-y-6">
+      {paymentReturnId ? (
+        <BookingPaymentReturnModal
+          open={paymentModalOpen}
+          onClose={stripPaymentReturnQuery}
+          flow={paymentModalFlow}
+          reservationId={paymentReturnId}
+          refFallback={paymentReturnRef}
+        />
+      ) : null}
+
       <div>
         <h1 className="dash-page-title">Travel history</h1>
         <p className="dash-page-sub">Upcoming stays and past visits at your home resort.</p>

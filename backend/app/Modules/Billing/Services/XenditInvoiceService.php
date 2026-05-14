@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Services;
 
 use App\Models\Reservation;
 use App\Models\User;
+use App\Modules\Billing\Support\CheckoutReturnBaseResolver;
 use App\Modules\Billing\Support\XenditTls;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ class XenditInvoiceService
 {
     public function __construct(
         private readonly XenditWebhookService $webhooks,
+        private readonly CheckoutReturnBaseResolver $checkoutReturnBase,
     ) {}
 
     private function secretKey(): string
@@ -81,9 +83,9 @@ class XenditInvoiceService
      *
      * @return array{invoice_url: string|null, invoice_id: string, already_confirmed: bool, resumed: bool}
      */
-    public function resolveGuestCheckoutInvoice(Reservation $reservation, User $user): array
+    public function resolveGuestCheckoutInvoice(Reservation $reservation, User $user, ?string $checkoutReturnBase = null): array
     {
-        return DB::transaction(function () use ($reservation, $user): array {
+        return DB::transaction(function () use ($reservation, $user, $checkoutReturnBase): array {
             $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== 'pending_payment') {
@@ -91,7 +93,7 @@ class XenditInvoiceService
             }
 
             if (! $locked->xendit_invoice_id) {
-                $created = $this->createInvoice($locked, $user);
+                $created = $this->createInvoice($locked, $user, $checkoutReturnBase);
                 $locked->update(['xendit_invoice_id' => $created['invoice_id']]);
 
                 return [
@@ -102,22 +104,23 @@ class XenditInvoiceService
                 ];
             }
 
-            return $this->reconcileExistingGuestInvoice($locked, $user);
+            return $this->reconcileExistingGuestInvoice($locked, $user, $checkoutReturnBase);
         });
     }
 
     /**
      * @return array{invoice_url: string|null, invoice_id: string, already_confirmed: bool, resumed: bool}
      */
-    private function reconcileExistingGuestInvoice(Reservation $locked, User $user): array
+    private function reconcileExistingGuestInvoice(Reservation $locked, User $user, ?string $checkoutReturnBase = null): array
     {
         $id = (string) $locked->xendit_invoice_id;
 
         if (! $this->isConfigured() && ! app()->isProduction() && str_starts_with($id, 'mock-inv-')) {
-            $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
+            $base = $this->checkoutReturnBase->resolve($checkoutReturnBase);
+            $urls = $this->bookingInvoiceReturnUrls($locked, $user, $base);
 
             return [
-                'invoice_url' => "{$frontendUrl}/payment/success?reservation_id={$locked->id}&ref={$locked->reference_no}",
+                'invoice_url' => $urls['success'],
                 'invoice_id' => $id,
                 'already_confirmed' => false,
                 'resumed' => true,
@@ -146,7 +149,7 @@ class XenditInvoiceService
 
         if (in_array($status, ['EXPIRED', 'FAILED'], true)) {
             $locked->update(['xendit_invoice_id' => null]);
-            $created = $this->createInvoice($locked, $user);
+            $created = $this->createInvoice($locked, $user, $checkoutReturnBase);
             $locked->update(['xendit_invoice_id' => $created['invoice_id']]);
 
             return [
@@ -170,11 +173,53 @@ class XenditInvoiceService
         ];
     }
 
-    public function createInvoice(Reservation $reservation, User $user): array
+    /**
+     * Xendit redirect URLs after booking invoice pay / fail. Guest and client land on dashboard with a modal;
+     * other roles keep marketing payment pages (stay aligned with frontend `postPaymentDashboardReturnHref`).
+     *
+     * @return array{success: string, failure: string}
+     */
+    private function bookingInvoiceReturnUrls(Reservation $reservation, User $user, string $frontendBase): array
     {
-        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
-        $successUrl = "{$frontendUrl}/payment/success?reservation_id={$reservation->id}&ref={$reservation->reference_no}";
-        $failureUrl = "{$frontendUrl}/payment/failed?reservation_id={$reservation->id}&ref={$reservation->reference_no}";
+        $frontendUrl = rtrim($frontendBase, '/');
+        $role = (string) ($user->role ?? '');
+
+        if ($role === 'guest' || $role === 'client') {
+            $path = $role === 'guest' ? '/dashboard/guest/history' : '/dashboard/client/bookings';
+            $successQuery = http_build_query([
+                'from' => 'payment',
+                'reservation_id' => (string) $reservation->id,
+                'ref' => $reservation->reference_no,
+            ]);
+            $failureQuery = http_build_query([
+                'from' => 'payment_failed',
+                'reservation_id' => (string) $reservation->id,
+                'ref' => $reservation->reference_no,
+            ]);
+
+            return [
+                'success' => "{$frontendUrl}{$path}?{$successQuery}",
+                'failure' => "{$frontendUrl}{$path}?{$failureQuery}",
+            ];
+        }
+
+        $legacyQuery = http_build_query([
+            'reservation_id' => (string) $reservation->id,
+            'ref' => $reservation->reference_no,
+        ]);
+
+        return [
+            'success' => "{$frontendUrl}/payment/success?{$legacyQuery}",
+            'failure' => "{$frontendUrl}/payment/failed?{$legacyQuery}",
+        ];
+    }
+
+    public function createInvoice(Reservation $reservation, User $user, ?string $checkoutReturnBase = null): array
+    {
+        $base = $this->checkoutReturnBase->resolve($checkoutReturnBase);
+        $urls = $this->bookingInvoiceReturnUrls($reservation, $user, $base);
+        $successUrl = $urls['success'];
+        $failureUrl = $urls['failure'];
 
         if (! $this->isConfigured() && app()->isProduction()) {
             throw new RuntimeException('Xendit secret key is not configured.');

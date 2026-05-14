@@ -5,6 +5,7 @@ namespace App\Modules\Billing\Services;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
+use App\Modules\Billing\Support\CheckoutReturnBaseResolver;
 use App\Modules\Billing\Support\XenditTls;
 use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Http\Client\ConnectionException;
@@ -14,6 +15,10 @@ use RuntimeException;
 
 class XenditSubscriptionInvoiceService
 {
+    public function __construct(
+        private readonly CheckoutReturnBaseResolver $checkoutReturnBase,
+    ) {}
+
     private function secretKey(): string
     {
         return (string) config('services.xendit.secret_key');
@@ -89,7 +94,7 @@ class XenditSubscriptionInvoiceService
             throw new RuntimeException('No resort owner account found for this subscription.');
         }
 
-        $base = $this->resolveCheckoutReturnBase($checkoutReturnBase);
+        $base = $this->checkoutReturnBase->resolve($checkoutReturnBase);
         // Payments page was removed; land on Resort Overview with query for optional UI feedback.
         $successUrl = "{$base}/dashboard/resort?payment=success";
         $failureUrl = "{$base}/dashboard/resort?payment=failed";
@@ -386,64 +391,6 @@ class XenditSubscriptionInvoiceService
     private function canUseLocalMockPaid(): bool
     {
         return ! app()->isProduction() && (bool) config('services.xendit.allow_mock_paid', false);
-    }
-
-    /**
-     * Normalize optional browser origin for Xendit redirects. Falls back to FRONTEND_URL
-     * when missing or not on the allowlist (prevents open redirects).
-     */
-    private function resolveCheckoutReturnBase(?string $requested): string
-    {
-        $default = rtrim((string) config('app.frontend_url', 'http://127.0.0.1:3000'), '/');
-        if ($requested === null) {
-            return $default;
-        }
-        $trimmed = trim($requested);
-        if ($trimmed === '' || ! preg_match('#^https?://#i', $trimmed)) {
-            return $default;
-        }
-        $parts = parse_url($trimmed);
-        if (! is_array($parts) || empty($parts['host'])) {
-            return $default;
-        }
-        if (! empty($parts['user']) || ! empty($parts['pass'])) {
-            return $default;
-        }
-        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
-        if (! in_array($scheme, ['http', 'https'], true)) {
-            return $default;
-        }
-        $host = strtolower((string) $parts['host']);
-        if (! $this->isAllowedCheckoutReturnHost($host)) {
-            return $default;
-        }
-        $port = isset($parts['port']) ? ':'.(int) $parts['port'] : '';
-
-        return rtrim("{$scheme}://{$host}{$port}", '/');
-    }
-
-    private function isAllowedCheckoutReturnHost(string $host): bool
-    {
-        if ($host === 'localhost' || $host === '127.0.0.1') {
-            return true;
-        }
-        if (str_ends_with($host, '.localhost')) {
-            return true;
-        }
-        $frontendHost = parse_url((string) config('app.frontend_url', ''), PHP_URL_HOST);
-        if (is_string($frontendHost) && $frontendHost !== '' && strcasecmp($host, $frontendHost) === 0) {
-            return true;
-        }
-        $allow = config('app.checkout_return_hosts', []);
-        if (is_array($allow)) {
-            foreach ($allow as $h) {
-                if (is_string($h) && strcasecmp($host, $h) === 0) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     private function monthlyRate(int $durationMonths): float

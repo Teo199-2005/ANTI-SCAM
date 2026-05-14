@@ -3,11 +3,12 @@
 import PageContainer from "@/components/layout/PageContainer";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
-import { createPaymentInvoice } from "@/lib/api/payment";
-import { getPublicRoom, RoomDetail } from "@/lib/api/public";
+import { createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
+import { getPublicResort, getPublicRoom, RoomDetail } from "@/lib/api/public";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
+  ArrowRight,
   BadgeCheck,
-  CreditCard,
   Loader2,
   Lock,
   LogIn,
@@ -15,8 +16,8 @@ import {
   Shield,
   User,
 } from "lucide-react";
-import { use, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMeter";
@@ -30,18 +31,20 @@ import Link from "next/link";
 
 type Step = "auth" | "confirm" | "paying";
 
-export default function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: resortId } = use(params);
+export default function CheckoutPage() {
+  const { id: resortIdParam } = useParams();
+  const resortId = String(resortIdParam ?? "");
   const searchParams = useSearchParams();
   const roomId   = searchParams.get("roomId")   ?? "";
   const checkIn  = searchParams.get("checkIn")  ?? "";
   const checkOut = searchParams.get("checkOut") ?? "";
 
-  const { user, login, register } = useAuth();
+  const { user, loading: authLoading, login, register } = useAuth();
 
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState<string | null>(null);
+  const [resortSlug, setResortSlug] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(user ? "confirm" : "auth");
 
   // Auth form fields
@@ -59,11 +62,29 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
   const [booking, setBooking] = useState(false);
   const redirecting = useRef(false);
 
+  useEffect(() => {
+    const n = Number(resortId);
+    if (!resortId || !Number.isFinite(n) || n <= 0) return;
+    void getPublicResort(n)
+      .then((r) => setResortSlug(r.slug?.trim() || null))
+      .catch(() => setResortSlug(null));
+  }, [resortId]);
+
+  const resortListingHref = resortSlug
+    ? `/resort/${encodeURIComponent(resortSlug)}`
+    : `/resorts/${encodeURIComponent(resortId)}`;
+
   const nights = checkIn && checkOut
     ? Math.max(0, (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)
     : 0;
 
   const reservationFeePhp = room ? Number(room.reservationFee ?? 500) : 500;
+  const balanceAtResortTotal = room && nights > 0 ? Number(room.basePrice) * nights : 0;
+  const formatPhp = (amount: number, maxFrac = 2) =>
+    `₱${amount.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: maxFrac,
+    })}`;
 
   useEffect(() => {
     const load = async () => {
@@ -90,6 +111,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
       setStep("confirm");
     }
   }, [user, step]);
+
+  // If the session drops while on checkout (401 / cookie issues), return to the auth step instead of a blank card.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user && (step === "confirm" || step === "paying")) {
+      setStep("auth");
+      setBooking(false);
+      setBookingError(null);
+    }
+  }, [authLoading, user, step]);
 
   const onAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,22 +174,42 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
         check_out_date: checkOut,
       });
       const lock = lockRes.data?.data ?? lockRes.data;
+      const lockToken =
+        typeof lock === "object" && lock !== null && "lock_token" in lock
+          ? String((lock as { lock_token?: string }).lock_token ?? "")
+          : "";
+      if (!lockToken) {
+        throw new Error("Could not reserve your dates (missing lock). Please try again.");
+      }
 
       // 2. Create reservation
       const totalAmount = room ? Number(room.basePrice) * nights : 0;
       const resRes = await apiClient.post("/reservations", {
         resort_id: Number(resortId),
-        lock_token: lock.lock_token,
+        lock_token: lockToken,
         guest_count: guestCount,
         total_amount: totalAmount,
       });
       const reservation = resRes.data?.data ?? resRes.data;
+      const reservationId =
+        typeof reservation === "object" && reservation !== null && "id" in reservation
+          ? Number((reservation as { id?: unknown }).id)
+          : NaN;
+      if (!Number.isFinite(reservationId)) {
+        throw new Error("Could not create your reservation. Please try again.");
+      }
 
       // 3. Create Xendit invoice → redirect (idempotent: may resume pending checkout or sync PAID)
-      const invoice = await createPaymentInvoice(reservation.id);
+      const invoice = await createPaymentInvoice(reservationId, {
+        checkoutReturnBase: paymentCheckoutReturnBase(),
+      });
       redirecting.current = true;
       if (invoice.already_confirmed) {
-        window.location.href = `/payment/success?reservation_id=${reservation.id}&ref=${encodeURIComponent(String(reservation.reference_no ?? ""))}`;
+        const refStr =
+          typeof reservation === "object" && reservation !== null
+            ? String((reservation as { referenceNo?: string }).referenceNo ?? "")
+            : "";
+        window.location.href = `/payment/success?reservation_id=${reservationId}&ref=${encodeURIComponent(refStr)}`;
         return;
       }
       if (!invoice.invoice_url) {
@@ -166,10 +217,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
       }
       window.location.href = invoice.invoice_url;
     } catch (err: unknown) {
-      const msg = err instanceof Error
-        ? err.message
-        : (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Booking failed.";
-      setBookingError(msg);
+      setBookingError(parseApiErrorMessage(err, "Booking failed. Please try again."));
       setStep("confirm");
     } finally {
       setBooking(false);
@@ -348,29 +396,53 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
 
               <ReservationFeeBreakdownPanel totalPhp={reservationFeePhp} />
 
-              <div className="rounded-xl border border-white/40 bg-white/30 p-4 text-sm backdrop-blur-md">
-                <p className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <Lock size={12} />
-                  Your room will be locked for 10 minutes while you complete payment.
+              <div className="rounded-xl border border-zinc-200/90 bg-zinc-50/60 p-4 text-sm text-zinc-700">
+                <p>
+                  Reservation fee due now:{" "}
+                  <strong className="tabular-nums text-zinc-900">{formatPhp(reservationFeePhp)}</strong>
+                  {room && nights > 0 ? (
+                    <>
+                      {" "}
+                      <span className="text-zinc-500">
+                        ({nights} night{nights === 1 ? "" : "s"} · {formatPhp(Number(room.basePrice), 0)}/night).
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+                {room && balanceAtResortTotal > 0 ? (
+                  <p className="mt-2 text-zinc-600">
+                    Remaining stay total at check-in:{" "}
+                    <span className="tabular-nums font-semibold text-zinc-800">{formatPhp(balanceAtResortTotal)}</span>
+                  </p>
+                ) : null}
+                <p className="mt-3 flex items-start gap-2 text-xs text-zinc-500">
+                  <Lock size={13} className="mt-0.5 shrink-0 text-zinc-400" aria-hidden />
+                  <span>Your room is held for 10 minutes while you complete payment.</span>
                 </p>
               </div>
 
               <button
                 type="submit"
                 disabled={booking || !room || !roomId || !checkIn || !checkOut || nights <= 0}
-                className="cl-btn-primary w-full disabled:opacity-60 disabled:pointer-events-none"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-800/20 bg-emerald-600 px-4 py-3 text-base font-semibold text-white shadow-none transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/50 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
               >
                 {booking ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" /> Preparing payment…
-                  </span>
+                  <>
+                    <Loader2 size={18} className="animate-spin shrink-0" aria-hidden />
+                    Opening payment…
+                  </>
                 ) : (
-                  <span className="inline-flex items-center gap-2">
-                    <CreditCard size={15} />
-                    Pay ₱{reservationFeePhp.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} reservation fee
-                  </span>
+                  <>
+                    Continue — pay securely
+                    <ArrowRight size={18} className="shrink-0 opacity-95" aria-hidden />
+                  </>
                 )}
               </button>
+
+              <p className="text-center text-xs leading-relaxed text-zinc-500">
+                Payments are processed by Xendit. You pay the reservation fee here only; the rest is settled at the
+                resort.
+              </p>
             </form>
           )}
         </div>
@@ -380,39 +452,61 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
           <div className="soft-panel p-6">
             <h2 className="mb-4 font-heading text-2xl text-zinc-900">Booking Summary</h2>
             {room ? (
-              <div className="space-y-3 text-sm text-zinc-700">
-                <p className="font-semibold text-zinc-900">{room.resort.name}</p>
-                <p className="text-zinc-600">{room.name} ({room.code})</p>
-                <div className="flex justify-between border-t border-zinc-200 pt-3">
-                  <span>Check-in</span>
-                  <span>{checkIn || "—"}</span>
+              <div className="space-y-4 text-sm text-zinc-700">
+                <div>
+                  <p className="font-heading text-lg font-bold text-navy">{room.resort.name}</p>
+                  <p className="mt-0.5 text-zinc-600">
+                    {room.name} <span className="text-zinc-400">({room.code})</span>
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span>Check-out</span>
-                  <span>{checkOut || "—"}</span>
+                <div className="space-y-2 rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-3 py-3">
+                  <div className="flex justify-between text-xs font-medium text-zinc-500">
+                    <span>Check-in</span>
+                    <span className="tabular-nums font-semibold text-zinc-800">{checkIn || "—"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-medium text-zinc-500">
+                    <span>Check-out</span>
+                    <span className="tabular-nums font-semibold text-zinc-800">{checkOut || "—"}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-zinc-200/80 pt-2 text-xs font-medium text-zinc-500">
+                    <span>Nights</span>
+                    <span className="font-bold text-navy">{nights}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Nights</span>
-                  <span>{nights}</span>
+                <div className="flex justify-between rounded-lg border border-zinc-200/90 bg-white/80 px-3 py-2.5">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Rate / night</span>
+                  <span className="tabular-nums text-base font-bold text-zinc-900">{formatPhp(Number(room.basePrice))}</span>
                 </div>
-                <div className="flex justify-between border-t border-zinc-200 pt-3">
-                  <span>Base price / night</span>
-                  <span>₱{Number(room.basePrice).toLocaleString()}</span>
+                <div className="relative overflow-hidden rounded-xl border-2 border-amber-300/70 bg-gradient-to-br from-amber-50 via-white to-emerald-50/90 p-3.5 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800/90">Due now (online)</p>
+                  <div className="mt-1 flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-semibold text-zinc-700">Reservation fee</span>
+                    <span className="tabular-nums font-heading text-2xl font-extrabold tracking-tight text-amber-900">
+                      {formatPhp(reservationFeePhp)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-snug text-zinc-600">Locks your dates and starts secure payment.</p>
                 </div>
-                <div className="flex justify-between font-semibold text-amber-700">
-                  <span>Reservation fee (now)</span>
-                  <span>₱{reservationFeePhp.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between font-semibold text-zinc-500">
-                  <span>Balance at resort</span>
-                  <span>₱{(Number(room.basePrice) * nights).toLocaleString()}</span>
+                <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 px-3 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">At check-in</p>
+                      <p className="mt-0.5 text-xs font-medium text-zinc-600">Room total for this stay</p>
+                    </div>
+                    <span className="shrink-0 tabular-nums text-right text-lg font-bold text-zinc-700">
+                      {formatPhp(balanceAtResortTotal)}
+                    </span>
+                  </div>
+                  <p className="mt-2 border-t border-zinc-200/70 pt-2 text-[11px] text-zinc-500">
+                    Pay the resort directly — not charged on this page.
+                  </p>
                 </div>
               </div>
             ) : (
               <div className="space-y-2 text-sm text-zinc-600">
                 <p>{roomError ?? "Room details unavailable."}</p>
                 <div className="flex gap-2">
-                  <Link href={`/resorts/${resortId}`} className="cl-btn-secondary">
+                  <Link href={resortListingHref} className="cl-btn-secondary">
                     Back to resort
                   </Link>
                   <Link href="/resorts" className="cl-btn-secondary">

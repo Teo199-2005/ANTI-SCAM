@@ -4,8 +4,8 @@ import { checkRoomAvailability, getPublicRoom, RoomDetail } from "@/lib/api/publ
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { CalendarRange, ChevronLeft, ChevronRight, ExternalLink, Loader2, Users } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { use, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -110,12 +110,10 @@ function MonthCalendar({
   );
 }
 
-export default function ClientRoomExplorePage({
-  params,
-}: {
-  params: Promise<{ resortId: string; roomId: string }>;
-}) {
-  const { resortId, roomId } = use(params);
+export default function ClientRoomExplorePage() {
+  const { resortId: resortIdParam, roomId: roomIdParam } = useParams();
+  const resortId = String(resortIdParam ?? "");
+  const roomId = String(roomIdParam ?? "");
   const router = useRouter();
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [loading, setLoading] = useState(true);

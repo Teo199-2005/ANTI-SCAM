@@ -43,6 +43,11 @@ export type ResortItem = {
   is_publicly_listed: boolean;
   is_vip?: boolean;
   rooms_count?: number;
+  /** Tenant subdomain for `/resort/{slug}` when the tenant relation is loaded. */
+  subdomain?: string | null;
+  /** Admin-only: optional intro video on the owner’s public landing page. */
+  admin_landing_embed_enabled?: boolean;
+  admin_landing_youtube_url?: string | null;
   subscription?: SubscriptionInfo;
   created_at: string;
   updated_at: string;

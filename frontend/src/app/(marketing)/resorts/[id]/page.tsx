@@ -5,10 +5,12 @@ import ResortJsonLd from "@/components/seo/ResortJsonLd";
 import { getPublicResort, getPublicResortBySlug, PublicResort, PublicRoom } from "@/lib/api/public";
 import { BedDouble, CalendarDays, MapPin, PhoneCall, Users } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
-export default function ResortDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ResortDetailPage() {
+  const { id: idParam } = useParams();
+  const id = String(idParam ?? "");
   const [resort, setResort] = useState<PublicResort | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -72,10 +72,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Only the tenant apex path `/` maps to the public resort landing. All other paths must use
+  // the normal app routes on this host (same as plain `localhost`). Otherwise e.g.
+  // `{tenant}.localhost/login` was rewritten to `/resort/{tenant}/login`, which has no page and
+  // renders blank — breaking guest signup links with `?resort=` from a tenant subdomain.
+  if (pathname !== "/") {
+    return NextResponse.next();
+  }
+
   const url = request.nextUrl.clone();
-  const originalPath = pathname === "/" ? "" : pathname;
-  // Singular /resort/... avoids collision with marketing /resorts/[id] (catalog).
-  url.pathname = `/resort/${subdomain}${originalPath}`;
+  url.pathname = `/resort/${subdomain}`;
   return NextResponse.rewrite(url);
 }
 

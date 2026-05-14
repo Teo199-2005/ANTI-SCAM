@@ -4,7 +4,7 @@ import DashCard from "@/components/dash/DashCard";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
-import { createPaymentInvoice } from "@/lib/api/payment";
+import { createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { BadgeCheck, CalendarDays, Clock, MapPin } from "lucide-react";
 import Image from "next/image";
@@ -58,6 +58,19 @@ export default function GuestDashboardPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void load();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load]);
+
   const pending = reservations.filter((r) => r.status === "pending_payment");
   const firstName = user?.name?.split(" ")[0] ?? "Guest";
   const resortLogoAbs = resort?.logoUrl ? laravelPublicUrl(resort.logoUrl) : "";
@@ -65,7 +78,7 @@ export default function GuestDashboardPage() {
   const onPay = async (id: number) => {
     setPayingId(id);
     try {
-      const result = await createPaymentInvoice(id);
+      const result = await createPaymentInvoice(id, { checkoutReturnBase: paymentCheckoutReturnBase() });
       if (result.already_confirmed) {
         await load();
         return;

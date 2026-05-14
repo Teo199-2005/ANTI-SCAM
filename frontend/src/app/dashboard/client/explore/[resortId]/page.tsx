@@ -4,7 +4,8 @@ import { checkRoomAvailability, getPublicResort, PublicRoom, PublicResort } from
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { BedDouble, CalendarRange, ChevronLeft, Loader2, MapPin, Phone, Users } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T12:00:00");
@@ -91,8 +92,9 @@ function InlineAvailabilityPanel({ roomId, resortId }: { roomId: number; resortI
   );
 }
 
-export default function ResortExplorePage({ params }: { params: Promise<{ resortId: string }> }) {
-  const { resortId } = use(params);
+export default function ResortExplorePage() {
+  const { resortId: resortIdParam } = useParams();
+  const resortId = String(resortIdParam ?? "");
   const [resort, setResort] = useState<PublicResort | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -11,8 +11,9 @@ class ResortResource extends JsonResource
     public function toArray(Request $request): array
     {
         $loc = app(PhilippineLocationService::class);
+        $isAdmin = $request->user()?->role === 'admin';
 
-        return [
+        $base = [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
             'name' => $this->name,
@@ -36,6 +37,7 @@ class ResortResource extends JsonResource
             'amenities' => $this->amenities ?? [],
             'is_publicly_listed' => (bool) $this->is_publicly_listed,
             'is_vip' => (bool) ($this->is_vip ?? false),
+            'subdomain' => $this->whenLoaded('tenant', fn () => $this->tenant?->subdomain),
             'rooms_count' => $this->whenCounted('rooms'),
             'subscription' => $this->whenLoaded('subscription', function () {
                 return [
@@ -56,5 +58,12 @@ class ResortResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+
+        if ($isAdmin) {
+            $base['admin_landing_embed_enabled'] = (bool) ($this->admin_landing_embed_enabled ?? false);
+            $base['admin_landing_youtube_url'] = $this->admin_landing_youtube_url;
+        }
+
+        return $base;
     }
 }

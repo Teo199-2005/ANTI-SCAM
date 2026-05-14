@@ -1,32 +1,80 @@
 "use client";
 
 import PageContainer from "@/components/layout/PageContainer";
+import { useAuth } from "@/contexts/AuthContext";
+import { getPublicResort } from "@/lib/api/public";
 import { getReservation, ReservationDetail } from "@/lib/api/payment";
-import { ArrowLeft, Home, XCircle } from "lucide-react";
+import {
+  postPaymentBookingsHref,
+  postPaymentBookingsLabel,
+  postPaymentDashboardReturnHref,
+  postPaymentResortLandingOrDashboardHref,
+  postPaymentResortLandingOrDashboardLabel,
+} from "@/lib/postPaymentDashboardLinks";
+import { LayoutDashboard, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function PaymentFailedPage() {
-  const searchParams  = useSearchParams();
+function PaymentFailedContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const reservationId = searchParams.get("reservation_id");
+  const ref = searchParams.get("ref");
+  const { user, loading: authLoading } = useAuth();
 
   const [reservation, setReservation] = useState<ReservationDetail | null>(null);
   const [loadingRes, setLoadingRes] = useState(Boolean(reservationId));
+  const [resortSlug, setResortSlug] = useState<string | null>(null);
+
+  const dashboardReturnHref =
+    !authLoading && reservationId
+      ? postPaymentDashboardReturnHref(user?.role, "failed", { reservationId, ref })
+      : null;
 
   useEffect(() => {
-    if (!reservationId) return;
+    if (dashboardReturnHref) {
+      router.replace(dashboardReturnHref);
+    }
+  }, [dashboardReturnHref, router]);
+
+  useEffect(() => {
+    if (!reservationId || dashboardReturnHref) {
+      if (!reservationId) setLoadingRes(false);
+      return;
+    }
     const load = async () => {
       setLoadingRes(true);
       try {
         const data = await getReservation(Number(reservationId));
         setReservation(data);
-      } catch { /* fall through */ } finally {
+        try {
+          const pr = await getPublicResort(data.resortId);
+          setResortSlug(pr.slug?.trim() || null);
+        } catch {
+          setResortSlug(null);
+        }
+      } catch {
+        /* fall through */
+      } finally {
         setLoadingRes(false);
       }
     };
     void load();
-  }, [reservationId]);
+  }, [reservationId, dashboardReturnHref]);
+
+  const bookingsHref = postPaymentBookingsHref(user?.role, authLoading, "failed");
+  const bookingsLabel = postPaymentBookingsLabel(user?.role, authLoading);
+  const secondaryHref = postPaymentResortLandingOrDashboardHref(resortSlug, user?.role, authLoading);
+  const secondaryLabel = postPaymentResortLandingOrDashboardLabel(resortSlug, user?.role, authLoading);
+
+  if (dashboardReturnHref) {
+    return (
+      <PageContainer className="section-padding">
+        <div className="soft-panel mx-auto max-w-md p-10 text-center text-zinc-600">Continuing to your dashboard…</div>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer className="section-padding">
@@ -38,10 +86,10 @@ export default function PaymentFailedPage() {
           <h1 className="mt-5 font-heading text-4xl text-zinc-900">Payment Unsuccessful</h1>
           <p className="mt-3 text-zinc-600">
             We could not complete the payment on Xendit. If your booking is still awaiting payment, open{" "}
-            <Link href="/dashboard/client/bookings" className="font-semibold text-navy underline">
-              My bookings
+            <Link href={bookingsHref} className="font-semibold text-navy underline">
+              {bookingsLabel}
             </Link>{" "}
-            and use <strong>Pay now</strong> to resume or refresh checkout.
+            and use <strong>Pay now</strong> (or complete checkout again) to resume.
           </p>
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-950">
             <strong>Room hold:</strong> checkout starts a short hold on your dates. If payment was not finished in time,
@@ -69,26 +117,33 @@ export default function PaymentFailedPage() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
-            <Link
-              href="/dashboard/client/bookings"
-              className="glass-inline-btn justify-center text-navy"
-            >
-              My bookings
-            </Link>
-            <Link href="/resorts" className="glass-inline-btn justify-center text-navy">
-              <ArrowLeft size={15} />
-              Browse resorts
+            <Link href={bookingsHref} className="glass-inline-btn justify-center text-navy">
+              {bookingsLabel}
             </Link>
             <Link
-              href="/"
+              href={secondaryHref}
               className="rounded-full border border-white/30 bg-gradient-to-r from-slateBlue/90 to-navy/90 px-5 py-2.5 text-sm font-semibold text-white shadow-soft backdrop-blur-md transition hover:from-slateBlue hover:to-navy"
             >
-              <Home size={14} className="mr-2 inline" />
-              Back to Home
+              <LayoutDashboard size={14} className="mr-2 inline" />
+              {secondaryLabel}
             </Link>
           </div>
         </div>
       </div>
     </PageContainer>
+  );
+}
+
+export default function PaymentFailedPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="section-padding">
+          <div className="soft-panel mx-auto max-w-md p-10 text-center text-zinc-600">Loading…</div>
+        </PageContainer>
+      }
+    >
+      <PaymentFailedContent />
+    </Suspense>
   );
 }

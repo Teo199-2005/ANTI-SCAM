@@ -124,20 +124,27 @@ class PhilippineLocationService
 
         $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
         $prov = PsgcProvince::query()->where('code', $provinceCode)->first();
-        if ($city === null || $prov === null || $city->province_code !== $provinceCode) {
-            return null;
+        if ($city !== null && $prov !== null && $city->province_code === $provinceCode) {
+            if (filled($barangayName)) {
+                return trim((string) $barangayName).', '.$city->name.', '.$prov->name;
+            }
+
+            $br = PsgcBarangay::query()->where('code', $barangayPsgc)->first();
+            if ($br === null) {
+                return null;
+            }
+
+            return $br->name.', '.$city->name.', '.$prov->name;
         }
 
-        if (filled($barangayName)) {
-            return trim((string) $barangayName).', '.$city->name.', '.$prov->name;
+        // SPA pickers (e.g. @jobuntux/psgc) may use codes that are not present in this server's PSGC tables
+        // or differ slightly from seeded rows. If the pair still validates, accept free-text barangay so
+        // landing readiness and address_label sync are not blocked forever.
+        if (filled($barangayName) && $this->isValidProvinceCityPair($provinceCode, $cityCode)) {
+            return trim((string) $barangayName);
         }
 
-        $br = PsgcBarangay::query()->where('code', $barangayPsgc)->first();
-        if ($br === null) {
-            return null;
-        }
-
-        return $br->name.', '.$city->name.', '.$prov->name;
+        return null;
     }
 
     /**
@@ -156,13 +163,33 @@ class PhilippineLocationService
             $resort->address_barangay_name ?? null,
             $resort->address_barangay_psgc,
         );
+        if ($fromParts !== null && $this->isPlaceholderDemoLocationLine($fromParts)) {
+            $fromParts = null;
+        }
         if ($fromParts !== null) {
             return $fromParts;
         }
 
         $label = $resort->address_label ?? null;
+        $label = is_string($label) ? trim($label) : '';
+        if ($label !== '' && ! $this->isPlaceholderDemoLocationLine($label)) {
+            return $label;
+        }
 
-        return is_string($label) && trim($label) !== '' ? trim($label) : null;
+        return null;
+    }
+
+    /**
+     * Legacy/example PSGC seeds used names like "Demo Province" — hide them so UI can fall back
+     * to a proper {@see Resort::$address_label} or omit the line until the owner fixes location.
+     */
+    private function isPlaceholderDemoLocationLine(string $line): bool
+    {
+        $lower = mb_strtolower($line);
+
+        return str_contains($lower, 'demo province')
+            || str_contains($lower, 'demo city')
+            || str_contains($lower, 'alt barangay');
     }
 
     public function resortMapQueryString(Resort $resort): ?string
@@ -191,7 +218,7 @@ class PhilippineLocationService
             $resort->address_barangay_name ?? null,
             $resort->address_barangay_psgc,
         );
-        if ($formatted !== null) {
+        if ($formatted !== null && ! $this->isPlaceholderDemoLocationLine($formatted)) {
             $resort->forceFill(['address_label' => $formatted])->saveQuietly();
         }
     }

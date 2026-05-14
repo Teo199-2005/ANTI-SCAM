@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, use, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T12:00:00");
@@ -23,8 +23,10 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function RoomDetailInner({ params }: { params: Promise<{ id: string; roomId: string }> }) {
-  const { id: resortId, roomId } = use(params);
+function RoomDetailInner() {
+  const { id: resortIdParam, roomId: roomIdParam } = useParams();
+  const resortId = String(resortIdParam ?? "");
+  const roomId = String(roomIdParam ?? "");
   const searchParams = useSearchParams();
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -295,7 +297,7 @@ function RoomDetailInner({ params }: { params: Promise<{ id: string; roomId: str
   );
 }
 
-export default function RoomDetailPage({ params }: { params: Promise<{ id: string; roomId: string }> }) {
+export default function RoomDetailPage() {
   return (
     <Suspense
       fallback={
@@ -304,7 +306,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
         </PageContainer>
       }
     >
-      <RoomDetailInner params={params} />
+      <RoomDetailInner />
     </Suspense>
   );
 }
