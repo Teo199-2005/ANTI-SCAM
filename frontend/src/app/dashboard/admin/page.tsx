@@ -4,6 +4,7 @@ import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
 import StatCard from "@/components/dashboard/StatCard";
 import { getAdminStats, AdminStats } from "@/lib/api/admin";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { color, kpiTone } from "@/lib/design-tokens";
 import {
   AlertTriangle,
@@ -13,11 +14,12 @@ import {
   Clock3,
   DollarSign,
   Globe2,
+  RefreshCw,
   TrendingUp,
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -38,19 +40,23 @@ export default function AdminOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await getAdminStats();
-        setStats(data);
-      } catch (err) {
-        setError("Failed to load admin stats.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getAdminStats();
+      setStats(data);
+      setError(null);
+    } catch (err) {
+      setStats(null);
+      setError(parseApiErrorMessage(err, "Failed to load admin stats."));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   if (loading) {
     return (
@@ -69,8 +75,17 @@ export default function AdminOverviewPage() {
 
   if (error || !stats) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-10 text-center text-rose-800">
-        {error ?? "No data."}
+      <div className="space-y-4 rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900">
+        <p className="text-sm leading-relaxed">{error ?? "No data."}</p>
+        <button
+          type="button"
+          onClick={() => void loadDashboard()}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-5 py-2.5 text-sm font-semibold text-white shadow-card transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden />
+          Try again
+        </button>
       </div>
     );
   }

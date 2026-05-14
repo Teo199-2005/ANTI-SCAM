@@ -9,6 +9,8 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Support\CacheSafe;
 use App\Shared\Traits\ApiResponseTrait;
+
+class AdminStatsController extends Controller
 {
     use ApiResponseTrait;
 
