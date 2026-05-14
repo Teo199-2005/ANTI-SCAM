@@ -20,6 +20,23 @@ function isTenantLocalhostHostname(hostname: string): boolean {
   return h.endsWith(".localhost") && h !== "localhost";
 }
 
+/** Lines to paste under “Website restrictions” for the Maps JS key (exact origin first — wildcards on *.localhost are unreliable). */
+function buildMapsReferrerPasteList(pageOrigin: string): string {
+  const lines: string[] = [];
+  try {
+    const u = new URL(pageOrigin);
+    const portPart = u.port ? `:${u.port}` : "";
+    lines.push(`${u.origin}/*`);
+    if (u.hostname === "localhost" || isTenantLocalhostHostname(u.hostname)) {
+      lines.push(`http://*.localhost${portPart}/*`);
+    }
+  } catch {
+    /* ignore */
+  }
+  lines.push("http://localhost:3000/*", "http://127.0.0.1:3000/*", "https://anti-scamph.com/*");
+  return [...new Set(lines)].join("\n");
+}
+
 /**
  * Draggable marker + map click to set coordinates. Requires Maps JavaScript API key.
  */
@@ -31,6 +48,7 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
   const prevGmAuthFailureRef = useRef<(() => void) | undefined>(undefined);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [pageOrigin, setPageOrigin] = useState<string>("");
+  const [referrerCopied, setReferrerCopied] = useState(false);
 
   onPinChangeRef.current = onPinChange;
 
@@ -54,10 +72,11 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const host = typeof window !== "undefined" ? window.location.hostname : "";
       const tenantLocal = isTenantLocalhostHostname(host);
+      const exactLine = origin ? `${origin}/*` : "";
       setMapLoadError(
         tenantLocal
-          ? `Google blocked the map: your browser is on ${origin}, not plain localhost. "http://localhost:3000/*" does not cover ${host}. Add "http://*.localhost:3000/*" (or "${origin}/*") to your Maps API key referrers in Google Cloud, then wait a few minutes and refresh.`
-          : "Google rejected this Maps key (referrer, API not enabled, or billing). Fix the key in Google Cloud Console — your profile still saves without the map.",
+          ? `Google blocked the map while you are on ${origin}. Wildcards like http://*.localhost:3000/* are not always honored for *.localhost. Add this exact referrer first: ${exactLine} — same API key as in NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, “Maps JavaScript API” enabled, then wait a few minutes and hard-refresh.`
+          : `Google blocked the map (referrer, wrong API on the key, or billing). Add ${exactLine || "your full origin with /*"} to Website restrictions for the **same** key as in NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, enable **Maps JavaScript API** on that key, wait a few minutes, hard-refresh.`,
       );
       mapRef.current = null;
       markerRef.current = null;
@@ -191,47 +210,49 @@ export default function ResortMapPinPicker({ apiKey, latitude, longitude, onPinC
         <div className="rounded-xl border border-rose-200/90 bg-rose-50/95 px-3 py-3 text-xs text-rose-950">
           <p className="font-semibold">Map unavailable</p>
           <p className="mt-1.5 leading-relaxed">{mapLoadError}</p>
-          {(() => {
-            try {
-              if (!pageOrigin) return null;
-              const host = new URL(pageOrigin).hostname;
-              if (!isTenantLocalhostHostname(host)) return null;
-              return (
-                <p className="mt-2 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 py-2 text-[11px] font-medium leading-snug text-amber-950">
-                  Detected host <code className="rounded bg-white/80 px-1 font-mono">{host}</code>: add referrer{" "}
-                  <code className="rounded bg-white/80 px-1 font-mono">http://*.localhost:3000/*</code> (port must match
-                  yours). Plain <code className="rounded bg-white/80 px-1 font-mono">http://localhost:3000/*</code> alone
-                  is not enough for <code className="rounded bg-white/80 px-1 font-mono">*.localhost</code> URLs.
-                </p>
-              );
-            } catch {
-              return null;
-            }
-          })()}
-          <ul className="mt-2 list-inside list-disc space-y-0.5 text-[11px] text-rose-900/95">
+          {apiKey.length >= 8 ? (
+            <p className="mt-2 text-[11px] text-rose-900/90">
+              Key in this app ends with{" "}
+              <code className="rounded bg-white/80 px-1 font-mono text-[11px]">…{apiKey.slice(-4)}</code> — in Google Cloud,
+              open <strong>that same</strong> key (name + last digits). A different key will keep failing.
+            </p>
+          ) : null}
+          {pageOrigin ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-[11px] font-semibold text-zinc-800">
+                Google Cloud → Credentials → your Maps browser key → <strong>Website restrictions</strong> → add each
+                line (first line is the one Google usually needs for <code className="font-mono">*.localhost</code>):
+              </p>
+              <pre className="max-h-40 overflow-auto rounded-lg border border-rose-200/80 bg-white/90 p-2.5 font-mono text-[10px] leading-relaxed text-zinc-900">
+                {buildMapsReferrerPasteList(pageOrigin)}
+              </pre>
+              <button
+                type="button"
+                className="inline-flex items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-rose-900 shadow-sm transition hover:bg-rose-50"
+                onClick={() => {
+                  void navigator.clipboard.writeText(buildMapsReferrerPasteList(pageOrigin)).then(() => {
+                    setReferrerCopied(true);
+                    window.setTimeout(() => setReferrerCopied(false), 2200);
+                  });
+                }}
+              >
+                {referrerCopied ? "Copied" : "Copy referrer lines"}
+              </button>
+            </div>
+          ) : null}
+          <ul className="mt-3 list-inside list-disc space-y-0.5 text-[11px] text-rose-900/95">
             <li>
-              <strong>Tenant / subdomain dev</strong> (e.g. <code className="rounded bg-white/70 px-1">anything.localhost:3000</code>
-              ): add{" "}
-              <code className="rounded bg-white/70 px-1">http://*.localhost:3000/*</code> — required in addition to{" "}
-              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code> if you use both URL styles.
+              <strong>API restrictions</strong> on that key must include <strong>Maps JavaScript API</strong> (not only
+              Address Validation).
             </li>
             <li>
-              <strong>RefererNotAllowedMapError</strong> on plain localhost: add{" "}
-              <code className="rounded bg-white/70 px-1">http://localhost:3000/*</code> (with trailing{" "}
-              <code className="rounded bg-white/70 px-1">/*</code>), <code className="rounded bg-white/70 px-1">http</code> not{" "}
-              <code className="rounded bg-white/70 px-1">https</code> for local HTTP. Add{" "}
-              <code className="rounded bg-white/70 px-1">http://127.0.0.1:3000/*</code> if you use 127.0.0.1.
+              <strong>Application restrictions</strong> must be <strong>Websites</strong> (not “IP addresses”) for a
+              browser map.
             </li>
             <li>
-              Production: <code className="rounded bg-white/70 px-1">https://anti-scamph.com/*</code>.
-            </li>
-            <li>
-              Google Cloud → APIs &amp; Services → enable <strong>Maps JavaScript API</strong> and ensure billing is
-              active.
-            </li>
-            <li>
-              After editing <code className="rounded bg-white/70 px-1">.env.local</code>, restart{" "}
-              <code className="rounded bg-white/70 px-1">next dev</code> (public env is inlined at build for production).
+              After saving in Google, wait up to ~5 minutes, then <strong>Ctrl+Shift+R</strong> on this page. Restart{" "}
+              <code className="rounded bg-white/70 px-1 font-mono">next dev</code> if you changed{" "}
+              <code className="rounded bg-white/70 px-1">.env.local</code>.
             </li>
           </ul>
         </div>
