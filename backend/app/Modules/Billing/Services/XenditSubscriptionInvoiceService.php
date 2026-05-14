@@ -7,6 +7,7 @@ use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Modules\Billing\Support\CheckoutReturnBaseResolver;
 use App\Modules\Billing\Support\XenditTls;
+use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +18,7 @@ class XenditSubscriptionInvoiceService
 {
     public function __construct(
         private readonly CheckoutReturnBaseResolver $checkoutReturnBase,
+        private readonly DigitalAcknowledgmentReceiptService $digitalReceipts,
     ) {}
 
     private function secretKey(): string
@@ -326,6 +328,12 @@ class XenditSubscriptionInvoiceService
     ): array {
         $mockInvoiceId = 'mock-sub-inv-'.$subscription->id.'-'.now()->timestamp;
 
+        $paidAt = now();
+        $ackNo = $this->digitalReceipts->allocate(
+            DigitalAcknowledgmentReceiptService::KIND_SUBSCRIPTION,
+            $paidAt
+        );
+
         $invoice = SubscriptionInvoice::create([
             'tenant_id' => $subscription->tenant_id,
             'subscription_id' => $subscription->id,
@@ -337,9 +345,10 @@ class XenditSubscriptionInvoiceService
             'referral_code' => $storedReferralCode,
             'marketer_id' => $marketerId,
             'status' => 'paid',
-            'paid_at' => now(),
+            'paid_at' => $paidAt,
             'billing_cycle_start' => $subscription->billing_cycle_start,
             'billing_cycle_end' => $subscription->billing_cycle_end,
+            'acknowledgment_receipt_no' => $ackNo,
         ]);
 
         if ($billingScope === 'room_addon') {

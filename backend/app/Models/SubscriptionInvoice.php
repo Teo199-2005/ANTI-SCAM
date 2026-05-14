@@ -18,6 +18,7 @@ class SubscriptionInvoice extends Model
         'xendit_invoice_url',
         'amount',
         'plan',
+        'acknowledgment_receipt_no',
         'referral_code',
         'marketer_id',
         'status',
@@ -46,4 +47,3 @@ class SubscriptionInvoice extends Model
         return $this->belongsTo(Resort::class);
     }
 }
-

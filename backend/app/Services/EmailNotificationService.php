@@ -8,6 +8,7 @@ use App\Models\EmailLog;
 use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Subscription;
+use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Request;
@@ -86,13 +87,19 @@ class EmailNotificationService
             'Your reservation fee receipt is here.'
         );
 
+        $ack = $reservation->acknowledgment_receipt_no;
+        $subjectSuffix = ($ack !== null && $ack !== '') ? $ack : $reservation->reference_no;
+
         $this->queueMail(
             'payment_receipt',
             $user->email,
             $user->name,
-            'Payment Receipt – '.$reservation->reference_no,
+            'Digital Acknowledgment Receipt – '.$subjectSuffix,
             $fullHtml,
-            ['reservation_id' => $reservation->id],
+            [
+                'reservation_id' => $reservation->id,
+                'acknowledgment_receipt_no' => $ack,
+            ],
             $reservation->tenant_id
         );
     }
@@ -160,8 +167,8 @@ class EmailNotificationService
         );
     }
 
-    /** Subscription renewal confirmation. */
-    public function sendSubscriptionRenewalConfirmation(Subscription $subscription): void
+    /** Subscription renewal confirmation (includes digital acknowledgment receipt when invoice is paid). */
+    public function sendSubscriptionRenewalConfirmation(Subscription $subscription, ?SubscriptionInvoice $invoice = null): void
     {
         $owner = User::withoutGlobalScopes()
             ->where('tenant_id', $subscription->tenant_id)
@@ -174,17 +181,24 @@ class EmailNotificationService
 
         $fullHtml = $this->templateService->render(
             'Subscription renewed',
-            $this->subscriptionRenewalHtml($subscription),
+            $this->subscriptionRenewalHtml($subscription, $invoice),
             'Your subscription has been renewed successfully.'
         );
+
+        $ack = $invoice?->acknowledgment_receipt_no;
+        $subjectSuffix = ($ack !== null && $ack !== '') ? $ack : (string) ($subscription->resort?->name ?? 'Subscription');
 
         $this->queueMail(
             'subscription_renewal_confirmation',
             $owner->email,
             $owner->name,
-            'Subscription Renewed – '.$subscription->resort?->name,
+            'Digital Acknowledgment Receipt – '.$subjectSuffix,
             $fullHtml,
-            ['subscription_id' => $subscription->id],
+            array_filter([
+                'subscription_id' => $subscription->id,
+                'subscription_invoice_id' => $invoice?->id,
+                'acknowledgment_receipt_no' => $ack,
+            ]),
             $subscription->tenant_id
         );
     }
@@ -322,23 +336,41 @@ HTML;
     private function paymentReceiptHtml(Reservation $r): string
     {
         $fee = number_format($r->reservation_fee, 2);
+        $ref = htmlspecialchars((string) $r->reference_no, ENT_QUOTES, 'UTF-8');
+        $ackRaw = (string) ($r->acknowledgment_receipt_no ?? '');
+        $ack = htmlspecialchars($ackRaw, ENT_QUOTES, 'UTF-8');
+        $ackRow = $ackRaw !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Digital acknowledgment receipt</td><td style="padding:8px 0;font-weight:600;font-family:monospace">'.$ack.'</td></tr>'
+            : '';
 
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
-  <h2 style="color:#1E3A5F">Payment Receipt</h2>
-  <p>Reference: <strong>{$r->reference_no}</strong></p>
-  <p>Amount paid: <strong style="color:#10b981">₱{$fee}</strong> (non-refundable reservation fee)</p>
-  <p style="font-size:12px;color:#9ca3af">This is your official receipt for the platform reservation fee. Keep this for your records.</p>
+  <h2 style="color:#1E3A5F">Digital Acknowledgment Receipt</h2>
+  <p style="font-size:13px;color:#374151">Official receipt for the <strong>Anti-Scam PH</strong> platform reservation fee (non-refundable).</p>
+  <table style="width:100%;border-collapse:collapse;margin-top:16px">
+    {$ackRow}
+    <tr><td style="padding:8px 0;color:#6b7280">Booking reference</td><td style="padding:8px 0;font-weight:600">{$ref}</td></tr>
+    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:600;color:#10b981">₱{$fee}</td></tr>
+  </table>
+  <p style="margin-top:16px;font-size:12px;color:#9ca3af">Keep this email for your records. The reservation fee is collected by the platform; remaining balance is paid at the resort on check-in.</p>
 </div>
 HTML;
     }
 
     private function newBookingResortHtml(Reservation $r): string
     {
+        $ref = htmlspecialchars((string) $r->reference_no, ENT_QUOTES, 'UTF-8');
+        $ackRaw = (string) ($r->acknowledgment_receipt_no ?? '');
+        $ack = htmlspecialchars($ackRaw, ENT_QUOTES, 'UTF-8');
+        $ackLine = $ackRaw !== ''
+            ? '<p style="margin-top:8px;font-size:13px">Platform fee acknowledgment: <strong style="font-family:monospace">'.$ack.'</strong></p>'
+            : '';
+
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
   <h2 style="color:#1E3A5F">New Booking Received</h2>
-  <p>Reservation <strong>{$r->reference_no}</strong> has been confirmed.</p>
+  <p>Reservation <strong>{$ref}</strong> has been confirmed.</p>
+  {$ackLine}
   <p>Check-in: <strong>{$r->check_in_date}</strong> → Check-out: <strong>{$r->check_out_date}</strong></p>
   <p>Guests: {$r->guest_count}</p>
   <p style="font-size:12px;color:#9ca3af">Log in to your resort dashboard for full details.</p>
@@ -360,16 +392,33 @@ HTML;
 HTML;
     }
 
-    private function subscriptionRenewalHtml(Subscription $s): string
+    private function subscriptionRenewalHtml(Subscription $s, ?SubscriptionInvoice $invoice = null): string
     {
-        $amount = number_format($s->total_monthly_fee, 2);
-        $nextDue = $s->next_due_date;
+        $amountVal = $invoice !== null ? (float) $invoice->amount : (float) $s->total_monthly_fee;
+        $amount = number_format($amountVal, 2);
+        $nextDue = htmlspecialchars((string) $s->next_due_date, ENT_QUOTES, 'UTF-8');
+        $resortName = htmlspecialchars((string) ($s->resort?->name ?? ''), ENT_QUOTES, 'UTF-8');
+        $ackRaw = (string) ($invoice?->acknowledgment_receipt_no ?? '');
+        $ack = htmlspecialchars($ackRaw, ENT_QUOTES, 'UTF-8');
+        $plan = htmlspecialchars((string) ($invoice?->plan ?? ''), ENT_QUOTES, 'UTF-8');
+        $ackRow = $ackRaw !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Digital acknowledgment receipt</td><td style="padding:8px 0;font-weight:600;font-family:monospace">'.$ack.'</td></tr>'
+            : '';
+        $planRow = $plan !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Invoice plan</td><td style="padding:8px 0;font-weight:600">'.$plan.'</td></tr>'
+            : '';
 
         return <<<HTML
 <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #bbf7d0;border-radius:12px;background:#f0fdf4">
-  <h2 style="color:#166534">Subscription Renewed</h2>
-  <p>Your subscription payment of <strong>₱{$amount}</strong> has been received successfully.</p>
-  <p>Next due date: <strong>{$nextDue}</strong></p>
+  <h2 style="color:#166534">Digital Acknowledgment Receipt</h2>
+  <p style="font-size:13px;color:#374151">Subscription payment received for <strong>{$resortName}</strong>.</p>
+  <table style="width:100%;border-collapse:collapse;margin-top:16px">
+    {$ackRow}
+    {$planRow}
+    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:600;color:#166534">₱{$amount}</td></tr>
+    <tr><td style="padding:8px 0;color:#6b7280">Next due date</td><td style="padding:8px 0;font-weight:600">{$nextDue}</td></tr>
+  </table>
+  <p style="margin-top:16px;font-size:12px;color:#9ca3af">This is your official acknowledgment of the subscription payment processed through Anti-Scam PH.</p>
 </div>
 HTML;
     }

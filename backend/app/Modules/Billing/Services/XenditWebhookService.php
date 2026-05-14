@@ -6,6 +6,7 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Models\XenditWebhookEvent;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\EmailNotificationService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,8 @@ class XenditWebhookService
 {
     public function __construct(
         private readonly AuditLogService $audits,
-        private readonly EmailNotificationService $emails
+        private readonly EmailNotificationService $emails,
+        private readonly DigitalAcknowledgmentReceiptService $digitalReceipts,
     ) {}
 
     public function verifySignature(string $signature): void
@@ -82,12 +84,22 @@ class XenditWebhookService
                     }
                 }
 
-                $oldValues = $reservation->only(['status', 'xendit_payment_status', 'client_id']);
+                $paidMoment = now();
+                $ackNo = $reservation->acknowledgment_receipt_no;
+                if ($ackNo === null || $ackNo === '') {
+                    $ackNo = $this->digitalReceipts->allocate(
+                        DigitalAcknowledgmentReceiptService::KIND_BOOKING,
+                        $paidMoment
+                    );
+                }
+
+                $oldValues = $reservation->only(['status', 'xendit_payment_status', 'client_id', 'acknowledgment_receipt_no']);
                 $reservation->update([
                     'xendit_payment_status' => 'paid',
                     'status' => 'confirmed',
                     'client_id' => $reservation->client_id,
-                    'reserved_at' => now(),
+                    'reserved_at' => $paidMoment,
+                    'acknowledgment_receipt_no' => $ackNo,
                 ]);
 
                 $this->audits->log(
@@ -95,7 +107,7 @@ class XenditWebhookService
                     'reservation',
                     $reservation->id,
                     $oldValues,
-                    $reservation->only(['status', 'xendit_payment_status', 'client_id'])
+                    $reservation->only(['status', 'xendit_payment_status', 'client_id', 'acknowledgment_receipt_no'])
                 );
 
                 $reservationForNotifications = $reservation->load(['client', 'resort']);

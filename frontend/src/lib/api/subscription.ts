@@ -7,6 +7,8 @@ type SubscriptionInvoicePayload = {
   xendit_invoice_url?: string | null;
   amount: string;
   plan: string;
+  acknowledgment_receipt_no?: string | null;
+  acknowledgmentReceiptNo?: string | null;
   status: "pending" | "paid" | "failed" | "expired";
   billing_cycle_start: string;
   billing_cycle_end: string;
@@ -20,6 +22,7 @@ export type SubscriptionInvoice = {
   xenditInvoiceUrl: string | null;
   amount: string;
   plan: string;
+  acknowledgmentReceiptNo: string | null;
   status: "pending" | "paid" | "failed" | "expired";
   billingCycleStart: string;
   billingCycleEnd: string;
@@ -34,6 +37,7 @@ function normalizeInvoice(raw: SubscriptionInvoicePayload): SubscriptionInvoice 
     xenditInvoiceUrl: raw.xendit_invoice_url ?? null,
     amount: raw.amount,
     plan: raw.plan,
+    acknowledgmentReceiptNo: raw.acknowledgment_receipt_no ?? raw.acknowledgmentReceiptNo ?? null,
     status: raw.status,
     billingCycleStart: raw.billing_cycle_start,
     billingCycleEnd: raw.billing_cycle_end,

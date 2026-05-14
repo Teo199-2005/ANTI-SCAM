@@ -5,6 +5,7 @@ namespace App\Modules\Billing\Services;
 use App\Models\SubscriptionInvoice;
 use App\Models\XenditWebhookEvent;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\EmailNotificationService;
 use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Support\Arr;
@@ -17,6 +18,7 @@ class XenditSubscriptionWebhookService
         private readonly AuditLogService $audits,
         private readonly EmailNotificationService $emails,
         private readonly SubscriptionReferralCommissionService $referralCommissions,
+        private readonly DigitalAcknowledgmentReceiptService $digitalReceipts,
     ) {}
 
     public function verifySignature(string $signature): void
@@ -66,10 +68,21 @@ class XenditSubscriptionWebhookService
             }
 
             if ($eventType === 'invoice.paid' && $status === 'PAID') {
+                $paidMoment = now();
+                $ackNo = $invoice->acknowledgment_receipt_no;
+                if ($ackNo === null || $ackNo === '') {
+                    $ackNo = $this->digitalReceipts->allocate(
+                        DigitalAcknowledgmentReceiptService::KIND_SUBSCRIPTION,
+                        $paidMoment
+                    );
+                }
+
                 $invoice->update([
                     'status' => 'paid',
-                    'paid_at' => now(),
+                    'paid_at' => $paidMoment,
+                    'acknowledgment_receipt_no' => $ackNo,
                 ]);
+                $invoice->refresh();
 
                 $subscription = $invoice->subscription()->lockForUpdate()->first();
                 if ($subscription) {
@@ -113,7 +126,13 @@ class XenditSubscriptionWebhookService
                             ])
                         );
 
-                        return $invoice->refresh();
+                        $subscriptionForNotifications = $subscription->loadMissing('resort');
+                        $paidInvoice = $invoice->refresh();
+                        DB::afterCommit(function () use ($subscriptionForNotifications, $paidInvoice): void {
+                            $this->emails->sendSubscriptionRenewalConfirmation($subscriptionForNotifications, $paidInvoice);
+                        });
+
+                        return $paidInvoice;
                     }
 
                     $oldValues = $subscription->only([
@@ -155,8 +174,9 @@ class XenditSubscriptionWebhookService
                     $this->referralCommissions->creditFromPaidMonthlyInvoice($invoice);
 
                     $subscriptionForNotifications = $subscription->loadMissing('resort');
-                    DB::afterCommit(function () use ($subscriptionForNotifications): void {
-                        $this->emails->sendSubscriptionRenewalConfirmation($subscriptionForNotifications);
+                    $paidInvoice = $invoice->refresh();
+                    DB::afterCommit(function () use ($subscriptionForNotifications, $paidInvoice): void {
+                        $this->emails->sendSubscriptionRenewalConfirmation($subscriptionForNotifications, $paidInvoice);
                     });
                 }
             } elseif (in_array($status, ['EXPIRED', 'FAILED'], true)) {

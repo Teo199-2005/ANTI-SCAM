@@ -15,6 +15,7 @@ class ReservationResource extends JsonResource
         return [
             'id' => $this->id,
             'referenceNo' => $this->reference_no,
+            'acknowledgmentReceiptNo' => $this->acknowledgment_receipt_no,
             'resortId' => $this->resort_id,
             'roomId' => $this->room_id,
             'clientId' => $this->client_id,

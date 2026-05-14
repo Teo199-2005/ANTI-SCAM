@@ -127,11 +127,20 @@ class AdminOverrideAndWebhookTest extends TestCase
         $this->postJson('/api/v1/webhooks/xendit/invoice', $payload, $headers)->assertOk();
 
         $this->assertDatabaseCount('xendit_webhook_events', 1);
+        $reservation = Reservation::withoutGlobalScopes()->where('xendit_invoice_id', 'inv_test_123')->first();
+        $this->assertNotNull($reservation);
+        $this->assertMatchesRegularExpression('/^ASPH-BKG-\d{4}-\d{6}$/', (string) $reservation->acknowledgment_receipt_no);
+        $firstAck = $reservation->acknowledgment_receipt_no;
+
         $this->assertDatabaseHas('reservations', [
             'xendit_invoice_id' => 'inv_test_123',
             'status' => 'confirmed',
             'xendit_payment_status' => 'paid',
+            'acknowledgment_receipt_no' => $firstAck,
         ]);
+
+        $reservation->refresh();
+        $this->assertSame($firstAck, $reservation->acknowledgment_receipt_no);
     }
 
     public function test_xendit_webhook_rejects_when_token_not_configured(): void

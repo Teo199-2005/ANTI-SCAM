@@ -20,6 +20,7 @@ class Reservation extends Model
         'guest_email',
         'guest_phone',
         'reference_no',
+        'acknowledgment_receipt_no',
         'check_in_date',
         'check_out_date',
         'guest_count',
