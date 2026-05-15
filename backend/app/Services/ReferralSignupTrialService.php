@@ -162,7 +162,7 @@ class ReferralSignupTrialService
             ->count();
     }
 
-    /** After signup trial ends, return subscription to pending_payment so owners can subscribe. */
+    /** After signup trial ends, mark subscription expired so owners can renew via Subscribe. */
     public function expireLapsedTrials(): int
     {
         $updated = 0;
@@ -181,7 +181,7 @@ class ReferralSignupTrialService
                         ->where('status', 'active')
                         ->whereDate('next_due_date', '<=', $today)
                         ->update([
-                            'status' => 'pending_payment',
+                            'status' => 'expired',
                             'grace_until' => null,
                         ]);
                 }

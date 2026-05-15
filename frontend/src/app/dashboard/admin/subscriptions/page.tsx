@@ -38,9 +38,7 @@ const SORT_FIRST: Record<string, SortDir> = {
 
 const statusBadge: Record<string, string> = {
   active:          "dash-badge-emerald",
-  pending_payment: "dash-badge-amber",
-  grace_period:    "dash-badge-orange",
-  suspended:       "dash-badge-rose",
+  expired: "dash-badge-rose",
   cancelled:       "dash-badge-slate",
 };
 

@@ -90,7 +90,7 @@ class ReferralFirstMonthFreeTest extends TestCase
         return $resort;
     }
 
-    private function makeSubscription(Resort $resort, string $status = 'pending_payment'): Subscription
+    private function makeSubscription(Resort $resort, string $status = 'active'): Subscription
     {
         return Subscription::create([
             'tenant_id' => $resort->tenant_id,
@@ -104,7 +104,7 @@ class ReferralFirstMonthFreeTest extends TestCase
             'status' => $status,
             'billing_cycle_start' => now()->startOfMonth()->toDateString(),
             'billing_cycle_end' => now()->endOfMonth()->toDateString(),
-            'next_due_date' => now()->toDateString(),
+            'next_due_date' => now()->subDay()->toDateString(),
         ]);
     }
 
@@ -366,7 +366,7 @@ class ReferralFirstMonthFreeTest extends TestCase
         $tenant = $this->makeTenant();
         $owner = $this->makeResortOwner($tenant);
         $resort = $this->makeResort($tenant);
-        $subscription = $this->makeSubscription($resort, 'pending_payment');
+        $subscription = $this->makeSubscription($resort, 'active');
         $cycleStart = $subscription->billing_cycle_start;
         $cycleEnd = $subscription->billing_cycle_end;
 
@@ -411,7 +411,7 @@ class ReferralFirstMonthFreeTest extends TestCase
         $tenant = $this->makeTenant();
         $owner = $this->makeResortOwner($tenant);
         $resort = $this->makeResort($tenant);
-        $subscription = $this->makeSubscription($resort, 'pending_payment');
+        $subscription = $this->makeSubscription($resort, 'active');
         $cycleEnd = $subscription->billing_cycle_end;
 
         // Legacy _b1 invoice: paidMonths=12, bonusMonths=1 → credited=13

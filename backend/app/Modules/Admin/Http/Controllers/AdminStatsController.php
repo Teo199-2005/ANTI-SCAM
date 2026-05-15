@@ -37,8 +37,8 @@ class AdminStatsController extends Controller
             return [
                 'totalResorts'           => Resort::withoutGlobalScopes()->count(),
                 'publicResorts'          => Resort::withoutGlobalScopes()->where('is_publicly_listed', true)->count(),
-                'suspendedResorts'       => Subscription::withoutGlobalScopes()->where('status', 'suspended')->count(),
-                'gracePeriodResorts'     => Subscription::withoutGlobalScopes()->where('status', 'grace_period')->count(),
+                'suspendedResorts'       => Subscription::withoutGlobalScopes()->where('status', 'expired')->count(),
+                'gracePeriodResorts'     => 0,
                 'totalUsers'             => User::count(),
                 'newUsersThisWeek'       => User::where('created_at', '>=', now()->subDays(7))->count(),
                 'totalReservations'      => (int) ($reservationAgg->total_reservations ?? 0),

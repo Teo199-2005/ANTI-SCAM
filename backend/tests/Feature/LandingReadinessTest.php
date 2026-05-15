@@ -302,14 +302,13 @@ class LandingReadinessTest extends TestCase
     public function test_public_landing_returns_503_when_subscription_pending_and_profile_incomplete(): void
     {
         // The public landing endpoint gates on readiness (profile completeness), not
-        // subscription status. A pending_payment subscription with an incomplete
-        // profile still returns 503 landing_incomplete.
+        // subscription status. An incomplete profile still returns 503 landing_incomplete.
         $tenant = $this->makeTenant(['subdomain' => 'no-sub-resort', 'slug' => 'no-sub-resort']);
         $resort = $this->makeResort($tenant, [
             'logo_url' => null,
             'background_image_url' => null,
         ]);
-        $this->makeSubscription($resort, 'pending_payment');
+        $this->makeSubscription($resort, 'active');
 
         $response = $this->getJson('/api/v1/public/resorts/landing/no-sub-resort');
 

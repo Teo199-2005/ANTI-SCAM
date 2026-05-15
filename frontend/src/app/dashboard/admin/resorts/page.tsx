@@ -33,8 +33,7 @@ const SORT_FIRST: Record<string, SortDir> = {
 
 const subBadge = (status: string) => {
   if (status === "active") return "dash-badge-emerald";
-  if (status === "suspended") return "dash-badge-rose";
-  if (status === "grace_period") return "dash-badge-orange";
+  if (status === "expired") return "dash-badge-rose";
   if (status === "cancelled") return "dash-badge-slate";
   return "dash-badge-amber";
 };

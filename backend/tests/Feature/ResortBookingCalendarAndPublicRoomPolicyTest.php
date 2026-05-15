@@ -113,7 +113,7 @@ class ResortBookingCalendarAndPublicRoomPolicyTest extends TestCase
             'billing_cycle_start' => now()->startOfMonth()->toDateString(),
             'billing_cycle_end' => now()->endOfMonth()->toDateString(),
             'next_due_date' => now()->endOfMonth()->toDateString(),
-            'status' => 'pending_payment',
+            'status' => 'expired',
         ]);
 
         $inactiveSubResponse = $this->getJson('/api/v1/public/rooms/' . $room->id);

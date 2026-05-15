@@ -36,10 +36,6 @@ class GenerateMonthlyInvoices extends Command
                 ->whereNotNull('xendit_invoice_id')
                 ->exists();
 
-            if ($subscription->status !== 'pending_payment') {
-                $subscription->update(['status' => 'pending_payment']);
-            }
-
             if (! $alreadyPendingForCycle) {
                 try {
                     $invoiceService->createInvoice($subscription);

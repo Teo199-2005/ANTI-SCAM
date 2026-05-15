@@ -27,7 +27,7 @@ class SubscriptionFactory extends Factory
         $cycleStart = now()->startOfMonth()->subMonths(fake()->numberBetween(0, 2));
         $cycleEnd = (clone $cycleStart)->endOfMonth();
         $nextDue = (clone $cycleEnd)->addDay();
-        $status = fake()->randomElement(['active', 'active', 'pending_payment', 'grace_period', 'suspended', 'cancelled']);
+        $status = fake()->randomElement(['active', 'active', 'active', 'expired']);
 
         return [
             'tenant_id' => $resort->tenant_id,
@@ -41,7 +41,7 @@ class SubscriptionFactory extends Factory
             'billing_cycle_start' => $cycleStart->toDateString(),
             'billing_cycle_end' => $cycleEnd->toDateString(),
             'next_due_date' => $nextDue->toDateString(),
-            'grace_until' => $status === 'grace_period' ? $nextDue->copy()->addDays(7)->toDateString() : null,
+            'grace_until' => null,
             'status' => $status,
         ];
     }

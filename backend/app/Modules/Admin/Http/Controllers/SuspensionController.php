@@ -27,7 +27,7 @@ class SuspensionController extends Controller
         $query = Subscription::with([
             'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc,is_vip',
         ])
-            ->whereIn('status', ['suspended', 'grace_period'])
+            ->where('status', 'expired')
             ->when($filter !== 'all', fn ($q) => $q->where('status', $filter))
             ->when($location['province_psgc'] || $location['city_municipality_psgc'], function ($q) use ($location): void {
                 $q->whereHas('resort', function ($resort) use ($location): void {

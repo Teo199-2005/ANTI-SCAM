@@ -37,6 +37,11 @@ class ResortOwnerOnboardingTest extends TestCase
             'tenant_id' => $user->tenant_id,
             'name' => 'Hayatop Resort',
         ]);
+
+        $this->assertDatabaseHas('subscriptions', [
+            'tenant_id' => $user->tenant_id,
+            'status' => 'active',
+        ]);
     }
 
     public function test_resort_owner_onboard_endpoint_succeeds_for_legacy_account(): void

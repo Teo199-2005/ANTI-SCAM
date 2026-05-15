@@ -42,7 +42,7 @@ class BackfillSubscriptions extends Command
                     'billing_cycle_start' => now()->startOfMonth()->toDateString(),
                     'billing_cycle_end' => now()->endOfMonth()->toDateString(),
                     'next_due_date' => now()->endOfMonth()->toDateString(),
-                    'status' => 'pending_payment',
+                    'status' => 'active',
                 ]);
 
                 $count++;

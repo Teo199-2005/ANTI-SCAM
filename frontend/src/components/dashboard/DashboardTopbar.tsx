@@ -96,11 +96,15 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       .toUpperCase() ?? "?";
 
   const roleLabel = formatRoleLabel(user?.role);
+  const ownerHasWorkspace = user?.role === "resort_owner" && user.tenant_id != null;
   const hasActiveReferralTrial = Boolean(user?.referral_trial?.active);
+  const subscriptionStatus = (subscriptionInfo?.status ?? "active").toLowerCase();
   const isSubscribedOwner =
     user?.role === "resort_owner" &&
-    ((subscriptionInfo?.status ?? "").toLowerCase() === "active" || hasActiveReferralTrial);
-  const ownerStatusLabel = (subscriptionInfo?.status ?? "pending_payment").replaceAll("_", " ");
+    (subscriptionStatus === "active" || hasActiveReferralTrial);
+  const showSubscribeCta =
+    user?.role === "resort_owner" && ownerHasWorkspace && subscriptionStatus === "expired";
+  const ownerStatusLabel = subscriptionStatus.replaceAll("_", " ");
   const subscriptionEndsAt =
     subscriptionInfo?.endsAt ?? (hasActiveReferralTrial ? (user?.referral_trial?.ends_at ?? null) : null);
   const formattedEndDate = subscriptionEndsAt
@@ -108,8 +112,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     : "Not available";
   const subscriptionDaysLeft = subscriptionDaysRemaining(subscriptionEndsAt);
   const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
-  const isPaidSubscriptionActive = (subscriptionInfo?.status ?? "").toLowerCase() === "active";
-  const ownerHasWorkspace = user?.role === "resort_owner" && user.tenant_id != null;
+  const isPaidSubscriptionActive = subscriptionStatus === "active";
   const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
   const totalCharge = selectedOffer.monthlyRate * selectedDuration;
 
@@ -279,7 +282,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
           <>
             {user.role === "resort_owner" ? (
               <>
-                {!isSubscribedOwner ? (
+                {showSubscribeCta ? (
                   <div className="relative">
                     <button
                       type="button"

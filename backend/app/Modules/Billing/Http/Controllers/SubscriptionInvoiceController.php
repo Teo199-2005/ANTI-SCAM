@@ -69,17 +69,15 @@ class SubscriptionInvoiceController extends Controller
         $roomAddonQuantity = max(1, min(50, (int) $request->integer('room_addon_quantity', 1)));
 
         $isOverdue = $subscription->next_due_date && now()->toDateString() >= (string) $subscription->next_due_date;
-        $isPayableStatus = in_array($subscription->status, ['pending_payment', 'active'], true);
-        $isFirstOrPendingPayment = $subscription->status === 'pending_payment';
+        $status = (string) $subscription->status;
         $isAdmin = (string) $request->user()?->role === 'admin';
         $force = $isAdmin && (bool) $request->boolean('force', false);
 
-        // Allow immediate payment for newly onboarded / pending-payment subscriptions.
-        // Only enforce due-date checks for currently active subscriptions.
         if (
             $billingScope === 'monthly'
             && ! $force
-            && (! $isPayableStatus || (! $isFirstOrPendingPayment && ! $isOverdue))
+            && $status === 'active'
+            && ! $isOverdue
         ) {
             return $this->errorResponse(
                 'Subscription is not due for payment yet.',
@@ -89,8 +87,20 @@ class SubscriptionInvoiceController extends Controller
         }
 
         if (
+            $billingScope === 'monthly'
+            && ! $force
+            && ! in_array($status, ['active', 'expired'], true)
+        ) {
+            return $this->errorResponse(
+                'Subscription cannot be renewed in its current state.',
+                ['subscription' => ['invalid_status']],
+                409
+            );
+        }
+
+        if (
             $billingScope === 'room_addon'
-            && ! in_array((string) $subscription->status, ['active', 'pending_payment'], true)
+            && $status !== 'active'
         ) {
             return $this->errorResponse(
                 'Room add-on payment is only available for active subscriptions.',
@@ -137,23 +147,12 @@ class SubscriptionInvoiceController extends Controller
         // Reuse an existing pending gateway invoice for this cycle
         // so users can continue payment instead of getting blocked by 409.
         if ($existingPendingGatewayInvoice) {
-            if ($subscription->status !== 'pending_payment') {
-                $subscription->update(['status' => 'pending_payment']);
-            }
-
             return $this->successResponse([
                 'invoice_url' => $existingPendingGatewayInvoice->xendit_invoice_url,
                 'invoice_id' => $existingPendingGatewayInvoice->xendit_invoice_id,
                 'subscription_invoice_id' => $existingPendingGatewayInvoice->id,
                 'reused' => true,
             ], 'Existing pending subscription invoice reused');
-        }
-
-        // Mark pending_payment BEFORE calling the service so the status is correct
-        // while the Xendit-hosted invoice is outstanding (real mode).
-        // In mock/dev mode the service will immediately override this to 'active'.
-        if ($billingScope === 'monthly') {
-            $subscription->update(['status' => 'pending_payment']);
         }
 
         $checkoutReturnBase = $request->input('checkout_return_base');
@@ -176,9 +175,6 @@ class SubscriptionInvoiceController extends Controller
         } catch (RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), null, 502);
         }
-        // Do NOT touch the status after this point — mock mode already set it to
-        // 'active', and in real mode it stays 'pending_payment' until the webhook fires.
-
         return $this->successResponse([
             'invoice_url' => $result['invoice_url'],
             'invoice_id' => $result['invoice_id'],
