@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\MarketerTierService;
+use App\Support\ResortLocationQuery;
 use App\Shared\Traits\ApiResponseTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -45,6 +46,8 @@ class MarketingController extends Controller
     {
         $search = $request->string('search')->trim()->toString();
 
+        $location = ResortLocationQuery::fromRequest($request);
+
         $marketerQuery = User::query()->where('role', 'marketing');
         if ($search !== '') {
             $like = '%'.$search.'%';
@@ -53,6 +56,14 @@ class MarketingController extends Controller
                     ->orWhere('email', 'like', $like)
                     ->orWhere('referral_code', 'like', $like);
             });
+        }
+
+        if ($location['province_psgc'] !== null || $location['city_municipality_psgc'] !== null) {
+            ResortLocationQuery::applyToUserMailingColumns(
+                $marketerQuery,
+                $location['province_psgc'],
+                $location['city_municipality_psgc'],
+            );
         }
 
         $marketers = $marketerQuery->withCount('assignedResorts')->orderBy('name')->get();

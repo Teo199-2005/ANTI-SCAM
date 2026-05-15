@@ -3,8 +3,11 @@
 namespace App\Modules\Resorts\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Reservation;
+use App\Models\User;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
+use App\Modules\Resorts\Http\Requests\StoreResortGuestRequest;
+use App\Modules\Resorts\Http\Requests\UpdateResortGuestRequest;
+use App\Modules\Resorts\Services\ResortGuestService;
 use App\Support\ResortGuestKey;
 use App\Support\Tenancy\TenantContext;
 use App\Shared\Traits\ApiResponseTrait;
@@ -14,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 class ResortGuestController extends Controller
 {
     use ApiResponseTrait;
+
+    public function __construct(private readonly ResortGuestService $guests) {}
 
     public function index(Request $request)
     {
@@ -47,6 +52,7 @@ class ResortGuestController extends Controller
                 MAX(COALESCE(NULLIF(reservations.guest_name, ''), users.name)) AS name,
                 MAX(COALESCE(NULLIF(reservations.guest_email, ''), users.email)) AS email,
                 MAX(COALESCE(NULLIF(reservations.guest_phone, ''), users.phone)) AS phone,
+                MAX(reservations.client_id) AS client_id,
                 COUNT(*) AS reservationCount,
                 SUM(COALESCE(reservations.reservation_fee, 0)) AS totalSpent,
                 MAX(reservations.check_in_date) AS lastCheckIn,
@@ -57,10 +63,31 @@ class ResortGuestController extends Controller
             ->orderByDesc('reservationCount')
             ->paginate($perPage);
 
-        $guests->getCollection()->transform(function ($row): array {
+        $resortIds = DB::table('resorts')
+            ->where('tenant_id', $tenantId)
+            ->pluck('id');
+
+        $guestAccountsByEmail = [];
+        if ($resortIds->isNotEmpty()) {
+            $guestAccountsByEmail = User::query()
+                ->where('role', 'guest')
+                ->whereIn('home_resort_id', $resortIds)
+                ->get(['id', 'email'])
+                ->mapWithKeys(fn (User $u) => [mb_strtolower((string) $u->email) => $u->id])
+                ->all();
+        }
+
+        $existingKeys = [];
+        $guests->getCollection()->transform(function ($row) use (&$existingKeys, $guestAccountsByEmail): array {
+            $guestKey = (string) $row->guest_key;
+            $existingKeys[] = $guestKey;
+            $emailKey = mb_strtolower(trim((string) ($row->email ?? '')));
+            $accountUserId = $emailKey !== '' ? ($guestAccountsByEmail[$emailKey] ?? null) : null;
+            $hasLogin = $accountUserId !== null;
+
             return [
-                'id' => abs(crc32((string) $row->guest_key)),
-                'guestKey' => (string) $row->guest_key,
+                'id' => abs(crc32($guestKey)),
+                'guestKey' => $guestKey,
                 'name' => (string) ($row->name ?? 'Guest'),
                 'email' => $row->email,
                 'phone' => $row->phone,
@@ -69,10 +96,76 @@ class ResortGuestController extends Controller
                 'lastCheckIn' => $row->lastCheckIn,
                 'lastCheckOut' => $row->lastCheckOut,
                 'firstBooking' => $row->firstBooking,
+                'userId' => $hasLogin ? (int) $accountUserId : null,
+                'hasLoginAccount' => $hasLogin,
             ];
         });
 
+        $accountOnly = $this->guests->accountOnlyGuests($tenantId, $existingKeys);
+        if ($accountOnly !== []) {
+            $merged = $guests->getCollection()->concat(collect($accountOnly));
+            if ($search !== '') {
+                $s = mb_strtolower($search);
+                $merged = $merged->filter(function (array $g) use ($s): bool {
+                    return str_contains(mb_strtolower($g['name']), $s)
+                        || str_contains(mb_strtolower((string) ($g['email'] ?? '')), $s)
+                        || str_contains((string) ($g['phone'] ?? ''), $s);
+                });
+            }
+            $guests->setCollection($merged->values());
+        }
+
         return $this->successResponse($guests, 'Resort guests fetched');
+    }
+
+    public function show(Request $request, string $guestKey)
+    {
+        $tenantId = $this->resolveTenantId($request);
+        if (! $tenantId) {
+            return $this->errorResponse('No tenant context', null, 422);
+        }
+
+        return $this->successResponse(
+            $this->guests->show($tenantId, $guestKey),
+            'Guest details fetched',
+        );
+    }
+
+    public function store(StoreResortGuestRequest $request)
+    {
+        $tenantId = $this->resolveTenantId($request);
+        if (! $tenantId) {
+            return $this->errorResponse('No tenant context', null, 422);
+        }
+
+        $guest = $this->guests->store($tenantId, $request->validated());
+
+        return $this->successResponse($guest, 'Guest account created', 201);
+    }
+
+    public function update(UpdateResortGuestRequest $request, string $guestKey)
+    {
+        $tenantId = $this->resolveTenantId($request);
+        if (! $tenantId) {
+            return $this->errorResponse('No tenant context', null, 422);
+        }
+
+        return $this->successResponse(
+            $this->guests->update($tenantId, $guestKey, $request->validated()),
+            'Guest updated',
+        );
+    }
+
+    public function destroy(Request $request, string $guestKey)
+    {
+        $tenantId = $this->resolveTenantId($request);
+        if (! $tenantId) {
+            return $this->errorResponse('No tenant context', null, 422);
+        }
+
+        $this->guests->destroy($tenantId, $guestKey);
+
+        return $this->successResponse(null, 'Guest removed');
     }
 
     public function reservationsForGuest(Request $request, string $guestKey)
@@ -91,25 +184,9 @@ class ResortGuestController extends Controller
             return $this->errorResponse('Forbidden.', null, 403);
         }
 
-        $guestKey = rawurldecode($guestKey);
-        $keyExpr = ResortGuestKey::sqlExpression();
-        $keyExprSub = str_replace(
-            ['reservations.', 'users.'],
-            ['reservations_sub.', 'users_sub.'],
-            $keyExpr
-        );
         $perPage = min(100, max(1, (int) $request->integer('perPage', 20)));
 
-        $query = Reservation::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereExists(function ($sub) use ($tenantId, $guestKey, $keyExprSub): void {
-                $sub->selectRaw('1')
-                    ->from('reservations as reservations_sub')
-                    ->leftJoin('users as users_sub', 'users_sub.id', '=', 'reservations_sub.client_id')
-                    ->whereColumn('reservations_sub.id', 'reservations.id')
-                    ->where('reservations_sub.tenant_id', $tenantId)
-                    ->whereRaw('('.$keyExprSub.') = ?', [$guestKey]);
-            })
+        $query = $this->guests->reservationsMatchingKey($tenantId, $guestKey)
             ->with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc', 'room:id,name'])
             ->orderByDesc('check_in_date');
 
@@ -122,5 +199,21 @@ class ResortGuestController extends Controller
             'data' => $resource->response()->getData(true),
             'errors' => null,
         ]);
+    }
+
+    private function resolveTenantId(Request $request): ?int
+    {
+        $user = $request->user();
+        $tenantId = TenantContext::tenantId() ?? $user?->tenant_id;
+
+        if (! $tenantId) {
+            return null;
+        }
+
+        if (in_array($user->role, ['resort_owner', 'admin_staff'], true) && (int) $user->tenant_id !== (int) $tenantId) {
+            abort(403, 'You are not allowed to access this resource.');
+        }
+
+        return (int) $tenantId;
     }
 }

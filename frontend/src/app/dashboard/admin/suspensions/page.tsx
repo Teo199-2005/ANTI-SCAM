@@ -3,6 +3,11 @@
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { getSuspensionList, SuspensionItem } from "@/lib/api/admin";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -13,11 +18,12 @@ export default function SuspensionsPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
 
-  const load = async (f = filter) => {
+  const load = async (f = filter, loc: LocationFilterValue = locationFilter) => {
     setLoading(true);
     try {
-      const res = await getSuspensionList({ filter: f, perPage: 50 });
+      const res = await getSuspensionList({ filter: f, perPage: 50, ...locationFilterToParams(loc) });
       setItems(res.data);
       setTotal(res.meta?.total ?? res.data.length);
       setError(null);
@@ -56,6 +62,14 @@ export default function SuspensionsPage() {
             {f === "all" ? "All" : f === "grace_period" ? "Grace Period" : "Suspended"}
           </button>
         ))}
+        <LocationFilterBar
+          label="Resort location"
+          value={locationFilter}
+          onChange={(next) => {
+            setLocationFilter(next);
+            void load(filter, next);
+          }}
+        />
         <span className="w-full text-xs text-zinc-400 sm:ml-auto sm:w-auto sm:text-right">{total} result{total !== 1 ? "s" : ""}</span>
       </div>
 

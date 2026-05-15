@@ -65,6 +65,34 @@ type Paginated<T> = {
   meta?: { current_page: number; last_page: number; total: number; per_page: number };
 };
 
+export type AdminLocationStatRow = {
+  province_psgc?: string;
+  province_name?: string;
+  city_psgc?: string;
+  city_name?: string;
+  resort_count: number;
+  owner_count: number;
+};
+
+export type AdminLocationStats = {
+  by_province: AdminLocationStatRow[];
+  by_city: AdminLocationStatRow[];
+  filtered_totals: { resort_count: number; owner_count: number };
+};
+
+export async function getAdminLocationStats(params?: {
+  province_psgc?: string | null;
+  city_municipality_psgc?: string | null;
+}): Promise<AdminLocationStats> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminLocationStats>>("/admin/location-stats", {
+    params: {
+      province_psgc: params?.province_psgc ?? undefined,
+      city_municipality_psgc: params?.city_municipality_psgc ?? undefined,
+    },
+  });
+  return data.data;
+}
+
 export async function getAdminStats(): Promise<AdminStats> {
   const { data } = await apiClient.get<ApiEnvelope<AdminStats>>("/admin/stats");
   const payload = data.data;
@@ -197,7 +225,13 @@ export async function getXenditLogs(params?: { perPage?: number; page?: number }
   return data.data;
 }
 
-export async function getSuspensionList(params?: { filter?: string; perPage?: number; page?: number }): Promise<Paginated<SuspensionItem>> {
+export async function getSuspensionList(params?: {
+  filter?: string;
+  perPage?: number;
+  page?: number;
+  province_psgc?: string | null;
+  city_municipality_psgc?: string | null;
+}): Promise<Paginated<SuspensionItem>> {
   const { data } = await apiClient.get<ApiEnvelope<Paginated<SuspensionItem>>>("/admin/suspensions", { params });
   return data.data;
 }
@@ -242,9 +276,18 @@ export async function getAssignableOwners(): Promise<AssignableOwner[]> {
   return data.data;
 }
 
-export async function getAdminSubscriptionOverview(): Promise<AdminSubscriptionOverviewItem[]> {
+export async function getAdminSubscriptionOverview(params?: {
+  province_psgc?: string | null;
+  city_municipality_psgc?: string | null;
+}): Promise<AdminSubscriptionOverviewItem[]> {
   const { data } = await apiClient.get<ApiEnvelope<AdminSubscriptionOverviewItem[]>>(
     "/admin/subscriptions/overview",
+    {
+      params: {
+        province_psgc: params?.province_psgc ?? undefined,
+        city_municipality_psgc: params?.city_municipality_psgc ?? undefined,
+      },
+    },
   );
   return data.data;
 }
@@ -494,9 +537,16 @@ export type AdminMarketerMonitoringPayload = {
   };
 };
 
-export async function getAdminMarketersMonitoring(search?: string): Promise<AdminMarketerMonitoringPayload> {
+export async function getAdminMarketersMonitoring(
+  search?: string,
+  location?: { province_psgc?: string | null; city_municipality_psgc?: string | null },
+): Promise<AdminMarketerMonitoringPayload> {
   const { data } = await apiClient.get<ApiEnvelope<AdminMarketerMonitoringPayload>>("/admin/marketers/monitoring", {
-    params: search?.trim() ? { search: search.trim() } : undefined,
+    params: {
+      ...(search?.trim() ? { search: search.trim() } : {}),
+      province_psgc: location?.province_psgc ?? undefined,
+      city_municipality_psgc: location?.city_municipality_psgc ?? undefined,
+    },
   });
   const raw = data.data;
   const meta = raw?.meta && typeof raw.meta === "object" ? (raw.meta as Record<string, unknown>) : {};

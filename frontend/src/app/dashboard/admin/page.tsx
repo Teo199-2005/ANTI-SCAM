@@ -3,7 +3,12 @@
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
 import StatCard from "@/components/dashboard/StatCard";
-import { getAdminStats, AdminStats } from "@/lib/api/admin";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
+import { getAdminLocationStats, getAdminStats, type AdminLocationStats, AdminStats } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { color, kpiTone } from "@/lib/design-tokens";
 import {
@@ -37,6 +42,9 @@ function percent(value: number, total: number): number {
 
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [locationStats, setLocationStats] = useState<AdminLocationStats | null>(null);
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
+  const [locationStatsLoading, setLocationStatsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +65,25 @@ export default function AdminOverviewPage() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLocationStatsLoading(true);
+      try {
+        const data = await getAdminLocationStats(locationFilterToParams(locationFilter));
+        if (!cancelled) setLocationStats(data);
+      } catch {
+        if (!cancelled) setLocationStats(null);
+      } finally {
+        if (!cancelled) setLocationStatsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [locationFilter]);
 
   if (loading) {
     return (
@@ -114,6 +141,65 @@ export default function AdminOverviewPage() {
         <StatCard compact label="Total reservations" value={stats.totalReservations}                    icon={CalendarDays} iconTone="sky" />
         <StatCard compact label="Total revenue"      value={`₱${stats.totalRevenue.toLocaleString()}`} icon={DollarSign}   iconTone="emerald" />
       </div>
+
+      <DashCard className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
+              <Globe2 size={16} className="text-clOcean" />
+            </div>
+            <div>
+              <h2 className="font-dash text-base font-semibold text-navy">Owners & resorts by location</h2>
+              <p className="text-xs text-zinc-500">Filter by resort address (PSGC)</p>
+            </div>
+          </div>
+          <LocationFilterBar label="Resort location" value={locationFilter} onChange={setLocationFilter} />
+        </div>
+        {locationStatsLoading ? (
+          <p className="px-6 py-8 text-sm text-zinc-500">Loading location breakdown…</p>
+        ) : locationStats ? (
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex flex-wrap gap-4 text-sm">
+              <p>
+                <span className="text-zinc-500">Resorts in filter:</span>{" "}
+                <span className="font-semibold text-navy">{locationStats.filtered_totals.resort_count}</span>
+              </p>
+              <p>
+                <span className="text-zinc-500">Resort owners in filter:</span>{" "}
+                <span className="font-semibold text-navy">{locationStats.filtered_totals.owner_count}</span>
+              </p>
+            </div>
+            {(locationFilter.cityPsgc ? locationStats.by_city : locationStats.by_province).length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="dash-table">
+                  <thead>
+                    <tr>
+                      <th>{locationFilter.cityPsgc ? "City / municipality" : "Province"}</th>
+                      <th>Resorts</th>
+                      <th>Owners</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(locationFilter.cityPsgc ? locationStats.by_city : locationStats.by_province)
+                      .slice(0, 12)
+                      .map((row) => (
+                        <tr key={row.city_psgc ?? row.province_psgc}>
+                          <td className="font-medium text-navy">{row.city_name ?? row.province_name ?? "—"}</td>
+                          <td>{row.resort_count}</td>
+                          <td>{row.owner_count}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500">No resorts with address data in this area yet.</p>
+            )}
+          </div>
+        ) : (
+          <p className="px-6 py-8 text-sm text-zinc-500">Location stats unavailable.</p>
+        )}
+      </DashCard>
 
       {/* ── Minimal KPI split: ratios left, growth right ─────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

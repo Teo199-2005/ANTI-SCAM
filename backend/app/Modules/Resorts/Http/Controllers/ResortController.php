@@ -22,6 +22,8 @@ class ResortController extends Controller
 
     public function index(Request $request)
     {
+        $location = \App\Support\ResortLocationQuery::fromRequest($request);
+
         $resorts = ResortResource::collection(
             $this->service->list(
                 $request->user(),
@@ -29,6 +31,8 @@ class ResortController extends Controller
                 $request->string('search')->value(),
                 $request->string('sort_by')->value(),
                 $request->string('sort_dir')->value(),
+                $location['province_psgc'],
+                $location['city_municipality_psgc'],
             )
         );
 

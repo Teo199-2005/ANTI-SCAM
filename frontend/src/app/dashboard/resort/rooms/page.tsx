@@ -1,5 +1,7 @@
 "use client";
 
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import RoomModal, { RoomFormValues } from "@/components/dashboard/RoomModal";
 import DashModal from "@/components/dash/DashModal";
@@ -24,7 +26,9 @@ import {
   slotPrepayTotal,
   type SlotPrepayDuration,
 } from "@/lib/billing/slotPrepay";
+import { bulkDeleteRooms, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { buildStoredAmenitiesArray } from "@/lib/roomInclusions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import {
@@ -91,6 +95,8 @@ export default function ResortRoomsPage() {
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [confirmDelete, setConfirmDelete] = useState<RoomItem | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   /** After POST /rooms succeeds, we keep the modal open with this id for the Photos tab. */
   const [createRoomId, setCreateRoomId] = useState<number | null>(null);
@@ -102,6 +108,7 @@ export default function ResortRoomsPage() {
   const [roomAddonDuration, setRoomAddonDuration] = useState<SlotPrepayDuration>(1);
   const [error, setError] = useState<string | null>(null);
   const { pushToast } = useToast();
+  const bulk = useBulkSelection(rooms, (r) => r.id);
 
   const hydrateResort = async (): Promise<ResortItem | null> => {
     const resorts = await listResorts({ perPage: 10 });
@@ -233,11 +240,38 @@ export default function ResortRoomsPage() {
       await apiClient.delete(`/rooms/${roomId}`);
       const r = await hydrateResort();
       if (r?.id) await refetchRooms(r.id, page, perPage, sortBy, sortDir);
+      bulk.clear();
       pushToast({ title: "Room deleted", tone: "success" });
     } catch (err) {
       pushToast({ title: "Delete failed", description: parseApiErrorMessage(err, "Unable to delete room."), tone: "error" });
     } finally {
       setConfirmDelete(null);
+    }
+  };
+
+  const onBulkDelete = async () => {
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const result = await bulkDeleteRooms(ids);
+      const r = await hydrateResort();
+      if (r?.id) await refetchRooms(r.id, page, perPage, sortBy, sortDir);
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Rooms deleted",
+        description: bulkDeleteToastDescription(result),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete selected rooms."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
     }
   };
 
@@ -531,6 +565,13 @@ export default function ResortRoomsPage() {
 
       {error !== "no_resort_workspace" ? (
         <>
+          <BulkActionBar
+            count={bulk.selectedCount}
+            onClear={bulk.clear}
+            onDelete={() => setConfirmBulkDelete(true)}
+            deleting={bulkDeleting}
+            deleteLabel="Delete selected rooms"
+          />
           <div className="md:hidden">
             {loading && rooms.length === 0 ? (
               <div className="rounded-2xl border border-softBorder bg-softCard p-8 text-center text-sm text-zinc-600">
@@ -550,6 +591,11 @@ export default function ResortRoomsPage() {
                       key={room.id}
                       title={
                         <span className="inline-flex items-center gap-2">
+                          <BulkSelectMobile
+                            checked={bulk.isSelected(room.id)}
+                            onChange={() => bulk.toggle(room.id)}
+                            ariaLabel={`Select ${room.name}`}
+                          />
                           <BedDouble size={16} className="shrink-0 text-skyBlue" />
                           {room.name}
                         </span>
@@ -604,6 +650,14 @@ export default function ResortRoomsPage() {
               minWidthClass="min-w-[820px]"
               scrollRegionLabel="Room inventory — swipe sideways to see all columns"
               footer={paginationFooter}
+              leadingHeader={
+                <BulkSelectTh
+                  checked={bulk.isAllSelected}
+                  indeterminate={bulk.isSomeSelected}
+                  onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
+                  disabled={loading || rooms.length === 0}
+                />
+              }
               headers={
                 <>
                   <SortableTh label="Name" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
@@ -622,10 +676,15 @@ export default function ResortRoomsPage() {
                 isEmpty={!loading && totalRows === 0}
                 emptyText="No rooms found. Create your first room to begin accepting reservations."
                 withinTable
-                colSpan={7}
+                colSpan={8}
               >
                 {rooms.map((room) => (
                   <tr key={room.id}>
+                    <BulkSelectTd
+                      checked={bulk.isSelected(room.id)}
+                      onChange={() => bulk.toggle(room.id)}
+                      ariaLabel={`Select ${room.name}`}
+                    />
                     <td>
                       <p className="inline-flex items-center gap-2 font-medium text-navy">
                         <BedDouble size={14} className="text-skyBlue" />
@@ -673,6 +732,16 @@ export default function ResortRoomsPage() {
         </>
       ) : null}
 
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected rooms?"
+        description={`Delete ${bulk.selectedCount} room${bulk.selectedCount === 1 ? "" : "s"} on this page. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        tone="danger"
+        loading={bulkDeleting}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void onBulkDelete()}
+      />
       <ConfirmDialog
         open={Boolean(confirmDelete)}
         title="Delete room?"

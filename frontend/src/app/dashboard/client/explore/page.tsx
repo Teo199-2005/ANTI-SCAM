@@ -1,5 +1,10 @@
 "use client";
 
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import { getFavoriteResortIds, toggleFavoriteResortId } from "@/lib/client/favorites";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
@@ -16,12 +21,18 @@ export default function ExplorePage() {
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
 
-  const load = useCallback(async (q: string, pg: number) => {
+  const load = useCallback(async (q: string, pg: number, loc: LocationFilterValue) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await listPublicResorts({ search: q || undefined, perPage: 12, page: pg });
+      const result = await listPublicResorts({
+        search: q || undefined,
+        perPage: 12,
+        page: pg,
+        ...locationFilterToParams(loc),
+      });
       setResorts(result?.data ?? []);
       setLastPage(result?.meta?.last_page ?? 1);
     } catch (err) {
@@ -43,13 +54,13 @@ export default function ExplorePage() {
   }, []);
 
   useEffect(() => {
-    void load("", 1);
-  }, [load]);
+    void load("", 1, locationFilter);
+  }, [load, locationFilter]);
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    void load(search, 1);
+    void load(search, 1, locationFilter);
   };
 
   const onToggleFav = (id: number) => {
@@ -79,6 +90,14 @@ export default function ExplorePage() {
           <button type="submit" className="dash-btn-primary shrink-0">
             Search
           </button>
+          <LocationFilterBar
+            label="Resort location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+            }}
+          />
         </form>
       </div>
 
@@ -136,7 +155,7 @@ export default function ExplorePage() {
             onClick={() => {
               const p = page - 1;
               setPage(p);
-              void load(search, p);
+              void load(search, p, locationFilter);
             }}
             className="dash-btn-sm disabled:opacity-40"
           >
@@ -151,7 +170,7 @@ export default function ExplorePage() {
             onClick={() => {
               const p = page + 1;
               setPage(p);
-              void load(search, p);
+              void load(search, p, locationFilter);
             }}
             className="dash-btn-sm disabled:opacity-40"
           >

@@ -1,14 +1,21 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile } from "@/components/shared/BulkSelectCheckbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { useToast } from "@/components/shared/ToastProvider";
 import { ResortRoomDetailsBookingModal } from "@/components/resort-page/ResortRoomDetailsBookingModal";
 import type { LandingComputedRoom } from "@/lib/api/landingPage";
 import { apiClient } from "@/lib/api/client";
+import { bulkDeleteGuestFavorites, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { amenityMeta, extractRoomMeta, formatPhp, formatPhpPerNight } from "@/lib/roomPreviewDisplay";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 import { BedDouble, Heart, ImageOff, Loader2, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type RoomRow = {
   id: number;
@@ -37,12 +44,18 @@ function roomRowToLanding(r: RoomRow): LandingComputedRoom {
 }
 
 export default function GuestRoomsPage() {
+  const { pushToast } = useToast();
   const [resort, setResort] = useState<GuestResort | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<LandingComputedRoom | null>(null);
   const [rooms, setRooms] = useState<RoomRow[]>([]);
   const [favIds, setFavIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmBulkRemove, setConfirmBulkRemove] = useState(false);
+  const [bulkRemoving, setBulkRemoving] = useState(false);
+
+  const favoriteRooms = useMemo(() => rooms.filter((r) => favIds.has(r.id)), [rooms, favIds]);
+  const bulk = useBulkSelection(favoriteRooms, (r) => r.id);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +96,7 @@ export default function GuestRoomsPage() {
           n.delete(roomId);
           return n;
         });
+        if (bulk.isSelected(roomId)) bulk.toggle(roomId);
       } else {
         await apiClient.post("/guest/favorites", { room_id: roomId });
         setFavIds((prev) => new Set(prev).add(roomId));
@@ -92,12 +106,49 @@ export default function GuestRoomsPage() {
     }
   };
 
+  const onBulkRemoveFavorites = async () => {
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkRemoving(true);
+    try {
+      const result = await bulkDeleteGuestFavorites(ids);
+      setFavIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk remove completed with errors" : "Favorites removed",
+        description: bulkDeleteToastDescription(result),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk remove failed",
+        description: parseApiErrorMessage(err, "Could not remove selected favorites."),
+        tone: "error",
+      });
+    } finally {
+      setBulkRemoving(false);
+      setConfirmBulkRemove(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="dash-page-title">Rooms at your resort</h1>
         <p className="dash-page-sub">Active listings you can book. Save favorites for quick access.</p>
       </div>
+
+      <BulkActionBar
+        count={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setConfirmBulkRemove(true)}
+        deleting={bulkRemoving}
+        deleteLabel="Remove from favorites"
+      />
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-zinc-500">
@@ -110,6 +161,7 @@ export default function GuestRoomsPage() {
           {rooms.map((room) => {
             const primaryImage = room.images[0];
             const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities ?? []);
+            const isFav = favIds.has(room.id);
             return (
               <article
                 key={room.id}
@@ -142,9 +194,21 @@ export default function GuestRoomsPage() {
                       <span>No photo yet</span>
                     </div>
                   )}
+                  {isFav ? (
+                    <div
+                      className="absolute left-2 top-2 z-10 rounded-lg border border-white/80 bg-white/90 p-1.5 shadow-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <BulkSelectMobile
+                        checked={bulk.isSelected(room.id)}
+                        onChange={() => bulk.toggle(room.id)}
+                        ariaLabel={`Select ${room.name} for bulk remove`}
+                      />
+                    </div>
+                  ) : null}
                   <button
                     type="button"
-                    aria-label={favIds.has(room.id) ? "Remove from favorites" : "Add to favorites"}
+                    aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
                     className="absolute right-2 top-2 z-10 rounded-lg border border-white/80 bg-white/90 p-2 text-rose-500 shadow-sm backdrop-blur-sm transition hover:bg-white"
                     disabled={busyId === room.id}
                     onClick={(e) => void toggleFav(e, room.id)}
@@ -152,7 +216,7 @@ export default function GuestRoomsPage() {
                     {busyId === room.id ? (
                       <Loader2 className="animate-spin" size={16} />
                     ) : (
-                      <Heart size={16} className={favIds.has(room.id) ? "fill-current" : ""} />
+                      <Heart size={16} className={isFav ? "fill-current" : ""} />
                     )}
                   </button>
                 </div>
@@ -237,6 +301,17 @@ export default function GuestRoomsPage() {
           onClose={() => setSelectedRoom(null)}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={confirmBulkRemove}
+        title="Remove from favorites?"
+        description={`Remove ${bulk.selectedCount} saved room${bulk.selectedCount === 1 ? "" : "s"} from your favorites.`}
+        confirmLabel="Remove selected"
+        tone="danger"
+        loading={bulkRemoving}
+        onCancel={() => setConfirmBulkRemove(false)}
+        onConfirm={() => void onBulkRemoveFavorites()}
+      />
     </div>
   );
 }

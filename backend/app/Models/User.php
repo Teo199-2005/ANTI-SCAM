@@ -115,6 +115,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Resort::class, 'marketer_resorts', 'marketer_id', 'resort_id');
     }
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function homeResort(): BelongsTo
     {
         return $this->belongsTo(Resort::class, 'home_resort_id');

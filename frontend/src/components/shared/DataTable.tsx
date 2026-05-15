@@ -5,6 +5,8 @@ import { ReactNode } from "react";
 
 type DataTableProps = {
   headers: ReactNode;
+  /** Optional leading column (e.g. bulk-select checkbox header). */
+  leadingHeader?: ReactNode;
   children: ReactNode;
   minWidthClass?: string;
   caption?: string;
@@ -18,6 +20,7 @@ type DataTableProps = {
 
 export default function DataTable({
   headers,
+  leadingHeader,
   children,
   minWidthClass = "min-w-[640px]",
   caption,
@@ -39,7 +42,10 @@ export default function DataTable({
       >
         <table className={cn("dash-table", minWidthClass, splitBodyRows && "dash-table--split-pairs")}>
           <thead>
-            <tr>{headers}</tr>
+            <tr>
+              {leadingHeader}
+              {headers}
+            </tr>
           </thead>
           <tbody>{children}</tbody>
         </table>

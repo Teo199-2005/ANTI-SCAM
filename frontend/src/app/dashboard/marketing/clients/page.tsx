@@ -2,6 +2,11 @@
 
 import DashCard from "@/components/dash/DashCard";
 import { useToast } from "@/components/shared/ToastProvider";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { getMarketingClients, type MarketingClientRow } from "@/lib/api/marketing";
 import { ChevronLeft, ChevronRight, Gift, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -200,12 +205,13 @@ export default function MarketingClientsPage() {
     trial_active_total: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
 
   const load = useCallback(
-    async (p: number) => {
+    async (p: number, loc: LocationFilterValue = locationFilter) => {
       setLoading(true);
       try {
-        const res = await getMarketingClients({ page: p, perPage });
+        const res = await getMarketingClients({ page: p, perPage, ...locationFilterToParams(loc) });
         setRows(res.clients);
         setMeta(res.meta);
         setTierPolicy(res.tier_policy);
@@ -217,7 +223,7 @@ export default function MarketingClientsPage() {
         setLoading(false);
       }
     },
-    [perPage, pushToast],
+    [locationFilter, perPage, pushToast],
   );
 
   useEffect(() => {
@@ -253,6 +259,14 @@ export default function MarketingClientsPage() {
               </p>
             </div>
           </div>
+          <LocationFilterBar
+            label="Client resort location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              void load(1, next);
+            }}
+          />
         </div>
 
         {loading ? (

@@ -291,9 +291,19 @@ function mapMarketingClientRow(o: Record<string, unknown>): MarketingClientRow {
   };
 }
 
-export async function getMarketingClients(params?: { page?: number; perPage?: number }): Promise<MarketingClientsPayload> {
+export async function getMarketingClients(params?: {
+  page?: number;
+  perPage?: number;
+  province_psgc?: string | null;
+  city_municipality_psgc?: string | null;
+}): Promise<MarketingClientsPayload> {
   const { data } = await apiClient.get<ApiEnvelope<Record<string, unknown>>>("/dashboard/marketing/clients", {
-    params: { page: params?.page, perPage: params?.perPage },
+    params: {
+      page: params?.page,
+      perPage: params?.perPage,
+      province_psgc: params?.province_psgc ?? undefined,
+      city_municipality_psgc: params?.city_municipality_psgc ?? undefined,
+    },
   });
   const raw = (data.data ?? {}) as Record<string, unknown>;
   const metaRaw = raw.meta as Record<string, unknown> | undefined;

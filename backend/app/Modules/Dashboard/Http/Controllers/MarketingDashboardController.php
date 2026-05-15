@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\ReferralSignupAttribution;
+use App\Models\Resort;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
+use App\Support\ResortLocationQuery;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\MarketerTierService;
 use App\Services\ReferralSignupTrialService;
@@ -217,6 +219,15 @@ class MarketingDashboardController extends Controller
                     $trialActiveTotal++;
                 }
             }
+        }
+
+        $location = ResortLocationQuery::fromRequest($request);
+        if ($location['province_psgc'] !== null || $location['city_municipality_psgc'] !== null) {
+            $clients = $this->filterMarketingClientsByResortLocation(
+                $clients,
+                $location['province_psgc'],
+                $location['city_municipality_psgc'],
+            );
         }
 
         usort($clients, static fn (array $a, array $b): int => $b['sort_at'] <=> $a['sort_at']);
@@ -437,5 +448,45 @@ class MarketingDashboardController extends Controller
             'by_resort' => $byResort,
             'totals' => $totals,
         ], 'Marketing analytics');
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $clients
+     * @return list<array<string, mixed>>
+     */
+    private function filterMarketingClientsByResortLocation(array $clients, ?string $provincePsgc, ?string $cityPsgc): array
+    {
+        $tenantIds = collect($clients)
+            ->pluck('tenant_id')
+            ->filter()
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $matchingTenants = [];
+        if ($tenantIds !== []) {
+            $q = Resort::withoutGlobalScopes()->whereIn('tenant_id', $tenantIds);
+            ResortLocationQuery::applyToResortColumns($q, $provincePsgc, $cityPsgc);
+            $matchingTenants = $q->distinct()->pluck('tenant_id')->map(static fn ($id): int => (int) $id)->all();
+        }
+
+        $matchingUserIds = [];
+        if ($provincePsgc !== null || $cityPsgc !== null) {
+            $userQ = User::query()->where('role', 'resort_owner')->whereIn('id', collect($clients)->pluck('referred_user_id')->filter());
+            ResortLocationQuery::whereUserTenantHasResortLocation($userQ, $provincePsgc, $cityPsgc);
+            $matchingUserIds = $userQ->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        }
+
+        return array_values(array_filter($clients, function (array $row) use ($matchingTenants, $matchingUserIds): bool {
+            $tenantId = $row['tenant_id'] ?? null;
+            if ($tenantId !== null && in_array((int) $tenantId, $matchingTenants, true)) {
+                return true;
+            }
+
+            $userId = $row['referred_user_id'] ?? null;
+
+            return $userId !== null && in_array((int) $userId, $matchingUserIds, true);
+        }));
     }
 }

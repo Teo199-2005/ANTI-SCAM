@@ -28,6 +28,10 @@ function isTenantLocalhostHostname(hostname: string): boolean {
   return h.endsWith(".localhost") && h !== "localhost";
 }
 
+function hasValidPin(latitude: number | null, longitude: number | null): boolean {
+  return latitude != null && longitude != null && Number.isFinite(latitude) && Number.isFinite(longitude);
+}
+
 /** Lines to paste under “Website restrictions” for the Maps JS key (exact origin first — wildcards on *.localhost are unreliable). */
 function buildMapsReferrerPasteList(pageOrigin: string): string {
   const lines: string[] = [];
@@ -110,8 +114,7 @@ export default function ResortMapPinPicker({
         if (cancelled || !containerRef.current) return;
         googleNsRef.current = googleNs as GoogleMapsNs;
 
-        const hasPin =
-          latitude != null && longitude != null && Number.isFinite(latitude) && Number.isFinite(longitude);
+        const hasPin = hasValidPin(latitude, longitude);
         const center = hasPin ? { lat: latitude as number, lng: longitude as number } : PH_CENTER;
 
         const map = new googleNs.maps.Map(containerRef.current, {
@@ -193,8 +196,10 @@ export default function ResortMapPinPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init map once per mount / key
   }, [apiKey, disabled]);
 
-  /** Pan map to selected province + city (PSGC resolved to a geocode query). */
+  /** Pan map to province + city only when no saved pin — pinned coordinates always take priority. */
   useEffect(() => {
+    if (hasValidPin(latitude, longitude)) return;
+
     const q = regionGeocodeQuery?.trim();
     if (!q || mapEpoch === 0) return;
 
@@ -202,11 +207,11 @@ export default function ResortMapPinPicker({
     const t = window.setTimeout(() => {
       const map = mapRef.current;
       const g = googleNsRef.current;
-      if (!map || !g || cancelled) return;
+      if (!map || !g || cancelled || hasValidPin(latitude, longitude)) return;
 
       const geocoder = new g.maps.Geocoder();
       void geocoder.geocode({ address: q }, (results, status) => {
-        if (cancelled || !mapRef.current) return;
+        if (cancelled || !mapRef.current || hasValidPin(latitude, longitude)) return;
         if (status !== "OK" || !results?.[0]?.geometry?.location) return;
         const loc = results[0].geometry.location;
         mapRef.current.panTo(loc);
@@ -222,15 +227,14 @@ export default function ResortMapPinPicker({
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [regionGeocodeQuery, mapEpoch]);
+  }, [regionGeocodeQuery, mapEpoch, latitude, longitude]);
 
   useEffect(() => {
     const map = mapRef.current;
     const marker = markerRef.current;
     if (!map || !marker) return;
 
-    const hasPin =
-      latitude != null && longitude != null && Number.isFinite(latitude) && Number.isFinite(longitude);
+    const hasPin = hasValidPin(latitude, longitude);
     if (hasPin) {
       const pos = { lat: latitude as number, lng: longitude as number };
       marker.setPosition(pos);
@@ -259,9 +263,14 @@ export default function ResortMapPinPicker({
     <div className="space-y-2">
       <p className="text-xs text-zinc-500">
         Click the map or drag the pin to set the exact location shown on your public page.
-        {regionGeocodeQuery?.trim() ? (
+        {hasValidPin(latitude, longitude) ? (
           <span className="mt-1 block text-[11px] text-zinc-400">
-            The map recenters on your selected city/municipality when both are chosen (enable{" "}
+            Your saved pin is shown on the map. Changing province or city does not move it — use{" "}
+            <strong>Clear map pin</strong> to recenter on your selected location.
+          </span>
+        ) : regionGeocodeQuery?.trim() ? (
+          <span className="mt-1 block text-[11px] text-zinc-400">
+            With no pin yet, the map centers on your selected city/municipality (enable{" "}
             <strong>Geocoding API</strong> on the same browser key if it stays on the Philippines view).
           </span>
         ) : null}

@@ -1,5 +1,10 @@
 "use client";
 
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { listResorts, ResortItem, updateResort } from "@/lib/api/resort";
 import { setResortVip } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -47,9 +52,17 @@ export default function AdminResortsPage() {
   const [perPage, setPerPage] = useState(15);
   const [sortBy, setSortBy] = useState<string>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const { pushToast } = useToast();
 
-  const load = async (s: string, pg: number, pp: number, sb: string, sd: SortDir) => {
+  const load = async (
+    s: string,
+    pg: number,
+    pp: number,
+    sb: string,
+    sd: SortDir,
+    loc: LocationFilterValue = locationFilter,
+  ) => {
     setLoading(true);
     try {
       const res = await listResorts({
@@ -58,6 +71,7 @@ export default function AdminResortsPage() {
         page: pg,
         sort_by: sb,
         sort_dir: sd,
+        ...locationFilterToParams(loc),
       });
       setResorts(res.data ?? []);
       setMeta(extractLaravelMeta(res));
@@ -222,6 +236,15 @@ export default function AdminResortsPage() {
           <button type="submit" className="dash-btn-primary shrink-0">
             Search
           </button>
+          <LocationFilterBar
+            label="Resort location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+              void load(search, 1, perPage, sortBy, sortDir, next);
+            }}
+          />
         </form>
         {search ? <p className="mt-2 text-xs text-zinc-600">Results for &quot;{search}&quot;</p> : null}
       </div>

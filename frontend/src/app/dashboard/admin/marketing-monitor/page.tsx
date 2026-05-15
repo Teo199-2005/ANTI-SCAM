@@ -7,6 +7,11 @@ import DataTable from "@/components/shared/DataTable";
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import MarketerTierBadge, { marketerTierSortRank } from "@/components/dashboard/MarketerTierBadge";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import {
   getAdminMarketersMonitoring,
   type AdminMarketerMonitorRow,
@@ -73,12 +78,13 @@ export default function AdminMarketingMonitorPage() {
   const [perPage, setPerPage] = useState(10);
   const [sortBy, setSortBy] = useState<string>("months_since_last_new_referred_resort");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
 
-  const load = useCallback(async (search: string) => {
+  const load = useCallback(async (search: string, loc: LocationFilterValue = locationFilter) => {
     setLoading(true);
     setError(null);
     try {
-      const payload = await getAdminMarketersMonitoring(search || undefined);
+      const payload = await getAdminMarketersMonitoring(search || undefined, locationFilterToParams(loc));
       setRows(payload.rows);
       setMeta(payload.meta);
     } catch (err) {
@@ -88,7 +94,7 @@ export default function AdminMarketingMonitorPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [locationFilter]);
 
   useEffect(() => {
     void load("");
@@ -228,6 +234,15 @@ export default function AdminMarketingMonitorPage() {
             <button type="submit" className="dash-btn-primary shrink-0">
               Search
             </button>
+            <LocationFilterBar
+              label="Mailing address"
+              value={locationFilter}
+              onChange={(next) => {
+                setLocationFilter(next);
+                setPage(1);
+                void load(applied, next);
+              }}
+            />
           </form>
           <button
             type="button"

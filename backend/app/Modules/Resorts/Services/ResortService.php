@@ -6,6 +6,7 @@ use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\PhilippineLocationService;
+use App\Support\ResortLocationQuery;
 use App\Support\SafeSort;
 use App\Support\TenantPublicIdentifier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -17,8 +18,15 @@ class ResortService
         private readonly PhilippineLocationService $locations,
     ) {}
 
-    public function list(User $user, int $perPage = 10, ?string $search = null, ?string $sortBy = null, ?string $sortDir = null): LengthAwarePaginator
-    {
+    public function list(
+        User $user,
+        int $perPage = 10,
+        ?string $search = null,
+        ?string $sortBy = null,
+        ?string $sortDir = null,
+        ?string $provincePsgc = null,
+        ?string $cityPsgc = null,
+    ): LengthAwarePaginator {
         $query = Resort::query()
             ->with('subscription')
             ->with('tenant:id,subdomain')
@@ -35,6 +43,8 @@ class ResortService
         if ($user->role !== 'admin') {
             $query->where('tenant_id', $user->tenant_id);
         }
+
+        ResortLocationQuery::applyToResortColumns($query, $provincePsgc, $cityPsgc);
 
         SafeSort::apply($query, $sortBy, $sortDir, ['name', 'created_at', 'address_label'], 'created_at', 'desc');
 

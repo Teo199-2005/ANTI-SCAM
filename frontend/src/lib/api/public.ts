@@ -70,10 +70,24 @@ type PaginatedResponse<T> = {
   links?: Record<string, string | null>;
 };
 
-export async function listPublicResorts(params?: { search?: string; perPage?: number; page?: number }) {
+export async function listPublicResorts(params?: {
+  search?: string;
+  perPage?: number;
+  page?: number;
+  province_psgc?: string | null;
+  city_municipality_psgc?: string | null;
+}) {
   const { data } = await apiClient.get<ApiEnvelope<PaginatedResponse<PublicResortListItem>>>(
     "/public/resorts",
-    { params }
+    {
+      params: {
+        ...params,
+        province_code: params?.province_psgc ?? undefined,
+        city_code: params?.city_municipality_psgc ?? undefined,
+        province_psgc: undefined,
+        city_municipality_psgc: undefined,
+      },
+    },
   );
   return data.data;
 }

@@ -13,6 +13,11 @@ import {
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { getAdminSubscriptionOverview } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { ResortItem } from "@/lib/api/resort";
@@ -52,12 +57,13 @@ export default function AdminSubscriptionsPage() {
   const [perPage, setPerPage] = useState(15);
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const { pushToast } = useToast();
 
-  const load = async () => {
+  const load = async (loc: LocationFilterValue = locationFilter) => {
     setLoading(true);
     try {
-      const overview = await getAdminSubscriptionOverview();
+      const overview = await getAdminSubscriptionOverview(locationFilterToParams(loc));
       setResorts(overview);
       setLatestInvoiceStatus(
         Object.fromEntries(overview.map((resort) => [resort.id, resort.latest_invoice_status ?? "none"])),
@@ -182,6 +188,17 @@ export default function AdminSubscriptionsPage() {
           Subscriptions
         </h1>
         <p className="dash-page-sub">Review and refresh billing subscriptions for all resorts.</p>
+        <div className="dash-filter-bar mt-5">
+          <LocationFilterBar
+            label="Resort location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+              void load(next);
+            }}
+          />
+        </div>
       </div>
 
       <div className="md:hidden">

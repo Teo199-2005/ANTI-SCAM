@@ -5,6 +5,11 @@ import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import { useToast } from "@/components/shared/ToastProvider";
 import { updateAdminResortLandingEmbed } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { getResort, listResorts, type ResortItem } from "@/lib/api/resort";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { siteUrl } from "@/lib/site";
@@ -60,6 +65,7 @@ export default function AdminLandingEmbedPage() {
   const [page, setPage] = useState(1);
   const [perPage] = useState(20);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
 
   const [selectedId, setSelectedId] = useState<number | "">("");
   const [detailSubdomain, setDetailSubdomain] = useState<string | null>(null);
@@ -69,7 +75,7 @@ export default function AdminLandingEmbedPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const loadList = async (q: string, pg: number, dir: SortDir) => {
+  const loadList = async (q: string, pg: number, dir: SortDir, loc: LocationFilterValue = locationFilter) => {
     setLoadingList(true);
     try {
       const res = await listResorts({
@@ -78,6 +84,7 @@ export default function AdminLandingEmbedPage() {
         page: pg,
         sort_by: "name",
         sort_dir: dir,
+        ...locationFilterToParams(loc),
       });
       setResorts(res.data ?? []);
       setMeta(extractLaravelMeta(res));
@@ -279,6 +286,15 @@ export default function AdminLandingEmbedPage() {
           <button type="submit" className="dash-btn-secondary shrink-0">
             Search
           </button>
+          <LocationFilterBar
+            label="Resort location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+              void loadList(search, 1, sortDir, next);
+            }}
+          />
         </form>
 
         <AsyncStatePanel loading={loadingList} error={listError} isEmpty={!loadingList && resorts.length === 0}>

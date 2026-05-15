@@ -68,6 +68,8 @@ export async function listResorts(params?: {
   page?: number;
   sort_by?: string;
   sort_dir?: string;
+  province_psgc?: string | null;
+  city_municipality_psgc?: string | null;
 }) {
   const { data } = await apiClient.get<
     ApiEnvelope<ResortItem[] | { data: ResortItem[]; meta?: Record<string, unknown> }>

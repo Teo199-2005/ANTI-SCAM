@@ -1,6 +1,8 @@
 "use client";
 
 import AvailabilityCalendar from "@/components/dashboard/AvailabilityCalendar";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
@@ -11,6 +13,9 @@ import {
 } from "@/components/shared/DashTableActions";
 import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
+import { bulkDeleteAvailability, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { sanitizeLongText } from "@/lib/inputRestrictions";
 import { CalendarDays, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -51,8 +56,11 @@ export default function RoomCalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<AvailabilityRecord | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const { pushToast } = useToast();
+  const bulk = useBulkSelection(records, (r) => r.id);
 
   const load = async () => {
     if (!roomId) return;
@@ -105,12 +113,39 @@ export default function RoomCalendarPage() {
     try {
       await apiClient.delete(`/rooms/${roomId}/availability/${record.id}`);
       await load();
+      bulk.clear();
       pushToast({ title: "Date range deleted", tone: "success" });
     } catch (err) {
       pushToast({ title: "Delete failed", description: "Could not delete date range.", tone: "error" });
     } finally {
       setDeletingId(null);
       setConfirmDelete(null);
+    }
+  };
+
+  const onBulkDelete = async () => {
+    if (!roomId) return;
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const result = await bulkDeleteAvailability(Number(roomId), ids);
+      await load();
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Date ranges deleted",
+        description: bulkDeleteToastDescription(result),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Could not delete selected ranges."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
     }
   };
 
@@ -162,6 +197,13 @@ export default function RoomCalendarPage() {
 
       <div className="dash-card p-6">
         <h2 className="font-dash text-xl text-navy">Recorded date ranges</h2>
+        <BulkActionBar
+          count={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setConfirmBulkDelete(true)}
+          deleting={bulkDeleting}
+          deleteLabel="Delete selected ranges"
+        />
         <div className="mt-3">
           {records.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-600">No date ranges recorded yet.</p>
@@ -171,7 +213,16 @@ export default function RoomCalendarPage() {
                 {records.map((record) => (
                   <DashMobileTableCard
                     key={record.id}
-                    title={`${record.start_date} → ${record.end_date}`}
+                    title={
+                      <span className="inline-flex items-center gap-2">
+                        <BulkSelectMobile
+                          checked={bulk.isSelected(record.id)}
+                          onChange={() => bulk.toggle(record.id)}
+                          ariaLabel={`Select ${record.start_date} to ${record.end_date}`}
+                        />
+                        {`${record.start_date} → ${record.end_date}`}
+                      </span>
+                    }
                     fields={[
                       {
                         label: "Status",
@@ -199,6 +250,14 @@ export default function RoomCalendarPage() {
               </div>
               <div className="hidden md:block">
                 <DataTable
+                  leadingHeader={
+                    <BulkSelectTh
+                      checked={bulk.isAllSelected}
+                      indeterminate={bulk.isSomeSelected}
+                      onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
+                      disabled={records.length === 0}
+                    />
+                  }
                   headers={
                     <>
                       <th>Date range</th>
@@ -210,6 +269,11 @@ export default function RoomCalendarPage() {
                 >
                   {records.map((record) => (
                     <tr key={record.id}>
+                      <BulkSelectTd
+                        checked={bulk.isSelected(record.id)}
+                        onChange={() => bulk.toggle(record.id)}
+                        ariaLabel={`Select ${record.start_date} to ${record.end_date}`}
+                      />
                       <td className="font-medium text-navy">
                         {record.start_date} to {record.end_date}
                       </td>
@@ -241,6 +305,16 @@ export default function RoomCalendarPage() {
         </div>
       </div>
 
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected date ranges?"
+        description={`Delete ${bulk.selectedCount} recorded range${bulk.selectedCount === 1 ? "" : "s"}. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        tone="danger"
+        loading={bulkDeleting}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void onBulkDelete()}
+      />
       <ConfirmDialog
         open={Boolean(confirmDelete)}
         title="Delete date range?"

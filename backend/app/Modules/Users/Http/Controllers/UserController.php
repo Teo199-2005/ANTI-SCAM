@@ -22,12 +22,17 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
+        $location = \App\Support\ResortLocationQuery::fromRequest($request);
+
         $collection = UserResource::collection(
             $this->service->list(
                 (int) $request->integer('perPage', 10),
                 $request->string('search')->value(),
                 $request->string('sort_by')->value(),
                 $request->string('sort_dir')->value(),
+                $request->string('role')->value() ?: null,
+                $location['province_psgc'],
+                $location['city_municipality_psgc'],
             )
         );
 

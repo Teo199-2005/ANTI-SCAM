@@ -1,9 +1,16 @@
 "use client";
 
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import AdminCreateUserModal from "@/components/dashboard/AdminCreateUserModal";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
 import {
@@ -16,7 +23,9 @@ import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/share
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { useToast } from "@/components/shared/ToastProvider";
+import { bulkDeleteToastDescription, bulkDeleteUsers } from "@/lib/api/bulkDelete";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { Search, Trash2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -72,11 +81,23 @@ export default function AdminUsersPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const { pushToast } = useToast();
 
-  const load = async (q: string, pg: number, pp: number, sb: string, sd: SortDir) => {
+  const bulk = useBulkSelection(users, (u) => u.id);
+
+  const load = async (
+    q: string,
+    pg: number,
+    pp: number,
+    sb: string,
+    sd: SortDir,
+    loc: LocationFilterValue = locationFilter,
+  ) => {
     setLoading(true);
     try {
       const { data } = await apiClient.get<PaginatedEnvelope>("/users", {
@@ -86,6 +107,7 @@ export default function AdminUsersPage() {
           page: pg,
           sort_by: sb,
           sort_dir: sd,
+          ...locationFilterToParams(loc),
         },
       });
       const payload = data.data;
@@ -142,6 +164,7 @@ export default function AdminUsersPage() {
     try {
       await apiClient.delete(`/users/${id}`);
       await load(appliedQuery, page, perPage, sortBy, sortDir);
+      bulk.clear();
       pushToast({ title: "User deleted", tone: "success" });
     } catch (err) {
       pushToast({
@@ -152,6 +175,31 @@ export default function AdminUsersPage() {
     } finally {
       setDeleting(null);
       setConfirmDelete(null);
+    }
+  };
+
+  const onBulkDelete = async () => {
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const result = await bulkDeleteUsers(ids);
+      await load(appliedQuery, page, perPage, sortBy, sortDir);
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Users deleted",
+        description: bulkDeleteToastDescription(result),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete selected users."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
     }
   };
 
@@ -193,8 +241,25 @@ export default function AdminUsersPage() {
             <UserPlus size={14} />
             Add user
           </button>
+          <LocationFilterBar
+            label="Location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+              void load(appliedQuery, 1, perPage, sortBy, sortDir, next);
+            }}
+          />
         </form>
       </div>
+
+      <BulkActionBar
+        count={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setConfirmBulkDelete(true)}
+        deleting={bulkDeleting}
+        deleteLabel="Delete selected users"
+      />
 
       <div className="md:hidden">
         {loading ? (
@@ -210,6 +275,11 @@ export default function AdminUsersPage() {
                 key={u.id}
                 title={
                   <span className="inline-flex items-center gap-2">
+                    <BulkSelectMobile
+                      checked={bulk.isSelected(u.id)}
+                      onChange={() => bulk.toggle(u.id)}
+                      ariaLabel={`Select ${u.name}`}
+                    />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={avatarSrc(u.name, u.email)}
@@ -253,6 +323,14 @@ export default function AdminUsersPage() {
       <div className="hidden md:block">
         <DataTable
           footer={paginationFooter}
+          leadingHeader={
+            <BulkSelectTh
+              checked={bulk.isAllSelected}
+              indeterminate={bulk.isSomeSelected}
+              onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
+              disabled={loading || users.length === 0}
+            />
+          }
           headers={
             <>
               <SortableTh label="Name" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
@@ -263,9 +341,14 @@ export default function AdminUsersPage() {
             </>
           }
         >
-          <AsyncStatePanel loading={loading} error={error} isEmpty={users.length === 0} emptyText="No users found." withinTable colSpan={5}>
+          <AsyncStatePanel loading={loading} error={error} isEmpty={users.length === 0} emptyText="No users found." withinTable colSpan={6}>
             {users.map((u) => (
               <tr key={u.id} className="group">
+                <BulkSelectTd
+                  checked={bulk.isSelected(u.id)}
+                  onChange={() => bulk.toggle(u.id)}
+                  ariaLabel={`Select ${u.name}`}
+                />
                 <td>
                   <div className="inline-flex items-center gap-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -303,6 +386,17 @@ export default function AdminUsersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => void load(appliedQuery, page, perPage, sortBy, sortDir)}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected users?"
+        description={`Delete ${bulk.selectedCount} user${bulk.selectedCount === 1 ? "" : "s"} on this page. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        tone="danger"
+        loading={bulkDeleting}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void onBulkDelete()}
       />
 
       <ConfirmDialog

@@ -7,6 +7,8 @@ use App\Modules\Admin\Http\Controllers\AdminFinanceController;
 use App\Modules\Admin\Http\Controllers\AdminMailHealthController;
 use App\Modules\Admin\Http\Controllers\AdminOnboardController;
 use App\Modules\Admin\Http\Controllers\AdminResortLandingEmbedController;
+use App\Http\Controllers\BulkDeleteController;
+use App\Modules\Admin\Http\Controllers\AdminLocationStatsController;
 use App\Modules\Admin\Http\Controllers\AdminStatsController;
 use App\Modules\Admin\Http\Controllers\AdminSubscriptionOverviewController;
 use App\Modules\Admin\Http\Controllers\MarketingController;
@@ -128,7 +130,9 @@ Route::prefix('v1')->group(function (): void {
 
         // Admin-only routes
         Route::middleware('role:admin')->group(function (): void {
+            Route::post('/users/bulk-delete', [BulkDeleteController::class, 'users']);
             Route::get('/admin/stats', [AdminStatsController::class, 'stats']);
+            Route::get('/admin/location-stats', [AdminLocationStatsController::class, 'index']);
             Route::get('/admin/analytics', [AdminAnalyticsController::class, 'index']);
             Route::get('/admin/subscriptions/overview', [AdminSubscriptionOverviewController::class, 'index']);
             Route::get('/admin/finance/overview', [AdminFinanceController::class, 'overview']);
@@ -174,11 +178,17 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/reservations/{reservation}/notes/{note}', [StaffNoteController::class, 'destroy']);
 
         Route::middleware('role:resort_owner,admin_staff,admin')->group(function (): void {
+            Route::post('/resort/guests/bulk-delete', [BulkDeleteController::class, 'resortGuests']);
             Route::get('/resort/guests/{guestKey}/reservations', [ResortGuestController::class, 'reservationsForGuest']);
+            Route::get('/resort/guests/{guestKey}', [ResortGuestController::class, 'show']);
+            Route::patch('/resort/guests/{guestKey}', [ResortGuestController::class, 'update']);
+            Route::delete('/resort/guests/{guestKey}', [ResortGuestController::class, 'destroy']);
+            Route::post('/resort/guests', [ResortGuestController::class, 'store']);
             Route::get('/resort/guests', [ResortGuestController::class, 'index']);
         });
 
         Route::middleware('role:guest')->prefix('guest')->group(function (): void {
+            Route::post('/favorites/bulk-delete', [BulkDeleteController::class, 'guestFavorites']);
             Route::get('/resort', [GuestPortalController::class, 'resort']);
             Route::get('/rooms', [GuestPortalController::class, 'rooms']);
             Route::get('/reservations', [GuestPortalController::class, 'reservations']);
@@ -228,11 +238,13 @@ Route::prefix('v1')->group(function (): void {
         // Resources
         Route::apiResource('resorts', ResortController::class);
         Route::apiResource('users', UserController::class);
+        Route::post('/rooms/bulk-delete', [BulkDeleteController::class, 'rooms']);
         Route::apiResource('rooms', RoomController::class);
 
         // Room availability
         Route::get('/rooms/{room}/availability', [RoomController::class, 'availability']);
         Route::post('/rooms/{room}/availability', [RoomController::class, 'storeAvailability']);
+        Route::post('/rooms/{room}/availability/bulk-delete', [BulkDeleteController::class, 'availability']);
         Route::delete('/rooms/{room}/availability/{availability}', [RoomController::class, 'destroyAvailability']);
 
         // Room images
@@ -245,6 +257,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/resorts/{resort}/discount-codes', [DiscountCodeController::class, 'index']);
         Route::post('/resorts/{resort}/discount-codes', [DiscountCodeController::class, 'store']);
         Route::patch('/resorts/{resort}/discount-codes/{code}', [DiscountCodeController::class, 'update']);
+        Route::post('/resorts/{resort}/discount-codes/bulk-delete', [BulkDeleteController::class, 'discountCodes']);
         Route::delete('/resorts/{resort}/discount-codes/{code}', [DiscountCodeController::class, 'destroy']);
     });
 });

@@ -12,6 +12,11 @@ import {
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { useToast } from "@/components/shared/ToastProvider";
+import LocationFilterBar, {
+  emptyLocationFilter,
+  locationFilterToParams,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
 import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
@@ -87,9 +92,18 @@ export default function AdminReservationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmOverride, setConfirmOverride] = useState<{ id: number; status: string } | null>(null);
   const [overridingId, setOverridingId] = useState<number | null>(null);
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const { pushToast } = useToast();
 
-  const load = async (q: string, st: string, pg: number, pp: number, sb: string, sd: SortDir) => {
+  const load = async (
+    q: string,
+    st: string,
+    pg: number,
+    pp: number,
+    sb: string,
+    sd: SortDir,
+    loc: LocationFilterValue = locationFilter,
+  ) => {
     setLoading(true);
     try {
       const { data } = await apiClient.get<PaginatedEnvelope>("/reservations", {
@@ -100,6 +114,7 @@ export default function AdminReservationsPage() {
           page: pg,
           sort_by: sb,
           sort_dir: sd,
+          ...locationFilterToParams(loc),
         },
       });
       const payload = data.data;
@@ -209,6 +224,15 @@ export default function AdminReservationsPage() {
           <button type="submit" className="dash-btn-primary shrink-0">
             Filter
           </button>
+          <LocationFilterBar
+            label="Resort location"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+              void load(appliedSearch, appliedStatus, 1, perPage, sortBy, sortDir, next);
+            }}
+          />
         </form>
       </div>
 

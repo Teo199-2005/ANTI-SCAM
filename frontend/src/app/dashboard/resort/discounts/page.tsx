@@ -1,7 +1,12 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { apiClient } from "@/lib/api/client";
+import { bulkDeleteDiscountCodes, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { listResorts } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
@@ -51,7 +56,10 @@ export default function ResortDiscountsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blankForm);
   const [error, setError] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { pushToast } = useToast();
+  const bulk = useBulkSelection(codes, (c) => c.id);
 
   const load = async () => {
     setLoading(true);
@@ -104,11 +112,38 @@ export default function ResortDiscountsPage() {
     try {
       await apiClient.delete(`/resorts/${resortId}/discount-codes/${id}`);
       setCodes((prev) => prev.filter((c) => c.id !== id));
+      bulk.clear();
       pushToast({ title: "Code deleted", tone: "success" });
     } catch (err) {
       pushToast({ title: "Delete failed", description: parseApiErrorMessage(err), tone: "error" });
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const onBulkDelete = async () => {
+    if (!resortId) return;
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const result = await bulkDeleteDiscountCodes(resortId, ids);
+      await load();
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Codes deleted",
+        description: bulkDeleteToastDescription(result),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete selected codes."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
     }
   };
 
@@ -217,6 +252,14 @@ export default function ResortDiscountsPage() {
         </DashCard>
       )}
 
+      <BulkActionBar
+        count={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setConfirmBulkDelete(true)}
+        deleting={bulkDeleting}
+        deleteLabel="Delete selected codes"
+      />
+
       {/* List */}
       <DashCard className="overflow-hidden p-0">
         {error ? <p className="px-6 py-4 text-sm text-rose-700">{error}</p> : null}
@@ -233,7 +276,16 @@ export default function ResortDiscountsPage() {
               {codes.map((c) => (
                 <DashMobileTableCard
                   key={c.id}
-                  title={<span className="font-mono text-sm font-bold tracking-wider">{c.code}</span>}
+                  title={
+                    <span className="inline-flex items-center gap-2 font-mono text-sm font-bold tracking-wider">
+                      <BulkSelectMobile
+                        checked={bulk.isSelected(c.id)}
+                        onChange={() => bulk.toggle(c.id)}
+                        ariaLabel={`Select ${c.code}`}
+                      />
+                      {c.code}
+                    </span>
+                  }
                   fields={[
                     { label: "Type", value: <span className="dash-badge-slate capitalize">{c.type}</span> },
                     {
@@ -284,6 +336,12 @@ export default function ResortDiscountsPage() {
               <table className="dash-table">
                 <thead>
                   <tr>
+                    <BulkSelectTh
+                      checked={bulk.isAllSelected}
+                      indeterminate={bulk.isSomeSelected}
+                      onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
+                      disabled={loading || codes.length === 0}
+                    />
                     <th>Code</th>
                     <th>Type</th>
                     <th>Value</th>
@@ -296,6 +354,11 @@ export default function ResortDiscountsPage() {
                 <tbody>
                   {codes.map((c) => (
                     <tr key={c.id}>
+                      <BulkSelectTd
+                        checked={bulk.isSelected(c.id)}
+                        onChange={() => bulk.toggle(c.id)}
+                        ariaLabel={`Select ${c.code}`}
+                      />
                       <td className="font-mono font-bold text-navy tracking-wider">{c.code}</td>
                       <td>
                         <span className="dash-badge-slate capitalize">{c.type}</span>
@@ -342,6 +405,17 @@ export default function ResortDiscountsPage() {
           </>
         )}
       </DashCard>
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected codes?"
+        description={`Delete ${bulk.selectedCount} discount code${bulk.selectedCount === 1 ? "" : "s"}. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        tone="danger"
+        loading={bulkDeleting}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void onBulkDelete()}
+      />
     </div>
   );
 }

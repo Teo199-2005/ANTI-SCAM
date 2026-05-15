@@ -153,6 +153,50 @@ class GuestPlatformTest extends TestCase
         $this->assertCount(2, $rows);
     }
 
+    public function test_resort_owner_crud_guest_directory(): void
+    {
+        [$tenant, $resort] = $this->seedListedResort('crud-guest');
+        $owner = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'resort_owner',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $create = $this->postJson('/api/v1/resort/guests', [
+            'name' => 'Walk-in Guest',
+            'email' => 'walkin-guest@example.com',
+            'phone' => '639171234567',
+            'password' => 'Password1!x',
+            'password_confirmation' => 'Password1!x',
+        ]);
+
+        $create->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.hasLoginAccount', true)
+            ->assertJsonPath('data.email', 'walkin-guest@example.com');
+
+        $guestKey = 'walkin-guest@example.com';
+
+        $this->getJson('/api/v1/resort/guests/'.rawurlencode($guestKey))
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Walk-in Guest');
+
+        $this->patchJson('/api/v1/resort/guests/'.rawurlencode($guestKey), [
+            'name' => 'Walk-in Updated',
+            'phone' => '639179999999',
+        ])->assertOk()->assertJsonPath('data.name', 'Walk-in Updated');
+
+        $this->deleteJson('/api/v1/resort/guests/'.rawurlencode($guestKey))
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertNull(User::query()->where('email', 'walkin-guest@example.com')->first());
+
+        $this->getJson('/api/v1/resort/guests/'.rawurlencode($guestKey))
+            ->assertStatus(422);
+    }
+
     public function test_guest_user_can_resume_xendit_invoice_for_own_reservation(): void
     {
         config(['services.xendit.secret_key' => 'xnd_development_test_key']);

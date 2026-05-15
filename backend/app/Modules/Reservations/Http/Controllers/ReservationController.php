@@ -128,6 +128,13 @@ class ReservationController extends Controller
             $query->where('tenant_id', $user->tenant_id);
         }
 
+        $location = \App\Support\ResortLocationQuery::fromRequest(request());
+        \App\Support\ResortLocationQuery::whereHasResortLocation(
+            $query,
+            $location['province_psgc'],
+            $location['city_municipality_psgc'],
+        );
+
         SafeSort::apply(
             $query,
             $sortBy,
