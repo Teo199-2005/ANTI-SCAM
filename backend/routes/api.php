@@ -23,6 +23,7 @@ use App\Modules\Billing\Http\Controllers\SubscriptionWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditInvoiceController;
 use App\Modules\Billing\Http\Controllers\XenditPayoutWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditExpiredPhWebhookController;
+use App\Modules\Billing\Http\Controllers\XenditUnifiedInvoiceWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditWebhookController;
 use App\Modules\Dashboard\Http\Controllers\DashboardController;
 use App\Modules\Dashboard\Http\Controllers\MarketingDashboardController;
@@ -50,7 +51,16 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/auth/marketing-gov-id-options', [AuthController::class, 'marketingGovIdOptions']);
 
     // ---------- Webhooks (no auth, verified by token header) ----------
+    Route::get('/webhooks/xendit/health', function () {
+        return response()->json([
+            'success' => true,
+            'message' => 'Xendit webhook endpoint reachable',
+            'data' => ['ok' => true, 'host' => 'anti-scamph.com'],
+        ]);
+    });
+
     Route::middleware('throttle:webhooks')->group(function (): void {
+        Route::post('/webhooks/xendit/invoices', [XenditUnifiedInvoiceWebhookController::class, 'handle']);
         Route::post('/webhooks/xendit/invoice', [XenditWebhookController::class, 'invoice']);
         Route::post('/webhooks/xendit/subscription-invoice', [SubscriptionWebhookController::class, 'invoice']);
         Route::post('/webhooks/xendit/expired-ph', [XenditExpiredPhWebhookController::class, 'handle']);

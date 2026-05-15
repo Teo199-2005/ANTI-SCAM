@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Services;
 
 use App\Models\SubscriptionInvoice;
 use App\Models\XenditWebhookEvent;
+use App\Support\XenditInvoiceWebhookStatus;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\EmailNotificationService;
@@ -67,7 +68,7 @@ class XenditSubscriptionWebhookService
                 return null;
             }
 
-            if ($eventType === 'invoice.paid' && $status === 'PAID') {
+            if (XenditInvoiceWebhookStatus::isPaid($payload)) {
                 $paidMoment = now();
                 $ackNo = $invoice->acknowledgment_receipt_no;
                 if ($ackNo === null || $ackNo === '') {
@@ -179,7 +180,7 @@ class XenditSubscriptionWebhookService
                         $this->emails->sendSubscriptionRenewalConfirmation($subscriptionForNotifications, $paidInvoice);
                     });
                 }
-            } elseif (in_array($status, ['EXPIRED', 'FAILED'], true)) {
+            } elseif (XenditInvoiceWebhookStatus::isExpiredOrFailed($payload)) {
                 $invoice->update([
                     'status' => strtolower($status),
                 ]);

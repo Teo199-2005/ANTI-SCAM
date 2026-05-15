@@ -5,6 +5,7 @@ namespace App\Modules\Billing\Services;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Models\XenditWebhookEvent;
+use App\Support\XenditInvoiceWebhookStatus;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\EmailNotificationService;
@@ -71,7 +72,7 @@ class XenditWebhookService
                 return null;
             }
 
-            if ($eventType === 'invoice.paid' && $status === 'PAID') {
+            if (XenditInvoiceWebhookStatus::isPaid($payload)) {
                 if ($reservation->xendit_payment_status === 'paid' && $reservation->status === 'confirmed') {
                     return $reservation->refresh();
                 }
@@ -117,7 +118,7 @@ class XenditWebhookService
                     $this->emails->sendNewBookingToResort($reservationForNotifications);
                 });
 
-            } elseif (in_array($status, ['EXPIRED', 'FAILED'], true)) {
+            } elseif (XenditInvoiceWebhookStatus::isExpiredOrFailed($payload)) {
                 if ($reservation->status === 'expired'
                     && in_array((string) $reservation->xendit_payment_status, ['expired', 'failed'], true)) {
                     return $reservation->refresh();

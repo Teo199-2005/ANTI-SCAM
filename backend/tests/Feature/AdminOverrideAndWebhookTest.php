@@ -200,7 +200,7 @@ class AdminOverrideAndWebhookTest extends TestCase
             'reserved_at' => now(),
         ]);
 
-        $payload = ['id' => 'inv_test_event_123', 'status' => 'PAID', 'event' => 'invoice.created'];
+        $payload = ['id' => 'inv_test_event_123', 'status' => 'PENDING', 'event' => 'invoice.created'];
         $headers = ['x-callback-token' => 'test-webhook-token'];
 
         $this->postJson('/api/v1/webhooks/xendit/invoice', $payload, $headers)->assertOk();
