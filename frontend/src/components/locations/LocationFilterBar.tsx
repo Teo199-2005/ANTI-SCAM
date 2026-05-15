@@ -3,7 +3,7 @@
 import type { PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
 import { listMuncities, listProvinces } from "@jobuntux/psgc";
 import { MapPin } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 
 export type LocationFilterValue = {
   provincePsgc: string | null;
@@ -13,7 +13,7 @@ export type LocationFilterValue = {
 type Props = {
   value: LocationFilterValue;
   onChange: (next: LocationFilterValue) => void;
-  /** Label prefix, e.g. "Resort location" vs "Mailing address" */
+  /** Accessible name for the filter group */
   label?: string;
   className?: string;
 };
@@ -58,19 +58,19 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
   }, [selectedProv]);
 
   return (
-    <LocationFilterRoot className={className}>
-      <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-zinc-600">
+    <div className={`dash-filter-location ${className}`.trim()} role="group" aria-label={label}>
+      <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-transparent px-1 text-[11px] font-medium text-zinc-500">
         <MapPin size={13} className="text-zinc-400" aria-hidden />
-        {label}
+        <span className="hidden sm:inline">{label}</span>
       </span>
       <select
-        className="dash-input min-w-[140px] py-2 text-sm"
+        className="dash-filter-select"
         value={value.provincePsgc ?? ""}
         onChange={(e) => {
           const code = e.target.value || null;
           onChange({ provincePsgc: code, cityPsgc: null });
         }}
-        aria-label={`${label} province`}
+        aria-label={`${label} — province`}
       >
         <option value="">All provinces</option>
         {provinces.map((p) => (
@@ -80,13 +80,13 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
         ))}
       </select>
       <select
-        className="dash-input min-w-[140px] py-2 text-sm disabled:opacity-50"
+        className="dash-filter-select"
         value={value.cityPsgc ?? ""}
         disabled={!value.provincePsgc}
         onChange={(e) => {
           onChange({ ...value, cityPsgc: e.target.value || null });
         }}
-        aria-label={`${label} city or municipality`}
+        aria-label={`${label} — city or municipality`}
       >
         <option value="">All cities</option>
         {cities.map((c) => (
@@ -96,24 +96,10 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
         ))}
       </select>
       {(value.provincePsgc || value.cityPsgc) && (
-        <button
-          type="button"
-          className="dash-btn-secondary shrink-0 text-xs"
-          onClick={() => onChange(emptyLocationFilter())}
-        >
-          Clear location
+        <button type="button" className="dash-filter-clear" onClick={() => onChange(emptyLocationFilter())}>
+          Clear
         </button>
       )}
-    </LocationFilterRoot>
+    </div>
   );
-}
-
-function LocationFilterRoot({
-  className,
-  children,
-}: {
-  className: string;
-  children: ReactNode;
-}) {
-  return <div className={`flex flex-wrap items-center gap-2 ${className}`.trim()}>{children}</div>;
 }

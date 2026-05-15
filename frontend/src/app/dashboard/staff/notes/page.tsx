@@ -3,7 +3,8 @@
 import DashCard from "@/components/dash/DashCard";
 import { apiClient } from "@/lib/api/client";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
-import { AlertTriangle, ChevronLeft, MessageSquare, Search } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { AlertTriangle, ChevronLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -56,18 +57,15 @@ export default function StaffNotesPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            className="dash-input pl-9"
-            placeholder="Search notes or reference…"
-            value={query}
-            onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-          />
-        </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700">
+      <div className="dash-filter-bar">
+        <DashboardFilterSearch
+          value={query}
+          onChange={(v) => setQuery(sanitizeSearchQuery(v))}
+          placeholder="Search notes or reference…"
+          wide
+          live
+        />
+        <label className="flex h-8 cursor-pointer shrink-0 items-center gap-2 px-1 text-xs text-zinc-700">
           <input
             type="checkbox"
             checked={filterEscalated}

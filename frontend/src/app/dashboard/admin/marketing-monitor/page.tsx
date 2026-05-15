@@ -20,7 +20,8 @@ import {
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/tableSortPagination";
-import { Activity, Info, RefreshCw, Search } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { Activity, Info, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const SORT_FIRST: Record<string, SortDir> = {
@@ -220,39 +221,31 @@ export default function AdminMarketingMonitorPage() {
           subscription invoice. Sorted with the longest idle periods first.
         </p>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <form onSubmit={onSearch} className="dash-filter-bar flex-1">
-            <div className="relative min-w-[200px] flex-1">
-              <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-              <input
-                className="dash-input pl-9"
-                placeholder="Search name, email, or referral code…"
-                value={query}
-                onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-              />
-            </div>
-            <button type="submit" className="dash-btn-primary shrink-0">
-              Search
-            </button>
-            <LocationFilterBar
-              label="Mailing address"
-              value={locationFilter}
-              onChange={(next) => {
-                setLocationFilter(next);
-                setPage(1);
-                void load(applied, next);
-              }}
-            />
-          </form>
+        <form onSubmit={onSearch} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={query}
+            onChange={(v) => setQuery(sanitizeSearchQuery(v))}
+            placeholder="Search name, email, or referral code…"
+            wide
+          />
+          <LocationFilterBar
+            label="Mailing address"
+            value={locationFilter}
+            onChange={(next) => {
+              setLocationFilter(next);
+              setPage(1);
+              void load(applied, next);
+            }}
+          />
           <button
             type="button"
             onClick={() => void load(applied)}
-            className="dash-btn-neutral-strong inline-flex items-center justify-center gap-2"
+            className="dash-filter-clear ml-auto inline-flex items-center gap-1.5"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden />
             Refresh
           </button>
-        </div>
+        </form>
       </div>
 
       {rows.length > 0 ? (
@@ -334,6 +327,7 @@ export default function AdminMarketingMonitorPage() {
                     },
                     {
                       label: "Assigned / clients / resorts billed",
+                      fullWidth: true,
                       value: (
                         <span>
                           {r.assigned_resorts_count} assigned · <strong>{r.referred_clients_count}</strong> clients ·{" "}
@@ -378,6 +372,7 @@ export default function AdminMarketingMonitorPage() {
                     },
                     {
                       label: "Commission pending / released / total",
+                      fullWidth: true,
                       value: (
                         <span>
                           {fmtPhp(r.commission_pending_php)} / {fmtPhp(r.commission_released_gross_php)} /{" "}

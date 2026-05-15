@@ -74,9 +74,15 @@ export type AdminLocationStatRow = {
   owner_count: number;
 };
 
+export type AdminLocationTopResortRow = {
+  location_label: string;
+  resort_count: number;
+};
+
 export type AdminLocationStats = {
   by_province: AdminLocationStatRow[];
   by_city: AdminLocationStatRow[];
+  top_resorts: AdminLocationTopResortRow[];
   filtered_totals: { resort_count: number; owner_count: number };
 };
 
@@ -90,7 +96,11 @@ export async function getAdminLocationStats(params?: {
       city_municipality_psgc: params?.city_municipality_psgc ?? undefined,
     },
   });
-  return data.data;
+  const payload = data.data;
+  return {
+    ...payload,
+    top_resorts: payload.top_resorts ?? [],
+  };
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -258,12 +268,27 @@ export async function adminOnboard(payload: {
   address_city_municipality_psgc?: string | null;
   address_barangay_psgc?: string | null;
   address_barangay_name?: string | null;
+  address_street_line?: string | null;
   address_label?: string | null;
-  contact_number?: string;
-  logo_url?: string;
-  description?: string;
+  map_latitude?: number | null;
+  map_longitude?: number | null;
+  contact_number?: string | null;
+  logo_url?: string | null;
+  background_image_url?: string | null;
+  description?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  tiktok_url?: string | null;
+  representative_name?: string | null;
+  representative_contact_number?: string | null;
+  cancellation_policy?: string | null;
+  amenities?: string[];
   plan?: "basic";
-  owner_user_id: number;
+  owner_user_id?: number;
+  owner_name?: string;
+  owner_email?: string;
+  owner_password?: string;
+  owner_password_confirmation?: string;
   is_publicly_listed?: boolean;
   accept_terms: boolean;
 }) {
@@ -591,6 +616,18 @@ export async function uploadResortLogo(file: File): Promise<string> {
   const { data } = await apiClient.post<ApiEnvelope<{ logo_url: string }>>(
     "/admin/resorts/onboard/upload-logo",
     form,
+    { timeout: 120_000, maxBodyLength: Infinity, maxContentLength: Infinity },
   );
   return data.data.logo_url;
+}
+
+export async function uploadResortBackground(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("image", file);
+  const { data } = await apiClient.post<ApiEnvelope<{ background_image_url: string }>>(
+    "/admin/resorts/onboard/upload-background",
+    form,
+    { timeout: 180_000, maxBodyLength: Infinity, maxContentLength: Infinity },
+  );
+  return data.data.background_image_url;
 }

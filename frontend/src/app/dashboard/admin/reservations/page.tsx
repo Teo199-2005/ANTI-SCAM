@@ -21,7 +21,8 @@ import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { BadgeCheck, CalendarDays, Clock, ExternalLink, Search, XCircle } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { BadgeCheck, CalendarDays, Clock, ExternalLink, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -204,26 +205,20 @@ export default function AdminReservationsPage() {
         </h1>
         <p className="dash-page-sub">View and manage every reservation across all resorts.</p>
 
-        <form onSubmit={onFilter} className="dash-filter-bar mt-5">
-          <div className="relative min-w-[200px] flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Search reference…"
-              value={search}
-              onChange={(e) => setSearch(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <select className="dash-input min-w-[160px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <form onSubmit={onFilter} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={search}
+            onChange={(v) => setSearch(sanitizeSearchQuery(v))}
+            placeholder="Search reference…"
+            submitLabel="Filter"
+          />
+          <select className="dash-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
             <option value="">All statuses</option>
             <option value="confirmed">Confirmed</option>
             <option value="pending_payment">Pending payment</option>
             <option value="cancelled">Cancelled</option>
             <option value="expired">Expired</option>
           </select>
-          <button type="submit" className="dash-btn-primary shrink-0">
-            Filter
-          </button>
           <LocationFilterBar
             label="Resort location"
             value={locationFilter}
@@ -329,7 +324,7 @@ export default function AdminReservationsPage() {
 
       <div className="hidden md:block">
         <DataTable
-          minWidthClass="min-w-[920px]"
+          minWidthClass="min-w-[960px]"
           footer={paginationFooter}
           headers={
             <>
@@ -340,7 +335,7 @@ export default function AdminReservationsPage() {
               <th>Fee</th>
               <SortableTh label="Status" sortKey="status" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <SortableTh label="Created" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
-              <DashTableActionsHead>Override</DashTableActionsHead>
+              <DashTableActionsHead variant="control">Override</DashTableActionsHead>
             </>
           }
         >
@@ -355,7 +350,7 @@ export default function AdminReservationsPage() {
             {reservations.map((r) => (
               <tr key={r.id}>
                 <td className="font-mono font-semibold text-navy">{r.referenceNo}</td>
-                <td className="max-w-[10rem] truncate text-sm text-zinc-700">
+                <td className="min-w-[8rem] max-w-[12rem] truncate text-sm text-zinc-700">
                   {r.resortId ? (
                     <Link
                       href={`/resorts/${r.resortId}`}
@@ -388,13 +383,14 @@ export default function AdminReservationsPage() {
                 <td className="text-xs text-zinc-500">
                   {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
                 </td>
-                <DashTableActionsCell>
-                  <DashTableActionsInner>
+                <DashTableActionsCell variant="control">
+                  <DashTableActionsInner variant="control">
                     <select
-                      className="dash-input max-w-[170px] py-1.5 text-xs md:max-w-[170px]"
+                      className="dash-input dash-table-select"
                       value={r.status}
                       disabled={overridingId === r.id}
                       onChange={(e) => setConfirmOverride({ id: r.id, status: e.target.value })}
+                      aria-label={`Override status for ${r.referenceNo}`}
                     >
                       <option value="pending_payment">pending_payment</option>
                       <option value="confirmed">confirmed</option>

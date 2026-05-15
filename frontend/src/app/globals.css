@@ -158,6 +158,99 @@ body {
   @apply border-r border-white/55 bg-gradient-to-b from-softCard via-softCard to-metalFace text-zinc-700 shadow-sidebar;
 }
 
+/* Admin: fixed compact rail — readable, no nav scroll on typical desktop heights */
+.dash-sidebar--compact {
+  @apply w-[252px] overflow-hidden;
+}
+
+.dash-sidebar--compact .dash-sidebar-header {
+  @apply h-12 px-3;
+}
+
+.dash-sidebar--compact .dash-sidebar-user-wrap {
+  @apply px-2.5 py-2;
+}
+
+.dash-sidebar--compact .dash-sidebar-user-card {
+  @apply gap-2 px-2.5 py-1.5;
+}
+
+.dash-sidebar--compact .dash-sidebar-user-avatar {
+  @apply h-8 w-8 text-[11px] rounded-lg;
+}
+
+.dash-sidebar--compact .dash-sidebar-user-name {
+  @apply text-[13px];
+}
+
+.dash-sidebar--compact .dash-sidebar-user-email,
+.dash-sidebar--compact .dash-sidebar-user-decor {
+  @apply hidden;
+}
+
+.dash-sidebar--compact .dash-sidebar-user-role {
+  @apply mt-0.5 px-1.5 py-px text-[10px];
+}
+
+/* Natural height only — logout sits directly under last link (no flex stretch / justify-evenly) */
+.dash-sidebar--compact .dash-sidebar-nav {
+  flex: 0 0 auto;
+  @apply shrink-0 overflow-hidden px-2.5 py-2;
+}
+
+.dash-sidebar--compact .dash-sidebar-group {
+  @apply mb-2.5 last:mb-0;
+}
+
+.dash-sidebar--compact .dash-sidebar-group-label {
+  @apply mb-0.5 px-1.5 text-[10px] tracking-widest;
+}
+
+.dash-sidebar--compact .dash-sidebar-group-list {
+  @apply space-y-px;
+}
+
+.dash-sidebar--compact .dash-sidebar-link {
+  @apply gap-2 rounded-lg px-2 py-[0.4375rem] text-dash-sm leading-tight;
+}
+
+.dash-sidebar--compact .dash-sidebar-link-icon {
+  @apply h-6 w-6 rounded-md;
+}
+
+.dash-sidebar--compact .dash-sidebar-link-dot {
+  @apply h-1.5 w-1.5 ring-[3px];
+}
+
+.dash-sidebar--compact .dash-sidebar-footer {
+  @apply shrink-0 border-t border-softBorder p-2;
+}
+
+.dash-sidebar--compact .dash-sidebar-logout {
+  @apply gap-1.5 py-2 text-dash-sm;
+}
+
+/* Very short viewports only: allow nav scroll instead of clipping */
+@media (max-height: 640px) {
+  .dash-sidebar--compact .dash-sidebar-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    @apply overflow-y-auto overscroll-contain;
+  }
+
+  .dash-sidebar--compact .dash-sidebar-link {
+    @apply py-1 text-xs;
+  }
+
+  .dash-sidebar--compact .dash-sidebar-link-icon {
+    @apply h-[1.375rem] w-[1.375rem];
+  }
+
+  .dash-sidebar--compact .dash-sidebar-group {
+    @apply mb-2;
+  }
+}
+
 /* ── Topbar — bead-blast strip with cool front edge ───────────── */
 .dash-topbar {
   @apply border-b border-white/50 bg-gradient-to-b from-metalGlow via-softCard to-metalFace text-zinc-800 shadow-topbar backdrop-blur-[1px];
@@ -186,6 +279,61 @@ body {
   @apply mb-1 block font-dash text-dash-xs font-medium text-zinc-600;
 }
 
+/* ── Compact filter toolbar (search + selects + location on one row) ── */
+.dash-filter-bar {
+  @apply mt-4 flex flex-row flex-wrap items-center gap-2 rounded-xl border border-white/55
+         bg-gradient-to-b from-softCard/95 to-metalFace/50 px-2.5 py-2
+         shadow-[inset_0_1px_0_rgba(255,255,255,0.65)];
+}
+.dash-filter-field {
+  @apply relative flex min-w-0 items-center;
+}
+.dash-filter-field--grow {
+  @apply min-w-[9rem] flex-[1_1_10rem] max-w-[min(100%,14rem)];
+}
+.dash-filter-field--wide {
+  @apply min-w-[10rem] flex-[1_1_12rem] max-w-[min(100%,18rem)];
+}
+.dash-filter-field-icon {
+  @apply pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-zinc-400;
+}
+.dash-filter-input {
+  @apply h-8 w-full rounded-lg border border-softBorderStrong bg-white py-0 pl-8 pr-2.5 font-dash text-xs
+         text-zinc-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none
+         placeholder:text-zinc-400 focus:border-primaryBlue focus:ring-2 focus:ring-primaryBlue/15
+         disabled:cursor-not-allowed disabled:opacity-50;
+}
+.dash-filter-select {
+  @apply h-8 min-w-[7.25rem] max-w-[10.5rem] shrink-0 rounded-lg border border-softBorderStrong bg-white px-2.5
+         font-dash text-xs text-zinc-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none
+         focus:border-primaryBlue focus:ring-2 focus:ring-primaryBlue/15 disabled:cursor-not-allowed disabled:opacity-50;
+}
+.dash-filter-submit {
+  @apply inline-flex h-8 shrink-0 items-center justify-center rounded-lg border-0 bg-primaryBlue px-3 font-dash
+         text-xs font-semibold text-white shadow-dash-primary transition-colors hover:bg-primaryBlueDark
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue focus-visible:ring-offset-1;
+}
+.dash-filter-location {
+  @apply flex flex-row flex-wrap items-center gap-2;
+}
+.dash-filter-clear {
+  @apply inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-softBorderStrong bg-white
+         px-2.5 font-dash text-xs font-medium text-zinc-600 transition-colors hover:bg-softGray hover:text-navy;
+}
+.dash-filter-bar--flat {
+  @apply mt-0 border-0 bg-transparent px-0 py-0 shadow-none;
+}
+.dash-filter-segment {
+  @apply inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-3 font-dash text-xs font-semibold transition
+         [touch-action:manipulation];
+}
+.dash-filter-segment--active {
+  @apply border-0 bg-navy text-white;
+}
+.dash-filter-segment--idle {
+  @apply border border-softBorderStrong bg-white text-zinc-600 hover:bg-softGray hover:text-navy;
+}
+
 /* ── Buttons — primary fill ONLY on .dash-btn-primary ─────────── */
 .dash-btn-sm {
   @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-softBorderStrong/90
@@ -210,6 +358,20 @@ body {
          hover:bg-accentOrangeDark
          disabled:opacity-50
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accentOrange focus-visible:ring-offset-2;
+}
+
+/* ── Mobile table cards (2-column field grid, md:hidden) ─────── */
+.dash-mobile-table-card__value :is([class*="dash-badge"]) {
+  @apply inline-flex max-w-full flex-wrap whitespace-normal;
+}
+.dash-mobile-table-card__value select,
+.dash-mobile-table-card__value .dash-input {
+  @apply w-full min-w-0 text-xs;
+}
+.dash-mobile-table-card__actions .dash-btn-sm,
+.dash-mobile-table-card__actions .dash-btn-danger,
+.dash-mobile-table-card__actions .dash-btn-primary {
+  @apply w-full justify-center;
 }
 
 /* ── Tables ──────────────────────────────────────────────────── */
@@ -272,8 +434,20 @@ body {
 .dash-table-actions-cell {
   @apply w-[1%] whitespace-nowrap align-middle;
 }
+.dash-table-actions-head--control,
+.dash-table-actions-cell--control {
+  @apply w-[1%] whitespace-nowrap align-middle;
+}
 .dash-table-actions-inner {
   @apply flex flex-row flex-nowrap items-center justify-end gap-2;
+}
+.dash-table-actions-inner--control {
+  @apply inline-flex w-auto justify-end;
+}
+.dash-table-select {
+  @apply w-auto max-w-[10.25rem] shrink-0 py-1.5 pl-2.5 pr-7 text-xs;
+  min-width: 8.5rem;
+  field-sizing: content;
 }
 .dash-table-actions-inner--toolbar {
   @apply gap-1.5;

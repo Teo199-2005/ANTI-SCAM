@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import StatCard from "@/components/dashboard/StatCard";
+import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
 import { apiClient } from "@/lib/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { BadgeCheck, CalendarDays, Clock, Heart, MapPin, MessageSquare, XCircle, TrendingUp } from "lucide-react";
@@ -168,7 +169,45 @@ export default function ClientOverviewPage() {
             </Link>
           </div>
         ) : (
-          <div className="divide-y divide-softBorder">
+          <>
+            <div className="space-y-3 p-4 md:hidden">
+              {recentFive.map((r) => (
+                <DashMobileTableCard
+                  key={r.id}
+                  title={
+                    <Link href={`/dashboard/client/bookings/${r.id}`} className="font-mono text-sm text-navy hover:underline">
+                      {r.referenceNo}
+                    </Link>
+                  }
+                  fields={[
+                    { label: "Dates", value: `${r.checkInDate} → ${r.checkOutDate}` },
+                    { label: "Total", value: `₱${Number(r.totalAmount).toLocaleString()}` },
+                    {
+                      label: "Resort",
+                      fullWidth: true,
+                      value: r.resort ? `${r.resort.name}${r.room?.name ? ` — ${r.room.name}` : ""}` : "—",
+                    },
+                    {
+                      label: "Status",
+                      value: (
+                        <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
+                          {statusIcon[r.status] ?? null}
+                          {r.status.replaceAll("_", " ")}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  actions={
+                    r.status === "pending_payment" ? (
+                      <Link href={`/dashboard/client/bookings/${r.id}`} className="dash-btn-accent w-full justify-center">
+                        Pay now
+                      </Link>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </div>
+            <div className="hidden divide-y divide-softBorder md:block">
             {recentFive.map((r) => (
               <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 transition-colors hover:bg-dsRowHover">
                 <div>
@@ -193,6 +232,7 @@ export default function ClientOverviewPage() {
               </div>
             ))}
           </div>
+          </>
         )}
       </DashCard>
     </div>

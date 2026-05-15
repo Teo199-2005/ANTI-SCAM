@@ -8,7 +8,8 @@ import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { AuditLog, getAuditLogs } from "@/lib/api/admin";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { ChevronDown, ChevronUp, FileText, Search } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const SORT_FIRST: Record<string, SortDir> = {
@@ -113,17 +114,14 @@ export default function AuditLogsPage() {
         </h1>
         <p className="dash-page-sub">System-wide activity log across all tenants and users.</p>
 
-        <form onSubmit={onFilter} className="dash-filter-bar mt-5">
-          <div className="relative min-w-[180px] flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Filter by action…"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <select className="dash-input min-w-[160px]" value={entityFilter} onChange={(e) => setEntityFilter(e.target.value)}>
+        <form onSubmit={onFilter} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={actionFilter}
+            onChange={(v) => setActionFilter(sanitizeSearchQuery(v))}
+            placeholder="Filter by action…"
+            submitLabel="Filter"
+          />
+          <select className="dash-filter-select" value={entityFilter} onChange={(e) => setEntityFilter(e.target.value)} aria-label="Entity type">
             <option value="">All entities</option>
             <option value="reservation">reservation</option>
             <option value="booking_lock">booking_lock</option>
@@ -132,9 +130,6 @@ export default function AuditLogsPage() {
             <option value="room">room</option>
             <option value="user">user</option>
           </select>
-          <button type="submit" className="dash-btn-primary shrink-0">
-            Filter
-          </button>
         </form>
       </div>
 

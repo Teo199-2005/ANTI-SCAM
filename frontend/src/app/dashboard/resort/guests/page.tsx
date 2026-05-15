@@ -11,6 +11,7 @@ import {
   DashTableActionsInner,
 } from "@/components/shared/DashTableActions";
 import { useToast } from "@/components/shared/ToastProvider";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import Button from "@/components/ui/Button";
 import { apiClient } from "@/lib/api/client";
 import { bulkDeleteResortGuests, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
@@ -29,7 +30,6 @@ import {
   Mail,
   Pencil,
   Plus,
-  Search,
   Trash2,
   UserCheck,
   Users,
@@ -405,21 +405,17 @@ export default function ResortGuestsPage() {
         </Button>
       </div>
 
-      <div className="dash-filter-bar items-stretch md:flex-row md:flex-wrap md:items-center">
-        <form onSubmit={onSearch} className="dash-filter-bar flex-1 md:min-w-[220px]">
-          <div className="relative flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Search by name, email, or phone…"
-              value={query}
-              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <button type="submit" className="dash-btn-primary shrink-0">Search</button>
+      <div className="dash-filter-bar">
+        <form onSubmit={onSearch} className="contents">
+          <DashboardFilterSearch
+            value={query}
+            onChange={(v) => setQuery(sanitizeSearchQuery(v))}
+            placeholder="Search by name, email, or phone…"
+            wide
+          />
         </form>
         {!loading && (
-          <span className="rounded-full bg-navy/8 px-3 py-1 text-sm font-medium text-navy">
+          <span className="ml-auto shrink-0 rounded-full bg-navy/8 px-3 py-1 text-xs font-medium text-navy">
             {filtered.length} guest{filtered.length !== 1 ? "s" : ""}
           </span>
         )}

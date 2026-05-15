@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
+import AdminLocationStatsChart from "@/components/dashboard/AdminLocationStatsChart";
 import StatCard from "@/components/dashboard/StatCard";
 import LocationFilterBar, {
   emptyLocationFilter,
@@ -149,11 +150,13 @@ export default function AdminOverviewPage() {
               <Globe2 size={16} className="text-clOcean" />
             </div>
             <div>
-              <h2 className="font-dash text-base font-semibold text-navy">Owners & resorts by location</h2>
-              <p className="text-xs text-zinc-500">Filter by resort address (PSGC)</p>
+              <h2 className="font-dash text-base font-semibold text-navy">Top resort locations</h2>
+              <p className="text-xs text-zinc-500">Top 5 by resort count · filter by address (PSGC)</p>
             </div>
           </div>
-          <LocationFilterBar label="Resort location" value={locationFilter} onChange={setLocationFilter} />
+          <div className="dash-filter-bar dash-filter-bar--flat">
+            <LocationFilterBar label="Resort location" value={locationFilter} onChange={setLocationFilter} />
+          </div>
         </div>
         {locationStatsLoading ? (
           <p className="px-6 py-8 text-sm text-zinc-500">Loading location breakdown…</p>
@@ -169,32 +172,7 @@ export default function AdminOverviewPage() {
                 <span className="font-semibold text-navy">{locationStats.filtered_totals.owner_count}</span>
               </p>
             </div>
-            {(locationFilter.cityPsgc ? locationStats.by_city : locationStats.by_province).length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="dash-table">
-                  <thead>
-                    <tr>
-                      <th>{locationFilter.cityPsgc ? "City / municipality" : "Province"}</th>
-                      <th>Resorts</th>
-                      <th>Owners</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(locationFilter.cityPsgc ? locationStats.by_city : locationStats.by_province)
-                      .slice(0, 12)
-                      .map((row) => (
-                        <tr key={row.city_psgc ?? row.province_psgc}>
-                          <td className="font-medium text-navy">{row.city_name ?? row.province_name ?? "—"}</td>
-                          <td>{row.resort_count}</td>
-                          <td>{row.owner_count}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-sm text-zinc-500">No resorts with address data in this area yet.</p>
-            )}
+            <AdminLocationStatsChart rows={locationStats.top_resorts ?? []} limit={5} />
           </div>
         ) : (
           <p className="px-6 py-8 text-sm text-zinc-500">Location stats unavailable.</p>

@@ -71,9 +71,12 @@ class AdminLocationStatsTest extends TestCase
                 'data' => [
                     'by_province',
                     'by_city',
+                    'top_resorts',
                     'filtered_totals' => ['resort_count', 'owner_count'],
                 ],
             ])
+            ->assertJsonPath('data.top_resorts.0.location_label', 'Bangued, Abra')
+            ->assertJsonPath('data.top_resorts.0.resort_count', 1)
             ->assertJsonPath('data.filtered_totals.resort_count', 2)
             ->assertJsonPath('data.filtered_totals.owner_count', 1);
 

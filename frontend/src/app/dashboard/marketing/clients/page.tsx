@@ -131,7 +131,7 @@ function ClientRow({ r }: { r: MarketingClientRow }) {
       </div>
 
       {isTrial ? (
-        <div className="grid grid-cols-1 gap-3 text-xs sm:col-span-5 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2 text-xs sm:col-span-5 sm:gap-3">
           <div className="rounded-lg border border-emerald-100 bg-white/90 px-3 py-2 sm:border-0 sm:bg-transparent sm:p-0">
             <p className="font-semibold uppercase tracking-wide text-zinc-400">Time remaining</p>
             <p className="mt-0.5 text-lg font-bold tabular-nums leading-tight text-emerald-800 sm:text-sm">
@@ -259,14 +259,16 @@ export default function MarketingClientsPage() {
               </p>
             </div>
           </div>
-          <LocationFilterBar
-            label="Client resort location"
-            value={locationFilter}
-            onChange={(next) => {
-              setLocationFilter(next);
-              void load(1, next);
-            }}
-          />
+          <div className="dash-filter-bar dash-filter-bar--flat">
+            <LocationFilterBar
+              label="Client resort location"
+              value={locationFilter}
+              onChange={(next) => {
+                setLocationFilter(next);
+                void load(1, next);
+              }}
+            />
+          </div>
         </div>
 
         {loading ? (

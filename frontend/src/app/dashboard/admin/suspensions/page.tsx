@@ -50,14 +50,13 @@ export default function SuspensionsPage() {
         <p className="dash-page-sub">Resorts with overdue subscriptions in grace period or fully suspended.</p>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="dash-filter-bar">
         {["all", "grace_period", "suspended"].map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`min-h-11 rounded-xl px-4 py-2 text-sm font-semibold transition [touch-action:manipulation] md:min-h-0 ${filter === f ? "bg-navy text-white" : "border border-softBorder bg-softCard text-zinc-600 hover:bg-softGray"}`}
+            className={`dash-filter-segment ${filter === f ? "dash-filter-segment--active" : "dash-filter-segment--idle"}`}
           >
             {f === "all" ? "All" : f === "grace_period" ? "Grace Period" : "Suspended"}
           </button>
@@ -70,7 +69,9 @@ export default function SuspensionsPage() {
             void load(filter, next);
           }}
         />
-        <span className="w-full text-xs text-zinc-400 sm:ml-auto sm:w-auto sm:text-right">{total} result{total !== 1 ? "s" : ""}</span>
+        <span className="ml-auto shrink-0 text-xs text-zinc-500">
+          {total} result{total !== 1 ? "s" : ""}
+        </span>
       </div>
 
       <DashCard className="overflow-hidden p-0">

@@ -187,7 +187,7 @@ export default function AdminSubscriptionsPage() {
           Subscriptions
         </h1>
         <p className="dash-page-sub">Review and refresh billing subscriptions for all resorts.</p>
-        <div className="dash-filter-bar mt-5">
+        <div className="dash-filter-bar">
           <LocationFilterBar
             label="Resort location"
             value={locationFilter}

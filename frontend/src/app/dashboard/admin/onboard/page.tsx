@@ -1,42 +1,36 @@
 "use client";
-import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 
-import { PhilippineLocationPicker, type PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
-import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
+import AdminResortOnboardForm, {
+  type AdminOnboardFormState,
+} from "@/components/dashboard/AdminResortOnboardForm";
+import type { PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
 import { useToast } from "@/components/shared/ToastProvider";
-import { adminOnboard, AssignableOwner, getAssignableOwners, uploadResortLogo } from "@/lib/api/admin";
-import { getLaravelWebOrigin } from "@/lib/api/baseUrl";
-import { getResort, updateResort } from "@/lib/api/resort";
-import { Building2, Globe, Image as ImageIcon, Loader2 } from "lucide-react";
 import {
+  adminOnboard,
+  getAssignableOwners,
+  uploadResortBackground,
+  uploadResortLogo,
+  type AssignableOwner,
+} from "@/lib/api/admin";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { getResort, updateResort } from "@/lib/api/resort";
+import {
+  sanitizeAmenityListTyping,
   sanitizeBusinessOrResortName,
+  sanitizeEmailTyping,
   sanitizeLongText,
   sanitizeNumericIdInput,
+  sanitizePersonName,
   sanitizePhoneInput,
   sanitizeSubdomainInput,
 } from "@/lib/inputRestrictions";
+import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
+import { shrinkRasterForUpload } from "@/lib/uploads/shrinkRasterForUpload";
+import { Building2, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const BACKEND_ORIGIN = getLaravelWebOrigin();
-
-type FormState = {
-  tenant_name: string;
-  resort_name: string;
-  subdomain: string;
-  address_province_psgc: string | null;
-  address_city_municipality_psgc: string | null;
-  address_barangay_psgc: string | null;
-  address_barangay_name: string | null;
-  contact_number: string;
-  logo_url: string;
-  description: string;
-  plan: "basic";
-  owner_user_id: string;
-  is_publicly_listed: boolean;
-};
-
-const initial: FormState = {
+const initial: AdminOnboardFormState = {
   tenant_name: "",
   resort_name: "",
   subdomain: "",
@@ -44,13 +38,36 @@ const initial: FormState = {
   address_city_municipality_psgc: null,
   address_barangay_psgc: null,
   address_barangay_name: null,
+  address_street_line: "",
+  map_latitude: null,
+  map_longitude: null,
   contact_number: "",
   logo_url: "",
+  background_image_url: "",
   description: "",
+  facebook_url: "",
+  instagram_url: "",
+  tiktok_url: "",
+  representative_name: "",
+  representative_contact_number: "",
+  cancellation_policy: "",
+  amenities: "",
   plan: "basic",
+  owner_account_mode: "create",
+  owner_name: "",
+  owner_email: "",
+  owner_password: "",
+  owner_password_confirmation: "",
   owner_user_id: "",
   is_publicly_listed: true,
 };
+
+function amenitiesToArray(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 export default function AdminOnboardPage() {
   const { pushToast } = useToast();
@@ -58,9 +75,11 @@ export default function AdminOnboardPage() {
   const resortIdParam = params.get("resort_id");
   const editResortId = resortIdParam ? Number(resortIdParam) : null;
   const isEditMode = Number.isFinite(editResortId) && (editResortId ?? 0) > 0;
-  const [form, setForm] = useState<FormState>(initial);
+
+  const [form, setForm] = useState<AdminOnboardFormState>(initial);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBg, setUploadingBg] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [owners, setOwners] = useState<AssignableOwner[]>([]);
   const [loadingOwners, setLoadingOwners] = useState(false);
@@ -69,7 +88,25 @@ export default function AdminOnboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [acceptAdminTerms, setAcceptAdminTerms] = useState(false);
 
-  const update = (key: keyof FormState, value: string | boolean) => {
+  const selectedOwnerEmail = useMemo(() => {
+    if (form.owner_account_mode === "create") {
+      return form.owner_email.trim() || null;
+    }
+    if (!form.owner_user_id) return null;
+    return owners.find((o) => String(o.id) === form.owner_user_id)?.email ?? null;
+  }, [form.owner_account_mode, form.owner_email, form.owner_user_id, owners]);
+
+  const ownerAccountValid = useMemo(() => {
+    if (isEditMode || form.owner_account_mode === "existing") return true;
+    return (
+      form.owner_name.trim().length > 0 &&
+      form.owner_email.trim().length > 0 &&
+      passwordPolicyMet(getPasswordPolicyChecks(form.owner_password)) &&
+      form.owner_password === form.owner_password_confirmation
+    );
+  }, [form, isEditMode]);
+
+  const update = (key: keyof AdminOnboardFormState, value: string | boolean) => {
     let next: string | boolean = value;
     if (typeof value === "string") {
       switch (key) {
@@ -81,13 +118,34 @@ export default function AdminOnboardPage() {
           next = sanitizeSubdomainInput(value);
           break;
         case "contact_number":
+        case "representative_contact_number":
           next = sanitizePhoneInput(value);
           break;
         case "logo_url":
+        case "background_image_url":
+        case "facebook_url":
+        case "instagram_url":
+        case "tiktok_url":
           next = sanitizeLongText(value, 2048);
           break;
         case "description":
+        case "cancellation_policy":
           next = sanitizeLongText(value);
+          break;
+        case "amenities":
+          next = sanitizeAmenityListTyping(value);
+          break;
+        case "representative_name":
+          next = sanitizePersonName(value);
+          break;
+        case "address_street_line":
+          next = sanitizeLongText(value, 255);
+          break;
+        case "owner_name":
+          next = sanitizePersonName(value);
+          break;
+        case "owner_email":
+          next = sanitizeEmailTyping(value).toLowerCase();
           break;
         case "owner_user_id":
           next = sanitizeNumericIdInput(value, 12);
@@ -96,7 +154,19 @@ export default function AdminOnboardPage() {
           break;
       }
     }
-    setForm((prev) => ({ ...prev, [key]: next }));
+    setForm((prev) => {
+      const updated = { ...prev, [key]: next };
+      if (key === "owner_user_id" && typeof next === "string" && next) {
+        const owner = owners.find((o) => String(o.id) === next);
+        if (owner && !prev.representative_name.trim()) {
+          updated.representative_name = owner.name;
+        }
+      }
+      if (key === "owner_name" && typeof next === "string" && next && !prev.representative_name.trim()) {
+        updated.representative_name = next;
+      }
+      return updated;
+    });
   };
 
   useEffect(() => {
@@ -106,22 +176,31 @@ export default function AdminOnboardPage() {
       setError(null);
       try {
         const resort = await getResort(editResortId);
-        setForm((prev) => ({
-          ...prev,
-          tenant_name: "",
+        const raw = resort as Record<string, unknown>;
+        setForm({
+          ...initial,
           resort_name: resort.name ?? "",
-          subdomain: "",
           address_province_psgc: resort.address_province_psgc ?? null,
           address_city_municipality_psgc: resort.address_city_municipality_psgc ?? null,
           address_barangay_psgc: resort.address_barangay_psgc ?? null,
           address_barangay_name: resort.address_barangay_name ?? null,
+          address_street_line: resort.address_street_line ?? "",
+          map_latitude: resort.map_latitude != null ? Number(resort.map_latitude) : null,
+          map_longitude: resort.map_longitude != null ? Number(resort.map_longitude) : null,
           contact_number: resort.contact_number ?? "",
           logo_url: resort.logo_url ?? "",
+          background_image_url: resort.background_image_url ?? "",
           description: resort.description ?? "",
-          plan: "basic",
+          facebook_url: resort.facebook_url ?? "",
+          instagram_url: resort.instagram_url ?? "",
+          tiktok_url: resort.tiktok_url ?? "",
+          representative_name: (raw.representative_name as string) ?? "",
+          representative_contact_number: (raw.representative_contact_number as string) ?? "",
+          cancellation_policy: (raw.cancellation_policy as string) ?? "",
+          amenities: Array.isArray(resort.amenities) ? resort.amenities.join(", ") : "",
           is_publicly_listed: Boolean(resort.is_publicly_listed),
-        }));
-      } catch (err) {
+        });
+      } catch {
         setError("Failed to load resort details for editing.");
       } finally {
         setInitializing(false);
@@ -131,9 +210,9 @@ export default function AdminOnboardPage() {
   }, [editResortId, isEditMode]);
 
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || form.owner_account_mode !== "existing") return;
     void fetchOwners();
-  }, [isEditMode]);
+  }, [isEditMode, form.owner_account_mode]);
 
   const fetchOwners = async () => {
     setLoadingOwners(true);
@@ -152,8 +231,46 @@ export default function AdminOnboardPage() {
     }
   };
 
+  const buildResortPayload = () => ({
+    description: form.description.trim() || null,
+    address_province_psgc: form.address_province_psgc,
+    address_city_municipality_psgc: form.address_city_municipality_psgc,
+    address_barangay_name: form.address_barangay_name?.trim() || null,
+    address_barangay_psgc: null,
+    address_street_line: form.address_street_line.trim() || null,
+    map_latitude: form.map_latitude,
+    map_longitude: form.map_longitude,
+    contact_number: form.contact_number.trim() || null,
+    logo_url: form.logo_url.trim() || null,
+    background_image_url: form.background_image_url.trim() || null,
+    representative_name: form.representative_name.trim() || null,
+    representative_contact_number: form.representative_contact_number.trim() || null,
+    cancellation_policy: form.cancellation_policy.trim() || null,
+    amenities: amenitiesToArray(form.amenities),
+    facebook_url: form.facebook_url.trim() || null,
+    instagram_url: form.instagram_url.trim() || null,
+    tiktok_url: form.tiktok_url.trim() || null,
+    is_publicly_listed: form.is_publicly_listed,
+  });
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEditMode && form.owner_account_mode === "create" && !ownerAccountValid) {
+      pushToast({
+        title: "Owner login incomplete",
+        description: "Enter the owner name, email, and a password that meets the requirements.",
+        tone: "warning",
+      });
+      return;
+    }
+    if (!isEditMode && form.owner_account_mode === "existing" && !form.owner_user_id) {
+      pushToast({
+        title: "Select an owner account",
+        description: "Choose an unassigned resort owner or switch to Create new account.",
+        tone: "warning",
+      });
+      return;
+    }
     setSaving(true);
     setError(null);
     setSuccess(false);
@@ -161,33 +278,33 @@ export default function AdminOnboardPage() {
       if (isEditMode && editResortId) {
         await updateResort(editResortId, {
           name: form.resort_name.trim(),
-          address_province_psgc: form.address_province_psgc,
-          address_city_municipality_psgc: form.address_city_municipality_psgc,
-          address_barangay_name: form.address_barangay_name?.trim() || null,
-          address_barangay_psgc: null,
-          contact_number: form.contact_number.trim() || null,
-          logo_url: form.logo_url.trim() || null,
-          description: form.description.trim() || null,
-          is_publicly_listed: form.is_publicly_listed,
+          ...buildResortPayload(),
         });
       } else {
+        const ownerPayload =
+          form.owner_account_mode === "create"
+            ? {
+                owner_name: form.owner_name.trim(),
+                owner_email: form.owner_email.trim().toLowerCase(),
+                owner_password: form.owner_password,
+                owner_password_confirmation: form.owner_password_confirmation,
+              }
+            : { owner_user_id: Number(form.owner_user_id) };
+
         await adminOnboard({
           tenant_name: form.tenant_name.trim(),
           resort_name: form.resort_name.trim(),
           subdomain: form.subdomain.trim().toLowerCase(),
-          address_province_psgc: form.address_province_psgc,
-          address_city_municipality_psgc: form.address_city_municipality_psgc,
-          address_barangay_name: form.address_barangay_name?.trim() || null,
-          address_barangay_psgc: null,
-          contact_number: form.contact_number.trim() || undefined,
-          logo_url: form.logo_url.trim() || undefined,
-          description: form.description.trim() || undefined,
           plan: form.plan,
-          owner_user_id: Number(form.owner_user_id),
-          is_publicly_listed: form.is_publicly_listed,
           accept_terms: true,
+          ...ownerPayload,
+          ...buildResortPayload(),
         });
       }
+      const onboardedOwnerEmail =
+        !isEditMode && form.owner_account_mode === "create" ? form.owner_email.trim().toLowerCase() : null;
+      const onboardedExistingOwner = !isEditMode && form.owner_account_mode === "existing";
+
       setSuccess(true);
       if (!isEditMode) {
         setForm(initial);
@@ -197,7 +314,11 @@ export default function AdminOnboardPage() {
         title: isEditMode ? "Resort updated" : "Resort onboarded",
         description: isEditMode
           ? "Resort profile details were updated successfully."
-          : "Tenant, resort, and subscription are ready. Share access with the owner.",
+          : onboardedOwnerEmail
+            ? `Resort is ready. The owner can sign in at the login page with ${onboardedOwnerEmail} and the password you set.`
+            : onboardedExistingOwner
+              ? "Tenant, resort, and subscription are ready. The owner signs in with the email and password from when their account was created."
+              : "Tenant, resort, and subscription are ready.",
         tone: "success",
         durationMs: 5000,
       });
@@ -214,22 +335,35 @@ export default function AdminOnboardPage() {
     if (!file) return;
     setUploadingLogo(true);
     try {
-      const logoUrl = await uploadResortLogo(file);
+      const prepared = await shrinkRasterForUpload(file);
+      const logoUrl = await uploadResortLogo(prepared);
       update("logo_url", logoUrl);
       pushToast({ title: "Logo uploaded", tone: "success" });
     } catch (err: unknown) {
-      const msg = parseApiErrorMessage(err, "Logo upload failed.");
-      pushToast({ title: "Upload failed", description: msg, tone: "error" });
+      pushToast({ title: "Upload failed", description: parseApiErrorMessage(err, "Logo upload failed."), tone: "error" });
     } finally {
       setUploadingLogo(false);
     }
   };
 
-  const previewSrc = form.logo_url.trim()
-    ? form.logo_url.trim().startsWith("/storage/")
-      ? `${BACKEND_ORIGIN}${form.logo_url.trim()}`
-      : form.logo_url.trim()
-    : "";
+  const onBgSelected = async (file: File | null) => {
+    if (!file) return;
+    setUploadingBg(true);
+    try {
+      const prepared = await shrinkRasterForUpload(file);
+      const url = await uploadResortBackground(prepared);
+      update("background_image_url", url);
+      pushToast({ title: "Cover image uploaded", tone: "success" });
+    } catch (err: unknown) {
+      pushToast({
+        title: "Upload failed",
+        description: parseApiErrorMessage(err, "Background upload failed."),
+        tone: "error",
+      });
+    } finally {
+      setUploadingBg(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -238,261 +372,79 @@ export default function AdminOnboardPage() {
           <Building2 size={24} className="text-skyBlue" />
           {isEditMode ? "Edit resort profile" : "Onboard new resort"}
         </h1>
-        <p className="dash-page-sub max-w-2xl">
+        <p className="dash-page-sub max-w-3xl">
           {isEditMode
-            ? "Update resort listing fields, contact details, and visibility."
-            : "Create a new tenant, resort, and subscription in a single step. The resort owner portal activates immediately after onboarding."}
+            ? "Update the same fields owners manage in Resort profile — location, branding, social links, and listing settings."
+            : "Create tenant, resort, and subscription in one step. Fill in branding and location now so the owner’s public page is closer to ready on day one."}
         </p>
       </div>
 
       <div className="dash-card p-6 lg:p-8">
-        {initializing ? (
-          <p className="mb-4 text-sm text-zinc-600">Loading resort details…</p>
-        ) : null}
+        {initializing ? <p className="mb-4 text-sm text-zinc-600">Loading resort details…</p> : null}
         {success ? (
           <p className="mb-6 rounded-xl border border-emerald-200/80 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-900">
             {isEditMode
               ? "Saved. Review changes or continue editing this resort."
-              : "Form cleared — you can onboard another resort, or check the toast for a quick confirmation."}
+              : "Form cleared — you can onboard another resort, or check the toast for confirmation."}
           </p>
         ) : null}
-
         {error ? (
-          <p className="mb-4 rounded-xl border border-rose-200/80 bg-rose-50/90 px-3 py-2 text-sm text-rose-800">
-            {error}
-          </p>
+          <p className="mb-4 rounded-xl border border-rose-200/80 bg-rose-50/90 px-3 py-2 text-sm text-rose-800">{error}</p>
         ) : null}
 
-        <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
+        <form onSubmit={onSubmit}>
+          <AdminResortOnboardForm
+            form={form}
+            isEditMode={isEditMode}
+            saving={saving}
+            uploadingLogo={uploadingLogo}
+            uploadingBg={uploadingBg}
+            owners={owners}
+            loadingOwners={loadingOwners}
+            ownerLoadError={ownerLoadError}
+            selectedOwnerEmail={selectedOwnerEmail}
+            acceptAdminTerms={acceptAdminTerms}
+            onFetchOwners={() => void fetchOwners()}
+            onChange={update}
+            onLocationChange={(next: PhilippineLocationValue) => {
+              setForm((prev) => ({
+                ...prev,
+                address_province_psgc: next.provinceCode,
+                address_city_municipality_psgc: next.cityCode,
+                address_barangay_name: next.barangayName,
+              }));
+            }}
+            onMapPinChange={(lat, lng) => {
+              setForm((prev) => ({ ...prev, map_latitude: lat, map_longitude: lng }));
+            }}
+            onLogoUpload={(file) => void onLogoSelected(file)}
+            onBgUpload={(file) => void onBgSelected(file)}
+            onAcceptTermsChange={setAcceptAdminTerms}
+            ownerAccountValid={ownerAccountValid}
+          />
 
-          {/* Tenant / account name */}
-          {!isEditMode ? (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">
-              Account / Tenant name *{" "}
-              <span className="font-normal text-zinc-400">(used for login + billing)</span>
-            </label>
-            <input
-              className="dash-input"
-              required
-              placeholder="Beach Paradise Properties"
-              value={form.tenant_name}
-              onChange={(e) => update("tenant_name", e.target.value)}
-            />
-          </div>
-          ) : null}
-
-          {/* Resort display name */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">
-              Resort display name *{" "}
-              <span className="font-normal text-zinc-400">(shown publicly)</span>
-            </label>
-            <input
-              className="dash-input"
-              required
-              placeholder="Beach Paradise Resort"
-              value={form.resort_name}
-              onChange={(e) => update("resort_name", e.target.value)}
-            />
-          </div>
-
-          {/* Subdomain */}
-          {!isEditMode ? (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">
-              Subdomain *{" "}
-              <span className="font-normal text-zinc-400">(e.g. beachparadise)</span>
-            </label>
-            <div className="relative">
-              <Globe size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                className="dash-input pl-9"
-                required
-                placeholder="beachparadise"
-                pattern="[a-z0-9-]+"
-                value={form.subdomain}
-                onChange={(e) => update("subdomain", e.target.value)}
-              />
-            </div>
-          </div>
-          ) : null}
-
-          {/* Plan */}
-          {!isEditMode ? (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Subscription plan *</label>
-            <input className="dash-input" value="Standard plan set (durations selected by owner at checkout)" readOnly />
-            <div className="mt-2 rounded-xl border border-softBorder bg-softGray/40 p-3 text-xs text-zinc-600">
-              <p className="font-semibold text-navy">Current pricing model:</p>
-              <p className="mt-1">Standard: 1M ₱2,100/mo, 3M ₱1,900/mo, 6M ₱1,700/mo, 12M ₱1,500/mo (+VAT).</p>
-              <p className="mt-1">Referral promo: owners who enter a valid referral code get their <strong>first month free</strong> on 3, 6, or 12-month plans (same standard rates apply). Requires a complete resort profile (logo, Philippine location, contact, background image, and at least one active room with a photo) before the code is accepted.</p>
-              <p className="mt-1">Owners choose duration and apply a referral code in the Subscribe modal.</p>
-            </div>
-          </div>
-          ) : null}
-
-          {/* Resort owner account */}
-          {!isEditMode ? (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Resort owner account *</label>
-            <select
-              className="dash-input"
-              required
-              disabled={loadingOwners || Boolean(ownerLoadError)}
-              value={form.owner_user_id}
-              onChange={(e) => update("owner_user_id", e.target.value)}
-            >
-              <option value="">Select resort owner account</option>
-              {owners.map((owner) => (
-                <option key={owner.id} value={String(owner.id)}>
-                  {owner.name} ({owner.email})
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-zinc-500">
-              Only unassigned resort owner accounts are shown.
-            </p>
-            {ownerLoadError ? (
-              <div className="mt-2 flex items-center gap-2">
-                <p className="text-xs text-rose-600">{ownerLoadError}</p>
-                <button type="button" className="dash-btn-sm" onClick={() => void fetchOwners()}>
-                  Retry
-                </button>
-              </div>
-            ) : null}
-          </div>
-          ) : null}
-
-          {/* Philippine location */}
-          <div className="sm:col-span-2">
-            <p className="mb-1.5 text-xs font-semibold text-zinc-600">Philippine location</p>
-            <PhilippineLocationPicker
-              idPrefix="admin-onboard"
-              disabled={saving}
-              legacyBarangayCodeHint={Boolean(form.address_barangay_psgc && !form.address_barangay_name?.trim())}
-              value={{
-                provinceCode: form.address_province_psgc,
-                cityCode: form.address_city_municipality_psgc,
-                barangayName: form.address_barangay_name,
-              }}
-              onChange={(next: PhilippineLocationValue) => {
-                setForm((prev) => ({
-                  ...prev,
-                  address_province_psgc: next.provinceCode,
-                  address_city_municipality_psgc: next.cityCode,
-                  address_barangay_name: next.barangayName,
-                }));
-              }}
-            />
-          </div>
-
-          {/* Contact */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Contact number</label>
-            <input
-              className="dash-input"
-              placeholder="0917-874-4889"
-              value={form.contact_number}
-              onChange={(e) => update("contact_number", e.target.value)}
-            />
-          </div>
-
-          {/* Resort logo upload */}
-          <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">
-              Resort logo image{" "}
-              <span className="font-normal text-zinc-400">(click to upload)</span>
-            </label>
-            <div className="relative space-y-2">
-              <ImageIcon size={14} className="pointer-events-none absolute left-3 top-[14px] text-zinc-400" />
-              <input
-                className="dash-input pl-9"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => void onLogoSelected(e.target.files?.[0] ?? null)}
-              />
-              {uploadingLogo ? <p className="text-xs text-zinc-500">Uploading image...</p> : null}
-            </div>
-          </div>
-
-          {/* Logo preview */}
-          <div className="sm:col-span-2">
-            <div className="dash-inset">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Resort image preview</p>
-              {form.logo_url.trim() ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewSrc}
-                  alt="Resort logo preview"
-                  className="h-28 w-full rounded-xl border border-softBorder object-cover sm:h-36"
-                />
-              ) : (
-                <div className="flex h-28 w-full items-center justify-center rounded-xl border border-dashed border-softBorder bg-white/60 text-sm text-zinc-500 sm:h-36">
-                  Upload a logo to preview the resort branding.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Description</label>
-            <textarea
-              className="dash-input min-h-[80px] resize-none"
-              placeholder="A short description of the resort…"
-              value={form.description}
-              onChange={(e) => update("description", e.target.value)}
-            />
-          </div>
-
-          {/* Publicly listed toggle */}
-          <div className="sm:col-span-2 flex items-center gap-3">
-            <input
-              id="publicly-listed"
-              type="checkbox"
-              className="h-4 w-4 rounded border-softBorder accent-primaryBlue"
-              checked={form.is_publicly_listed}
-              onChange={(e) => update("is_publicly_listed", e.target.checked)}
-            />
-            <label htmlFor="publicly-listed" className="text-sm text-zinc-700">
-              Publicly list this resort immediately after onboarding
-            </label>
-          </div>
-
-          {!isEditMode ? (
-            <div className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
-              <input
-                id="admin-accept-terms"
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-softBorder accent-primaryBlue"
-                checked={acceptAdminTerms}
-                onChange={(e) => setAcceptAdminTerms(e.target.checked)}
-              />
-              <label htmlFor="admin-accept-terms" className="text-sm text-zinc-700">
-                I confirm the selected resort owner has been given access to the{" "}
-                <LegalLinkButton kind="terms">Terms &amp; Conditions</LegalLinkButton> and agrees to them as part of
-                onboarding. A copy will be emailed to the owner.
-              </label>
-            </div>
-          ) : null}
-
-          {/* Submit */}
-          <div className="sm:col-span-2">
+          <div className="mt-8 border-t border-softBorder pt-6">
             <button
               type="submit"
               disabled={
                 saving ||
-                (!isEditMode && (loadingOwners || Boolean(ownerLoadError) || !acceptAdminTerms))
+                (!isEditMode &&
+                  (!acceptAdminTerms ||
+                    !ownerAccountValid ||
+                    (form.owner_account_mode === "existing" &&
+                      (loadingOwners || Boolean(ownerLoadError) || !form.owner_user_id))))
               }
               className="dash-btn-primary px-8 py-3 disabled:opacity-60"
             >
               {saving ? (
                 <span className="inline-flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin" /> {isEditMode ? "Saving changes…" : "Creating resort…"}
+                  <Loader2 size={14} className="animate-spin" />
+                  {isEditMode ? "Saving changes…" : "Creating resort…"}
                 </span>
+              ) : isEditMode ? (
+                "Save changes"
               ) : (
-                isEditMode ? "Save changes" : "Onboard resort"
+                "Onboard resort"
               )}
             </button>
           </div>
@@ -501,4 +453,3 @@ export default function AdminOnboardPage() {
     </div>
   );
 }
-

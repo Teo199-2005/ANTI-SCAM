@@ -156,6 +156,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/admin/resorts/assignable-owners', [AdminOnboardController::class, 'assignableOwners']);
             Route::post('/admin/resorts/onboard', [AdminOnboardController::class, 'store']);
             Route::post('/admin/resorts/onboard/upload-logo', [AdminOnboardController::class, 'uploadLogo']);
+            Route::post('/admin/resorts/onboard/upload-background', [AdminOnboardController::class, 'uploadBackground']);
             Route::post('/subscriptions/enforce-grace-period', [SubscriptionController::class, 'enforceGracePeriod']);
 
             // VIP badge management

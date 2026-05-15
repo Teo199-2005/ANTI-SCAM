@@ -15,7 +15,8 @@ import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { BadgeCheck, CalendarDays, Clock, Search, XCircle } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { BadgeCheck, CalendarDays, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -148,20 +149,18 @@ function ClientBookingsContent() {
         <h1 className="dash-page-title">Booking history</h1>
         <p className="dash-page-sub">All your resort reservations in one place.</p>
 
-        <form onSubmit={onFilter} className="dash-filter-bar mt-5">
-          <div className="relative min-w-[180px] flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Search by reference…"
-              value={search}
-              onChange={(e) => setSearch(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
+        <form onSubmit={onFilter} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={search}
+            onChange={(v) => setSearch(sanitizeSearchQuery(v))}
+            placeholder="Search by reference…"
+            submitLabel="Filter"
+          />
           <select
-            className="dash-input min-w-[160px] flex-shrink-0"
+            className="dash-filter-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Status"
           >
             <option value="">All statuses</option>
             <option value="confirmed">Confirmed</option>
@@ -171,9 +170,6 @@ function ClientBookingsContent() {
             <option value="completed">Completed</option>
             <option value="no_show">No show</option>
           </select>
-          <button type="submit" className="dash-btn-primary">
-            Filter
-          </button>
         </form>
       </div>
 

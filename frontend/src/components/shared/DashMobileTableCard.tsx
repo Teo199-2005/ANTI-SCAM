@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 export type DashMobileTableField = {
   label: string;
   value: ReactNode;
+  /** Span both columns in the 2-column mobile grid */
+  fullWidth?: boolean;
 };
 
 type DashMobileTableCardProps = {
@@ -15,9 +17,16 @@ type DashMobileTableCardProps = {
   className?: string;
 };
 
+/** Column span for a field in the 2-column mobile grid (odd count → last item full width). */
+export function dashMobileFieldColSpan(index: number, total: number, fullWidth?: boolean): string {
+  if (fullWidth) return "col-span-2";
+  if (total % 2 === 1 && index === total - 1) return "col-span-2";
+  return "";
+}
+
 /**
  * Stacked “record card” for narrow viewports — use with `md:hidden` beside a desktop `DataTable`.
- * Badges inside `value` should use normal wrapping (see globals `.dash-mobile-table-card`).
+ * Fields render in a 2-column grid (2×2, 2×2×1 for odd counts, etc.).
  */
 export default function DashMobileTableCard({ title, fields, actions, className }: DashMobileTableCardProps) {
   return (
@@ -27,19 +36,27 @@ export default function DashMobileTableCard({ title, fields, actions, className 
         className,
       )}
     >
-      <header className="mb-1 border-b border-softBorder pb-3">
+      <header className="mb-3 border-b border-softBorder pb-3">
         <h3 className="font-dash text-base font-semibold leading-snug text-navy">{title}</h3>
       </header>
-      <dl className="divide-y divide-softBorder/90">
-        {fields.map(({ label, value }) => (
-          <div key={label} className="grid gap-1 py-3 first:pt-2">
-            <dt className="font-dash text-[10px] font-bold uppercase tracking-widest text-zinc-400">{label}</dt>
-            <dd className="min-w-0 break-words text-dash-sm text-zinc-700">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      {fields.length > 0 ? (
+        <dl className="grid grid-cols-2 gap-2">
+          {fields.map(({ label, value, fullWidth }, index) => (
+            <div
+              key={`${label}-${index}`}
+              className={cn(
+                "dash-mobile-table-card__cell min-w-0 rounded-xl border border-softBorder/75 bg-white/70 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
+                dashMobileFieldColSpan(index, fields.length, fullWidth),
+              )}
+            >
+              <dt className="font-dash text-[10px] font-bold uppercase tracking-widest text-zinc-400">{label}</dt>
+              <dd className="dash-mobile-table-card__value mt-1 min-w-0 break-words text-dash-sm text-zinc-700">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       {actions ? (
-        <footer className="dash-mobile-table-card__actions mt-2 grid gap-2 border-t border-softBorder pt-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]">
+        <footer className="dash-mobile-table-card__actions mt-3 grid gap-2 border-t border-softBorder pt-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]">
           {actions}
         </footer>
       ) : null}
@@ -51,7 +68,7 @@ export function DashMobileTableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="space-y-3" aria-hidden>
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-40 animate-pulse rounded-2xl bg-softGray/90 shadow-soft-sm" />
+        <div key={i} className="h-36 animate-pulse rounded-2xl bg-softGray/90 shadow-soft-sm" />
       ))}
     </div>
   );

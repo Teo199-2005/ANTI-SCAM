@@ -14,7 +14,8 @@ import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { CalendarDays, ChevronLeft, MessageSquare, Search } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { CalendarDays, ChevronLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -170,18 +171,11 @@ export default function StaffReservationsPage() {
       </div>
 
       <form onSubmit={onSearch} className="dash-filter-bar">
-        <div className="relative flex-1">
-          <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            className="dash-input pl-9"
-            placeholder="Search reference…"
-            value={query}
-            onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-          />
-        </div>
-        <button type="submit" className="dash-btn-primary shrink-0">
-          Search
-        </button>
+        <DashboardFilterSearch
+          value={query}
+          onChange={(v) => setQuery(sanitizeSearchQuery(v))}
+          placeholder="Search reference…"
+        />
       </form>
 
       <DashCard className="overflow-hidden p-0">

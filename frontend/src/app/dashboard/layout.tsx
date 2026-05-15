@@ -13,6 +13,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeOtpInput } from "@/lib/inputRestrictions";
+import { cn } from "@/lib/utils";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
@@ -418,7 +419,12 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     <div className="dash-shell flex min-h-screen">
       <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col md:pl-[264px]">
+      <div
+        className={cn(
+          "flex min-h-screen min-w-0 flex-1 flex-col",
+          user?.role === "admin" ? "md:pl-[252px]" : "md:pl-[264px]",
+        )}
+      >
         <DashboardTopbar onOpenMenu={() => setSidebarOpen(true)} />
         <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto px-4 py-6 lg:px-8 lg:py-8">
           <div className="dash-shell-main">{children}</div>

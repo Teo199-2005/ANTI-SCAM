@@ -19,7 +19,10 @@ import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/share
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BadgeCheck, Building2, Crown, Globe, PenLine, Search, XCircle } from "lucide-react";
+import AdminResortViewModal from "@/components/dashboard/AdminResortViewModal";
+import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { BadgeCheck, Building2, Crown, Eye, PenLine, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
@@ -52,6 +55,7 @@ export default function AdminResortsPage() {
   const [sortBy, setSortBy] = useState<string>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
+  const [viewResortId, setViewResortId] = useState<number | null>(null);
   const { pushToast } = useToast();
 
   const load = async (
@@ -173,7 +177,7 @@ export default function AdminResortsPage() {
   const subscriptionCell = (resort: ResortItem) =>
     resort.subscription ? (
       <span className={subBadge(resort.subscription.status)}>
-        {resort.subscription.status.replaceAll("_", " ")} · {resort.subscription.plan}
+        {formatSubscriptionStatusLabel(resort.subscription.status)} · {resort.subscription.plan}
       </span>
     ) : (
       <span className="text-zinc-600">—</span>
@@ -222,19 +226,12 @@ export default function AdminResortsPage() {
         </h1>
         <p className="dash-page-sub">Manage all resorts across every tenant.</p>
 
-        <form onSubmit={onSearch} className="dash-filter-bar mt-5">
-          <div className="relative min-w-[200px] flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Search by name…"
-              value={query}
-              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <button type="submit" className="dash-btn-primary shrink-0">
-            Search
-          </button>
+        <form onSubmit={onSearch} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={query}
+            onChange={(v) => setQuery(sanitizeSearchQuery(v))}
+            placeholder="Search by name…"
+          />
           <LocationFilterBar
             label="Resort location"
             value={locationFilter}
@@ -288,14 +285,14 @@ export default function AdminResortsPage() {
                 ]}
                 actions={
                   <>
-                    <Link
-                      href={`/resorts/${resort.id}`}
+                    <button
+                      type="button"
                       className="dash-btn-sm w-full justify-center"
-                      target="_blank"
+                      onClick={() => setViewResortId(resort.id)}
                     >
-                      <Globe size={14} />
-                      View public page
-                    </Link>
+                      <Eye size={14} />
+                      View
+                    </button>
                     <Link
                       href={`/dashboard/admin/onboard?resort_id=${resort.id}`}
                       className="dash-btn-sm w-full justify-center"
@@ -371,10 +368,10 @@ export default function AdminResortsPage() {
                 </td>
                 <DashTableActionsCell>
                   <DashTableActionsInner>
-                    <Link href={`/resorts/${resort.id}`} className="dash-btn-sm" target="_blank">
-                      <Globe size={14} />
+                    <button type="button" className="dash-btn-sm" onClick={() => setViewResortId(resort.id)}>
+                      <Eye size={14} />
                       View
-                    </Link>
+                    </button>
                     <Link href={`/dashboard/admin/onboard?resort_id=${resort.id}`} className="dash-btn-sm">
                       <PenLine size={14} />
                       Edit
@@ -386,6 +383,12 @@ export default function AdminResortsPage() {
           </AsyncStatePanel>
         </DataTable>
       </div>
+
+      <AdminResortViewModal
+        resortId={viewResortId}
+        open={viewResortId != null}
+        onClose={() => setViewResortId(null)}
+      />
     </div>
   );
 }

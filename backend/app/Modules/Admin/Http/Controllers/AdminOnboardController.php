@@ -8,7 +8,9 @@ use App\Models\Resort;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Modules\Subscriptions\Services\SubscriptionService;
+use App\Modules\Users\Services\UserService;
 use App\Services\EmailNotificationService;
+use App\Support\PlatformPasswordRules;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
 use App\Services\ResortOwnerOnboardingService;
@@ -31,6 +33,7 @@ class AdminOnboardController extends Controller
         private readonly PhilippineLocationService $locations,
         private readonly ReferralSignupTrialService $referralSignupTrial,
         private readonly ResortOwnerOnboardingService $ownerOnboarding,
+        private readonly UserService $userService,
     ) {}
 
     public function store(Request $request)
@@ -46,13 +49,33 @@ class AdminOnboardController extends Controller
             'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
+            'background_image_url' => ['nullable', 'string', 'max:2048'],
+            'address_street_line' => ['nullable', 'string', 'max:255'],
+            'map_latitude' => ['nullable', 'numeric', 'between:4.2,21.3'],
+            'map_longitude' => ['nullable', 'numeric', 'between:116.4,127.2'],
+            'facebook_url' => ['nullable', 'string', 'max:2048'],
+            'instagram_url' => ['nullable', 'string', 'max:2048'],
+            'tiktok_url' => ['nullable', 'string', 'max:2048'],
+            'representative_name' => ['nullable', 'string', 'max:190'],
+            'representative_contact_number' => ['nullable', 'string', 'max:30'],
+            'cancellation_policy' => ['nullable', 'string'],
+            'amenities' => ['nullable', 'array'],
+            'amenities.*' => ['string', 'max:120'],
             'plan' => ['required', 'in:basic'],
-            'owner_user_id' => ['required', 'integer', 'exists:users,id'],
+            'owner_user_id' => ['required_without:owner_email', 'nullable', 'integer', 'exists:users,id'],
+            'owner_name' => ['required_without:owner_user_id', 'string', 'max:120'],
+            'owner_email' => ['required_without:owner_user_id', 'email', 'max:190', 'unique:users,email'],
+            'owner_password' => array_merge(
+                ['required_without:owner_user_id'],
+                PlatformPasswordRules::confirmedOnly(),
+            ),
             'subdomain' => ['nullable', 'string', 'max:80', 'alpha_dash', 'unique:tenants,subdomain'],
             'slug' => ['nullable', 'string', 'max:120', 'alpha_dash', 'unique:tenants,slug'],
             'is_publicly_listed' => ['nullable', 'boolean'],
             'accept_terms' => ['required', 'accepted'],
         ]);
+
+        $validated = $this->normalizeOnboardSocialUrls($validated);
 
         $this->locations->assertValidPhilippineLocationOrEmpty(
             filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
@@ -60,6 +83,22 @@ class AdminOnboardController extends Controller
             isset($validated['address_barangay_name']) ? trim((string) $validated['address_barangay_name']) : null,
             filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
         );
+
+        $lat = $validated['map_latitude'] ?? null;
+        $lng = $validated['map_longitude'] ?? null;
+        $latEmpty = $lat === null || $lat === '';
+        $lngEmpty = $lng === null || $lng === '';
+        if ($latEmpty xor $lngEmpty) {
+            throw ValidationException::withMessages([
+                'map_latitude' => ['Provide both latitude and longitude, or clear both.'],
+            ]);
+        }
+
+        if (filled($validated['owner_user_id'] ?? null) && filled($validated['owner_email'] ?? null)) {
+            throw ValidationException::withMessages([
+                'owner_user_id' => ['Choose either an existing owner account or create a new one, not both.'],
+            ]);
+        }
 
         $payload = DB::transaction(function () use ($validated): array {
             $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName(
@@ -76,23 +115,7 @@ class AdminOnboardController extends Controller
                 'status' => 'active',
             ]);
 
-            $owner = User::withoutGlobalScopes()
-                ->where('id', $validated['owner_user_id'])
-                ->where('role', 'resort_owner')
-                ->lockForUpdate()
-                ->first();
-
-            if (! $owner) {
-                throw ValidationException::withMessages([
-                    'owner_user_id' => ['Selected owner account is invalid.'],
-                ]);
-            }
-
-            if ($owner->tenant_id !== null) {
-                throw ValidationException::withMessages([
-                    'owner_user_id' => ['Selected owner account is already assigned to another tenant.'],
-                ]);
-            }
+            $owner = $this->resolveOnboardOwner($validated);
 
             $owner->update([
                 'tenant_id' => $tenant->id,
@@ -100,23 +123,7 @@ class AdminOnboardController extends Controller
                 'terms_version' => PlatformTerms::version(),
             ]);
 
-            $resortPayload = [
-                'tenant_id' => $tenant->id,
-                'name' => $validated['resort_name'],
-                'description' => $validated['description'] ?? null,
-                'address_province_psgc' => filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
-                'address_city_municipality_psgc' => filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
-                'address_barangay_psgc' => filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
-                'address_barangay_name' => filled($validated['address_barangay_name'] ?? null) ? trim((string) $validated['address_barangay_name']) : null,
-                'address_label' => filled($validated['address_label'] ?? null) ? (string) $validated['address_label'] : null,
-                'contact_number' => $validated['contact_number'] ?? null,
-                'is_publicly_listed' => $validated['is_publicly_listed'] ?? true,
-            ];
-
-            // Backward compatibility: older sqlite files may not have logo_url yet.
-            if (Schema::hasColumn('resorts', 'logo_url')) {
-                $resortPayload['logo_url'] = $validated['logo_url'] ?? null;
-            }
+            $resortPayload = $this->resortPayloadFromOnboardInput($validated, $tenant->id);
 
             $resort = Resort::withoutGlobalScopes()->create($resortPayload);
             $this->locations->syncResortAddressLabel($resort);
@@ -164,6 +171,121 @@ class AdminOnboardController extends Controller
         ], 'Resort logo uploaded');
     }
 
+    public function uploadBackground(Request $request)
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
+        ]);
+
+        $disk = StoredMedia::disk();
+        $path = $request->file('image')->store('resort-backgrounds', $disk);
+
+        return $this->successResponse([
+            'background_image_url' => StoredMedia::publicUrlForPath($path),
+        ], 'Background image uploaded');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function resolveOnboardOwner(array $validated): User
+    {
+        if (filled($validated['owner_email'] ?? null)) {
+            return $this->userService->create([
+                'name' => trim((string) $validated['owner_name']),
+                'email' => strtolower(trim((string) $validated['owner_email'])),
+                'password' => (string) $validated['owner_password'],
+                'role' => 'resort_owner',
+            ]);
+        }
+
+        $owner = User::withoutGlobalScopes()
+            ->where('id', $validated['owner_user_id'])
+            ->where('role', 'resort_owner')
+            ->lockForUpdate()
+            ->first();
+
+        if (! $owner) {
+            throw ValidationException::withMessages([
+                'owner_user_id' => ['Selected owner account is invalid.'],
+            ]);
+        }
+
+        if ($owner->tenant_id !== null) {
+            throw ValidationException::withMessages([
+                'owner_user_id' => ['Selected owner account is already assigned to another tenant.'],
+            ]);
+        }
+
+        return $owner;
+    }
+
+    private function normalizeOnboardSocialUrls(array $validated): array
+    {
+        foreach (['facebook_url', 'instagram_url', 'tiktok_url'] as $key) {
+            if (! array_key_exists($key, $validated) || ! is_string($validated[$key])) {
+                continue;
+            }
+            $trimmed = trim($validated[$key]);
+            if ($trimmed === '') {
+                $validated[$key] = null;
+
+                continue;
+            }
+            if (! preg_match('#^https?://#i', $trimmed)) {
+                $trimmed = 'https://'.ltrim($trimmed, '/');
+            }
+            $validated[$key] = $trimmed;
+        }
+
+        return $validated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function resortPayloadFromOnboardInput(array $input, int $tenantId): array
+    {
+        $resortPayload = [
+            'tenant_id' => $tenantId,
+            'name' => $input['resort_name'],
+            'description' => $input['description'] ?? null,
+            'address_province_psgc' => filled($input['address_province_psgc'] ?? null) ? (string) $input['address_province_psgc'] : null,
+            'address_city_municipality_psgc' => filled($input['address_city_municipality_psgc'] ?? null) ? (string) $input['address_city_municipality_psgc'] : null,
+            'address_barangay_psgc' => filled($input['address_barangay_psgc'] ?? null) ? (string) $input['address_barangay_psgc'] : null,
+            'address_barangay_name' => filled($input['address_barangay_name'] ?? null) ? trim((string) $input['address_barangay_name']) : null,
+            'address_street_line' => filled($input['address_street_line'] ?? null) ? trim((string) $input['address_street_line']) : null,
+            'map_latitude' => filled($input['map_latitude'] ?? null) ? $input['map_latitude'] : null,
+            'map_longitude' => filled($input['map_longitude'] ?? null) ? $input['map_longitude'] : null,
+            'address_label' => filled($input['address_label'] ?? null) ? (string) $input['address_label'] : null,
+            'contact_number' => $input['contact_number'] ?? null,
+            'representative_name' => filled($input['representative_name'] ?? null) ? trim((string) $input['representative_name']) : null,
+            'representative_contact_number' => $input['representative_contact_number'] ?? null,
+            'cancellation_policy' => $input['cancellation_policy'] ?? null,
+            'amenities' => $input['amenities'] ?? [],
+            'is_publicly_listed' => $input['is_publicly_listed'] ?? true,
+        ];
+
+        if (Schema::hasColumn('resorts', 'logo_url')) {
+            $resortPayload['logo_url'] = $input['logo_url'] ?? null;
+        }
+        if (Schema::hasColumn('resorts', 'background_image_url')) {
+            $resortPayload['background_image_url'] = $input['background_image_url'] ?? null;
+        }
+        foreach (['facebook_url', 'instagram_url', 'tiktok_url'] as $social) {
+            if (Schema::hasColumn('resorts', $social)) {
+                $resortPayload[$social] = $input[$social] ?? null;
+            }
+        }
+
+        return $resortPayload;
+    }
+
     public function ownerStore(Request $request)
     {
         $user = $request->user();
@@ -190,12 +312,26 @@ class AdminOnboardController extends Controller
             'address_label' => ['nullable', 'string', 'max:512'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'logo_url' => ['nullable', 'string', 'max:2048'],
+            'background_image_url' => ['nullable', 'string', 'max:2048'],
+            'address_street_line' => ['nullable', 'string', 'max:255'],
+            'map_latitude' => ['nullable', 'numeric', 'between:4.2,21.3'],
+            'map_longitude' => ['nullable', 'numeric', 'between:116.4,127.2'],
+            'facebook_url' => ['nullable', 'string', 'max:2048'],
+            'instagram_url' => ['nullable', 'string', 'max:2048'],
+            'tiktok_url' => ['nullable', 'string', 'max:2048'],
+            'representative_name' => ['nullable', 'string', 'max:190'],
+            'representative_contact_number' => ['nullable', 'string', 'max:30'],
+            'cancellation_policy' => ['nullable', 'string'],
+            'amenities' => ['nullable', 'array'],
+            'amenities.*' => ['string', 'max:120'],
             'plan' => ['nullable', 'in:basic'],
             'subdomain' => ['nullable', 'string', 'max:80', 'alpha_dash', 'unique:tenants,subdomain'],
             'slug' => ['nullable', 'string', 'max:120', 'alpha_dash', 'unique:tenants,slug'],
             'is_publicly_listed' => ['nullable', 'boolean'],
             'accept_terms' => $acceptTermsRules,
         ]);
+
+        $validated = $this->normalizeOnboardSocialUrls($validated);
 
         if ($user->terms_accepted_at === null && ! $request->boolean('accept_terms')) {
             throw ValidationException::withMessages([

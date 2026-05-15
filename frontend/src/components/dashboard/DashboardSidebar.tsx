@@ -198,6 +198,8 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
   const guestResortLogo =
     role === "guest" && user?.home_resort?.logo_url ? laravelPublicUrl(user.home_resort.logo_url) : "";
 
+  const isCompactSidebar = role === "admin";
+
   const groups =
     role === "admin"        ? adminGroups :
     role === "resort_owner" ? resortOwnerGroups :
@@ -205,6 +207,8 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
     role === "admin_staff"  ? staffGroups :
     role === "guest"        ? guestGroups :
     clientGroups;
+
+  const navIconSize = isCompactSidebar ? 14 : 15;
   function isActive(item: NavItem): boolean {
     if (item.exact) return pathname === item.href;
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -225,11 +229,12 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
       <aside
         className={cn(
           "dash-sidebar fixed left-0 top-0 z-50 flex h-full w-[264px] flex-col transition-transform duration-200 ease-out md:translate-x-0",
+          isCompactSidebar && "dash-sidebar--compact",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
         {/* ── Logo header — dark ocean gradient ────────────────── */}
-        <div className="relative flex h-16 shrink-0 items-center justify-between overflow-hidden bg-gradient-to-br from-navy via-navy to-primaryBlue px-4 shadow-soft-sm">
+        <div className="dash-sidebar-header relative flex h-16 shrink-0 items-center justify-between overflow-hidden bg-gradient-to-br from-navy via-navy to-primaryBlue px-4 shadow-soft-sm">
           {/* Subtle diagonal sheen */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.04] to-transparent" />
 
@@ -250,7 +255,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
                   <BrandWordmark tone="onDark" size="2xs" className="leading-tight" />
                 </>
               ) : (
-                <BrandWordmark tone="onDark" size="sm" className="leading-tight" />
+                <BrandWordmark tone="onDark" size={isCompactSidebar ? "xs" : "sm"} className="leading-tight" />
               )}
             </div>
           </Link>
@@ -266,11 +271,11 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
         </div>
 
         {/* ── User info card ────────────────────────────────────── */}
-        <div className="border-b border-softBorder bg-gradient-to-b from-metalFace/60 to-transparent px-3 py-3">
+        <div className="dash-sidebar-user-wrap border-b border-softBorder bg-gradient-to-b from-metalFace/60 to-transparent px-3 py-3">
           {user ? (
-            <div className="flex items-center gap-3 rounded-xl border border-softBorder bg-white px-3 py-2.5 shadow-card">
+            <div className="dash-sidebar-user-card flex items-center gap-3 rounded-xl border border-softBorder bg-white px-3 py-2.5 shadow-card">
               {/* Avatar initials */}
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-navy to-primaryBlue text-[13px] font-bold text-white shadow-[0_2px_6px_rgba(11,85,99,0.30)] select-none">
+              <div className="dash-sidebar-user-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-navy to-primaryBlue text-[13px] font-bold text-white shadow-[0_2px_6px_rgba(11,85,99,0.30)] select-none">
                 {user.name
                   ?.split(/\s+/)
                   .map((w) => w[0])
@@ -282,20 +287,20 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
               {/* Name + email + role */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <p className="truncate font-dash text-[13px] font-semibold text-navy leading-tight">
+                  <p className="dash-sidebar-user-name truncate font-dash text-[13px] font-semibold text-navy leading-tight">
                     {user.name}
                   </p>
                 </div>
-                <p className="truncate text-[11px] text-zinc-500 leading-tight mt-0.5">{user.email}</p>
+                <p className="dash-sidebar-user-email truncate text-[11px] text-zinc-500 leading-tight mt-0.5">{user.email}</p>
                 <span
-                  className={`mt-1.5 inline-block rounded-full px-2 py-0.5 font-dash text-[10px] font-bold uppercase tracking-wide ${rolePillClass(role)}`}
+                  className={`dash-sidebar-user-role mt-1.5 inline-block rounded-full px-2 py-0.5 font-dash text-[10px] font-bold uppercase tracking-wide ${rolePillClass(role)}`}
                 >
                   {formatRoleLabel(role)}
                 </span>
               </div>
 
               {/* Role icon indicator */}
-              <div className="shrink-0">
+              <div className="dash-sidebar-user-decor shrink-0">
                 <BarChart3 size={14} className="text-slateBlue/60" aria-hidden />
               </div>
             </div>
@@ -303,13 +308,21 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
         </div>
 
         {/* ── Navigation ───────────────────────────────────────── */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Dashboard">
+        <nav
+          className={cn(
+            "dash-sidebar-nav px-3 py-4",
+            isCompactSidebar
+              ? "shrink-0 overflow-hidden"
+              : "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+          )}
+          aria-label="Dashboard"
+        >
           {groups.map((group) => (
-            <div key={group.label} className="mb-5">
-              <p className="mb-1.5 px-2 font-dash text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            <div key={group.label} className="dash-sidebar-group mb-5">
+              <p className="dash-sidebar-group-label mb-1.5 px-2 font-dash text-[10px] font-bold uppercase tracking-widest text-zinc-400">
                 {group.label}
               </p>
-              <ul className="space-y-0.5">
+              <ul className="dash-sidebar-group-list space-y-0.5">
                 {group.items.map((item) => {
                   const active = isActive(item);
                   return (
@@ -318,7 +331,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
                         href={item.href}
                         onClick={onClose}
                         className={cn(
-                          "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-dash text-dash-sm",
+                          "dash-sidebar-link group flex items-center gap-3 rounded-xl px-3 py-2.5 font-dash text-dash-sm",
                           "transition-[transform,color,background-color,box-shadow] duration-150",
                           "active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue/50",
                           active
@@ -330,7 +343,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
                       >
                         <span
                           className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+                            "dash-sidebar-link-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
                             "transition-[transform,color,background-color] duration-150",
                             active
                               // White-tinted icon bubble on dark bg
@@ -340,12 +353,12 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
                           )}
                           aria-hidden
                         >
-                          <item.icon size={15} strokeWidth={active ? 2.5 : 2} />
+                          <item.icon size={navIconSize} strokeWidth={active ? 2.5 : 2} />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>
                         {active ? (
                           // Bright dot indicator on active dark bg
-                          <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white/80 ring-4 ring-white/20" />
+                          <span className="dash-sidebar-link-dot ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white/80 ring-4 ring-white/20" />
                         ) : null}
                       </Link>
                     </li>
@@ -356,7 +369,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-softBorder bg-softGray/30 p-3">
+        <div className="dash-sidebar-footer shrink-0 border-t border-softBorder bg-softGray/30 p-3">
           <button
             type="button"
             onClick={() => {
@@ -364,9 +377,9 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
                 router.replace("/");
               });
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-softBorder bg-white py-2.5 font-dash text-dash-sm font-semibold text-zinc-600 shadow-dash-btn-sm transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-dsError/40 hover:bg-rose-50 hover:text-dsError focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/50 focus-visible:ring-offset-2"
+            className="dash-sidebar-logout flex w-full items-center justify-center gap-2 rounded-xl border border-softBorder bg-white py-2.5 font-dash text-dash-sm font-semibold text-zinc-600 shadow-dash-btn-sm transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-dsError/40 hover:bg-rose-50 hover:text-dsError focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/50 focus-visible:ring-offset-2"
           >
-            <LogOut size={15} strokeWidth={2} />
+            <LogOut size={isCompactSidebar ? 14 : 15} strokeWidth={2} />
             Log out
           </button>
         </div>

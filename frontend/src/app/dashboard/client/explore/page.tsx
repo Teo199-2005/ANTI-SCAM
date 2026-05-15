@@ -9,7 +9,8 @@ import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import { getFavoriteResortIds, toggleFavoriteResortId } from "@/lib/client/favorites";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
-import { Building2, Heart, MapPin, Search } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { Building2, Heart, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -77,19 +78,13 @@ export default function ExplorePage() {
         </h1>
         <p className="dash-page-sub">Browse public listings and open rooms to check availability.</p>
 
-        <form onSubmit={onSearch} className="dash-filter-bar mt-5">
-          <div className="relative min-w-[200px] flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Search by name or location…"
-              value={search}
-              onChange={(e) => setSearch(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <button type="submit" className="dash-btn-primary shrink-0">
-            Search
-          </button>
+        <form onSubmit={onSearch} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={search}
+            onChange={(v) => setSearch(sanitizeSearchQuery(v))}
+            placeholder="Search by name or location…"
+            wide
+          />
           <LocationFilterBar
             label="Resort location"
             value={locationFilter}

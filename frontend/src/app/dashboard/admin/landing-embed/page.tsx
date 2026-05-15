@@ -14,7 +14,8 @@ import { getResort, listResorts, type ResortItem } from "@/lib/api/resort";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { siteUrl } from "@/lib/site";
 import { extractLaravelMeta, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import { ChevronDown, ChevronUp, ExternalLink, Loader2, Search, Video } from "lucide-react";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { ChevronDown, ChevronUp, ExternalLink, Loader2, Video } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -273,19 +274,13 @@ export default function AdminLandingEmbedPage() {
         </h2>
         <p className="mb-4 text-sm text-zinc-600">Search and pick a resort to configure.</p>
 
-        <form onSubmit={onSearch} className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, address, or phone…"
-              className="dash-input w-full pl-9"
-            />
-          </div>
-          <button type="submit" className="dash-btn-secondary shrink-0">
-            Search
-          </button>
+        <form onSubmit={onSearch} className="dash-filter-bar mb-4">
+          <DashboardFilterSearch
+            value={query}
+            onChange={setQuery}
+            placeholder="Search by name, address, or phone…"
+            wide
+          />
           <LocationFilterBar
             label="Resort location"
             value={locationFilter}

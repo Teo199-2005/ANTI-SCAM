@@ -116,13 +116,28 @@ class ResortOwnerOnboardingService
                 'address_city_municipality_psgc' => filled($input['address_city_municipality_psgc'] ?? null) ? (string) $input['address_city_municipality_psgc'] : null,
                 'address_barangay_psgc' => filled($input['address_barangay_psgc'] ?? null) ? (string) $input['address_barangay_psgc'] : null,
                 'address_barangay_name' => filled($input['address_barangay_name'] ?? null) ? trim((string) $input['address_barangay_name']) : null,
+                'address_street_line' => filled($input['address_street_line'] ?? null) ? trim((string) $input['address_street_line']) : null,
+                'map_latitude' => filled($input['map_latitude'] ?? null) ? $input['map_latitude'] : null,
+                'map_longitude' => filled($input['map_longitude'] ?? null) ? $input['map_longitude'] : null,
                 'address_label' => filled($input['address_label'] ?? null) ? (string) $input['address_label'] : null,
                 'contact_number' => $input['contact_number'] ?? null,
+                'representative_name' => filled($input['representative_name'] ?? null) ? trim((string) $input['representative_name']) : null,
+                'representative_contact_number' => $input['representative_contact_number'] ?? null,
+                'cancellation_policy' => $input['cancellation_policy'] ?? null,
+                'amenities' => $input['amenities'] ?? [],
                 'is_publicly_listed' => $input['is_publicly_listed'] ?? false,
             ];
 
             if (Schema::hasColumn('resorts', 'logo_url')) {
                 $resortPayload['logo_url'] = $input['logo_url'] ?? null;
+            }
+            if (Schema::hasColumn('resorts', 'background_image_url')) {
+                $resortPayload['background_image_url'] = $input['background_image_url'] ?? null;
+            }
+            foreach (['facebook_url', 'instagram_url', 'tiktok_url'] as $social) {
+                if (Schema::hasColumn('resorts', $social)) {
+                    $resortPayload[$social] = $input[$social] ?? null;
+                }
             }
 
             $resort = Resort::withoutGlobalScopes()->create($resortPayload);

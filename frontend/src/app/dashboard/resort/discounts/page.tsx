@@ -303,11 +303,12 @@ export default function ResortDiscountsPage() {
                     { label: "Valid until", value: c.valid_until ?? "—" },
                     {
                       label: "Active",
+                      fullWidth: true,
                       value: (
                         <button
                           type="button"
                           onClick={() => void toggleActive(c)}
-                          className={`min-h-11 w-full max-w-xs rounded-xl px-3 text-xs font-semibold transition ${
+                          className={`min-h-11 w-full rounded-xl px-3 text-xs font-semibold transition ${
                             c.is_active
                               ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                               : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"

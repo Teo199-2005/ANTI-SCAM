@@ -9,6 +9,7 @@ import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import AdminCreateUserModal from "@/components/dashboard/AdminCreateUserModal";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import BulkActionBar from "@/components/shared/BulkActionBar";
 import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -26,7 +27,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { bulkDeleteToastDescription, bulkDeleteUsers } from "@/lib/api/bulkDelete";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
-import { Search, Trash2, UserPlus, Users } from "lucide-react";
+import { Trash2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type User = {
@@ -224,21 +225,19 @@ export default function AdminUsersPage() {
         </h1>
         <p className="dash-page-sub">Manage platform users and their roles.</p>
 
-        <form onSubmit={onSearch} className="dash-filter-bar mt-5">
-          <div className="relative min-w-[200px] flex-1">
-            <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
-              className="dash-input pl-9"
-              placeholder="Search by name or email…"
-              value={query}
-              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <button type="submit" className="dash-btn-primary shrink-0">
-            Search
-          </button>
-          <button type="button" className="dash-btn-sm inline-flex shrink-0 items-center justify-center gap-1.5" onClick={() => setCreateOpen(true)}>
-            <UserPlus size={14} />
+        <form onSubmit={onSearch} className="dash-filter-bar">
+          <DashboardFilterSearch
+            value={query}
+            onChange={(v) => setQuery(sanitizeSearchQuery(v))}
+            placeholder="Search by name or email…"
+            wide
+          />
+          <button
+            type="button"
+            className="dash-filter-clear inline-flex items-center gap-1"
+            onClick={() => setCreateOpen(true)}
+          >
+            <UserPlus size={13} aria-hidden />
             Add user
           </button>
           <LocationFilterBar

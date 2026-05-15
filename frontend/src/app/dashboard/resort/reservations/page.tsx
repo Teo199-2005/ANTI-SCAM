@@ -448,25 +448,31 @@ export default function ResortReservationsPage() {
         </p>
       </div>
 
-      <div className="dash-card dash-filter-bar flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end">
-        <div className="min-w-48 flex-1">
-          <label className="mb-1.5 block text-xs font-semibold text-zinc-600">Status filter</label>
-          <select className="dash-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="pending_payment">pending_payment</option>
-            <option value="confirmed">confirmed</option>
-            <option value="cancelled">cancelled</option>
-            <option value="expired">expired</option>
-            <option value="no_show">no_show</option>
-            <option value="completed">completed</option>
-          </select>
-        </div>
-        <button type="button" className="dash-btn-primary" onClick={() => applyFilter()}>
-          <Filter size={14} />
+      <div className="dash-filter-bar">
+        <select
+          className="dash-filter-select min-w-[9.5rem]"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          aria-label="Status filter"
+        >
+          <option value="">All statuses</option>
+          <option value="pending_payment">pending_payment</option>
+          <option value="confirmed">confirmed</option>
+          <option value="cancelled">cancelled</option>
+          <option value="expired">expired</option>
+          <option value="no_show">no_show</option>
+          <option value="completed">completed</option>
+        </select>
+        <button type="button" className="dash-filter-submit inline-flex items-center gap-1" onClick={() => applyFilter()}>
+          <Filter size={13} aria-hidden />
           Apply
         </button>
-        <button type="button" className="dash-btn-sm border border-navy/20 bg-softCard text-navy" onClick={() => void openManualCreate()}>
-          <Plus size={14} />
+        <button
+          type="button"
+          className="dash-filter-clear ml-auto inline-flex items-center gap-1"
+          onClick={() => void openManualCreate()}
+        >
+          <Plus size={13} aria-hidden />
           Manual reservation
         </button>
       </div>
@@ -512,26 +518,29 @@ export default function ResortReservationsPage() {
                         {expanded ? "Hide details" : "Show details"}
                       </button>
                       {expanded ? (
-                        <div className="space-y-2 border-t border-softBorder pt-3 text-dash-sm text-zinc-700">
-                          <p>
-                            <span className="font-semibold text-zinc-500">Room</span> {item.room?.name ?? "—"}
+                        <div className="grid grid-cols-2 gap-2 border-t border-softBorder pt-3 text-dash-sm text-zinc-700">
+                          <p className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Room</span>
+                            {item.room?.name ?? "—"}
                           </p>
-                          <p>
-                            <span className="font-semibold text-zinc-500">Guest</span> {guestDisplayName(item)}
+                          <p className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Guest</span>
+                            {guestDisplayName(item)}
                           </p>
-                          <p>
-                            <span className="font-semibold text-zinc-500">Email</span> {guestDisplayEmail(item)}
+                          <p className="col-span-2 min-w-0 break-all">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Email</span>
+                            {guestDisplayEmail(item)}
                           </p>
-                          <p>
-                            <span className="font-semibold text-zinc-500">Reservation fee</span>{" "}
+                          <p className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Reservation fee</span>
                             <span className="text-emerald-700">₱{Number(item.reservationFee).toLocaleString()}</span>
                           </p>
-                          <p>
-                            <span className="font-semibold text-zinc-500">Payment</span>{" "}
+                          <p className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Payment</span>
                             {item.xenditPaymentStatus ?? "pending"}
                           </p>
                           {canEditManual(item) || canCancelManual(item) ? (
-                            <div className="mt-2 flex flex-col gap-2">
+                            <div className="col-span-2 mt-1 flex flex-col gap-2">
                               {canEditManual(item) ? (
                                 <button
                                   type="button"
@@ -556,7 +565,7 @@ export default function ResortReservationsPage() {
                             </div>
                           ) : null}
                           {lifecycle ? (
-                            <div className="mt-3 flex flex-col gap-2">
+                            <div className="col-span-2 flex flex-col gap-2">
                               <button
                                 type="button"
                                 disabled={lifecycleBusyId === item.id}

@@ -33,4 +33,17 @@ final class PlatformPasswordRules
             Password::min(8)->mixedCase()->numbers()->uncompromised(),
         ];
     }
+
+    /**
+     * Password strength rules when another rule (e.g. required_without) handles presence.
+     *
+     * @return list<Rule|string>
+     */
+    public static function confirmedOnly(): array
+    {
+        return [
+            'confirmed',
+            Password::min(8)->mixedCase()->numbers()->uncompromised(),
+        ];
+    }
 }
