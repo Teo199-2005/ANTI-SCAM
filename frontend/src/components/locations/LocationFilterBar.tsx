@@ -53,7 +53,7 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
   const cities = useMemo(() => {
     if (!selectedProv?.provCode) return [];
     return listMuncities(selectedProv.provCode)
-      .map((m) => ({ code: m.psgcCode, name: m.munName.trim() }))
+      .map((m) => ({ code: m.psgcCode, name: m.munCityName.trim() }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedProv]);
 
