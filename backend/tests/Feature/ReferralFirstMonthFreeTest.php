@@ -20,13 +20,11 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Tests for the referral "first month free" feature:
- *  - Profile/readiness gate blocks checkout when profile is incomplete
- *  - 1-month term is blocked (promo requires multi-month)
- *  - Standard rates are charged (no referral tier discount)
- *  - Charge reflects N-1 months for an N-month term (first month free)
- *  - Webhook credits the full N-month term to the subscription
- *  - ReferralValidationController returns readiness payload
+ * Referral UX and billing:
+ *  - Validation endpoints return marketer + landing readiness
+ *  - Checkout rejects referral codes (benefits apply at registration only)
+ *  - Standard prepay amounts without referral at checkout
+ *  - Webhook credits full term for legacy _fmf / _b1 invoice plan tags
  */
 class ReferralFirstMonthFreeTest extends TestCase
 {
@@ -146,6 +144,14 @@ class ReferralFirstMonthFreeTest extends TestCase
         ]);
     }
 
+    private function enableMockSubscriptionCheckout(): void
+    {
+        config([
+            'services.xendit.allow_mock_paid' => true,
+            'services.xendit.secret_key' => null,
+        ]);
+    }
+
     // ─── Referral validation endpoint ────────────────────────────────────────
 
     public function test_referral_validation_returns_readiness_payload(): void
@@ -220,18 +226,16 @@ class ReferralFirstMonthFreeTest extends TestCase
 
     // ─── Invoice creation: gate checks ───────────────────────────────────────
 
-    public function test_referral_checkout_blocked_when_profile_incomplete(): void
+    public function test_pay_invoice_rejects_referral_code_at_checkout(): void
     {
-        config(['services.xendit.allow_mock_paid' => false]);
+        $this->enableMockSubscriptionCheckout();
 
         $tenant = $this->makeTenant();
         $owner = $this->makeResortOwner($tenant);
         $marketer = $this->makeMarketer($tenant);
-        $resort = $this->makeResort($tenant, [
-            'logo_url' => null,
-            'background_image_url' => null,
-        ]);
-        $this->makeSubscription($resort);
+        $resort = $this->makeResort($tenant);
+        $this->addRoomWithImage($resort);
+        $this->makeSubscription($resort, 'expired');
         $this->assignMarketerToResort($marketer, $resort);
 
         Sanctum::actingAs($owner);
@@ -243,105 +247,45 @@ class ReferralFirstMonthFreeTest extends TestCase
         ]);
 
         $response->assertStatus(422);
-        $response->assertJsonPath('errors.referral_code.0', 'profile_incomplete');
-        $this->assertContains('logo', $response->json('errors.missing_fields'));
-        $this->assertContains('room_with_image', $response->json('errors.missing_fields'));
-    }
-
-    public function test_referral_checkout_blocked_for_one_month_term(): void
-    {
-        config(['services.xendit.allow_mock_paid' => false]);
-
-        $tenant = $this->makeTenant();
-        $owner = $this->makeResortOwner($tenant);
-        $marketer = $this->makeMarketer($tenant);
-        $resort = $this->makeResort($tenant);
-        $this->addRoomWithImage($resort);
-        $this->makeSubscription($resort);
-        $this->assignMarketerToResort($marketer, $resort);
-
-        Sanctum::actingAs($owner);
-
-        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
-            'billing_scope' => 'monthly',
-            'subscription_duration_months' => 1,
-            'referral_code' => 'TESTCODE001',
-        ]);
-
-        $response->assertStatus(422);
-        $response->assertJsonPath('errors.referral_code.0', 'invalid_duration');
+        $response->assertJsonPath('errors.referral_code.0', 'registration_only');
     }
 
     // ─── Invoice creation: amounts ────────────────────────────────────────────
 
-    public function test_referral_checkout_charges_standard_rate_minus_one_month_for_3m(): void
+    public function test_checkout_charges_full_standard_amount_for_3m(): void
     {
-        config(['services.xendit.allow_mock_paid' => true]);
+        $this->enableMockSubscriptionCheckout();
 
         $tenant = $this->makeTenant();
         $owner = $this->makeResortOwner($tenant);
-        $marketer = $this->makeMarketer($tenant);
         $resort = $this->makeResort($tenant);
         $this->addRoomWithImage($resort);
-        $this->makeSubscription($resort);
-        $this->assignMarketerToResort($marketer, $resort);
+        $this->makeSubscription($resort, 'expired');
 
         Sanctum::actingAs($owner);
 
         $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 3,
-            'referral_code' => 'TESTCODE001',
         ]);
 
         $response->assertOk();
 
-        // Standard 3-month rate = ₱1,900/mo; first month free → charge 2 months = ₱3,800
         $invoice = SubscriptionInvoice::where('resort_id', $resort->id)->latest('id')->first();
         $this->assertNotNull($invoice);
-        $this->assertEquals(3800.0, (float) $invoice->amount);
-        $this->assertStringContainsString('_m3_fmf', (string) $invoice->plan);
-        $this->assertEquals('TESTCODE001', $invoice->referral_code);
-    }
-
-    public function test_referral_checkout_charges_standard_rate_minus_one_month_for_12m(): void
-    {
-        config(['services.xendit.allow_mock_paid' => true]);
-
-        $tenant = $this->makeTenant();
-        $owner = $this->makeResortOwner($tenant);
-        $marketer = $this->makeMarketer($tenant);
-        $resort = $this->makeResort($tenant);
-        $this->addRoomWithImage($resort);
-        $this->makeSubscription($resort);
-        $this->assignMarketerToResort($marketer, $resort);
-
-        Sanctum::actingAs($owner);
-
-        $response = $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
-            'billing_scope' => 'monthly',
-            'subscription_duration_months' => 12,
-            'referral_code' => 'TESTCODE001',
-        ]);
-
-        $response->assertOk();
-
-        // Standard 12-month rate = ₱1,500/mo; first month free → charge 11 months = ₱16,500
-        $invoice = SubscriptionInvoice::where('resort_id', $resort->id)->latest('id')->first();
-        $this->assertNotNull($invoice);
-        $this->assertEquals(16500.0, (float) $invoice->amount);
-        $this->assertStringContainsString('_m12_fmf', (string) $invoice->plan);
+        $this->assertEquals(5700.0, (float) $invoice->amount);
+        $this->assertStringContainsString('_m3_b0', (string) $invoice->plan);
     }
 
     public function test_no_referral_charges_full_standard_amount(): void
     {
-        config(['services.xendit.allow_mock_paid' => true]);
+        $this->enableMockSubscriptionCheckout();
 
         $tenant = $this->makeTenant();
         $owner = $this->makeResortOwner($tenant);
         $resort = $this->makeResort($tenant);
         $this->addRoomWithImage($resort);
-        $this->makeSubscription($resort);
+        $this->makeSubscription($resort, 'expired');
 
         Sanctum::actingAs($owner);
 

@@ -22,6 +22,7 @@ use App\Modules\Billing\Http\Controllers\SubscriptionInvoiceController;
 use App\Modules\Billing\Http\Controllers\SubscriptionWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditInvoiceController;
 use App\Modules\Billing\Http\Controllers\XenditPayoutWebhookController;
+use App\Modules\Billing\Http\Controllers\XenditExpiredPhWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditWebhookController;
 use App\Modules\Dashboard\Http\Controllers\DashboardController;
 use App\Modules\Dashboard\Http\Controllers\MarketingDashboardController;
@@ -52,6 +53,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('throttle:webhooks')->group(function (): void {
         Route::post('/webhooks/xendit/invoice', [XenditWebhookController::class, 'invoice']);
         Route::post('/webhooks/xendit/subscription-invoice', [SubscriptionWebhookController::class, 'invoice']);
+        Route::post('/webhooks/xendit/expired-ph', [XenditExpiredPhWebhookController::class, 'handle']);
         Route::post('/webhooks/xendit/payout', [XenditPayoutWebhookController::class, 'payout']);
     });
 

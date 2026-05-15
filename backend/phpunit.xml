@@ -33,5 +33,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="XENDIT_SECRET_KEY" value=""/>
+        <env name="XENDIT_ALLOW_MOCK_PAID" value="true"/>
     </php>
 </phpunit>
