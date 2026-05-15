@@ -58,7 +58,7 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
   }, [selectedProv]);
 
   return (
-    <motionlessLocationFilterRoot className={className}>
+    <LocationFilterRoot className={className}>
       <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-zinc-600">
         <MapPin size={13} className="text-zinc-400" aria-hidden />
         {label}
@@ -104,11 +104,11 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
           Clear location
         </button>
       )}
-    </motionlessLocationFilterRoot>
+    </LocationFilterRoot>
   );
 }
 
-function motionlessLocationFilterRoot({
+function LocationFilterRoot({
   className,
   children,
 }: {
