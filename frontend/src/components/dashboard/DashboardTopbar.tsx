@@ -109,6 +109,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const subscriptionDaysLeft = subscriptionDaysRemaining(subscriptionEndsAt);
   const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
   const isPaidSubscriptionActive = (subscriptionInfo?.status ?? "").toLowerCase() === "active";
+  const ownerHasWorkspace = user?.role === "resort_owner" && user.tenant_id != null;
   const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
   const totalCharge = selectedOffer.monthlyRate * selectedDuration;
 
@@ -183,6 +184,14 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
 
   const subscribeNow = async () => {
     if (!user || user.role !== "resort_owner") return;
+    if (!ownerHasWorkspace) {
+      pushToast({
+        title: "Complete setup first",
+        description: "Create your resort workspace on Profile before subscribing.",
+        tone: "warning",
+      });
+      return;
+    }
     if (subscribeInFlightRef.current) return;
     subscribeInFlightRef.current = true;
     setSubscribingNow(true);

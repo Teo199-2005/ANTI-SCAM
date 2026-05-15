@@ -11,12 +11,14 @@ use App\Modules\Subscriptions\Services\SubscriptionService;
 use App\Services\EmailNotificationService;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
+use App\Services\ResortOwnerOnboardingService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\MultipartUploadHints;
 use App\Support\StoredMedia;
 use App\Support\TenantPublicIdentifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AdminOnboardController extends Controller
@@ -28,6 +30,7 @@ class AdminOnboardController extends Controller
         private readonly EmailNotificationService $emailNotifications,
         private readonly PhilippineLocationService $locations,
         private readonly ReferralSignupTrialService $referralSignupTrial,
+        private readonly ResortOwnerOnboardingService $ownerOnboarding,
     ) {}
 
     public function store(Request $request)
@@ -172,6 +175,10 @@ class AdminOnboardController extends Controller
             return $this->errorResponse('This resort owner account is already assigned to a tenant.', null, 409);
         }
 
+        $acceptTermsRules = $user->terms_accepted_at === null
+            ? ['required', 'accepted']
+            : ['nullable', 'boolean'];
+
         $validated = $request->validate([
             'tenant_name' => ['required', 'string', 'max:120'],
             'resort_name' => ['required', 'string', 'max:120'],
@@ -187,66 +194,16 @@ class AdminOnboardController extends Controller
             'subdomain' => ['nullable', 'string', 'max:80', 'alpha_dash', 'unique:tenants,subdomain'],
             'slug' => ['nullable', 'string', 'max:120', 'alpha_dash', 'unique:tenants,slug'],
             'is_publicly_listed' => ['nullable', 'boolean'],
-            'accept_terms' => ['required', 'accepted'],
+            'accept_terms' => $acceptTermsRules,
         ]);
 
-        $this->locations->assertValidPhilippineLocationOrEmpty(
-            filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
-            filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
-            isset($validated['address_barangay_name']) ? trim((string) $validated['address_barangay_name']) : null,
-            filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
-        );
-
-        $payload = DB::transaction(function () use ($validated, $user): array {
-            $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName(
-                $validated['resort_name'],
-                $validated['tenant_name'],
-            );
-            $publicKey = $validated['subdomain']
-                ?? TenantPublicIdentifier::allocateUniqueSubdomain($base);
-
-            $tenant = Tenant::create([
-                'name' => $validated['tenant_name'],
-                'slug' => $validated['slug'] ?? $publicKey,
-                'subdomain' => $publicKey,
-                'status' => 'active',
+        if ($user->terms_accepted_at === null && ! $request->boolean('accept_terms')) {
+            throw ValidationException::withMessages([
+                'accept_terms' => ['You must accept the Terms & Conditions.'],
             ]);
+        }
 
-            $user->update([
-                'tenant_id' => $tenant->id,
-                'terms_accepted_at' => now(),
-                'terms_version' => PlatformTerms::version(),
-            ]);
-
-            $resortPayload = [
-                'tenant_id' => $tenant->id,
-                'name' => $validated['resort_name'],
-                'description' => $validated['description'] ?? null,
-                'address_province_psgc' => filled($validated['address_province_psgc'] ?? null) ? (string) $validated['address_province_psgc'] : null,
-                'address_city_municipality_psgc' => filled($validated['address_city_municipality_psgc'] ?? null) ? (string) $validated['address_city_municipality_psgc'] : null,
-                'address_barangay_psgc' => filled($validated['address_barangay_psgc'] ?? null) ? (string) $validated['address_barangay_psgc'] : null,
-                'address_barangay_name' => filled($validated['address_barangay_name'] ?? null) ? trim((string) $validated['address_barangay_name']) : null,
-                'address_label' => filled($validated['address_label'] ?? null) ? (string) $validated['address_label'] : null,
-                'contact_number' => $validated['contact_number'] ?? null,
-                'is_publicly_listed' => $validated['is_publicly_listed'] ?? true,
-            ];
-
-            if (Schema::hasColumn('resorts', 'logo_url')) {
-                $resortPayload['logo_url'] = $validated['logo_url'] ?? null;
-            }
-
-            $resort = Resort::withoutGlobalScopes()->create($resortPayload);
-            $this->locations->syncResortAddressLabel($resort);
-            $subscription = $this->subscriptions->refreshForResort($resort, 'basic');
-            $subscription = $this->referralSignupTrial->applyTrialAfterOnboard($user->fresh(), $resort, $subscription);
-
-            return [
-                'tenant' => $tenant,
-                'resort' => $resort->fresh()->loadCount('rooms'),
-                'subscription' => $subscription,
-                'owner' => $user->fresh(),
-            ];
-        });
+        $payload = $this->ownerOnboarding->onboardOwner($user, $validated);
 
         $this->emailNotifications->sendTermsAccepted($payload['owner'], 'resort onboarding');
 

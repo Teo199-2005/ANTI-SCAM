@@ -20,6 +20,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, ReceiptText, RefreshCw, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -36,6 +37,7 @@ export default function ResortOverviewPage() {
   const [calendarReservations, setCalendarReservations] = useState<ResortBookingCalendarReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [setupRequired, setSetupRequired] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [paymentThankYou, setPaymentThankYou] = useState<SubscriptionPaymentThankVariant | null>(null);
 
@@ -106,6 +108,7 @@ export default function ResortOverviewPage() {
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
+    setSetupRequired(false);
     try {
       const now = new Date();
       const [statsResult, calendarResult] = await Promise.allSettled([
@@ -113,6 +116,20 @@ export default function ResortOverviewPage() {
         getResortBookingCalendar(now.getFullYear(), now.getMonth() + 1),
       ]);
       if (statsResult.status !== "fulfilled") {
+        const reason = statsResult.reason;
+        const noResortLinked =
+          isAxiosError(reason) &&
+          reason.response?.status === 422 &&
+          String(reason.response?.data?.message ?? "")
+            .toLowerCase()
+            .includes("no resort is linked");
+        if (noResortLinked) {
+          setSetupRequired(true);
+          setStats(null);
+          setCalendarReservations([]);
+          setError(null);
+          return;
+        }
         throw new Error("stats_failed");
       }
       setStats(statsResult.value);
@@ -142,6 +159,22 @@ export default function ResortOverviewPage() {
             <div key={i} className="h-24 animate-pulse rounded-2xl bg-softCard/80 shadow-card md:h-28" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (setupRequired) {
+    return (
+      <div className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-950">
+        <p className="text-sm leading-relaxed">
+          Your resort workspace is not set up yet. Finish setup on your profile to load bookings and revenue here.
+        </p>
+        <Link
+          href="/dashboard/resort/profile"
+          className="inline-flex items-center justify-center rounded-xl bg-navy px-5 py-2.5 text-sm font-semibold text-white shadow-card transition hover:opacity-95"
+        >
+          Go to Profile
+        </Link>
       </div>
     );
   }

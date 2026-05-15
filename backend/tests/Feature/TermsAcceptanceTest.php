@@ -56,6 +56,7 @@ class TermsAcceptanceTest extends TestCase
         $this->assertNotNull($user);
         $this->assertNotNull($user->terms_accepted_at);
         $this->assertSame('2026-05', $user->terms_version);
+        $this->assertNotNull($user->tenant_id);
 
         $this->assertDatabaseHas('email_logs', [
             'type' => 'terms_accepted',

@@ -12,6 +12,7 @@ use App\Services\EmailVerificationOtpService;
 use App\Services\PasswordResetOtpService;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
+use App\Services\ResortOwnerOnboardingService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\GcashAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
@@ -33,6 +34,7 @@ class AuthController extends Controller
         private readonly EmailNotificationService $emailNotifications,
         private readonly PhilippineLocationService $locations,
         private readonly ReferralSignupTrialService $referralSignupTrial,
+        private readonly ResortOwnerOnboardingService $ownerOnboarding,
     ) {}
 
     public function register(Request $request)
@@ -101,12 +103,22 @@ class AuthController extends Controller
 
         $referralTrialPayload = ['referral_trial' => $this->referralSignupTrial->trialPayloadForUser($user)];
         $referralCode = trim((string) ($validated['referral_code'] ?? ''));
+        $businessName = isset($validated['business_name']) ? trim((string) $validated['business_name']) : null;
+
         if ($referralCode !== '' && $roleIntent === 'resort_owner') {
             $referralTrialPayload = $this->referralSignupTrial->redeemAtRegistration(
                 $user,
                 $referralCode,
-                isset($validated['business_name']) ? trim((string) $validated['business_name']) : null,
+                $businessName !== '' ? $businessName : null,
             );
+            $user->refresh();
+        }
+
+        if ($roleIntent === 'resort_owner') {
+            $this->ownerOnboarding->onboardOwner($user, [
+                'business_name' => $businessName !== '' ? $businessName : null,
+                'is_publicly_listed' => false,
+            ]);
             $user->refresh();
         }
 

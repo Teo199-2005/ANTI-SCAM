@@ -116,9 +116,8 @@ export default function ResortProfilePage() {
   const [bgUploadDetail, setBgUploadDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [subdomain, setSubdomain] = useState<string | null>(null);
-  const [onboardingGate, setOnboardingGate] = useState(false);
-  const [acceptOnboardTerms, setAcceptOnboardTerms] = useState(false);
-  const [onboardingBusy, setOnboardingBusy] = useState(false);
+  const [needsWorkspaceSetup, setNeedsWorkspaceSetup] = useState(false);
+  const [setupBusy, setSetupBusy] = useState(false);
   /** Same readiness rules as the public `/resort/{slug}` page (includes active room + photo). */
   const [ownerLanding, setOwnerLanding] = useState<OwnerLandingPageResponse | null>(null);
 
@@ -133,13 +132,13 @@ export default function ResortProfilePage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      setOnboardingGate(false);
+      setNeedsWorkspaceSetup(false);
       try {
         const resorts = await listResorts({ perPage: 10 });
         const first = resorts.data[0];
         if (!first) {
           if (user?.role === "resort_owner") {
-            setOnboardingGate(true);
+            setNeedsWorkspaceSetup(true);
             setForm(null);
             setOwnerLanding(null);
             setSubdomain(null);
@@ -206,10 +205,10 @@ export default function ResortProfilePage() {
     void load();
   }, [refreshUser, user?.email, user?.name, user?.phone, user?.role]);
 
-  const completeOwnerOnboarding = async () => {
-    if (!user?.name || !acceptOnboardTerms) return;
+  const finishWorkspaceSetup = async () => {
+    if (!user?.name) return;
     const ownerLabel = (user.name ?? "Resort Owner").trim();
-    setOnboardingBusy(true);
+    setSetupBusy(true);
     try {
       await ownerOnboardResort({
         tenant_name: ownerLabel,
@@ -218,8 +217,7 @@ export default function ResortProfilePage() {
         accept_terms: true,
       });
       await refreshUser();
-      setAcceptOnboardTerms(false);
-      setOnboardingGate(false);
+      setNeedsWorkspaceSetup(false);
       setLoading(true);
       const resorts = await listResorts({ perPage: 10 });
       const first = resorts.data[0];
@@ -270,17 +268,17 @@ export default function ResortProfilePage() {
       setError(null);
       pushToast({
         title: "Workspace ready",
-        description: "Your resort workspace was created. A copy of the Terms was sent to your email.",
+        description: "Your resort workspace is ready. You can complete your profile below.",
         tone: "success",
       });
     } catch (err) {
       pushToast({
-        title: "Onboarding failed",
+        title: "Setup failed",
         description: parseApiErrorMessage(err, "Could not create your resort workspace."),
         tone: "error",
       });
     } finally {
-      setOnboardingBusy(false);
+      setSetupBusy(false);
       setLoading(false);
     }
   };
@@ -289,36 +287,24 @@ export default function ResortProfilePage() {
     return <div className="dash-card p-8 text-center text-zinc-600">Loading resort profile…</div>;
   }
 
-  if (onboardingGate && user?.role === "resort_owner") {
+  if (needsWorkspaceSetup && user?.role === "resort_owner") {
     return (
       <div className="dash-card max-w-xl p-8">
         <h1 className="dash-page-title inline-flex items-center gap-2">
           <Building2 size={24} className="text-skyBlue" />
-          Accept terms to continue
+          Finish setup
         </h1>
         <p className="mt-2 text-sm text-zinc-600">
-          Before we create your resort workspace, please confirm you have read and agree to the{" "}
-          <BrandWordmark tone="onLight" size="xs" className="inline" /> Terms & Conditions. A full copy will be
-          emailed to you for your records.
+          Your account does not have a resort workspace yet. This one-time step creates your tenant and default resort
+          so you can use the dashboard, rooms, and subscription checkout.
         </p>
-        <label className="mt-6 flex items-start gap-3 rounded-xl border border-softBorder bg-softGray/30 p-4 text-sm text-zinc-700">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 rounded border-softBorder accent-primaryBlue"
-            checked={acceptOnboardTerms}
-            onChange={(e) => setAcceptOnboardTerms(e.target.checked)}
-          />
-          <span>
-            I have read and agree to the <LegalLinkButton kind="terms">Terms &amp; Conditions</LegalLinkButton>.
-          </span>
-        </label>
         <button
           type="button"
-          disabled={!acceptOnboardTerms || onboardingBusy}
+          disabled={setupBusy}
           className="dash-btn-primary mt-6 px-6 py-2.5 disabled:opacity-50"
-          onClick={() => void completeOwnerOnboarding()}
+          onClick={() => void finishWorkspaceSetup()}
         >
-          {onboardingBusy ? "Creating workspace…" : "Create my resort workspace"}
+          {setupBusy ? "Setting up…" : "Create resort workspace"}
         </button>
       </div>
     );
