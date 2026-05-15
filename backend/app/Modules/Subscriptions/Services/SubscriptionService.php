@@ -38,7 +38,10 @@ class SubscriptionService
         ];
     }
 
-    public function refreshForResort(Resort $resort, string $plan = 'basic'): Subscription
+    /**
+     * @param  bool  $activateIfNew  When true, new subscriptions start active (demos/admin). Default false — owners must pay or use a referral trial.
+     */
+    public function refreshForResort(Resort $resort, string $plan = 'basic', bool $activateIfNew = false): Subscription
     {
         $roomCount = $resort->rooms()->where('status', 'active')->count();
         $pricing = $this->calculateMonthlyBilling($plan, $roomCount);
@@ -58,7 +61,7 @@ class SubscriptionService
             $subscription->billing_cycle_start = $cycleStart->toDateString();
             $subscription->billing_cycle_end = $cycleEnd->toDateString();
             $subscription->next_due_date = $cycleEnd->toDateString();
-            $subscription->status = 'active';
+            $subscription->status = $activateIfNew ? 'active' : 'expired';
         } else {
             $subscription->billing_cycle_start = $subscription->billing_cycle_start ?? now()->startOfMonth()->toDateString();
             $subscription->billing_cycle_end = $subscription->billing_cycle_end ?? now()->endOfMonth()->toDateString();

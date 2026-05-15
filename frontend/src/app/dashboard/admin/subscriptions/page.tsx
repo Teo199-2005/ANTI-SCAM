@@ -23,6 +23,7 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { ResortItem } from "@/lib/api/resort";
 import { triggerSubscriptionInvoice } from "@/lib/api/subscription";
 import { CreditCard, RefreshCw } from "lucide-react";
+import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/tableSortPagination";
 import { useEffect, useMemo, useState } from "react";
 
@@ -225,7 +226,7 @@ export default function AdminSubscriptionsPage() {
                       label: "Status",
                       value: sub ? (
                         <span className={statusBadge[sub.status] ?? "dash-badge-slate"}>
-                          {sub.status.replaceAll("_", " ")}
+                          {formatSubscriptionStatusLabel(sub.status)}
                         </span>
                       ) : (
                         <span className="text-xs text-zinc-600">No subscription</span>
@@ -303,7 +304,7 @@ export default function AdminSubscriptionsPage() {
                   <td>
                     {sub ? (
                       <span className={statusBadge[sub.status] ?? "dash-badge-slate"}>
-                        {sub.status.replaceAll("_", " ")}
+                        {formatSubscriptionStatusLabel(sub.status)}
                       </span>
                     ) : (
                       <span className="text-xs text-zinc-600">No subscription</span>

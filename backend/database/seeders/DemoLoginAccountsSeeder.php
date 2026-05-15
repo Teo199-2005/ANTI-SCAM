@@ -72,7 +72,7 @@ class DemoLoginAccountsSeeder extends Seeder
                     'address_label' => 'Tagaytay City, Cavite, Philippines',
                 ])->saveQuietly();
             }
-            app(SubscriptionService::class)->refreshForResort($resort, 'basic');
+            app(SubscriptionService::class)->refreshForResort($resort, 'basic', activateIfNew: true);
         }
 
         User::query()->updateOrCreate(

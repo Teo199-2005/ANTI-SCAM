@@ -14,6 +14,7 @@ import { Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Lo
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { formatOwnerConsoleStatusLabel } from "@/lib/billing/subscriptionStatus";
 import { createPortal } from "react-dom";
 
 function segmentLabel(segment: string): string {
@@ -98,13 +99,16 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const roleLabel = formatRoleLabel(user?.role);
   const ownerHasWorkspace = user?.role === "resort_owner" && user.tenant_id != null;
   const hasActiveReferralTrial = Boolean(user?.referral_trial?.active);
-  const subscriptionStatus = (subscriptionInfo?.status ?? "active").toLowerCase();
+  const subscriptionStatus = (
+    subscriptionInfo?.status ??
+    (user?.role === "resort_owner" && ownerHasWorkspace ? "expired" : "active")
+  ).toLowerCase();
   const isSubscribedOwner =
     user?.role === "resort_owner" &&
     (subscriptionStatus === "active" || hasActiveReferralTrial);
   const showSubscribeCta =
     user?.role === "resort_owner" && ownerHasWorkspace && subscriptionStatus === "expired";
-  const ownerStatusLabel = subscriptionStatus.replaceAll("_", " ");
+  const ownerStatusLabel = formatOwnerConsoleStatusLabel(subscriptionStatus, hasActiveReferralTrial);
   const subscriptionEndsAt =
     subscriptionInfo?.endsAt ?? (hasActiveReferralTrial ? (user?.referral_trial?.ends_at ?? null) : null);
   const formattedEndDate = subscriptionEndsAt
@@ -354,7 +358,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         </p>
                       ) : null}
                       <p className="mt-2 text-[11px] text-zinc-500">
-                        Recurring billing is enabled. A new invoice is generated automatically each cycle before due date.
+                        {isPaidSubscriptionActive
+                          ? "Recurring billing is enabled. A new invoice is generated automatically each cycle before due date."
+                          : hasActiveReferralTrial
+                            ? "Referral trial access. Subscribe before your trial ends to keep your resort active."
+                            : "Subscribe to activate your plan and enable recurring billing."}
                       </p>
                     </div>
                   ) : null}

@@ -40,7 +40,7 @@ class ResortOwnerOnboardingTest extends TestCase
 
         $this->assertDatabaseHas('subscriptions', [
             'tenant_id' => $user->tenant_id,
-            'status' => 'active',
+            'status' => 'expired',
         ]);
     }
 
