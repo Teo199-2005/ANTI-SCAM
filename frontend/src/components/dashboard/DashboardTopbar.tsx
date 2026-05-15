@@ -108,6 +108,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     : "Not available";
   const subscriptionDaysLeft = subscriptionDaysRemaining(subscriptionEndsAt);
   const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
+  const isPaidSubscriptionActive = (subscriptionInfo?.status ?? "").toLowerCase() === "active";
   const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
   const totalCharge = selectedOffer.monthlyRate * selectedDuration;
 
@@ -335,7 +336,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                       <p className="mt-1 text-sm text-zinc-700">Expires: {formattedEndDate}</p>
                       {subscriptionRemainingLabel ? (
                         <p className="mt-0.5 text-[11px] font-medium tabular-nums text-zinc-400">
-                          {hasActiveReferralTrial && !(subscriptionInfo?.status ?? "").toLowerCase() === "active"
+                          {hasActiveReferralTrial && !isPaidSubscriptionActive
                             ? `Referral trial · ${subscriptionRemainingLabel}`
                             : subscriptionRemainingLabel}
                         </p>
