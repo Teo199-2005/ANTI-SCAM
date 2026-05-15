@@ -51,6 +51,13 @@ export type AuthUser = {
   terms_accepted_at?: string | null;
   terms_version?: string | null;
   created_at: string;
+  /** Resort owner: signup referral trial from registration (also on /auth/me). */
+  referral_trial?: {
+    active: boolean;
+    ends_at: string | null;
+    code: string | null;
+    marketer_name: string | null;
+  } | null;
   /** Marketing: masked GCash number, e.g. ••••••1234 */
   gcash_masked_number?: string | null;
   gcash_account_holder_name?: string | null;

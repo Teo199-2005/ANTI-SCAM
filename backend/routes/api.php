@@ -62,10 +62,10 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('throttle:5,60')->group(function (): void {
         Route::post('/auth/register', [AuthController::class, 'register']);
     });
-    Route::middleware('throttle:5,1')->group(function (): void {
+    Route::middleware('throttle:password-reset-request')->group(function (): void {
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPasswordRequest']);
     });
-    Route::middleware('throttle:10,1')->group(function (): void {
+    Route::middleware('throttle:password-reset-verify')->group(function (): void {
         Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswordReset']);
     });
 

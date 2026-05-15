@@ -31,6 +31,7 @@ import {
   FileText,
   Image as ImageIcon,
   Link as LinkIcon,
+  Lock,
   Mail,
   MapPin,
   Phone,
@@ -417,7 +418,6 @@ export default function ResortProfilePage() {
     setSaving(true);
     try {
       await updateResort(form.id, {
-        name: form.name,
         description: form.description || null,
         address_province_psgc: form.address_province_psgc,
         address_city_municipality_psgc: form.address_city_municipality_psgc,
@@ -762,15 +762,23 @@ export default function ResortProfilePage() {
             <label htmlFor="resort-name" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
               <Building2 size={13} className="text-zinc-500" />
               Resort name <RequiredBadge />
+              <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                <Lock size={10} className="shrink-0" aria-hidden />
+                Locked
+              </span>
             </label>
             <input
               id="resort-name"
-              className="dash-input"
+              className="dash-input cursor-not-allowed border-zinc-200 bg-zinc-50 text-zinc-700"
               value={form.name}
-              onChange={(e) => onChange("name", e.target.value)}
-              placeholder="Resort name"
-              required
+              readOnly
+              aria-readonly="true"
+              title="Resort name is set at registration and cannot be changed."
             />
+            <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+              Set when you registered. One resort, one account, and one email — the name is kept for verification and
+              cannot be edited here.
+            </p>
           </div>
           <div>
             <label htmlFor="resort-contact" className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
@@ -985,9 +993,9 @@ export default function ResortProfilePage() {
           </button>
         </div>
         <p className="text-xs leading-snug text-zinc-500">
-          The web address is built from your <strong className="font-semibold text-zinc-600">Resort name</strong> (for example, TEO →{" "}
-          <span className="font-mono text-[11px] text-navy">/resort/teo</span>). Click <strong className="font-semibold text-zinc-600">Save profile</strong> once to
-          refresh the link (any field can change — we sync from the saved name). If that short name is already taken, a short random suffix is added automatically.
+          Your public link is based on your registered resort name (for example, Golden Villa Resort →{" "}
+          <span className="font-mono text-[11px] text-navy">/resort/golden-villa-resort</span>). The resort name is
+          fixed for verification; contact support if you need a correction.
         </p>
       </div>
 

@@ -5,11 +5,8 @@ namespace App\Modules\Billing\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Models\SubscriptionInvoice;
-use App\Models\User;
 use App\Modules\Billing\Services\XenditSubscriptionInvoiceService;
 use App\Modules\Billing\Services\XenditSubscriptionWebhookService;
-use App\Services\LandingReadinessService;
-use App\Services\MarketingReferralCodeService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -115,62 +112,17 @@ class SubscriptionInvoiceController extends Controller
         $paymentMethod = $request->input('payment_method'); // e.g. 'GCASH', 'CREDIT_CARD'
         $paymentMethods = $paymentMethod ? [(string) $paymentMethod] : [];
         $referralCode = trim((string) $request->input('referral_code', ''));
-        $hasReferralCode = $referralCode !== '';
-        $normalizedReferral = $hasReferralCode ? app(MarketingReferralCodeService::class)->normalize($referralCode) : null;
-        $marketerId = null;
-
-        if ($hasReferralCode) {
-            if ($billingScope !== 'monthly') {
-                return $this->errorResponse(
-                    'Referral codes apply to monthly subscription payments only.',
-                    ['referral_code' => ['invalid_scope']],
-                    422
-                );
-            }
-
-            $marketer = User::query()
-                ->where('role', 'marketing')
-                ->where('referral_code', $normalizedReferral)
-                ->first();
-
-            if (! $marketer) {
-                return $this->errorResponse(
-                    'Invalid or expired referral code.',
-                    ['referral_code' => ['invalid']],
-                    422
-                );
-            }
-
-            $marketerId = $marketer->id;
-
-            // Gate: resort profile must be complete before the first-month-free promo
-            // can be applied. The promo is not available for 1-month terms.
-            if ($durationMonths <= 1) {
-                return $this->errorResponse(
-                    'The referral first-month-free promo requires a multi-month plan (3, 6, or 12 months).',
-                    ['referral_code' => ['invalid_duration']],
-                    422
-                );
-            }
-
-            $readiness = app(LandingReadinessService::class)->check($resort);
-            if (! $readiness['is_ready']) {
-                return $this->errorResponse(
-                    'Your resort profile is incomplete. Complete your setup before applying a referral code.',
-                    [
-                        'referral_code' => ['profile_incomplete'],
-                        'missing_fields' => $readiness['missing_fields'],
-                    ],
-                    422
-                );
-            }
+        if ($referralCode !== '') {
+            return $this->errorResponse(
+                'Referral benefits are applied when you create your account at registration. Remove the referral code from checkout.',
+                ['referral_code' => ['registration_only']],
+                422
+            );
         }
-        $isFirstMonthFree = $hasReferralCode && $billingScope === 'monthly' && $durationMonths > 1;
+
         $invoicePlanTag = $billingScope === 'room_addon'
             ? sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths)
-            : ($isFirstMonthFree
-                ? sprintf('%s_m%d_fmf', (string) $subscription->plan, $durationMonths)
-                : sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths));
+            : sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
 
         $existingPendingGatewayInvoice = SubscriptionInvoice::query()
             ->where('subscription_id', $subscription->id)
@@ -184,7 +136,7 @@ class SubscriptionInvoiceController extends Controller
 
         // Reuse an existing pending gateway invoice for this cycle
         // so users can continue payment instead of getting blocked by 409.
-        if ($existingPendingGatewayInvoice && ! $hasReferralCode) {
+        if ($existingPendingGatewayInvoice) {
             if ($subscription->status !== 'pending_payment') {
                 $subscription->update(['status' => 'pending_payment']);
             }
@@ -195,12 +147,6 @@ class SubscriptionInvoiceController extends Controller
                 'subscription_invoice_id' => $existingPendingGatewayInvoice->id,
                 'reused' => true,
             ], 'Existing pending subscription invoice reused');
-        }
-
-        // Referral codes change the charged amount. If there is an existing pending invoice
-        // for this cycle, expire the local record so a new discounted invoice can be generated.
-        if ($existingPendingGatewayInvoice && $hasReferralCode) {
-            $existingPendingGatewayInvoice->update(['status' => 'expired']);
         }
 
         // Mark pending_payment BEFORE calling the service so the status is correct
@@ -219,11 +165,11 @@ class SubscriptionInvoiceController extends Controller
             $result = $this->service->createInvoice(
                 $subscription,
                 $paymentMethods,
-                $referralCode,
+                '',
                 $billingScope,
                 $roomAddonQuantity,
-                $marketerId,
-                $normalizedReferral,
+                null,
+                null,
                 $durationMonths,
                 $checkoutReturnBase
             );

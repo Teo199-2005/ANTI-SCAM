@@ -17,7 +17,6 @@ import {
   sanitizePhilippinesMobileInput,
   sanitizeReferralCodeInput,
 } from "@/lib/inputRestrictions";
-import { setPendingReferralFromSignup } from "@/lib/pendingReferralSignup";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
@@ -26,7 +25,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail, UserPlus, X } from "lucide-react";
+import { Eye, EyeOff, Gift, Loader2, Lock, Mail, UserPlus, X } from "lucide-react";
 
 const authInput =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/20 max-lg:min-h-[2.625rem] md:py-2";
@@ -52,6 +51,11 @@ function RegisterPageInner() {
   const [appliedReferral, setAppliedReferral] = useState<{ code: string; marketerName: string } | null>(null);
   const [referralFieldError, setReferralFieldError] = useState<string | null>(null);
   const [referralVerifyModalOpen, setReferralVerifyModalOpen] = useState(false);
+  const [trialSuccessModal, setTrialSuccessModal] = useState<{
+    marketerName: string;
+    code: string;
+    endsAt: string | null;
+  } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
@@ -169,22 +173,25 @@ function RegisterPageInner() {
     }
     setPending(true);
     try {
-      const user = await register({
+      const { user, referralTrial } = await register({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
         business_name: isGuestFromResort ? undefined : businessName.trim() || undefined,
         role_intent: isGuestFromResort ? "guest" : "resort_owner",
         resort_subdomain: isGuestFromResort ? resortSlug : undefined,
+        referral_code: !isGuestFromResort && appliedReferral ? appliedReferral.code : undefined,
         password,
         password_confirmation: passwordConfirmation,
         accept_terms: true,
       });
-      if (appliedReferral && !isGuestFromResort) {
-        setPendingReferralFromSignup({
-          code: appliedReferral.code,
-          marketerName: appliedReferral.marketerName,
+      if (!isGuestFromResort && referralTrial?.active) {
+        setTrialSuccessModal({
+          marketerName: referralTrial.marketer_name ?? appliedReferral?.marketerName ?? "your partner",
+          code: referralTrial.code ?? appliedReferral?.code ?? "",
+          endsAt: referralTrial.ends_at ?? null,
         });
+        return;
       }
       router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
     } catch (err) {
@@ -197,8 +204,49 @@ function RegisterPageInner() {
   const resortLogoAbs =
     isGuestFromResort && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
 
+  const trialEndLabel =
+    trialSuccessModal?.endsAt != null
+      ? new Date(trialSuccessModal.endsAt).toLocaleDateString("en-PH", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      : null;
+
   return (
     <AuthSplitShell guestResortContext={isGuestFromResort}>
+      {mounted && trialSuccessModal
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[410] flex items-center justify-center bg-zinc-900/50 p-4 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="register-trial-success-title"
+            >
+              <div className="w-full max-w-md rounded-2xl border border-emerald-200/80 bg-white p-6 text-center shadow-2xl shadow-zinc-900/20">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <Gift className="h-7 w-7" aria-hidden />
+                </div>
+                <h2 id="register-trial-success-title" className="mt-4 font-heading text-xl font-semibold text-zinc-900">
+                  You&apos;re on a 1-month free trial
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                  Referral <span className="font-mono font-semibold text-zinc-800">{trialSuccessModal.code}</span> from{" "}
+                  <span className="font-semibold text-zinc-800">{trialSuccessModal.marketerName}</span> is active. Your
+                  platform access is unlocked{trialEndLabel ? ` until ${trialEndLabel}` : ""}.
+                </p>
+                <button
+                  type="button"
+                  className="mt-5 w-full rounded-xl bg-gradient-to-r from-clOcean to-clOceanDeep px-4 py-2.5 text-sm font-semibold text-white shadow-md"
+                  onClick={() => router.push("/dashboard")}
+                >
+                  Go to dashboard
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {mounted && referralVerifyModalOpen && !isGuestFromResort
         ? createPortal(
             <div
@@ -330,7 +378,7 @@ function RegisterPageInner() {
             {isGuestFromResort ? null : (
             <div>
               <label htmlFor="register-business" className="mb-1 block text-[11px] font-semibold text-zinc-700">
-                Business name
+                Resort name
               </label>
               <input
                 id="register-business"
@@ -338,7 +386,7 @@ function RegisterPageInner() {
                 className={authInput}
                 value={businessName}
                 onChange={(e) => setBusinessName(sanitizeBusinessOrResortName(e.target.value))}
-                placeholder="Sample Staycation OPC"
+                placeholder="e.g. Sunset Cove Resort"
               />
             </div>
             )}

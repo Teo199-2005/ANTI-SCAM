@@ -6,6 +6,7 @@ use App\Models\Resort;
 use App\Models\Subscription;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\EmailNotificationService;
+use App\Services\ReferralSignupTrialService;
 
 class SubscriptionService
 {
@@ -69,7 +70,7 @@ class SubscriptionService
 
     public function applyGracePeriodRules(): int
     {
-        $updated = 0;
+        $updated = app(ReferralSignupTrialService::class)->expireLapsedTrials();
 
         Subscription::query()
             ->whereIn('status', ['pending_payment', 'active'])

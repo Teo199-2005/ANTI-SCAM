@@ -4,17 +4,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/shared/ToastProvider";
 import { createSubscriptionInvoice } from "@/lib/api/subscription";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
-import { validateReferralCodeAsOwner } from "@/lib/api/referral";
-import type { ReadinessPayload } from "@/lib/api/referral";
-import { clearPendingReferralSignup, readPendingReferralSignup } from "@/lib/pendingReferralSignup";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
-import { sanitizeReferralCodeInput } from "@/lib/inputRestrictions";
 import { getMarketingStats, type MarketingStats } from "@/lib/api/marketing";
 import { formatRoleLabel } from "@/lib/utils";
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
 import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
-import { AlertCircle, Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Gift, Loader2, LogOut, Menu, Sparkles, Tag, WalletCards, X } from "lucide-react";
+import { Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Loader2, LogOut, Menu, Sparkles, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -30,6 +26,25 @@ function roleBadgeClass(role: string): string {
   if (role === "marketing") return "bg-violet-50 text-violet-900 ring-1 ring-violet-200/80";
   if (role === "guest") return "bg-sky-50 text-sky-900 ring-1 ring-sky-200/80";
   return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80";
+}
+
+function subscriptionDaysRemaining(endsAt: string | null): number | null {
+  if (!endsAt) return null;
+  try {
+    const end = new Date(endsAt);
+    const ms = end.getTime() - Date.now();
+    if (ms <= 0) return 0;
+    return Math.ceil(ms / (1000 * 60 * 60 * 24));
+  } catch {
+    return null;
+  }
+}
+
+function formatSubscriptionRemainingLabel(days: number | null): string | null {
+  if (days === null) return null;
+  if (days === 0) return "Expires today";
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
 }
 
 type DashboardTopbarProps = { onOpenMenu: () => void };
@@ -56,15 +71,6 @@ const STANDARD_OFFERS: PlanOffer[] = [
   { duration: 12, monthlyRate: 1500, listMonthlyRate: 2300, billingType: "Upfront" },
 ];
 
-const MISSING_FIELD_LABELS: Record<string, string> = {
-  resort_name:      "Resort name",
-  location:         "Philippine location (province, city, barangay)",
-  contact_number:   "Contact number",
-  logo:             "Resort logo",
-  background_image: "Background image",
-  room_with_image:  "At least one active room with a photo",
-};
-
 export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -72,14 +78,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const { pushToast } = useToast();
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [referralCode, setReferralCode] = useState("");
-  const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
-  const [referralReadiness, setReferralReadiness] = useState<ReadinessPayload | null>(null);
-  const [appliedMarketerName, setAppliedMarketerName] = useState<string | null>(null);
-  const [referralInlineError, setReferralInlineError] = useState<string | null>(null);
-  const [applyingReferral, setApplyingReferral] = useState(false);
   const [subscribingNow, setSubscribingNow] = useState(false);
-  const referralVerifyInFlightRef = useRef(false);
   const subscribeInFlightRef = useRef(false);
   const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
   const [subscriptionInfo, setSubscriptionInfo] = useState<OwnerSubscriptionInfo | null>(null);
@@ -97,20 +96,20 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       .toUpperCase() ?? "?";
 
   const roleLabel = formatRoleLabel(user?.role);
+  const hasActiveReferralTrial = Boolean(user?.referral_trial?.active);
   const isSubscribedOwner =
-    user?.role === "resort_owner" && (subscriptionInfo?.status ?? "").toLowerCase() === "active";
+    user?.role === "resort_owner" &&
+    ((subscriptionInfo?.status ?? "").toLowerCase() === "active" || hasActiveReferralTrial);
   const ownerStatusLabel = (subscriptionInfo?.status ?? "pending_payment").replaceAll("_", " ");
-  const formattedEndDate = subscriptionInfo?.endsAt
-    ? new Date(subscriptionInfo.endsAt).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
+  const subscriptionEndsAt =
+    subscriptionInfo?.endsAt ?? (hasActiveReferralTrial ? (user?.referral_trial?.ends_at ?? null) : null);
+  const formattedEndDate = subscriptionEndsAt
+    ? new Date(subscriptionEndsAt).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
     : "Not available";
+  const subscriptionDaysLeft = subscriptionDaysRemaining(subscriptionEndsAt);
+  const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
   const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
-  // First-month-free: promo only applies when referral code is verified, duration > 1 month,
-  // and the resort profile is complete.
-  const referralIsReady = Boolean(appliedReferralCode) && (referralReadiness?.is_ready ?? false);
-  const isFirstMonthFree = referralIsReady && selectedDuration > 1;
-  const totalCharge = isFirstMonthFree
-    ? selectedOffer.monthlyRate * (selectedDuration - 1)
-    : selectedOffer.monthlyRate * selectedDuration;
+  const totalCharge = selectedOffer.monthlyRate * selectedDuration;
 
   useEffect(() => {
     setMounted(true);
@@ -173,23 +172,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   }, [user]);
 
   useEffect(() => {
-    if (!showSubscribeModal) {
-      // Closing the modal is also done at the start of "Subscribe now" before the invoice API returns.
-      // Do not wipe referral state during that in-flight checkout or Xendit can get no referral (wrong amount).
-      if (subscribeInFlightRef.current) {
-        return;
-      }
-      setReferralCode("");
-      setAppliedReferralCode(null);
-      setReferralReadiness(null);
-      setAppliedMarketerName(null);
-      setReferralInlineError(null);
-      return;
-    }
-    const pending = readPendingReferralSignup();
-    if (pending?.code) {
-      setReferralCode(pending.code);
-    }
+    if (!showSubscribeModal) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowSubscribeModal(false);
     };
@@ -197,75 +180,18 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [showSubscribeModal]);
 
-  const applyReferral = async () => {
-    if (referralVerifyInFlightRef.current) return;
-    const normalized = referralCode.trim().toUpperCase();
-    if (!normalized) {
-      pushToast({ title: "Referral code required", description: "Enter a referral code first.", tone: "warning" });
-      return;
-    }
-    // Same code already verified this session — avoid duplicate API calls / double toasts when Verify is clicked repeatedly.
-    if (appliedReferralCode === normalized && appliedMarketerName) {
-      pushToast({
-        title: "Already verified",
-        description: "This code is already applied. Change the code if you need a different partner.",
-        tone: "info",
-      });
-      return;
-    }
-    referralVerifyInFlightRef.current = true;
-    setReferralInlineError(null);
-    setApplyingReferral(true);
-    try {
-      const result = await validateReferralCodeAsOwner(normalized);
-      if (!result.valid) {
-        setReferralInlineError(result.message);
-        pushToast({
-          title: "Referral code not accepted",
-          description: result.message,
-          tone: "error",
-        });
-        return;
-      }
-      setAppliedReferralCode(result.code);
-      setAppliedMarketerName(result.marketer_name);
-      setReferralReadiness(result.readiness);
-      clearPendingReferralSignup();
-      const ready = result.readiness?.is_ready ?? false;
-      pushToast({
-        title: "Referral applied",
-        description: ready
-          ? `Partner: ${result.marketer_name}. First month free on 3, 6, or 12-month plans when you subscribe.`
-          : `Partner: ${result.marketer_name}. Complete your resort profile to unlock the first-month-free promo.`,
-        tone: ready ? "success" : "warning",
-      });
-    } catch (err) {
-      const msg = parseApiErrorMessage(err, "Check your connection and try again.");
-      setReferralInlineError(msg);
-      pushToast({
-        title: "Unable to verify code",
-        description: msg,
-        tone: "error",
-      });
-    } finally {
-      referralVerifyInFlightRef.current = false;
-      setApplyingReferral(false);
-    }
-  };
-
   const subscribeNow = async () => {
     if (!user || user.role !== "resort_owner") return;
     if (subscribeInFlightRef.current) return;
     subscribeInFlightRef.current = true;
     setSubscribingNow(true);
-    const referralForCheckout = appliedReferralCode ?? undefined;
     const durationForCheckout = selectedDuration;
     setShowSubscribeModal(false);
     try {
       const result = await createSubscriptionInvoice(
         false,
         undefined,
-        referralForCheckout,
+        undefined,
         "monthly",
         undefined,
         durationForCheckout,
@@ -407,6 +333,13 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         Plan: {(subscriptionInfo?.plan ?? "basic").toUpperCase()}
                       </p>
                       <p className="mt-1 text-sm text-zinc-700">Expires: {formattedEndDate}</p>
+                      {subscriptionRemainingLabel ? (
+                        <p className="mt-0.5 text-[11px] font-medium tabular-nums text-zinc-400">
+                          {hasActiveReferralTrial && !(subscriptionInfo?.status ?? "").toLowerCase() === "active"
+                            ? `Referral trial · ${subscriptionRemainingLabel}`
+                            : subscriptionRemainingLabel}
+                        </p>
+                      ) : null}
                       <p className="mt-2 text-[11px] text-zinc-500">
                         Recurring billing is enabled. A new invoice is generated automatically each cycle before due date.
                       </p>
@@ -587,16 +520,9 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     Total due now:{" "}
                     <span className="font-semibold text-navy">
                       ₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      {isFirstMonthFree ? ` (${selectedDuration - 1} of ${selectedDuration} months billed)` : ""}
                     </span>
                   </span>
                 </p>
-                {isFirstMonthFree ? (
-                  <p className="mt-1 inline-flex items-start gap-1 text-[10px] font-semibold leading-snug text-emerald-700 sm:items-center sm:gap-1.5 sm:text-xs">
-                    <Gift size={12} className="mt-0.5 shrink-0 sm:mt-0 sm:h-[13px] sm:w-[13px]" />
-                    First month free via referral — you get {selectedDuration} months of access.
-                  </p>
-                ) : null}
               </div>
 
               <ul className="grid gap-1.5 text-[11px] leading-snug text-zinc-700 sm:gap-2.5 sm:text-sm md:grid-cols-2">
@@ -630,186 +556,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                 Build trust with guests and start accepting online bookings in one setup. VAT is added at checkout by final invoice computation.
               </div>
 
-              <div>
-                <label
-                  htmlFor="subscribe-referral-code"
-                  className="mb-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase leading-snug tracking-wide text-zinc-600 sm:mb-1.5 sm:gap-1.5 sm:text-xs"
-                >
-                  <Tag size={12} className="shrink-0 text-primaryBlue sm:h-[13px] sm:w-[13px]" />
-                  Referral code (optional — unlocks 1st month free)
-                </label>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <input
-                    id="subscribe-referral-code"
-                    value={referralCode}
-                    onChange={(e) => {
-                      const v = sanitizeReferralCodeInput(e.target.value);
-                      setReferralCode(v);
-                      setReferralInlineError(null);
-                      const norm = v.trim().toUpperCase();
-                      if (!norm) {
-                        setAppliedReferralCode(null);
-                        setReferralReadiness(null);
-                        setAppliedMarketerName(null);
-                      } else if (appliedReferralCode && norm !== appliedReferralCode) {
-                        setAppliedReferralCode(null);
-                        setReferralReadiness(null);
-                        setAppliedMarketerName(null);
-                      }
-                    }}
-                    className="dash-input min-h-11 flex-1 sm:min-h-0"
-                    placeholder="e.g. SANTOS1234"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void applyReferral()}
-                    disabled={
-                      applyingReferral ||
-                      Boolean(
-                        appliedReferralCode &&
-                          referralCode.trim().toUpperCase() === appliedReferralCode &&
-                          appliedMarketerName,
-                      )
-                    }
-                    title={
-                      appliedReferralCode &&
-                      referralCode.trim().toUpperCase() === appliedReferralCode &&
-                      appliedMarketerName
-                        ? "This code is already verified. Edit the field to use a different code."
-                        : undefined
-                    }
-                    className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl border border-softBorder bg-white px-4 text-xs font-semibold text-navy hover:bg-zinc-50 disabled:opacity-60 sm:min-h-0 sm:w-auto sm:min-w-[108px] sm:self-stretch sm:py-2 sm:text-sm"
-                  >
-                    {applyingReferral ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        <span>Verifying…</span>
-                      </>
-                    ) : (
-                      "Verify"
-                    )}
-                  </button>
-                </div>
-
-                {applyingReferral ? (
-                  <div
-                    className="referral-status-animate mt-2 rounded-xl border border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white px-3 py-2.5 shadow-sm"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
-                        <Sparkles size={17} strokeWidth={2} />
-                      </span>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <p className="text-xs font-bold text-sky-950">Verifying referral code</p>
-                        <p className="mt-0.5 text-[11px] leading-snug text-sky-900/80">
-                          Checking with your marketer partner and your resort profile…
-                        </p>
-                        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-sky-200/70">
-                          <div className="referral-verify-bar-inner h-full w-2/5 rounded-full bg-gradient-to-r from-clOcean via-sky-400 to-clOcean opacity-90" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {referralInlineError && !applyingReferral ? (
-                  <div
-                    className="referral-status-animate mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-900 shadow-sm"
-                    role="alert"
-                  >
-                    <p className="inline-flex items-start gap-2 text-xs font-semibold leading-snug">
-                      <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                      <span>{referralInlineError}</span>
-                    </p>
-                  </div>
-                ) : null}
-
-                {appliedReferralCode && appliedMarketerName && !applyingReferral && !referralInlineError ? (
-                  <div
-                    className={`referral-status-animate mt-2 rounded-xl border px-3 py-2.5 shadow-sm ${
-                      referralReadiness?.is_ready
-                        ? "border-emerald-200 bg-emerald-50/95 text-emerald-950"
-                        : "border-amber-200 bg-amber-50/90 text-amber-950"
-                    }`}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span
-                        className={`referral-success-icon-animate flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
-                          referralReadiness?.is_ready ? "bg-emerald-500" : "bg-amber-500"
-                        }`}
-                      >
-                        <CheckCircle2 size={18} strokeWidth={2.25} />
-                      </span>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <p className="text-xs font-bold">Referral applied successfully</p>
-                        <p className="mt-0.5 text-[11px] leading-snug opacity-90">
-                          Partner: <span className="font-semibold">{appliedMarketerName}</span>
-                          {appliedReferralCode ? (
-                            <span className="text-zinc-600">
-                              {" "}
-                              · Code <span className="font-mono font-semibold text-zinc-800">{appliedReferralCode}</span>
-                            </span>
-                          ) : null}
-                        </p>
-                        {referralReadiness?.is_ready ? (
-                          <p className="mt-1 text-[11px] leading-snug text-emerald-900/85">
-                            Your profile looks ready — choose a 3, 6, or 12-month plan for first month free.
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-[11px] leading-snug text-amber-900/85">
-                            Finish the profile checklist below to unlock the promo.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Profile readiness checklist shown after code verification */}
-                {appliedReferralCode && referralReadiness && !referralReadiness.is_ready ? (
-                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                    <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800">
-                      <AlertCircle size={13} />
-                      Complete your resort profile to unlock the first-month-free promo:
-                    </p>
-                    <ul className="mt-1.5 space-y-1">
-                      {referralReadiness.missing_fields.map((f) => (
-                        <li key={f} className="inline-flex items-center gap-1.5 text-xs text-amber-700">
-                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-                          {MISSING_FIELD_LABELS[f] ?? f}
-                        </li>
-                      ))}
-                    </ul>
-                    <Link
-                      href="/dashboard/resort/profile"
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
-                      onClick={() => setShowSubscribeModal(false)}
-                    >
-                      Go to Resort Profile →
-                    </Link>
-                  </div>
-                ) : null}
-                {appliedReferralCode && referralReadiness?.is_ready && selectedDuration === 1 ? (
-                  <p className="mt-1.5 text-xs text-amber-700">
-                    Select a 3, 6, or 12-month plan to apply the first-month-free promo.
-                  </p>
-                ) : null}
-              </div>
-
               <div className="flex flex-col-reverse gap-2 pt-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:pt-1">
                 <button
                   type="button"
                   onClick={() => {
                     setShowSubscribeModal(false);
-                    setReferralCode("");
-                    setAppliedReferralCode(null);
-                    setReferralReadiness(null);
-                    setAppliedMarketerName(null);
-                    setReferralInlineError(null);
                   }}
                   className="min-h-10 w-full rounded-xl border border-softBorder bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:px-4 sm:text-sm"
                 >

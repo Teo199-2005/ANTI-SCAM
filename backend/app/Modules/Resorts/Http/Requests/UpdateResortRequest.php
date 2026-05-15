@@ -97,6 +97,38 @@ class UpdateResortRequest extends FormRequest
             if ($latEmpty xor $lngEmpty) {
                 $v->errors()->add('map_latitude', 'Provide both latitude and longitude, or clear both.');
             }
+
+            if ($this->user()?->role === 'resort_owner' && $this->has('name')) {
+                /** @var Resort $resort */
+                $resort = $this->route('resort');
+                $incoming = trim((string) $this->input('name'));
+                if ($incoming !== '' && $incoming !== (string) $resort->name) {
+                    $v->errors()->add(
+                        'name',
+                        'Resort name cannot be changed after registration. Contact support if you need help.',
+                    );
+                }
+            }
         });
+    }
+
+    /**
+     * Resort owners may update profile fields but not rename the property (1 resort · 1 account · 1 email).
+     *
+     * @return array<string, mixed>
+     */
+    public function validated($key = null, $default = null): mixed
+    {
+        $validated = parent::validated($key, $default);
+
+        if ($key !== null) {
+            return $validated;
+        }
+
+        if ($this->user()?->role === 'resort_owner') {
+            unset($validated['name']);
+        }
+
+        return $validated;
     }
 }

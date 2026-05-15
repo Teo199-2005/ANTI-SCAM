@@ -231,37 +231,63 @@ export async function getReleaseHistory(params?: { page?: number; perPage?: numb
   };
 }
 
+export type MarketingClientSource = "paid_subscription" | "signup_trial";
+
 export type MarketingClientRow = {
-  tenant_id: number;
+  tenant_id: number | null;
   tenant_name: string;
   tenant_slug: string;
   owner_name: string | null;
   owner_email: string | null;
+  source: MarketingClientSource;
   first_qualifying_paid_at: string | null;
   last_qualifying_paid_at: string | null;
   qualifying_subscription_invoices: number;
   referred_resorts_count: number;
   total_subscription_volume_php: number;
+  trial_ends_at: string | null;
+  referral_code: string | null;
+  trial_active: boolean;
+  referred_user_id: number | null;
 };
 
 export type MarketingClientsPayload = {
   clients: MarketingClientRow[];
-  meta: { current_page: number; last_page: number; per_page: number; total: number };
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    paid_total: number;
+    trial_total: number;
+    trial_active_total: number;
+  };
   tier_policy: string;
 };
 
 function mapMarketingClientRow(o: Record<string, unknown>): MarketingClientRow {
+  const sourceRaw = o.source;
+  const source: MarketingClientSource =
+    sourceRaw === "signup_trial" || sourceRaw === "paid_subscription" ? sourceRaw : "paid_subscription";
+  const tenantIdRaw = o.tenant_id;
+
   return {
-    tenant_id: Number(o.tenant_id),
+    tenant_id: tenantIdRaw === null || tenantIdRaw === undefined ? null : Number(tenantIdRaw),
     tenant_name: String(o.tenant_name ?? ""),
     tenant_slug: String(o.tenant_slug ?? ""),
     owner_name: typeof o.owner_name === "string" ? o.owner_name : null,
     owner_email: typeof o.owner_email === "string" ? o.owner_email : null,
+    source,
     first_qualifying_paid_at: typeof o.first_qualifying_paid_at === "string" ? o.first_qualifying_paid_at : null,
     last_qualifying_paid_at: typeof o.last_qualifying_paid_at === "string" ? o.last_qualifying_paid_at : null,
     qualifying_subscription_invoices: Number(o.qualifying_subscription_invoices ?? 0),
     referred_resorts_count: Number(o.referred_resorts_count ?? 0),
     total_subscription_volume_php: Number(o.total_subscription_volume_php ?? 0),
+    trial_ends_at: typeof o.trial_ends_at === "string" ? o.trial_ends_at : null,
+    referral_code: typeof o.referral_code === "string" ? o.referral_code : null,
+    trial_active: Boolean(o.trial_active),
+    referred_user_id:
+      o.referred_user_id === null || o.referred_user_id === undefined ? null : Number(o.referred_user_id),
   };
 }
 
@@ -279,6 +305,9 @@ export async function getMarketingClients(params?: { page?: number; perPage?: nu
       last_page: Number(metaRaw?.last_page ?? 1),
       per_page: Number(metaRaw?.per_page ?? 15),
       total: Number(metaRaw?.total ?? 0),
+      paid_total: Number(metaRaw?.paid_total ?? 0),
+      trial_total: Number(metaRaw?.trial_total ?? 0),
+      trial_active_total: Number(metaRaw?.trial_active_total ?? 0),
     },
     tier_policy: String(raw.tier_policy ?? ""),
   };

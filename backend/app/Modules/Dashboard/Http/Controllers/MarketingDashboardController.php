@@ -5,10 +5,12 @@ namespace App\Modules\Dashboard\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
+use App\Models\ReferralSignupAttribution;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\MarketerTierService;
+use App\Services\ReferralSignupTrialService;
 use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
 use Carbon\Carbon;
@@ -22,6 +24,7 @@ class MarketingDashboardController extends Controller
     public function __construct(
         private readonly MarketerCommissionPayoutService $marketerPayouts,
         private readonly MarketerTierService $marketerTiers,
+        private readonly ReferralSignupTrialService $referralSignupTrial,
     ) {}
 
     public function stats(Request $request)
@@ -52,8 +55,9 @@ class MarketingDashboardController extends Controller
         $frontend = $this->publicRegistrationBaseUrl($request);
         $code = $user->referral_code;
         $shareRegister = $code !== null && $code !== '' ? "{$frontend}/register?ref=".rawurlencode((string) $code) : null;
+        $referralSignupClientsCount = $this->referralSignupTrial->countSignupClients($marketerId);
         $subscribeHint = $code !== null && $code !== ''
-            ? "Resort owners who enter code {$code} at checkout get their first month free (3, 6, or 12-month plans) — after completing their resort profile setup."
+            ? "Share your registration link — resort owners who sign up with code {$code} receive 1 month of platform access free. Paid subscriptions after the trial count toward your commission tier."
             : null;
 
         $wh = $this->marketerPayouts->withholdingRate();
@@ -67,6 +71,7 @@ class MarketingDashboardController extends Controller
             'payoutWithholdingRate' => $wh,
             'assignedResorts' => $resortCount,
             'convertingClientsCount' => $convertingClientsCount,
+            'referralSignupClientsCount' => $referralSignupClientsCount,
             'convertingResortsWithReferralCount' => $convertingResortsWithReferralCount,
             'marketerTier' => $marketerTier === null ? null : [
                 'tierKey' => $marketerTier['tier_key'],
@@ -101,8 +106,24 @@ class MarketingDashboardController extends Controller
     {
         $marketerId = $request->user()->id;
         $perPage = min(50, max(5, (int) $request->integer('perPage', 15)));
+        $page = max(1, (int) $request->integer('page', 1));
 
-        $aggSub = DB::table('subscription_invoices as si')
+        $paidTenantIds = DB::table('subscription_invoices as si')
+            ->where('si.marketer_id', $marketerId)
+            ->where('si.status', 'paid')
+            ->whereNotNull('si.paid_at')
+            ->whereNotNull('si.tenant_id')
+            ->where(function ($q): void {
+                $q->whereNull('si.plan')->orWhere('si.plan', 'not like', '%_room_addon%');
+            })
+            ->distinct()
+            ->pluck('si.tenant_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        $clients = [];
+
+        $aggRows = DB::table('subscription_invoices as si')
             ->where('si.marketer_id', $marketerId)
             ->where('si.status', 'paid')
             ->whereNotNull('si.paid_at')
@@ -113,16 +134,11 @@ class MarketingDashboardController extends Controller
             ->groupBy('si.tenant_id')
             ->selectRaw(
                 'si.tenant_id, MIN(si.paid_at) as first_paid_at, MAX(si.paid_at) as last_paid_at, COUNT(*) as qualifying_invoice_count, COUNT(DISTINCT si.resort_id) as resort_count, SUM(si.amount) as total_subscription_php'
-            );
+            )
+            ->get();
 
-        $paginator = DB::query()
-            ->fromSub($aggSub, 'agg')
-            ->join('tenants as t', 't.id', '=', 'agg.tenant_id')
-            ->orderByDesc('agg.last_paid_at')
-            ->selectRaw('agg.*, t.name as tenant_name, t.slug as tenant_slug')
-            ->paginate($perPage);
-
-        $tenantIds = $paginator->getCollection()->pluck('tenant_id')->map(static fn ($id): int => (int) $id)->all();
+        $tenantIds = $aggRows->pluck('tenant_id')->map(static fn ($id): int => (int) $id)->all();
+        $tenants = DB::table('tenants')->whereIn('id', $tenantIds)->get()->keyBy('id');
         $owners = User::query()
             ->whereIn('tenant_id', $tenantIds)
             ->where('role', 'resort_owner')
@@ -131,38 +147,100 @@ class MarketingDashboardController extends Controller
             ->unique('tenant_id')
             ->keyBy('tenant_id');
 
-        $paginator->getCollection()->transform(function ($row) use ($owners): array {
-            /** @var \stdClass $row */
-            $owner = $owners->get((int) $row->tenant_id);
+        foreach ($aggRows as $row) {
+            $tenantId = (int) $row->tenant_id;
+            $tenant = $tenants->get($tenantId);
+            $owner = $owners->get($tenantId);
+            $lastAt = Carbon::parse((string) $row->last_paid_at);
 
-            return [
-                'tenant_id' => (int) $row->tenant_id,
-                'tenant_name' => (string) $row->tenant_name,
-                'tenant_slug' => (string) $row->tenant_slug,
+            $clients[] = [
+                'source' => 'paid_subscription',
+                'sort_at' => $lastAt->timestamp,
+                'tenant_id' => $tenantId,
+                'tenant_name' => (string) ($tenant->name ?? 'Resort owner'),
+                'tenant_slug' => (string) ($tenant->slug ?? ''),
                 'owner_name' => $owner?->name,
                 'owner_email' => $owner?->email,
-                'first_qualifying_paid_at' => $row->first_paid_at !== null
-                    ? Carbon::parse((string) $row->first_paid_at)->toIso8601String()
-                    : null,
-                'last_qualifying_paid_at' => $row->last_paid_at !== null
-                    ? Carbon::parse((string) $row->last_paid_at)->toIso8601String()
-                    : null,
+                'first_qualifying_paid_at' => Carbon::parse((string) $row->first_paid_at)->toIso8601String(),
+                'last_qualifying_paid_at' => $lastAt->toIso8601String(),
                 'qualifying_subscription_invoices' => (int) $row->qualifying_invoice_count,
                 'referred_resorts_count' => (int) $row->resort_count,
                 'total_subscription_volume_php' => round((float) $row->total_subscription_php, 2),
+                'trial_ends_at' => null,
+                'referral_code' => null,
+                'trial_active' => false,
+                'referred_user_id' => null,
             ];
-        });
+        }
 
-        $paginator->appends($request->query());
+        $signupRows = ReferralSignupAttribution::query()
+            ->where('marketer_id', $marketerId)
+            ->with(['referredUser', 'tenant'])
+            ->orderByDesc('trial_starts_at')
+            ->get();
+
+        foreach ($signupRows as $signup) {
+            if ($signup->tenant_id !== null && in_array((int) $signup->tenant_id, $paidTenantIds, true)) {
+                continue;
+            }
+
+            $owner = $signup->referredUser;
+            $clients[] = [
+                'source' => 'signup_trial',
+                'sort_at' => $signup->trial_starts_at->timestamp,
+                'tenant_id' => $signup->tenant_id,
+                'tenant_name' => $signup->tenant?->name ?? ($owner?->name ?? 'Resort owner'),
+                'tenant_slug' => $signup->tenant?->slug ?? '',
+                'owner_name' => $owner?->name,
+                'owner_email' => $owner?->email,
+                'first_qualifying_paid_at' => null,
+                'last_qualifying_paid_at' => null,
+                'qualifying_subscription_invoices' => 0,
+                'referred_resorts_count' => $signup->tenant_id !== null ? 1 : 0,
+                'total_subscription_volume_php' => 0.0,
+                'trial_ends_at' => $signup->trial_ends_at->toIso8601String(),
+                'referral_code' => $signup->referral_code,
+                'trial_active' => $signup->trial_ends_at->isFuture(),
+                'referred_user_id' => $signup->referred_user_id,
+            ];
+        }
+
+        $paidTotal = 0;
+        $trialTotal = 0;
+        $trialActiveTotal = 0;
+        foreach ($clients as $clientRow) {
+            if (($clientRow['source'] ?? '') === 'paid_subscription') {
+                $paidTotal++;
+            } elseif (($clientRow['source'] ?? '') === 'signup_trial') {
+                $trialTotal++;
+                if ($clientRow['trial_active'] ?? false) {
+                    $trialActiveTotal++;
+                }
+            }
+        }
+
+        usort($clients, static fn (array $a, array $b): int => $b['sort_at'] <=> $a['sort_at']);
+        $total = count($clients);
+        $offset = ($page - 1) * $perPage;
+        $slice = array_slice($clients, $offset, $perPage);
+        foreach ($slice as &$row) {
+            unset($row['sort_at']);
+        }
+        unset($row);
+
+        $lastPage = max(1, (int) ceil($total / $perPage));
 
         return $this->successResponse(
             [
-                'clients' => $paginator->items(),
+                'clients' => $slice,
                 'meta' => [
-                    'current_page' => $paginator->currentPage(),
-                    'last_page' => $paginator->lastPage(),
-                    'per_page' => $paginator->perPage(),
-                    'total' => $paginator->total(),
+                    'current_page' => $page,
+                    'last_page' => $lastPage,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'paid_total' => $paidTotal,
+                    'trial_total' => $trialTotal,
+                    'trial_active_total' => $trialActiveTotal,
                 ],
                 'tier_policy' => $this->marketerTiers->tierPolicySummary(),
             ],

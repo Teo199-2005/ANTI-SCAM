@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Modules\Subscriptions\Services\SubscriptionService;
 use App\Services\EmailNotificationService;
 use App\Services\PhilippineLocationService;
+use App\Services\ReferralSignupTrialService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\MultipartUploadHints;
 use App\Support\StoredMedia;
@@ -26,6 +27,7 @@ class AdminOnboardController extends Controller
         private readonly SubscriptionService $subscriptions,
         private readonly EmailNotificationService $emailNotifications,
         private readonly PhilippineLocationService $locations,
+        private readonly ReferralSignupTrialService $referralSignupTrial,
     ) {}
 
     public function store(Request $request)
@@ -236,6 +238,7 @@ class AdminOnboardController extends Controller
             $resort = Resort::withoutGlobalScopes()->create($resortPayload);
             $this->locations->syncResortAddressLabel($resort);
             $subscription = $this->subscriptions->refreshForResort($resort, 'basic');
+            $subscription = $this->referralSignupTrial->applyTrialAfterOnboard($user->fresh(), $resort, $subscription);
 
             return [
                 'tenant' => $tenant,

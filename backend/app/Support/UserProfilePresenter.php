@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Services\PhilippineLocationService;
+use App\Services\ReferralSignupTrialService;
 
 final class UserProfilePresenter
 {
@@ -21,6 +22,10 @@ final class UserProfilePresenter
                 'slug' => $slug,
                 'logo_url' => $user->homeResort->logo_url,
             ];
+        }
+
+        if ($user->role === 'resort_owner') {
+            $a['referral_trial'] = app(ReferralSignupTrialService::class)->trialPayloadForUser($user);
         }
 
         if ($user->role === 'marketing') {

@@ -42,6 +42,24 @@ class ForgotPasswordTest extends TestCase
         $this->assertDatabaseHas('password_reset_otps', ['user_id' => $user->id]);
     }
 
+    public function test_forgot_password_request_rate_limit_returns_friendly_message(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['email' => 'throttle-test@example.com']);
+
+        for ($i = 0; $i < 6; $i++) {
+            $this->postJson('/api/v1/auth/forgot-password', ['email' => $user->email]);
+        }
+
+        $response = $this->postJson('/api/v1/auth/forgot-password', ['email' => $user->email]);
+
+        $response->assertStatus(429)
+            ->assertJsonPath('success', false)
+            ->assertJsonStructure(['data' => ['retry_after_seconds']]);
+        $this->assertStringContainsString('wait', strtolower((string) $response->json('message')));
+    }
+
     public function test_forgot_password_reset_updates_password_and_revokes_tokens(): void
     {
         $user = User::factory()->create([

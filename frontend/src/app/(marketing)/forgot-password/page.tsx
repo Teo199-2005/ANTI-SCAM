@@ -47,10 +47,20 @@ export default function ForgotPasswordPage() {
       const data = (await res.json()) as {
         success?: boolean;
         message?: string;
-        data?: { expires_at?: string | null; cooldown_seconds?: number | null };
+        data?: {
+          expires_at?: string | null;
+          cooldown_seconds?: number | null;
+          retry_after_seconds?: number | null;
+        };
       };
       if (!res.ok || !data.success) {
-        setError(data.message ?? "Could not send reset code.");
+        const retry = data.data?.retry_after_seconds;
+        setError(
+          data.message ??
+            (retry && retry > 0
+              ? `Please wait ${retry} seconds before requesting another code.`
+              : "Could not send reset code."),
+        );
         return;
       }
       setInfo(data.message ?? "Check your email for a 6-digit code.");

@@ -139,29 +139,17 @@ class XenditSubscriptionInvoiceService
             $invoicePlan = sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths);
         } else {
             $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-            // Always use standard (non-referral) rates. Referral benefit is 1 free month,
-            // not a cheaper per-month price. The 1-month term cannot use the promo
-            // (there is no "N-1" month to charge when N=1).
             $monthlyRate = $this->monthlyRate($durationMonths);
-            $isFirstMonthFree = $hasReferral && $durationMonths > 1;
-            // First-month-free: charge for (N-1) months at standard rate, covering N months of service.
-            $chargeAmount = $isFirstMonthFree
-                ? $monthlyRate * ($durationMonths - 1)
-                : $monthlyRate * $durationMonths;
+            $chargeAmount = $monthlyRate * $durationMonths;
             $description = sprintf(
-                'Subscription fee — %s (%s) · %d month%s%s',
+                'Subscription fee — %s (%s) · %d month%s',
                 $subscription->resort?->name,
                 $subscription->plan,
                 $durationMonths,
-                $durationMonths > 1 ? 's' : '',
-                $isFirstMonthFree ? ' (1st month free via referral)' : ''
+                $durationMonths > 1 ? 's' : ''
             );
             $itemName = 'Subscription Plan';
-            // Plan tag: _fmf suffix indicates first-month-free so the webhook knows to
-            // credit the full N-month term despite charging only N-1 months.
-            $invoicePlan = $isFirstMonthFree
-                ? sprintf('%s_m%d_fmf', (string) $subscription->plan, $durationMonths)
-                : sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
+            $invoicePlan = sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
         }
 
         if (! $this->isConfigured()) {
@@ -201,8 +189,7 @@ class XenditSubscriptionInvoiceService
                 'name' => $itemName,
                 'quantity' => $isRoomAddon
                     ? $roomAddonQuantity * $durationMonths
-                    // First-month-free: quantity = paid months (N-1); standard: quantity = N.
-                    : ($isFirstMonthFree ? $durationMonths - 1 : max(1, $durationMonths)),
+                    : max(1, $durationMonths),
                 'price' => $isRoomAddon
                     ? $slotMonthly
                     : $monthlyRate,

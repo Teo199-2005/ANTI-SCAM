@@ -11,11 +11,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: "Invalid request body." }, { status: 400 });
   }
 
+  const email =
+    typeof body === "object" && body !== null && "email" in body && typeof (body as { email: unknown }).email === "string"
+      ? (body as { email: string }).email
+      : undefined;
+
   let backendRes: Response;
   try {
     backendRes = await fetch(`${BACKEND}/auth/forgot-password/reset`, {
       method: "POST",
-      headers: authBffJsonHeaders(req),
+      headers: authBffJsonHeaders(req, { emailForRateLimit: email }),
       body: JSON.stringify(body),
     });
   } catch {

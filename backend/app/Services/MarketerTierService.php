@@ -30,7 +30,11 @@ class MarketerTierService
             ->whereNotNull('marketer_id')
             ->whereNotNull('tenant_id')
             ->where(function ($q): void {
-                $q->whereNull('plan')->orWhere('plan', 'not like', '%_room_addon%');
+                $q->whereNull('plan')
+                    ->orWhere(function ($q2): void {
+                        $q2->where('plan', 'not like', '%_room_addon%')
+                            ->where('plan', 'not like', '%signup_trial%');
+                    });
             })
             ->groupBy('marketer_id', 'tenant_id');
 
@@ -54,7 +58,11 @@ class MarketerTierService
             ->whereNotNull('paid_at')
             ->whereNotNull('resort_id')
             ->where(function ($q): void {
-                $q->whereNull('plan')->orWhere('plan', 'not like', '%_room_addon%');
+                $q->whereNull('plan')
+                    ->orWhere(function ($q2): void {
+                        $q2->where('plan', 'not like', '%_room_addon%')
+                            ->where('plan', 'not like', '%signup_trial%');
+                    });
             })
             ->selectRaw('COUNT(DISTINCT resort_id) as c')
             ->first();
@@ -145,7 +153,7 @@ class MarketerTierService
     public function tierPolicySummary(): string
     {
         return 'Tier is based on converting clients: each distinct resort-owner organization (tenant) with at least one paid platform subscription invoice attributed to your referral counts once — '
-            .'multiple renewals or multiple resorts under the same owner still count as one client. Room add-on lines are excluded. '
+            .'multiple renewals or multiple resorts under the same owner still count as one client. Free trial signups at registration are listed separately and do not count toward tier. Room add-on lines are excluded. '
             .'Each qualifying subscription payment credits commission for that billing period at your current per-payment rate. '
             .'Payouts follow the platform schedule and withholding shown in your dashboard.';
     }

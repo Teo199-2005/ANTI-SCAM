@@ -11,6 +11,7 @@ use App\Services\EmailNotificationService;
 use App\Services\EmailVerificationOtpService;
 use App\Services\PasswordResetOtpService;
 use App\Services\PhilippineLocationService;
+use App\Services\ReferralSignupTrialService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\GcashAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
@@ -31,6 +32,7 @@ class AuthController extends Controller
         private readonly PasswordResetOtpService $passwordResetOtpService,
         private readonly EmailNotificationService $emailNotifications,
         private readonly PhilippineLocationService $locations,
+        private readonly ReferralSignupTrialService $referralSignupTrial,
     ) {}
 
     public function register(Request $request)
@@ -53,6 +55,7 @@ class AuthController extends Controller
             ],
             'accept_terms' => ['required', 'accepted'],
             'password' => PlatformPasswordRules::requiredWithConfirmation(),
+            'referral_code' => ['nullable', 'string', 'max:32'],
         ]);
 
         $roleIntent = $validated['role_intent'] ?? 'resort_owner';
@@ -96,11 +99,26 @@ class AuthController extends Controller
 
         $user = User::create($payload);
 
+        $referralTrialPayload = ['referral_trial' => $this->referralSignupTrial->trialPayloadForUser($user)];
+        $referralCode = trim((string) ($validated['referral_code'] ?? ''));
+        if ($referralCode !== '' && $roleIntent === 'resort_owner') {
+            $referralTrialPayload = $this->referralSignupTrial->redeemAtRegistration(
+                $user,
+                $referralCode,
+                isset($validated['business_name']) ? trim((string) $validated['business_name']) : null,
+            );
+            $user->refresh();
+        }
+
         $this->emailNotifications->sendTermsAccepted($user, 'account registration');
 
         $token = $user->createToken('spa-token')->plainTextToken;
 
-        return $this->successResponse(['user' => UserProfilePresenter::toArray($user), 'token' => $token], 'Account created', 201);
+        return $this->successResponse([
+            'user' => UserProfilePresenter::toArray($user),
+            'token' => $token,
+            ...$referralTrialPayload,
+        ], 'Account created', 201);
     }
 
     public function login(Request $request)

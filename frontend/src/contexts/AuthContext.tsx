@@ -37,10 +37,11 @@ type AuthContextValue = {
     business_name?: string;
     role_intent?: "resort_owner" | "client" | "guest";
     resort_subdomain?: string;
+    referral_code?: string;
     password: string;
     password_confirmation: string;
     accept_terms: boolean;
-  }) => Promise<AuthUser>;
+  }) => Promise<{ user: AuthUser; referralTrial: AuthUser["referral_trial"] }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -50,7 +51,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 type AuthEnvelope = {
   success: boolean;
   message?: string;
-  data?: { user: AuthUser };
+  data?: {
+    user: AuthUser;
+    referral_trial?: AuthUser["referral_trial"];
+  };
 };
 
 const ME_ATTEMPTS = 3;
@@ -190,19 +194,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       business_name?: string;
       role_intent?: "resort_owner" | "client" | "guest";
       resort_subdomain?: string;
+      referral_code?: string;
       password: string;
       password_confirmation: string;
       accept_terms: boolean;
-    }): Promise<AuthUser> => {
+    }): Promise<{ user: AuthUser; referralTrial: AuthUser["referral_trial"] }> => {
       bumpAuthEpoch();
       try {
         const data = await postAuthEnvelopeWithTransientRetry("/register", input);
         if (!data.success || !data.data?.user) {
           throw new Error(data.message ?? "Registration failed.");
         }
-        setUser(data.data.user);
+        const userPayload = {
+          ...data.data.user,
+          referral_trial: data.data.user.referral_trial ?? data.data.referral_trial ?? null,
+        };
+        setUser(userPayload);
         setLoading(false);
-        return data.data.user;
+        return {
+          user: userPayload,
+          referralTrial: data.data.referral_trial ?? userPayload.referral_trial ?? null,
+        };
       } catch (err) {
         setLoading(false);
         throw new Error(parseApiErrorMessage(err, "Registration failed."));

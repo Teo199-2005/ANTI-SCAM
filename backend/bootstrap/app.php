@@ -11,6 +11,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -86,6 +87,19 @@ return Application::configure(basePath: dirname(__DIR__))
                     'data' => null,
                     'errors' => null,
                 ], 403);
+            }
+
+            if ($e instanceof ThrottleRequestsException) {
+                $retryAfter = (int) ($e->getHeaders()['Retry-After'] ?? 60);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $retryAfter > 0
+                        ? "Please wait {$retryAfter} seconds before trying again."
+                        : 'Please wait a moment before trying again.',
+                    'data' => ['retry_after_seconds' => max(1, $retryAfter)],
+                    'errors' => null,
+                ], 429);
             }
 
             if ($e instanceof HttpException) {
