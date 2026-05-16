@@ -1,5 +1,6 @@
+import { apiClient } from "@/lib/api/client";
 import type { RoomImageRow } from "@/lib/roomImageTypes";
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import {
   ROOM_PHOTO_MAX_EDGE,
   SHRINK_FOR_UPLOAD_MAX_BYTES,
@@ -60,6 +61,29 @@ function estimateUploadTotalBytes(preparedSize: number, eventTotal: number | und
   }
   // Multipart framing adds a small overhead; avoid division by zero when total is missing.
   return Math.max(preparedSize + 4096, Math.round(preparedSize * 1.04));
+}
+
+async function postRoomImages(
+  roomId: number,
+  formData: FormData,
+  config: AxiosRequestConfig,
+): Promise<{ data: { success: boolean; data: RoomImageRow[] } }> {
+  try {
+    return await axios.post<{ success: boolean; data: RoomImageRow[] }>(
+      `/api/upload/rooms/${roomId}/images`,
+      formData,
+      { withCredentials: true, ...config },
+    );
+  } catch (err) {
+    if (axios.isAxiosError(err) && [404, 405, 502, 503].includes(err.response?.status ?? 0)) {
+      return apiClient.post<{ success: boolean; data: RoomImageRow[] }>(
+        `/rooms/${roomId}/images`,
+        formData,
+        config,
+      );
+    }
+    throw err;
+  }
 }
 
 /**
@@ -148,11 +172,7 @@ export async function uploadRoomPhotosSequential(
     };
 
     try {
-      const { data } = await axios.post<{ success: boolean; data: RoomImageRow[] }>(
-        `/api/upload/rooms/${roomId}/images`,
-        formData,
-        {
-          withCredentials: true,
+      const { data } = await postRoomImages(roomId, formData, {
           timeout: UPLOAD_TIMEOUT_MS,
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
@@ -176,8 +196,7 @@ export async function uploadRoomPhotosSequential(
               label: phaseLabel("uploading", fileName, fileIndex, fileCount, prepared.size),
             });
           },
-        },
-      );
+        });
 
       stopSaveCreep();
 

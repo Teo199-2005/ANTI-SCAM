@@ -15,6 +15,7 @@ import {
   uploadRoomPhotosSequential,
   type RoomPhotoUploadProgress,
 } from "@/lib/uploads/roomPhotoUpload";
+import { ROOM_PHOTO_UPLOAD_UI_VERSION } from "@/lib/uploadUiVersion";
 import { Loader2, Star, Trash2, Upload } from "lucide-react";
 import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -47,6 +48,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
   /** Last upload failure — subtle on-page detail for debugging (HTTP code + API messages). */
   const [lastUploadDetail, setLastUploadDetail] = useState<string | null>(null);
   const [uploadStallHint, setUploadStallHint] = useState(false);
+  const [serverUploadUi, setServerUploadUi] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadImages = useCallback(async () => {
@@ -66,6 +68,13 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
   useEffect(() => {
     void loadImages();
   }, [loadImages]);
+
+  useEffect(() => {
+    void axios
+      .get<{ roomPhotoUploadUi?: number }>("/api/app-version", { timeout: 8_000 })
+      .then((res) => setServerUploadUi(res.data.roomPhotoUploadUi ?? null))
+      .catch(() => setServerUploadUi(-1));
+  }, []);
 
   useEffect(() => {
     if (!uploading) {
@@ -187,8 +196,21 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
           ? "One photo at a time — each is compressed to about 2 MB before upload."
           : undefined;
 
+  const serverBehind =
+    serverUploadUi != null &&
+    serverUploadUi >= 0 &&
+    serverUploadUi < ROOM_PHOTO_UPLOAD_UI_VERSION;
+  const serverUnreachable = serverUploadUi === -1;
+
   return (
     <div className="space-y-3 md:space-y-4">
+      {serverBehind || serverUnreachable ? (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 md:text-sm">
+          {serverUnreachable
+            ? "The live site is not running the latest Next.js build (could not reach /api/app-version). On the VPS: git pull, npm ci, npm run build, pm2 restart — then purge Cloudflare cache and hard-refresh."
+            : `Server upload API is v${serverUploadUi}; this page is v${ROOM_PHOTO_UPLOAD_UI_VERSION}. Rebuild and restart the frontend on the VPS, then hard-refresh (Ctrl+Shift+R).`}
+        </p>
+      ) : null}
       <p className="rounded-xl border border-skyBlue/25 bg-sky-50/90 px-3 py-2 text-xs leading-relaxed text-sky-950 md:px-4 md:py-3 md:text-sm">
         These photos appear on your <strong className="font-semibold">public resort landing</strong> (your{" "}
         <span className="font-mono">/resort/</span> page) and when guests <strong className="font-semibold">explore rooms</strong>{" "}
@@ -248,6 +270,17 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
           onChange={handleUpload}
         />
       </div>
+
+      <p className="text-center text-[10px] text-zinc-400">
+        Upload module v{ROOM_PHOTO_UPLOAD_UI_VERSION}
+        {serverUploadUi != null && serverUploadUi >= 0
+          ? ` · server API v${serverUploadUi}`
+          : serverUnreachable
+            ? " · server API unreachable"
+            : ""}
+        {" · "}
+        compress ~2 MB · streaming proxy
+      </p>
 
       {lastUploadDetail ? (
         <p
