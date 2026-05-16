@@ -8,6 +8,7 @@ use App\Models\XenditWebhookEvent;
 use App\Support\XenditInvoiceWebhookStatus;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\DigitalAcknowledgmentReceiptService;
+use App\Services\RoomStayGuard;
 use App\Services\EmailNotificationService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -110,6 +111,8 @@ class XenditWebhookService
                     $oldValues,
                     $reservation->only(['status', 'xendit_payment_status', 'client_id', 'acknowledgment_receipt_no'])
                 );
+
+                RoomStayGuard::expireDuplicatePendingForStay($reservation);
 
                 $reservationForNotifications = $reservation->load(['client', 'resort', 'room']);
                 DB::afterCommit(function () use ($reservationForNotifications): void {

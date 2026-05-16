@@ -374,13 +374,13 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                             : subscriptionRemainingLabel}
                         </p>
                       ) : null}
-                      <p className="mt-2 text-[11px] text-zinc-500">
-                        {isPaidSubscriptionActive
-                          ? "Recurring billing is enabled. A new invoice is generated automatically each cycle before due date."
-                          : hasActiveReferralTrial
+                      {!isPaidSubscriptionActive ? (
+                        <p className="mt-2 text-[11px] text-zinc-500">
+                          {hasActiveReferralTrial
                             ? "Referral trial access. Subscribe before your trial ends to keep your resort active."
                             : "Subscribe to activate your plan and enable recurring billing."}
-                      </p>
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

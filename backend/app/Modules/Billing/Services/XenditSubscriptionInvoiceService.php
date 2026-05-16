@@ -117,24 +117,16 @@ class XenditSubscriptionInvoiceService
         );
 
         $pilot = PricingPilot::enabled();
+        $chargeAmount = $this->resolveChargeAmount($subscription, $billingScope, $roomAddonQuantity, $durationMonths);
+        $slotMonthly = 0.0;
 
         if ($isRoomAddon) {
             $roomAddonQuantity = max(1, $roomAddonQuantity);
             $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-            $baseExtra = (float) $subscription->extra_room_fee;
-            if (! $pilot && $baseExtra <= 0) {
-                throw new RuntimeException('Extra room fee is not configured for this subscription.');
-            }
             if (! $pilot) {
+                $baseExtra = (float) $subscription->extra_room_fee;
                 $ref = PricingPilot::subscriptionTierReference();
                 $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / $ref), 2);
-                $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
-                if ($chargeAmount <= 0) {
-                    throw new RuntimeException('Could not compute room add-on amount.');
-                }
-            } else {
-                $slotMonthly = 0.0;
-                $chargeAmount = PricingPilot::flatInvoiceAmount();
             }
             $description = sprintf(
                 'Extra room slots ×%d · %d-month prepay — %s (%s)',
@@ -148,7 +140,6 @@ class XenditSubscriptionInvoiceService
         } else {
             $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
             $monthlyRate = $this->monthlyRate($durationMonths);
-            $chargeAmount = $pilot ? PricingPilot::flatInvoiceAmount() : $monthlyRate * $durationMonths;
             $description = sprintf(
                 'Subscription fee — %s (%s) · %d month%s',
                 $subscription->resort?->name,
@@ -158,10 +149,6 @@ class XenditSubscriptionInvoiceService
             );
             $itemName = 'Subscription Plan';
             $invoicePlan = sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
-        }
-
-        if ($pilot) {
-            $chargeAmount = PricingPilot::flatInvoiceAmount();
         }
 
         $invoiceItems = $pilot
@@ -408,6 +395,72 @@ class XenditSubscriptionInvoiceService
     private function canUseLocalMockPaid(): bool
     {
         return ! app()->isProduction() && (bool) config('services.xendit.allow_mock_paid', false);
+    }
+
+    /**
+     * Amount that would be charged on a new Xendit invoice for this subscription checkout.
+     */
+    public function resolveChargeAmount(
+        Subscription $subscription,
+        string $billingScope = 'monthly',
+        int $roomAddonQuantity = 1,
+        int $durationMonths = 1,
+    ): float {
+        $pilot = PricingPilot::enabled();
+
+        if ($pilot) {
+            return PricingPilot::flatInvoiceAmount();
+        }
+
+        if ($billingScope === 'room_addon') {
+            $roomAddonQuantity = max(1, $roomAddonQuantity);
+            $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
+            $baseExtra = (float) $subscription->extra_room_fee;
+            if ($baseExtra <= 0) {
+                throw new RuntimeException('Extra room fee is not configured for this subscription.');
+            }
+            $ref = PricingPilot::subscriptionTierReference();
+            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / $ref), 2);
+            $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
+            if ($chargeAmount <= 0) {
+                throw new RuntimeException('Could not compute room add-on amount.');
+            }
+
+            return $chargeAmount;
+        }
+
+        $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
+
+        return $this->monthlyRate($durationMonths) * $durationMonths;
+    }
+
+    /**
+     * Whether a stored pending invoice should not be reused (stale test invoice, expired, amount drift).
+     */
+    public function pendingInvoiceShouldBeReplaced(
+        SubscriptionInvoice $invoice,
+        Subscription $subscription,
+        string $billingScope,
+        int $roomAddonQuantity,
+        int $durationMonths,
+    ): bool {
+        if ($invoice->xendit_invoice_id === null || $invoice->xendit_invoice_id === '') {
+            return true;
+        }
+
+        try {
+            $expectedAmount = $this->resolveChargeAmount($subscription, $billingScope, $roomAddonQuantity, $durationMonths);
+        } catch (RuntimeException) {
+            return true;
+        }
+
+        if (abs((float) $invoice->amount - $expectedAmount) > 0.009) {
+            return true;
+        }
+
+        $gatewayStatus = $this->fetchXenditInvoiceStatus((string) $invoice->xendit_invoice_id);
+
+        return $gatewayStatus === null || $gatewayStatus !== 'PENDING';
     }
 
     private function monthlyRate(int $durationMonths): float

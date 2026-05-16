@@ -9,8 +9,10 @@ use App\Models\Room;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\RoomStayGuard;
 use App\Support\PricingPilot;
 use DateTimeInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -51,24 +53,13 @@ class ReservationService
             ? $checkOut->format('Y-m-d')
             : (string) $checkOut;
 
-        $q = Reservation::query()
-            ->where('tenant_id', $tenantId)
-            ->where('room_id', $roomId)
-            ->whereIn('status', ['pending_payment', 'confirmed'])
-            ->where(function ($query) use ($checkInStr, $checkOutStr): void {
-                $query
-                    ->whereBetween('check_in_date', [$checkInStr, $checkOutStr])
-                    ->orWhereBetween('check_out_date', [$checkInStr, $checkOutStr])
-                    ->orWhere(function ($inner) use ($checkInStr, $checkOutStr): void {
-                        $inner->where('check_in_date', '<=', $checkInStr)
-                            ->where('check_out_date', '>=', $checkOutStr);
-                    });
-            });
-        if ($excludeReservationId !== null) {
-            $q->where('id', '!=', $excludeReservationId);
-        }
-
-        return $q->lockForUpdate()->count();
+        return RoomStayGuard::overlappingReservationCount(
+            $tenantId,
+            $roomId,
+            $checkInStr,
+            $checkOutStr,
+            $excludeReservationId
+        );
     }
 
     public function createFromLock(array $payload): Reservation
@@ -107,6 +98,7 @@ class ReservationService
             $room = Room::withoutGlobalScopes()
                 ->where('id', $lock->room_id)
                 ->where('tenant_id', $tenantId)
+                ->lockForUpdate()
                 ->first();
             if (! $room) {
                 throw new RuntimeException('Selected room is invalid for this booking.');
@@ -115,37 +107,91 @@ class ReservationService
                 throw new RuntimeException('Selected room does not belong to the chosen resort.');
             }
 
-            $overlapCount = $this->countBlockingOverlaps(
-                $tenantId,
-                (int) $lock->room_id,
-                $lock->check_in_date,
-                $lock->check_out_date,
-                null,
-            );
+            $existingForLock = Reservation::query()
+                ->where('booking_lock_id', $lock->id)
+                ->lockForUpdate()
+                ->first();
+            if ($existingForLock) {
+                if ($lock->status === 'locked') {
+                    $lock->update(['status' => 'converted']);
+                }
 
-            $units = max(1, (int) ($room->units ?? 1));
-
-            if ($overlapCount >= $units) {
-                $lock->update(['status' => 'released']);
-                throw new RuntimeException('Room was booked by another transaction. Please choose another date.');
+                return $existingForLock->refresh();
             }
 
-            $reservation = Reservation::create([
-                'tenant_id' => $tenantId,
-                'resort_id' => $resortId,
-                'room_id' => $lock->room_id,
-                'client_id' => $payload['client_id'] ?? null,
-                'booking_source' => 'online',
-                'reference_no' => 'RSV-'.strtoupper(Str::random(10)),
-                'check_in_date' => $lock->check_in_date->toDateString(),
-                'check_out_date' => $lock->check_out_date->toDateString(),
-                'guest_count' => (int) ($payload['guest_count'] ?? 1),
-                'reservation_fee' => self::reservationFeeAmount(),
-                'total_amount' => (float) ($payload['total_amount'] ?? 0),
-                'status' => 'pending_payment',
-                'xendit_payment_status' => 'pending',
-                'reserved_at' => now(),
-            ]);
+            $checkInStr = $lock->check_in_date->toDateString();
+            $checkOutStr = $lock->check_out_date->toDateString();
+            $clientId = isset($payload['client_id']) ? (int) $payload['client_id'] : null;
+
+            $pendingForStay = Reservation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('room_id', $lock->room_id)
+                ->whereDate('check_in_date', $checkInStr)
+                ->whereDate('check_out_date', $checkOutStr)
+                ->where('status', 'pending_payment')
+                ->lockForUpdate()
+                ->orderByDesc('id')
+                ->get();
+
+            if ($pendingForStay->isNotEmpty()) {
+                $reuse = $clientId
+                    ? $pendingForStay->firstWhere('client_id', $clientId)
+                    : null;
+                if ($reuse) {
+                    $lock->update(['status' => 'released']);
+
+                    return $reuse->refresh();
+                }
+
+                $lock->update(['status' => 'released']);
+                throw new RuntimeException(
+                    'These dates are already held pending payment. Complete or cancel the existing checkout before booking again.'
+                );
+            }
+
+            try {
+                RoomStayGuard::assertCanBook(
+                    $tenantId,
+                    (int) $lock->room_id,
+                    $checkInStr,
+                    $checkOutStr,
+                    RoomStayGuard::unitsForRoom($room),
+                    (int) $lock->id,
+                );
+            } catch (RuntimeException $e) {
+                $lock->update(['status' => 'released']);
+                throw $e;
+            }
+
+            try {
+                $reservation = Reservation::create([
+                    'tenant_id' => $tenantId,
+                    'resort_id' => $resortId,
+                    'room_id' => $lock->room_id,
+                    'booking_lock_id' => $lock->id,
+                    'client_id' => $payload['client_id'] ?? null,
+                    'booking_source' => 'online',
+                    'reference_no' => 'RSV-'.strtoupper(Str::random(10)),
+                    'check_in_date' => $lock->check_in_date->toDateString(),
+                    'check_out_date' => $lock->check_out_date->toDateString(),
+                    'guest_count' => (int) ($payload['guest_count'] ?? 1),
+                    'reservation_fee' => self::reservationFeeAmount(),
+                    'total_amount' => (float) ($payload['total_amount'] ?? 0),
+                    'status' => 'pending_payment',
+                    'xendit_payment_status' => 'pending',
+                    'reserved_at' => now(),
+                ]);
+            } catch (QueryException $e) {
+                if (str_contains(strtolower($e->getMessage()), 'unique') && str_contains($e->getMessage(), 'booking_lock_id')) {
+                    $existing = Reservation::query()->where('booking_lock_id', $lock->id)->first();
+                    if ($existing) {
+                        $lock->update(['status' => 'converted']);
+
+                        return $existing->refresh();
+                    }
+                }
+                throw $e;
+            }
 
             $lock->update(['status' => 'converted']);
 

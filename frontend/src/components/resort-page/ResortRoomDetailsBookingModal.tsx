@@ -40,6 +40,7 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
   const [modalCheckOut, setModalCheckOut] = useState(() => defaultPublicStayDates().checkOut);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [bookChecking, setBookChecking] = useState(false);
+  const bookInFlightRef = useRef(false);
   const availabilityOpenRef = useRef(false);
   availabilityOpenRef.current = availabilityOpen;
 
@@ -173,7 +174,8 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
                       type="button"
                       disabled={!datesValid || bookChecking}
                       onClick={async () => {
-                        if (!datesValid || !room) return;
+                        if (!datesValid || !room || bookInFlightRef.current) return;
+                        bookInFlightRef.current = true;
                         setBookChecking(true);
                         try {
                           const r = await checkRoomAvailability(Number(room.id), modalCheckIn, modalCheckOut);
@@ -194,6 +196,7 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
                             tone: "error",
                           });
                         } finally {
+                          bookInFlightRef.current = false;
                           setBookChecking(false);
                         }
                       }}
@@ -290,7 +293,11 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
                 </div>
 
                 <ReservationFeeBreakdownPanel
-                  totalPhp={pricingPilotEnabled() ? pricingPilotUnitPhp() : RESERVATION_FEE_REFERENCE_TOTAL}
+                  totalPhp={
+                    pricingPilotEnabled()
+                      ? pricingPilotUnitPhp()
+                      : Number(room.reservationFee ?? RESERVATION_FEE_REFERENCE_TOTAL)
+                  }
                   variant="compact"
                   className="mb-0"
                 />

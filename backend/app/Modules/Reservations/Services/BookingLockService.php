@@ -4,7 +4,7 @@ namespace App\Modules\Reservations\Services;
 
 use App\Models\BookingLock;
 use App\Models\Room;
-use App\Services\RoomOccupancyService;
+use App\Services\RoomStayGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -36,15 +36,13 @@ class BookingLockService
                 throw new RuntimeException('Room is invalid for this booking.');
             }
 
-            $units = max(1, (int) ($room->units ?? 1));
-
-            $resCount = RoomOccupancyService::overlappingReservationCount($tenantId, $roomId, $checkIn, $checkOut);
-            $lockCount = RoomOccupancyService::overlappingActiveLockCount($tenantId, $roomId, $checkIn, $checkOut);
-            $hasBlock = RoomOccupancyService::hasBlockedAvailabilityWindow($roomId, $checkIn, $checkOut);
-
-            if ($hasBlock || ($resCount + $lockCount) >= $units) {
-                throw new RuntimeException('Room is unavailable for the selected date range.');
-            }
+            RoomStayGuard::assertCanBook(
+                $tenantId,
+                $roomId,
+                (string) $checkIn,
+                (string) $checkOut,
+                RoomStayGuard::unitsForRoom($room),
+            );
 
             return BookingLock::create([
                 'tenant_id'      => $tenantId,

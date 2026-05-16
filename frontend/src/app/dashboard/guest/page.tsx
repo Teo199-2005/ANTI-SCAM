@@ -9,7 +9,7 @@ import { laravelPublicUrl } from "@/lib/publicAsset";
 import { BadgeCheck, CalendarDays, Clock, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type GuestResort = { id: number; name: string; slug: string; address: string | null; logoUrl?: string | null };
 
@@ -75,7 +75,11 @@ export default function GuestDashboardPage() {
   const firstName = user?.name?.split(" ")[0] ?? "Guest";
   const resortLogoAbs = resort?.logoUrl ? laravelPublicUrl(resort.logoUrl) : "";
 
+  const payingInFlight = useRef(false);
+
   const onPay = async (id: number) => {
+    if (payingInFlight.current) return;
+    payingInFlight.current = true;
     setPayingId(id);
     try {
       const result = await createPaymentInvoice(id, { checkoutReturnBase: paymentCheckoutReturnBase() });
@@ -87,6 +91,7 @@ export default function GuestDashboardPage() {
         window.location.href = result.invoice_url;
       }
     } finally {
+      payingInFlight.current = false;
       setPayingId(null);
     }
   };

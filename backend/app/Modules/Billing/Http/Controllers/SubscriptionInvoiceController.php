@@ -147,6 +147,19 @@ class SubscriptionInvoiceController extends Controller
         // Reuse an existing pending gateway invoice for this cycle
         // so users can continue payment instead of getting blocked by 409.
         if ($existingPendingGatewayInvoice) {
+            if ($this->service->pendingInvoiceShouldBeReplaced(
+                $existingPendingGatewayInvoice,
+                $subscription,
+                $billingScope,
+                $roomAddonQuantity,
+                $durationMonths
+            )) {
+                $existingPendingGatewayInvoice->update(['status' => 'expired']);
+                $existingPendingGatewayInvoice = null;
+            }
+        }
+
+        if ($existingPendingGatewayInvoice) {
             return $this->successResponse([
                 'invoice_url' => $existingPendingGatewayInvoice->xendit_invoice_url,
                 'invoice_id' => $existingPendingGatewayInvoice->xendit_invoice_id,

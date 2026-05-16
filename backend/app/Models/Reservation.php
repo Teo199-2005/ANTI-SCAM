@@ -39,6 +39,7 @@ class Reservation extends Model
         'tenant_id',
         'resort_id',
         'room_id',
+        'booking_lock_id',
         'client_id',
         'booking_source',
         'guest_name',

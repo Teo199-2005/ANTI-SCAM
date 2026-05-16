@@ -63,6 +63,7 @@ export default function CheckoutPage() {
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const redirecting = useRef(false);
+  const bookingInFlight = useRef(false);
 
   useEffect(() => {
     const n = Number(resortId);
@@ -156,12 +157,13 @@ export default function CheckoutPage() {
 
   const onBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (redirecting.current) return;
+    if (redirecting.current || bookingInFlight.current) return;
     if (!room || !roomId || !checkIn || !checkOut || nights <= 0) {
       setBookingError("Booking details are incomplete. Please reselect your room and dates.");
       return;
     }
     setBookingError(null);
+    bookingInFlight.current = true;
     setBooking(true);
     setStep("paying");
 
@@ -219,6 +221,7 @@ export default function CheckoutPage() {
       setBookingError(parseApiErrorMessage(err, "Booking failed. Please try again."));
       setStep("confirm");
     } finally {
+      bookingInFlight.current = false;
       setBooking(false);
     }
   };
