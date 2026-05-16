@@ -2,14 +2,18 @@
  * Room photo uploads: buffer the multipart body once, then POST to Laravel on loopback.
  * Streaming (fetch duplex) often hangs on production Node/nginx; files are ~2 MB after browser compress.
  */
-import { jsonFromNonJsonUpstream } from "@/lib/api/bffUpstreamResponse";
+import {
+  fetchLaravelUpstream,
+  isUpstreamTimeoutError,
+  jsonFromNonJsonUpstream,
+  jsonUpstreamTimeout,
+  rejectPublicLaravelBackendInProduction,
+} from "@/lib/api/bffUpstreamResponse";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
 export const maxDuration = 180;
 export const runtime = "nodejs";
-
-const UPSTREAM_TIMEOUT_MS = 120_000;
 
 type RouteContext = { params: Promise<{ roomId: string }> };
 
@@ -30,6 +34,11 @@ export async function POST(req: NextRequest, context: RouteContext): Promise<Nex
 
   const backend = serverLaravelApiV1BaseUrl().replace(/\/$/, "");
   const targetUrl = `${backend}/rooms/${encodeURIComponent(roomId)}/images`;
+
+  const misconfig = rejectPublicLaravelBackendInProduction(backend);
+  if (misconfig) {
+    return misconfig;
+  }
 
   if (backend.includes("anti-scamph.com") && !backend.includes("127.0.0.1") && !backend.includes("localhost")) {
     console.warn(
@@ -59,11 +68,10 @@ export async function POST(req: NextRequest, context: RouteContext): Promise<Nex
   };
 
   try {
-    const backendRes: Response = await fetch(targetUrl, {
+    const backendRes: Response = await fetchLaravelUpstream(targetUrl, {
       method: "POST",
       headers: forwardHeaders,
       body: bytes,
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     const resContentType = backendRes.headers.get("content-type") ?? "";
@@ -81,17 +89,18 @@ export async function POST(req: NextRequest, context: RouteContext): Promise<Nex
       headers: resContentType ? { "Content-Type": resContentType } : undefined,
     });
   } catch (err) {
+    if (isUpstreamTimeoutError(err)) {
+      return jsonUpstreamTimeout("room upload proxy");
+    }
     const msg = err instanceof Error ? err.message : "Upload proxy failed.";
-    const timedOut = err instanceof Error && err.name === "TimeoutError";
     console.error(`[room upload proxy] → ${targetUrl}:`, msg);
     return NextResponse.json(
       {
         success: false,
-        message: timedOut
-          ? "Saving the photo on the server timed out. Check R2 credentials (php artisan media:verify), PHP-FPM, and that LARAVEL_API_BASE_URL uses 127.0.0.1 on the VPS."
-          : "Upload could not reach the API server. Set LARAVEL_API_BASE_URL=http://127.0.0.1:8000/api/v1 in frontend env, run composer install in backend, then pm2 restart --update-env.",
+        message:
+          "Upload could not reach the API server. Set LARAVEL_API_BASE_URL=http://127.0.0.1:8080/api/v1 in frontend env, run composer install in backend, then pm2 restart --update-env.",
       },
-      { status: timedOut ? 504 : 502 },
+      { status: 502 },
     );
   }
 }

@@ -163,11 +163,10 @@ class AdminOnboardController extends Controller
             'logo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:12288'],
         ]);
 
-        $disk = StoredMedia::disk();
-        $path = $request->file('logo')->store('resort-logos', $disk);
+        $stored = StoredMedia::storeUploadedFile($request->file('logo'), 'resort-logos');
 
         return $this->successResponse([
-            'logo_url' => StoredMedia::publicUrlForPath($path),
+            'logo_url' => StoredMedia::urlForStoredFile($stored['disk'], $stored['path']),
         ], 'Resort logo uploaded');
     }
 
@@ -177,11 +176,10 @@ class AdminOnboardController extends Controller
             'image' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif,bmp,tif,tiff', 'max:25600'],
         ]);
 
-        $disk = StoredMedia::disk();
-        $path = $request->file('image')->store('resort-backgrounds', $disk);
+        $stored = StoredMedia::storeUploadedFile($request->file('image'), 'resort-backgrounds');
 
         return $this->successResponse([
-            'background_image_url' => StoredMedia::publicUrlForPath($path),
+            'background_image_url' => StoredMedia::urlForStoredFile($stored['disk'], $stored['path']),
         ], 'Background image uploaded');
     }
 
@@ -393,9 +391,17 @@ class AdminOnboardController extends Controller
 
         StoredMedia::deleteIfPresent($resort->logo_url);
 
-        $disk = StoredMedia::disk();
-        $path = $uploaded->store('resort-logos', $disk);
-        $logoUrl = StoredMedia::publicUrlForPath($path);
+        try {
+            $stored = StoredMedia::storeUploadedFile($uploaded, 'resort-logos');
+        } catch (\Throwable $e) {
+            return $this->errorResponse(
+                'Logo could not be saved to storage.',
+                ['logo' => [$e->getMessage()]],
+                500,
+            );
+        }
+
+        $logoUrl = StoredMedia::urlForStoredFile($stored['disk'], $stored['path']);
 
         $resort->update(['logo_url' => $logoUrl]);
 

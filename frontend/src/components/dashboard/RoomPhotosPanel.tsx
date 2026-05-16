@@ -279,7 +279,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
             ? " · server API unreachable"
             : ""}
         {" · "}
-        compress ~2 MB · streaming proxy
+        compress ~2 MB · BFF proxy
       </p>
 
       {lastUploadDetail ? (

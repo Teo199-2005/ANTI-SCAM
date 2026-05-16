@@ -114,9 +114,17 @@ class ResortLandingPageController extends Controller
 
         StoredMedia::deleteIfPresent($resort->background_image_url);
 
-        $disk = StoredMedia::disk();
-        $path = $uploaded->store('resort-backgrounds', $disk);
-        $url = StoredMedia::publicUrlForPath($path);
+        try {
+            $stored = StoredMedia::storeUploadedFile($uploaded, 'resort-backgrounds');
+        } catch (\Throwable $e) {
+            return $this->errorResponse(
+                'Background image could not be saved to storage.',
+                ['image' => [$e->getMessage()]],
+                500,
+            );
+        }
+
+        $url = StoredMedia::urlForStoredFile($stored['disk'], $stored['path']);
 
         $resort->update(['background_image_url' => $url]);
 
@@ -157,11 +165,18 @@ class ResortLandingPageController extends Controller
             return $this->errorResponse('Please select at least one image to upload.', null, 422);
         }
 
-        $disk = StoredMedia::disk();
         $urls = [];
         foreach ($uploaded as $file) {
-            $path = $file->store('resort-landing', $disk);
-            $urls[] = StoredMedia::publicUrlForPath($path);
+            try {
+                $stored = StoredMedia::storeUploadedFile($file, 'resort-landing');
+                $urls[] = StoredMedia::urlForStoredFile($stored['disk'], $stored['path']);
+            } catch (\Throwable $e) {
+                return $this->errorResponse(
+                    'Image could not be saved to storage.',
+                    ['images' => [$e->getMessage()]],
+                    500,
+                );
+            }
         }
 
         return $this->successResponse([

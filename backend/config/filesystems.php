@@ -61,6 +61,8 @@ return [
             // Passed to Aws\S3\S3Client (not Flysystem adapter options).
             'http' => [
                 'verify' => env('AWS_HTTP_VERIFY', env('APP_ENV') === 'local' ? false : true),
+                'connect_timeout' => (int) env('AWS_HTTP_CONNECT_TIMEOUT', 10),
+                'timeout' => (int) env('AWS_HTTP_TIMEOUT', 90),
             ],
         ],
 

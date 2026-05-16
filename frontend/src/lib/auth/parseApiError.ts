@@ -139,6 +139,10 @@ function joinValidationLines(lines: string[]): string {
 
 export function parseApiErrorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (axios.isAxiosError(error)) {
+    if (error.code === "ECONNABORTED") {
+      return "Upload timed out. The server may be misconfigured — on the VPS set LARAVEL_API_BASE_URL=http://127.0.0.1:8080/api/v1 and run php artisan media:verify.";
+    }
+
     const data = error.response?.data as Record<string, unknown> | undefined;
 
     const errors = data?.errors;
@@ -200,7 +204,20 @@ export function parseApiErrorMessage(error: unknown, fallback = "Something went 
     if (error.response?.status === 422) return "Some information looks incorrect. Check the form and try again.";
     if (error.response?.status === 429) return "Too many attempts. Please wait a moment and try again.";
     if (error.response?.status === 502) return "The service is temporarily unavailable. Please try again in a moment.";
-    if (error.response?.status === 503) return "We are doing brief maintenance. Please try again shortly.";
+    if (error.response?.status === 503) {
+      const code = typeof data?.code === "string" ? data.code : "";
+      if (code === "bff_laravel_not_loopback" && typeof data?.message === "string" && data.message.trim() !== "") {
+        return data.message.trim();
+      }
+      return typeof data?.message === "string" && data.message.trim() !== ""
+        ? data.message.trim()
+        : "We are doing brief maintenance. Please try again shortly.";
+    }
+    if (error.response?.status === 504) {
+      return typeof data?.message === "string" && data.message.trim() !== ""
+        ? data.message.trim()
+        : "Saving the file timed out. Check R2 (php artisan media:verify) and that the API uses loopback on the server.";
+    }
   }
   if (error instanceof Error && error.message) return error.message;
   return fallback;

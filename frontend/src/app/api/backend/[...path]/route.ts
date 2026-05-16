@@ -5,7 +5,13 @@
  * This keeps the auth token exclusively server-side (httpOnly cookie) while allowing
  * the React SPA to make authenticated requests without ever touching the token directly.
  */
-import { jsonFromNonJsonUpstream } from "@/lib/api/bffUpstreamResponse";
+import {
+  fetchLaravelUpstream,
+  isUpstreamTimeoutError,
+  jsonFromNonJsonUpstream,
+  jsonUpstreamTimeout,
+  rejectPublicLaravelBackendInProduction,
+} from "@/lib/api/bffUpstreamResponse";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -38,6 +44,11 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
   const targetPath = `/${segments.join("/")}`;
   const search = req.nextUrl.searchParams.toString();
   const targetUrl = `${BACKEND}${targetPath}${search ? `?${search}` : ""}`;
+
+  const misconfig = rejectPublicLaravelBackendInProduction(BACKEND);
+  if (misconfig) {
+    return misconfig;
+  }
 
   const reqContentType = req.headers.get("content-type") ?? "";
   const isMultipart = reqContentType.includes("multipart/form-data");
@@ -81,10 +92,11 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
       body: body ?? undefined,
     };
 
-    backendRes = await fetch(targetUrl, {
-      ...fetchInit,
-    });
+    backendRes = await fetchLaravelUpstream(targetUrl, fetchInit);
   } catch (err) {
+    if (isUpstreamTimeoutError(err)) {
+      return jsonUpstreamTimeout("BFF proxy");
+    }
     const msg = err instanceof Error ? err.message : "Backend unreachable.";
     console.error(`[BFF proxy] fetch error → ${targetUrl}:`, msg);
     return NextResponse.json({ success: false, message: "Backend unreachable. Is the API server running?" }, { status: 502 });
