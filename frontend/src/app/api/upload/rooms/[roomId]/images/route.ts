@@ -59,7 +59,7 @@ export async function POST(req: NextRequest, context: RouteContext): Promise<Nex
   };
 
   try {
-    const backendRes = await fetch(targetUrl, {
+    const backendRes: Response = await fetch(targetUrl, {
       method: "POST",
       headers: forwardHeaders,
       body: bytes,
@@ -72,11 +72,11 @@ export async function POST(req: NextRequest, context: RouteContext): Promise<Nex
       return NextResponse.json(data, { status: backendRes.status });
     }
 
-    const bytes = await backendRes.arrayBuffer();
+    const responseBytes = await backendRes.arrayBuffer();
     if (!backendRes.ok) {
-      return jsonFromNonJsonUpstream(backendRes.status, bytes, "room upload proxy");
+      return jsonFromNonJsonUpstream(backendRes.status, responseBytes, "room upload proxy");
     }
-    return new NextResponse(bytes, {
+    return new NextResponse(responseBytes, {
       status: backendRes.status,
       headers: resContentType ? { "Content-Type": resContentType } : undefined,
     });
