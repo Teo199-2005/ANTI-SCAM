@@ -132,6 +132,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
           tone: "success",
         });
       }
+      await loadImages();
     } catch (err) {
       const primary = parseApiErrorMessage(err, "Check file type and size, then try again.");
       const lines: string[] = [];

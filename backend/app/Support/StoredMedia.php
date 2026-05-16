@@ -5,6 +5,7 @@ namespace App\Support;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 final class StoredMedia
@@ -110,6 +111,31 @@ final class StoredMedia
         }
 
         return $path;
+    }
+
+    /**
+     * Stream a stored object for HTTP responses. For public R2 (AWS_URL set), redirect to the CDN URL
+     * instead of proxying bytes through PHP — avoids slow S3 exists()/read() calls that exhaust FPM workers.
+     */
+    public static function httpResponseForStoredFile(string $disk, string $path): Response
+    {
+        if (! self::isValidStorageKey($path)) {
+            abort(404, 'File not found.');
+        }
+
+        if ($disk === 's3') {
+            $publicUrl = self::urlForStoredFile($disk, $path);
+            if (str_starts_with($publicUrl, 'http://') || str_starts_with($publicUrl, 'https://')) {
+                return redirect()->away($publicUrl);
+            }
+        }
+
+        $storage = Storage::disk($disk);
+        if (! $storage->exists($path)) {
+            abort(404, 'File not found.');
+        }
+
+        return $storage->response($path);
     }
 
     /**

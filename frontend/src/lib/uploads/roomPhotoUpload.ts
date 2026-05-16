@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { RoomImageRow } from "@/lib/roomImageTypes";
-import type { AxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import {
   ROOM_PHOTO_MAX_EDGE,
   SHRINK_FOR_UPLOAD_MAX_BYTES,
@@ -63,13 +63,21 @@ function estimateUploadTotalBytes(preparedSize: number, eventTotal: number | und
   return Math.max(preparedSize + 4096, Math.round(preparedSize * 1.04));
 }
 
+function extractUploadedRoomImages(response: AxiosResponse<{ success?: boolean; data?: RoomImageRow[] }>): RoomImageRow[] {
+  const body = response.data;
+  if (Array.isArray(body?.data)) {
+    return body.data;
+  }
+  return [];
+}
+
 async function postRoomImages(
   roomId: number,
   formData: FormData,
   config: AxiosRequestConfig,
-): Promise<{ data: { success: boolean; data: RoomImageRow[] } }> {
+): Promise<AxiosResponse<{ success?: boolean; data?: RoomImageRow[] }>> {
   // Same BFF as GET /rooms/{id}/images — handles loopback Laravel + Cloudflare HTML 403.
-  return apiClient.post<{ success: boolean; data: RoomImageRow[] }>(`/rooms/${roomId}/images`, formData, config);
+  return apiClient.post<{ success?: boolean; data?: RoomImageRow[] }>(`/rooms/${roomId}/images`, formData, config);
 }
 
 /**
@@ -163,7 +171,7 @@ export async function uploadRoomPhotosSequential(
     };
 
     try {
-      const { data } = await postRoomImages(roomId, formData, {
+      const response = await postRoomImages(roomId, formData, {
           timeout: UPLOAD_TIMEOUT_MS,
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
@@ -191,9 +199,13 @@ export async function uploadRoomPhotosSequential(
 
       stopSaveCreep();
 
-      if (Array.isArray(data.data)) {
-        uploaded.push(...data.data);
+      const rows = extractUploadedRoomImages(response);
+      if (rows.length === 0 && response.status >= 200 && response.status < 300) {
+        throw new Error(
+          "The server saved your photo but did not return image details. Refresh this page — if photos appear, you can ignore this.",
+        );
       }
+      uploaded.push(...rows);
 
       onProgress({
         percent: slicePercent(fileIndex + 1, fileCount, 0),

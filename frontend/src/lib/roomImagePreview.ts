@@ -41,6 +41,11 @@ export function roomImageDisplaySrc(
 ): string {
   if (image.broken) return "";
 
+  const publicUrl = image.url?.trim() ?? "";
+  if (publicUrl.startsWith("https://") || publicUrl.startsWith("http://")) {
+    return publicUrl;
+  }
+
   if (image.id > 0) {
     const base =
       access === "session"
@@ -55,9 +60,17 @@ export function roomImageDisplaySrc(
 /**
  * Dashboard preview URL — streams through the authenticated BFF.
  */
-export function roomImagePreviewSrc(roomId: number, image: Pick<RoomImageRow, "id" | "broken">): string {
+export function roomImagePreviewSrc(
+  roomId: number,
+  image: Pick<RoomImageRow, "id" | "url" | "broken">,
+): string {
   if (image.broken) {
     return "";
+  }
+
+  const publicUrl = image.url?.trim() ?? "";
+  if (publicUrl.startsWith("https://") || publicUrl.startsWith("http://")) {
+    return publicUrl;
   }
 
   return `/api/backend/rooms/${roomId}/images/${image.id}/file`;

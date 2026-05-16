@@ -290,16 +290,7 @@ class PublicCatalogController extends Controller
             abort(404, 'Image not found for this room.');
         }
 
-        if (! StoredMedia::isValidStorageKey($image->path)) {
-            abort(404, 'Image file not found.');
-        }
-
-        $disk = Storage::disk($image->disk);
-        if (! $disk->exists($image->path)) {
-            abort(404, 'Image file not found.');
-        }
-
-        return $disk->response($image->path);
+        return StoredMedia::httpResponseForStoredFile($image->disk, $image->path);
     }
 
     public function room(Room $room)

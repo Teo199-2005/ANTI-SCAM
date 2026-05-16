@@ -81,6 +81,9 @@ class RoomImageController extends Controller
         }
 
         $tenantId = TenantContext::tenantId() ?? $request->user()?->tenant_id;
+        if (! $tenantId) {
+            return $this->errorResponse('Your account is not linked to a resort workspace.', null, 403);
+        }
 
         $created = [];
         foreach ($files as $file) {
@@ -124,16 +127,7 @@ class RoomImageController extends Controller
         $this->authorizeRoom($room);
         $this->authorizeImage($room, $image);
 
-        if (! StoredMedia::isValidStorageKey($image->path)) {
-            abort(404, 'Image file not found.');
-        }
-
-        $disk = Storage::disk($image->disk);
-        if (! $disk->exists($image->path)) {
-            abort(404, 'Image file not found.');
-        }
-
-        return $disk->response($image->path);
+        return StoredMedia::httpResponseForStoredFile($image->disk, $image->path);
     }
 
     public function destroy(Room $room, RoomImage $image)
