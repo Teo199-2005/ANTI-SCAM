@@ -17,7 +17,7 @@ const people = [
     meaningText: "text-rose-600",
   },
   {
-    name: "Chief Operating Officer",
+    name: "Adrian Park",
     role: "COO",
     roleMeaning: "Chief Operating Officer",
     bio: "Keeps day-to-day operations consistent, efficient, and ready for every guest stay.",
@@ -43,7 +43,7 @@ const people = [
     meaningText: "text-teal-600",
   },
   {
-    name: "Chief Marketing Officer",
+    name: "Ailene Manuel",
     role: "CMO",
     roleMeaning: "Chief Marketing Officer",
     bio: "Shapes brand narrative, campaigns, and trust across every guest touchpoint.",
