@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/shared/ToastProvider";
-import { createSubscriptionInvoice } from "@/lib/api/subscription";
+import { cancelSubscriptionRecurring, createSubscriptionInvoice } from "@/lib/api/subscription";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { getMarketingStats, type MarketingStats } from "@/lib/api/marketing";
@@ -51,10 +51,17 @@ function formatSubscriptionRemainingLabel(days: number | null): string | null {
 }
 
 type DashboardTopbarProps = { onOpenMenu: () => void };
+type SubscriptionPaymentMethod = "CREDIT_CARD" | "GCASH";
+
 type OwnerSubscriptionInfo = {
+  resortId: number | null;
   status: string | null;
   plan: string | null;
   endsAt: string | null;
+  billingMode: "manual" | "auto_card" | null;
+  renewalDurationMonths: number;
+  recurringCancelledAt: string | null;
+  nextDueDate: string | null;
 };
 
 type PlanDuration = 1 | 3 | 6 | 12;
@@ -97,7 +104,9 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const [subscribingNow, setSubscribingNow] = useState(false);
   const subscribeInFlightRef = useRef(false);
   const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod>("CREDIT_CARD");
   const [subscriptionInfo, setSubscriptionInfo] = useState<OwnerSubscriptionInfo | null>(null);
+  const [cancellingRecurring, setCancellingRecurring] = useState(false);
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
   const [marketingTierModalOpen, setMarketingTierModalOpen] = useState(false);
   const [marketingStats, setMarketingStats] = useState<MarketingStats | null>(null);
@@ -132,6 +141,9 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const subscriptionDaysLeft = subscriptionDaysRemaining(subscriptionEndsAt);
   const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
   const isPaidSubscriptionActive = subscriptionStatus === "active";
+  const autoRenewalActive =
+    subscriptionInfo?.billingMode === "auto_card" && !subscriptionInfo?.recurringCancelledAt;
+  const renewalMonths = subscriptionInfo?.renewalDurationMonths ?? selectedDuration;
   const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
   const totalCharge = pricingPilotEnabled()
     ? pricingPilotUnitPhp()
@@ -175,9 +187,15 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
         .then((landing) => {
           if (cancelled) return;
           setSubscriptionInfo({
+            resortId: landing.resort_id ?? null,
             status: landing.subscription_status ?? null,
             plan: landing.subscription_plan ?? null,
             endsAt: landing.subscription_end_at ?? null,
+            billingMode:
+              landing.subscription_billing_mode === "auto_card" ? "auto_card" : "manual",
+            renewalDurationMonths: landing.subscription_renewal_duration_months ?? 1,
+            recurringCancelledAt: landing.subscription_recurring_cancelled_at ?? null,
+            nextDueDate: landing.subscription_next_due_date ?? null,
           });
         })
         .catch(() => {
@@ -224,7 +242,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     try {
       const result = await createSubscriptionInvoice(
         false,
-        undefined,
+        selectedPaymentMethod,
         undefined,
         "monthly",
         undefined,
@@ -240,6 +258,39 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
       });
       setSubscribingNow(false);
       subscribeInFlightRef.current = false;
+    }
+  };
+
+  const onCancelAutoRenewal = async () => {
+    const resortId = subscriptionInfo?.resortId;
+    if (!resortId) {
+      pushToast({ title: "Resort not found", description: "Reload the page and try again.", tone: "error" });
+      return;
+    }
+    if (
+      !window.confirm(
+        "Cancel auto-renewal? Your card will not be charged again after the current billing period. You can pay manually when your plan is due.",
+      )
+    ) {
+      return;
+    }
+    setCancellingRecurring(true);
+    try {
+      await cancelSubscriptionRecurring(resortId);
+      pushToast({
+        title: "Auto-renewal cancelled",
+        description: "You will receive invoices for manual renewal when your plan is due.",
+        tone: "success",
+      });
+      window.dispatchEvent(new Event("subscription:refresh"));
+    } catch (err) {
+      pushToast({
+        title: "Could not cancel auto-renewal",
+        description: parseApiErrorMessage(err, "Please try again."),
+        tone: "error",
+      });
+    } finally {
+      setCancellingRecurring(false);
     }
   };
 
@@ -374,11 +425,38 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                             : subscriptionRemainingLabel}
                         </p>
                       ) : null}
+                      {isPaidSubscriptionActive ? (
+                        <p className="mt-2 text-[11px] text-zinc-600">
+                          {autoRenewalActive
+                            ? `Billing: Auto-renewal (card) · every ${renewalMonths} month${renewalMonths > 1 ? "s" : ""}`
+                            : "Billing: Manual renewal — pay each invoice when due"}
+                        </p>
+                      ) : null}
+                      {autoRenewalActive && subscriptionInfo?.nextDueDate ? (
+                        <p className="mt-0.5 text-[10px] text-zinc-500">
+                          Next billing date:{" "}
+                          {new Date(subscriptionInfo.nextDueDate).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                      ) : null}
+                      {autoRenewalActive ? (
+                        <button
+                          type="button"
+                          disabled={cancellingRecurring}
+                          onClick={() => void onCancelAutoRenewal()}
+                          className="mt-2 w-full rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                        >
+                          {cancellingRecurring ? "Cancelling…" : "Cancel auto-renewal"}
+                        </button>
+                      ) : null}
                       {!isPaidSubscriptionActive ? (
                         <p className="mt-2 text-[11px] text-zinc-500">
                           {hasActiveReferralTrial
                             ? "Referral trial access. Subscribe before your trial ends to keep your resort active."
-                            : "Subscribe to activate your plan and enable recurring billing."}
+                            : "Subscribe to activate your plan. Card payments can auto-renew; other methods renew manually."}
                         </p>
                       ) : null}
                     </div>
@@ -559,8 +637,44 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     <span className="font-semibold text-navy">
                       {formatPhpLedger(totalCharge)}
                     </span>
+                    <span className="text-zinc-400"> · VAT-inclusive</span>
                   </span>
                 </p>
+                <p className="mt-1 text-[10px] leading-snug text-zinc-500 sm:text-[11px]">
+                  {selectedPaymentMethod === "CREDIT_CARD"
+                    ? `Card (Visa, Mastercard, JCB): charged automatically every ${selectedDuration} month${selectedDuration > 1 ? "s" : ""} after checkout.`
+                    : "GCash and other methods: pay manually each billing period (we email an invoice)."}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-dash text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Payment method</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMethod("CREDIT_CARD")}
+                    className={`rounded-xl border px-3 py-2.5 text-left text-[11px] transition sm:text-xs ${
+                      selectedPaymentMethod === "CREDIT_CARD"
+                        ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/25"
+                        : "border-softBorder bg-white hover:border-primaryBlue/30"
+                    }`}
+                  >
+                    <span className="block font-semibold text-navy">Card</span>
+                    <span className="mt-0.5 block text-zinc-600">Visa, Mastercard, JCB · auto-renewal</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMethod("GCASH")}
+                    className={`rounded-xl border px-3 py-2.5 text-left text-[11px] transition sm:text-xs ${
+                      selectedPaymentMethod === "GCASH"
+                        ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/25"
+                        : "border-softBorder bg-white hover:border-primaryBlue/30"
+                    }`}
+                  >
+                    <span className="block font-semibold text-navy">GCash / other</span>
+                    <span className="mt-0.5 block text-zinc-600">Manual renewal each period</span>
+                  </button>
+                </div>
               </div>
 
               <ul className="grid gap-1.5 text-[11px] leading-snug text-zinc-700 sm:gap-2.5 sm:text-sm md:grid-cols-2">
@@ -591,7 +705,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
               </ul>
 
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-medium leading-snug text-amber-800 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
-                Build trust with guests and start accepting online bookings in one setup. VAT is added at checkout by final invoice computation.
+                Build trust with guests and start accepting online bookings in one setup. All prices are VAT-inclusive.
               </div>
 
               <div className="flex flex-col-reverse gap-2 pt-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:pt-1">

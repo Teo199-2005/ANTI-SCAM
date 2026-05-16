@@ -188,6 +188,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
     "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 transition group-focus-within:text-skyBlue";
   const inputCls =
     "h-11 w-full rounded-xl border-0 bg-transparent pl-10 pr-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none";
+  const fieldLabelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-zinc-500";
 
   if (loading) return <div className="dash-card p-8 text-center text-zinc-600">Loading room form…</div>;
 
@@ -207,65 +208,110 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
       {error ? <div className="dash-card border-rose-200 bg-rose-50 p-6 text-rose-800">{error}</div> : null}
 
       <form onSubmit={onSubmit} className="dash-card space-y-4 p-6">
-        <label className={inputWrap}>
-          <AlignLeft size={15} className={iconCls} />
-          <input className={inputCls} placeholder="Room name" value={form.name} onChange={(e) => update("name", e.target.value)} required />
-        </label>
-
-        <div className="grid gap-3 md:grid-cols-3">
+        <div>
+          <p className={fieldLabelCls}>Room name</p>
           <label className={inputWrap}>
-            <UserRound size={15} className={iconCls} />
-            <input className={inputCls} type="number" min={1} max={50} placeholder="Capacity" value={form.capacity} onChange={(e) => update("capacity", Number(e.target.value))} required />
-          </label>
-          <label className={inputWrap}>
-            <Layers size={15} className={iconCls} />
+            <AlignLeft size={15} className={iconCls} />
             <input
               className={inputCls}
-              type="number"
-              min={1}
-              max={99}
-              placeholder="Units"
-              title="Identical bookable units (parallel overlapping bookings)"
-              value={form.units}
-              onChange={(e) => update("units", Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+              placeholder="e.g. Deluxe Ocean View"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
               required
             />
-          </label>
-          <label className={inputWrap}>
-            <CircleDollarSign size={15} className={iconCls} />
-            <input className={inputCls} type="number" min={0} step="0.01" placeholder="Base price" value={form.base_price} onChange={(e) => update("base_price", Number(e.target.value))} required />
           </label>
         </div>
 
+        <div className="grid gap-3 md:grid-cols-3">
+          <div>
+            <p className={fieldLabelCls}>Capacity (guests)</p>
+            <label className={inputWrap}>
+              <UserRound size={15} className={iconCls} />
+              <input
+                className={inputCls}
+                type="number"
+                min={1}
+                max={50}
+                placeholder="e.g. 4"
+                value={form.capacity}
+                onChange={(e) => update("capacity", Number(e.target.value))}
+                required
+              />
+            </label>
+          </div>
+          <div>
+            <p className={fieldLabelCls}>Identical units</p>
+            <label className={inputWrap}>
+              <Layers size={15} className={iconCls} />
+              <input
+                className={inputCls}
+                type="number"
+                min={1}
+                max={99}
+                placeholder="e.g. 2"
+                title="How many identical rooms of this type can be booked on the same dates"
+                value={form.units}
+                onChange={(e) => update("units", Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+                required
+              />
+            </label>
+            <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+              Parallel bookings for overlapping dates (same room type).
+            </p>
+          </div>
+          <div>
+            <p className={fieldLabelCls}>Nightly rate (₱)</p>
+            <label className={inputWrap}>
+              <CircleDollarSign size={15} className={iconCls} />
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="e.g. 3500"
+                value={form.base_price || ""}
+                onChange={(e) => update("base_price", e.target.value === "" ? 0 : Number(e.target.value))}
+                required
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="grid gap-3 md:grid-cols-2">
-          <label className={inputWrap}>
-            <Hash size={15} className={iconCls} />
-            <input
-              className={inputCls}
-              type="number"
-              min={1}
-              max={20}
-              placeholder="How many beds included?"
-              value={form.bed_count}
-              onChange={(e) => update("bed_count", Number(e.target.value))}
-              required
-            />
-          </label>
-          <label className={inputWrap}>
-            <AlignLeft size={15} className={iconCls} />
-            <select
-              className={`${inputCls} appearance-none`}
-              value={form.bed_type}
-              onChange={(e) => update("bed_type", e.target.value)}
-            >
-              <option value="Single">Single bed</option>
-              <option value="Double">Double bed</option>
-              <option value="Queen">Queen bed</option>
-              <option value="King">King bed</option>
-              <option value="Bunk Bed">Bunk bed</option>
-              <option value="Mixed">Mixed bed types</option>
-            </select>
-          </label>
+          <div>
+            <p className={fieldLabelCls}>Bed count</p>
+            <label className={inputWrap}>
+              <Hash size={15} className={iconCls} />
+              <input
+                className={inputCls}
+                type="number"
+                min={1}
+                max={20}
+                placeholder="e.g. 1"
+                value={form.bed_count}
+                onChange={(e) => update("bed_count", Number(e.target.value))}
+                required
+              />
+            </label>
+          </div>
+          <div>
+            <p className={fieldLabelCls}>Bed type</p>
+            <label className={inputWrap}>
+              <AlignLeft size={15} className={iconCls} />
+              <select
+                className={`${inputCls} appearance-none`}
+                value={form.bed_type}
+                onChange={(e) => update("bed_type", e.target.value)}
+              >
+                <option value="Single">Single bed</option>
+                <option value="Double">Double bed</option>
+                <option value="Queen">Queen bed</option>
+                <option value="King">King bed</option>
+                <option value="Bunk Bed">Bunk bed</option>
+                <option value="Mixed">Mixed bed types</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="rounded-xl border border-softBorder bg-white p-3">
@@ -353,37 +399,56 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
           ) : null}
         </div>
 
-        <label className={inputWrap}>
-          <ImageIcon size={15} className={iconCls} />
-          <input
-            className={inputCls}
-            placeholder="Other amenities (comma separated)"
-            value={form.amenities.join(", ")}
-            onChange={(e) =>
-              update(
-                "amenities",
-                sanitizeAmenityListTyping(e.target.value)
-                  .split(",")
-                  .map((i) => i.trim())
-                  .filter(Boolean),
-              )
-            }
-          />
-        </label>
+        <div>
+          <p className={fieldLabelCls}>Other amenities</p>
+          <label className={inputWrap}>
+            <ImageIcon size={15} className={iconCls} />
+            <input
+              className={inputCls}
+              placeholder="e.g. Sea view, Private balcony"
+              value={form.amenities.join(", ")}
+              onChange={(e) =>
+                update(
+                  "amenities",
+                  sanitizeAmenityListTyping(e.target.value)
+                    .split(",")
+                    .map((i) => i.trim())
+                    .filter(Boolean),
+                )
+              }
+            />
+          </label>
+          <p className="mt-1 text-[11px] text-zinc-500">Separate each amenity with a comma.</p>
+        </div>
 
-        <label className={`${inputWrap} block`}>
-          <ScrollText size={15} className="pointer-events-none absolute left-3 top-4 text-zinc-400 transition group-focus-within:text-skyBlue" />
-          <textarea className="h-24 w-full resize-none rounded-xl border-0 bg-transparent pl-10 pr-3 pt-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none" placeholder="Rules and regulations" value={form.rules} onChange={(e) => update("rules", e.target.value)} />
-        </label>
+        <div>
+          <p className={fieldLabelCls}>House rules (optional)</p>
+          <label className={`${inputWrap} block`}>
+            <ScrollText size={15} className="pointer-events-none absolute left-3 top-4 text-zinc-400 transition group-focus-within:text-skyBlue" />
+            <textarea
+              className="h-24 w-full resize-none rounded-xl border-0 bg-transparent pl-10 pr-3 pt-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+              placeholder="e.g. No smoking indoors. Quiet hours after 10 PM."
+              value={form.rules}
+              onChange={(e) => update("rules", e.target.value)}
+            />
+          </label>
+        </div>
 
-        <label className={inputWrap}>
-          <Hash size={15} className={iconCls} />
-          <select className={`${inputCls} appearance-none capitalize`} value={form.status} onChange={(e) => update("status", e.target.value as RoomStatus)}>
-            <option value="active">active</option>
-            <option value="inactive">inactive</option>
-            <option value="maintenance">maintenance</option>
-          </select>
-        </label>
+        <div>
+          <p className={fieldLabelCls}>Room status</p>
+          <label className={inputWrap}>
+            <Hash size={15} className={iconCls} />
+            <select
+              className={`${inputCls} appearance-none capitalize`}
+              value={form.status}
+              onChange={(e) => update("status", e.target.value as RoomStatus)}
+            >
+              <option value="active">Active — open for booking</option>
+              <option value="inactive">Inactive — hidden from guests</option>
+              <option value="maintenance">Maintenance — temporarily unavailable</option>
+            </select>
+          </label>
+        </div>
 
         <div className="flex flex-col-reverse gap-2 pt-2 md:flex-row md:justify-end">
           <Link href="/dashboard/resort/rooms" className="inline-flex items-center justify-center rounded-xl border border-softBorder bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">

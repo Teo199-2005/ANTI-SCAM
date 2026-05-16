@@ -3,7 +3,7 @@
 import { apiClient } from "@/lib/api/client";
 import { flattenLaravelApiErrors, parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { useToast } from "@/components/shared/ToastProvider";
-import { laravelPublicUrl } from "@/lib/publicAsset";
+import { roomImagePreviewSrc } from "@/lib/roomImagePreview";
 import {
   ACCEPT_RASTER_IMAGES,
   RASTER_IMAGE_FORMATS_LABEL,
@@ -20,6 +20,8 @@ export type RoomImageRow = {
   url: string;
   is_primary: boolean;
   original_name: string;
+  /** API marks rows whose storage key is missing or invalid (e.g. failed R2 upload). */
+  broken?: boolean;
 };
 
 type Props = {
@@ -111,7 +113,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
         maxContentLength: Infinity,
       });
       if (Array.isArray(data.data)) {
-        setImages((prev) => [...prev, ...data.data]);
+        await loadImages();
         const n = data.data.length;
         setLastUploadDetail(null);
         pushToast({
@@ -238,14 +240,28 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
         <p className="py-4 text-center text-sm text-zinc-500">No photos yet. Upload some above.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {images.map((img) => (
+          {images.map((img) => {
+            const broken = Boolean(img.broken);
+            const src = roomImagePreviewSrc(roomId, img);
+
+            return (
             <div key={img.id} className="group relative aspect-video overflow-hidden rounded-xl bg-softGray">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={laravelPublicUrl(img.url)}
-                alt={img.original_name}
-                className="h-full w-full object-contain object-center"
-              />
+              {broken ? (
+                <div className="flex h-full flex-col items-center justify-center gap-1 bg-zinc-100 px-2 text-center">
+                  <p className="text-[11px] font-semibold text-rose-700">Preview unavailable</p>
+                  <p className="text-[10px] leading-snug text-zinc-500">
+                    Upload did not finish. Remove this tile and upload again.
+                  </p>
+                </div>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={src}
+                  alt={img.original_name}
+                  className="h-full w-full object-contain object-center"
+                  loading="lazy"
+                />
+              )}
               {img.is_primary ? (
                 <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/90 px-2 py-0.5 text-[10px] font-bold text-white">
                   <Star size={8} fill="white" /> Primary
@@ -275,7 +291,8 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

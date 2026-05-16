@@ -26,6 +26,21 @@ export function formatPhpPerNight(amount: unknown): string {
   return `${core}/night`;
 }
 
+/** Compact calendar cell label, e.g. ₱7.5K */
+export function formatPhpCompact(amount: unknown): string {
+  const n = coerceNumber(amount);
+  if (n === null) return "—";
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `₱${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`;
+  }
+  if (n >= 1000) {
+    const k = n / 1000;
+    return `₱${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`;
+  }
+  return formatPhp(amount);
+}
+
 /** Two decimal places (fee breakdown rows, parity with ledgers when precision matters). */
 export function formatPhpCents(amount: unknown): string {
   const n = coerceNumber(amount);

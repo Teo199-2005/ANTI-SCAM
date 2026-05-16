@@ -47,4 +47,9 @@ class Room extends Model
     {
         return $this->hasMany(RoomImage::class)->orderBy('sort_order');
     }
+
+    public function dailyRates(): HasMany
+    {
+        return $this->hasMany(RoomDailyRate::class);
+    }
 }

@@ -12,6 +12,7 @@ import LocationFilterBar, {
   locationFilterToParams,
   type LocationFilterValue,
 } from "@/components/locations/LocationFilterBar";
+import AdminMarketerDetailModal from "@/components/dashboard/AdminMarketerDetailModal";
 import {
   getAdminMarketersMonitoring,
   type AdminMarketerMonitorRow,
@@ -21,7 +22,7 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/tableSortPagination";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
-import { Activity, Info, RefreshCw } from "lucide-react";
+import { Activity, Eye, Info, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
 
@@ -33,7 +34,6 @@ const SORT_FIRST: Record<string, SortDir> = {
   months_since_last_new_referred_resort: "desc",
   joined_at: "desc",
   last_any_referral_payment_at: "desc",
-  total_referred_subscription_php: "desc",
   commission_pending_php: "desc",
   commission_released_gross_php: "desc",
   commission_total_gross_php: "desc",
@@ -75,6 +75,7 @@ export default function AdminMarketingMonitorPage() {
   const [sortBy, setSortBy] = useState<string>("months_since_last_new_referred_resort");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
+  const [detailMarketerId, setDetailMarketerId] = useState<number | null>(null);
 
   const load = useCallback(async (search: string, loc: LocationFilterValue = locationFilter) => {
     setLoading(true);
@@ -150,8 +151,6 @@ export default function AdminMarketingMonitorPage() {
             b.last_any_referral_payment_at ? new Date(b.last_any_referral_payment_at).getTime() : null,
             sortDir,
           );
-        case "total_referred_subscription_php":
-          return compareNullable(a.total_referred_subscription_php, b.total_referred_subscription_php, sortDir);
         case "commission_pending_php":
           return compareNullable(a.commission_pending_php, b.commission_pending_php, sortDir);
         case "commission_released_gross_php":
@@ -212,8 +211,8 @@ export default function AdminMarketingMonitorPage() {
         </h1>
         <p className="dash-page-sub">
           Referral conversions, partner tier (by converting clients — one owner org per client), idle time since the last
-          new client, paid subscription volume, and commission balances. Tiers set the PHP credited per qualifying paid
-          subscription invoice. Sorted with the longest idle periods first.
+          new client, and commission balances. Tiers set the PHP credited per qualifying paid subscription invoice. Sorted
+          with the longest idle periods first.
         </p>
 
         <form onSubmit={onSearch} className="dash-filter-bar">
@@ -362,10 +361,6 @@ export default function AdminMarketingMonitorPage() {
                       value: fmtDate(r.last_any_referral_payment_at),
                     },
                     {
-                      label: "Paid subscription volume (attrib.)",
-                      value: fmtPhp(r.total_referred_subscription_php),
-                    },
-                    {
                       label: "Commission pending / released / total",
                       fullWidth: true,
                       value: (
@@ -373,6 +368,19 @@ export default function AdminMarketingMonitorPage() {
                           {fmtPhp(r.commission_pending_php)} / {fmtPhp(r.commission_released_gross_php)} /{" "}
                           <strong>{fmtPhp(r.commission_total_gross_php)}</strong>
                         </span>
+                      ),
+                    },
+                    {
+                      label: "Actions",
+                      value: (
+                        <button
+                          type="button"
+                          className="dash-btn-sm inline-flex items-center gap-1.5 border border-zinc-200 bg-white"
+                          onClick={() => setDetailMarketerId(r.id)}
+                        >
+                          <Eye size={13} />
+                          View details
+                        </button>
                       ),
                     },
                   ]}
@@ -385,7 +393,7 @@ export default function AdminMarketingMonitorPage() {
 
         <div className="hidden md:block">
           <DataTable
-            minWidthClass="min-w-[1260px]"
+            minWidthClass="min-w-[1120px]"
             caption={undefined}
             footer={paginationFooter ?? undefined}
             headers={
@@ -440,15 +448,6 @@ export default function AdminMarketingMonitorPage() {
                   onSort={onSort}
                 />
                 <SortableTh
-                  label="Sub volume"
-                  sortKey="total_referred_subscription_php"
-                  activeKey={sortBy}
-                  direction={sortDir}
-                  onSort={onSort}
-                  align="right"
-                  className="text-right"
-                />
-                <SortableTh
                   label="Pending"
                   sortKey="commission_pending_php"
                   activeKey={sortBy}
@@ -475,6 +474,9 @@ export default function AdminMarketingMonitorPage() {
                   align="right"
                   className="text-right"
                 />
+                <th className="px-3 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                  Actions
+                </th>
               </>
             }
           >
@@ -523,16 +525,31 @@ export default function AdminMarketingMonitorPage() {
                     </div>
                   </td>
                   <td className="text-sm text-zinc-700">{fmtDate(r.last_any_referral_payment_at)}</td>
-                  <td className="text-right tabular-nums">{fmtPhp(r.total_referred_subscription_php)}</td>
                   <td className="text-right tabular-nums">{fmtPhp(r.commission_pending_php)}</td>
                   <td className="text-right tabular-nums">{fmtPhp(r.commission_released_gross_php)}</td>
                   <td className="text-right tabular-nums font-medium">{fmtPhp(r.commission_total_gross_php)}</td>
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      className="dash-btn-sm inline-flex items-center gap-1.5 border border-zinc-200 bg-white"
+                      onClick={() => setDetailMarketerId(r.id)}
+                    >
+                      <Eye size={13} />
+                      View details
+                    </button>
+                  </td>
                 </tr>
               ))}
             </AsyncStatePanel>
           </DataTable>
         </div>
       </DashCard>
+
+      <AdminMarketerDetailModal
+        marketerId={detailMarketerId}
+        open={detailMarketerId != null}
+        onClose={() => setDetailMarketerId(null)}
+      />
     </div>
   );
 }

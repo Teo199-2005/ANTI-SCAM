@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
+use App\Support\StoredMedia;
 
 class RoomImage extends Model
 {
@@ -24,6 +24,21 @@ class RoomImage extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk($this->disk)->url($this->path);
+        return StoredMedia::urlForStoredFile($this->disk, $this->path);
+    }
+
+    /**
+     * @return array{id: int, url: string}|null omitted when storage key is invalid (legacy broken rows)
+     */
+    public function toPublicArray(): ?array
+    {
+        if (! StoredMedia::isValidStorageKey($this->path)) {
+            return null;
+        }
+
+        return [
+            'id' => $this->id,
+            'url' => $this->url,
+        ];
     }
 }

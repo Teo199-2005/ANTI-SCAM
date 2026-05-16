@@ -890,7 +890,7 @@ export default function ResortProfilePage() {
               className="dash-input"
               value={form.owner_name}
               onChange={(e) => onChange("owner_name", e.target.value)}
-              placeholder="Owner name"
+              placeholder="e.g. Juan Dela Cruz"
             />
           </div>
           <div>
@@ -914,7 +914,7 @@ export default function ResortProfilePage() {
               className="dash-input"
               value={form.representative_name}
               onChange={(e) => onChange("representative_name", e.target.value)}
-              placeholder="Representative name"
+              placeholder="e.g. Maria Santos"
             />
           </div>
           <div>

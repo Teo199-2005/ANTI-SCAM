@@ -125,6 +125,18 @@ export async function getSubscriptionInvoices(resortId: number): Promise<Subscri
 }
 
 /** After Xendit redirect: poll gateway when webhooks do not reach the server (e.g. local dev). */
+export async function cancelSubscriptionRecurring(
+  resortId: number,
+): Promise<{ billing_mode: string; recurring_cancelled_at: string | null }> {
+  const { data } = await apiClient.post<
+    ApiEnvelope<{ billing_mode: string; recurring_cancelled_at: string | null }>
+  >(`/resorts/${resortId}/subscriptions/cancel-recurring`);
+  if (!data.success || !data.data) {
+    throw new Error(data.message ?? "Could not cancel auto-renewal.");
+  }
+  return data.data;
+}
+
 export async function syncPendingSubscriptionInvoice(
   resortId: number,
 ): Promise<{ synced: boolean; reason?: string; gateway_status?: string }> {

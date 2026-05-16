@@ -69,7 +69,8 @@ class GuestPortalController extends Controller
             ->map(function (Room $room): array {
                 $imageUrls = $room->images
                     ->sortBy(fn ($img): array => [($img->is_primary ? 0 : 1), (int) $img->sort_order])
-                    ->map(fn ($img): string => Storage::disk($img->disk)->url($img->path))
+                    ->map(fn ($img) => $img->toPublicArray())
+                    ->filter()
                     ->values()
                     ->all();
 

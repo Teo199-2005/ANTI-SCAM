@@ -43,7 +43,7 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
 
   const forwardHeaders: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    Accept: "application/json",
+    Accept: req.headers.get("accept") ?? "application/json",
   };
 
   const browserOrigin = req.headers.get("origin");
@@ -100,9 +100,10 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
     return NextResponse.json(data, { status: backendRes.status });
   }
 
-  // Non-JSON response (e.g. HTML error page, Cloudflare challenge, or nginx body)
-  const text = await backendRes.text();
+  // Non-JSON response (binary streams, HTML error pages, etc.)
+  const bytes = await backendRes.arrayBuffer();
   if (!backendRes.ok) {
+    const text = new TextDecoder().decode(bytes.slice(0, 2048));
     console.error(`[BFF proxy] Non-JSON error from backend (${backendRes.status}):`, text.slice(0, 500));
     const lower = text.toLowerCase();
     const looksCfChallenge =
@@ -128,9 +129,20 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
     }
     return NextResponse.json(body, { status: backendRes.status });
   }
-  return new NextResponse(text, {
+
+  const headers = new Headers();
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+  const len = backendRes.headers.get("content-length");
+  if (len) {
+    headers.set("Content-Length", len);
+  }
+  headers.set("Cache-Control", "private, max-age=3600");
+
+  return new NextResponse(bytes, {
     status: backendRes.status,
-    headers: { "Content-Type": contentType },
+    headers,
   });
 }
 

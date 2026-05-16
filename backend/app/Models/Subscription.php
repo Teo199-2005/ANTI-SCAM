@@ -25,6 +25,13 @@ class Subscription extends Model
         'next_due_date',
         'grace_until',
         'status',
+        'billing_mode',
+        'renewal_duration_months',
+        'xendit_customer_id',
+        'xendit_recurring_plan_id',
+        'xendit_payment_method_id',
+        'recurring_activated_at',
+        'recurring_cancelled_at',
     ];
 
     protected function casts(): array
@@ -34,6 +41,9 @@ class Subscription extends Model
             'billing_cycle_end' => 'date',
             'next_due_date' => 'date',
             'grace_until' => 'date',
+            'renewal_duration_months' => 'integer',
+            'recurring_activated_at' => 'datetime',
+            'recurring_cancelled_at' => 'datetime',
             'base_price' => 'decimal:2',
             'extra_room_fee' => 'decimal:2',
             'total_monthly_fee' => 'decimal:2',

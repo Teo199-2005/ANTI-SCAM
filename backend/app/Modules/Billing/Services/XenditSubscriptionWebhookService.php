@@ -20,6 +20,8 @@ class XenditSubscriptionWebhookService
         private readonly EmailNotificationService $emails,
         private readonly SubscriptionReferralCommissionService $referralCommissions,
         private readonly DigitalAcknowledgmentReceiptService $digitalReceipts,
+        private readonly SubscriptionPaymentConfirmationService $paymentConfirmation,
+        private readonly XenditRecurringSubscriptionService $recurring,
     ) {}
 
     public function verifySignature(string $signature): void
@@ -136,48 +138,10 @@ class XenditSubscriptionWebhookService
                         return $paidInvoice;
                     }
 
-                    $oldValues = $subscription->only([
-                        'billing_cycle_start',
-                        'billing_cycle_end',
-                        'next_due_date',
-                        'status',
-                    ]);
+                    $paidInvoice = $this->paymentConfirmation->applyBaseSubscriptionPayment($invoice);
 
-                    $newStart = $subscription->billing_cycle_end
-                        ? $subscription->billing_cycle_end->copy()->addDay()
-                        : now()->startOfMonth();
-                    // extractTermFromPlan returns the full subscription term to credit,
-                    // already accounting for first-month-free and legacy bonus plans.
-                    $creditedMonths = $this->extractTermFromPlan((string) $invoice->plan);
-                    $newEnd = $newStart->copy()->addMonthsNoOverflow($creditedMonths)->subDay();
-
-                    $subscription->update([
-                        'billing_cycle_start' => $newStart->toDateString(),
-                        'billing_cycle_end' => $newEnd->toDateString(),
-                        'next_due_date' => $newEnd->toDateString(),
-                        'status' => 'active',
-                        'grace_until' => null,
-                    ]);
-
-                    $this->audits->log(
-                        'subscription_payment_confirmed',
-                        'subscription',
-                        $subscription->id,
-                        $oldValues,
-                        $subscription->only([
-                            'billing_cycle_start',
-                            'billing_cycle_end',
-                            'next_due_date',
-                            'status',
-                        ])
-                    );
-
-                    $this->referralCommissions->creditFromPaidMonthlyInvoice($invoice);
-
-                    $subscriptionForNotifications = $subscription->loadMissing('resort');
-                    $paidInvoice = $invoice->refresh();
-                    DB::afterCommit(function () use ($subscriptionForNotifications, $paidInvoice): void {
-                        $this->emails->sendSubscriptionRenewalConfirmation($subscriptionForNotifications, $paidInvoice);
+                    DB::afterCommit(function () use ($paidInvoice): void {
+                        $this->recurring->activateRecurringAfterFirstPaid($paidInvoice);
                     });
                 }
             } elseif (XenditInvoiceWebhookStatus::isExpiredOrFailed($payload)) {
@@ -188,27 +152,6 @@ class XenditSubscriptionWebhookService
 
             return $invoice->refresh();
         });
-    }
-
-    /**
-     * Return the number of months to credit to the subscription when an invoice is paid.
-     *
-     * - _fmf (first-month-free): full N-month term is credited even though only N-1 months
-     *   were charged (the owner got the first month free via referral).
-     * - _bN (legacy bonus): paidMonths + bonusMonths (keep backwards-compat for old invoices).
-     * - fallback: 1 month.
-     */
-    private function extractTermFromPlan(string $invoicePlan): int
-    {
-        if (preg_match('/_m(\d+)_fmf$/', $invoicePlan, $m) === 1) {
-            return max(1, (int) $m[1]);
-        }
-
-        if (preg_match('/_m(\d+)_b(\d+)$/', $invoicePlan, $m) === 1) {
-            return max(1, (int) $m[1] + (int) $m[2]);
-        }
-
-        return 1;
     }
 
     /**

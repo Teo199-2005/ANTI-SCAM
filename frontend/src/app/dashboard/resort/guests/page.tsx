@@ -381,23 +381,24 @@ export default function ResortGuestsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="dash-page-title flex items-center gap-2">
             <Users size={24} className="text-skyBlue" /> Guest Directory
           </h1>
           <p className="dash-page-sub">Manage guests, create login accounts, and view booking history.</p>
         </div>
-        <Button
+        <button
           type="button"
-          className="gap-2 shrink-0"
+          className="dash-btn-primary inline-flex shrink-0 items-center gap-2"
           onClick={() => {
             setCreateForm(blankCreate);
             setCreateOpen(true);
           }}
         >
-          <Plus size={16} /> Add guest
-        </Button>
+          <Plus size={16} aria-hidden />
+          Add guest
+        </button>
       </div>
 
       <div className="dash-filter-bar">
@@ -607,6 +608,7 @@ function GuestForm({
         <input
           className="dash-input mt-1 w-full"
           required
+          placeholder="e.g. Maria Santos"
           value={name}
           onChange={(e) => onNameChange(sanitizePersonName(e.target.value))}
         />
@@ -618,6 +620,7 @@ function GuestForm({
           className="dash-input mt-1 w-full"
           required
           maxLength={INPUT_MAX.email}
+          placeholder="guest@example.com"
           value={email}
           onChange={(e) => onEmailChange(sanitizeEmailTyping(e.target.value))}
         />
@@ -626,6 +629,7 @@ function GuestForm({
         Phone
         <input
           className="dash-input mt-1 w-full"
+          placeholder="09xx xxx xxxx"
           value={phone}
           onChange={(e) => onPhoneChange(sanitizePhoneInput(e.target.value))}
         />
@@ -641,6 +645,7 @@ function GuestForm({
           required={mode === "create"}
           minLength={8}
           autoComplete="new-password"
+          placeholder="At least 8 characters"
           value={password}
           onChange={(e) => onPasswordChange(e.target.value)}
         />
@@ -653,6 +658,7 @@ function GuestForm({
           required={mode === "create" || password.length > 0}
           minLength={8}
           autoComplete="new-password"
+          placeholder="Re-enter password"
           value={passwordConfirmation}
           onChange={(e) => onPasswordConfirmationChange(e.target.value)}
         />

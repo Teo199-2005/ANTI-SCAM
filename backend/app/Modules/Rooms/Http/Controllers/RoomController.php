@@ -8,6 +8,8 @@ use App\Models\RoomAvailability;
 use App\Modules\Rooms\Http\Requests\StoreRoomAvailabilityRequest;
 use App\Modules\Rooms\Http\Requests\StoreRoomRequest;
 use App\Modules\Rooms\Http\Requests\UpdateRoomRequest;
+use App\Modules\Rooms\Http\Requests\UpsertRoomDailyRatesRequest;
+use App\Services\RoomDailyRateService;
 use App\Modules\Rooms\Http\Resources\RoomAvailabilityResource;
 use App\Modules\Rooms\Http\Resources\RoomResource;
 use App\Modules\Rooms\Services\RoomService;
@@ -18,8 +20,10 @@ class RoomController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly RoomService $service)
-    {
+    public function __construct(
+        private readonly RoomService $service,
+        private readonly RoomDailyRateService $dailyRateService,
+    ) {
         $this->authorizeResource(Room::class, 'room');
     }
 
@@ -94,5 +98,37 @@ class RoomController extends Controller
         $this->authorize('update', $room);
         $this->service->deleteAvailability($room, $availability);
         return $this->successResponse(null, 'Room availability period deleted');
+    }
+
+    public function dailyRates(Request $request, Room $room)
+    {
+        $this->authorize('view', $room);
+
+        $year = (int) $request->integer('year', now()->year);
+        $month = (int) $request->integer('month', now()->month);
+        $month = max(1, min(12, $month));
+
+        return $this->successResponse([
+            'base_price' => (float) $room->base_price,
+            'rates' => $this->dailyRateService->ratesForMonth($room, $year, $month),
+        ], 'Room daily rates fetched');
+    }
+
+    public function upsertDailyRates(UpsertRoomDailyRatesRequest $request, Room $room)
+    {
+        $validated = $request->validated();
+        $dates = $validated['dates'];
+        $this->dailyRateService->upsertDates(
+            $room,
+            $dates,
+            (float) $validated['nightly_price'],
+        );
+
+        $anchor = \Carbon\Carbon::parse($dates[0]);
+
+        return $this->successResponse([
+            'base_price' => (float) $room->fresh()->base_price,
+            'rates' => $this->dailyRateService->ratesForMonth($room, $anchor->year, $anchor->month),
+        ], 'Daily rates saved');
     }
 }

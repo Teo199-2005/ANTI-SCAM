@@ -56,6 +56,10 @@ class ResortResource extends JsonResource
                     'next_due_date' => $this->subscription?->next_due_date?->toDateString(),
                     'grace_until' => $this->subscription?->grace_until?->toDateString(),
                     'status' => $this->subscription?->status,
+                    'billing_mode' => $this->subscription?->billing_mode ?? 'manual',
+                    'renewal_duration_months' => (int) ($this->subscription?->renewal_duration_months ?? 1),
+                    'recurring_activated_at' => $this->subscription?->recurring_activated_at?->toIso8601String(),
+                    'recurring_cancelled_at' => $this->subscription?->recurring_cancelled_at?->toIso8601String(),
                 ];
             }),
             'created_at' => $this->created_at,

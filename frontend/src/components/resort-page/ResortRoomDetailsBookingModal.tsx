@@ -12,7 +12,11 @@ import {
   defaultPublicStayDates,
   todayIsoLocal,
 } from "@/lib/publicBookingLinks";
-import { laravelPublicUrl } from "@/lib/publicAsset";
+import {
+  normalizeRoomImages,
+  roomImageDisplaySrc,
+  type RoomImageAccess,
+} from "@/lib/roomImagePreview";
 import { amenityMeta, extractRoomMeta, formatPhp } from "@/lib/roomPreviewDisplay";
 import { defaultReservationFeeFallbackPhp, pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
@@ -25,12 +29,19 @@ type Props = {
   room: LandingComputedRoom | null;
   resortId: number;
   onClose: () => void;
+  /** `public` = resort landing; `session` = guest dashboard (authenticated BFF). */
+  imageAccess?: RoomImageAccess;
 };
 
 /**
  * Full-screen room details + stay dates + book / availability — same UX as the public resort landing “Our rooms” modal.
  */
-export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props) {
+export function ResortRoomDetailsBookingModal({
+  room,
+  resortId,
+  onClose,
+  imageAccess = "public",
+}: Props) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [mounted, setMounted] = useState(false);
@@ -44,6 +55,10 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
   availabilityOpenRef.current = availabilityOpen;
 
   const selectedMeta = useMemo(() => (room ? extractRoomMeta(room.amenities) : null), [room]);
+  const gallery = useMemo(
+    () => (room ? normalizeRoomImages(room.images) : []),
+    [room],
+  );
 
   const todayStr = useMemo(() => todayIsoLocal(), []);
   const checkOutMin = modalCheckIn ? addDaysIso(modalCheckIn, 1) : addDaysIso(todayStr, 1);
@@ -94,13 +109,13 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
           >
             <div className="grid max-h-[92vh] grid-cols-1 overflow-y-auto lg:grid-cols-2">
               <div className="flex min-h-0 flex-col border-b border-zinc-200 bg-zinc-100 lg:border-b-0 lg:border-r">
-                <div className="relative h-56 w-full shrink-0 overflow-hidden bg-zinc-200 sm:h-64 lg:h-72">
-                  {room.images[activeImage] ? (
+                <div className="relative flex h-56 w-full shrink-0 items-center justify-center overflow-hidden bg-zinc-100 sm:h-64 lg:h-72">
+                  {gallery[activeImage] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={laravelPublicUrl(room.images[activeImage])}
+                      src={roomImageDisplaySrc(room.id, gallery[activeImage], imageAccess)}
                       alt={room.name}
-                      className="absolute inset-0 h-full w-full object-cover"
+                      className="max-h-full max-w-full object-contain object-center"
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
@@ -111,17 +126,21 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
                     </div>
                   )}
                 </div>
-                {room.images.length > 1 ? (
+                {gallery.length > 1 ? (
                   <div className="grid grid-cols-4 gap-2 p-3">
-                    {room.images.slice(0, 8).map((img, idx) => (
+                    {gallery.slice(0, 8).map((img, idx) => (
                       <button
                         type="button"
-                        key={`${img}-${idx}`}
+                        key={img.id > 0 ? img.id : `thumb-${idx}`}
                         onClick={() => setActiveImage(idx)}
-                        className={`overflow-hidden rounded-lg border ${activeImage === idx ? "border-navy" : "border-zinc-200"}`}
+                        className={`flex h-16 items-center justify-center overflow-hidden rounded-lg border bg-zinc-100 ${activeImage === idx ? "border-navy" : "border-zinc-200"}`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={laravelPublicUrl(img)} alt="" className="h-16 w-full object-cover" />
+                        <img
+                          src={roomImageDisplaySrc(room.id, img, imageAccess)}
+                          alt=""
+                          className="max-h-full max-w-full object-contain object-center"
+                        />
                       </button>
                     ))}
                   </div>

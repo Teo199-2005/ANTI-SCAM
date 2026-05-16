@@ -116,11 +116,36 @@ NEXT_PUBLIC_PRICING_PILOT_AMOUNT=1
 
 Then `php artisan config:clear` (and rebuild the frontend). **Turn pilot mode off** before real customers pay normal prices. After disabling, refresh resort subscriptions (or rely on the next `refreshForResort`) so `base_price` / `extra_room_fee` in the database match production again.
 
-## 7) Verify end-to-end flow
+## 7) Card auto-renewal (Xendit Recurring)
+
+Enable only after Xendit enables **Subscriptions / Recurring** on your merchant account.
+
+```env
+XENDIT_RECURRING_ENABLED=true
+# Optional separate token for recurring webhooks; defaults to XENDIT_WEBHOOK_TOKEN
+# XENDIT_RECURRING_WEBHOOK_TOKEN=
+```
+
+Register this webhook URL in Xendit (same `x-callback-token` header as invoice webhooks unless you set `XENDIT_RECURRING_WEBHOOK_TOKEN`):
+
+```text
+POST https://your-api-domain.com/api/v1/webhooks/xendit/recurring
+```
+
+Behavior:
+
+- **Card (CREDIT_CARD)** at subscribe: first invoice checkout, then a recurring plan is created after payment (Visa, Mastercard, JCB). Future cycles extend the subscription via the recurring webhook; the cron job does **not** create duplicate manual invoices.
+- **GCash / other methods**: one-time invoice per checkout; owners receive manual renewal invoices from `subscriptions:generate-invoices` when due.
+- **Pilot mode** (`PRICING_PILOT_MODE=true`): recurring plan creation is skipped even when `XENDIT_RECURRING_ENABLED=true`.
+
+Owners cancel auto-renewal from the dashboard subscription details menu (`POST /api/v1/resorts/{resort}/subscriptions/cancel-recurring`). Access remains until the current `billing_cycle_end`.
+
+## 8) Verify end-to-end flow
 
 1. Create reservation from frontend checkout.
 2. Confirm Laravel returns a real `invoice_url` from Xendit.
 3. Complete payment in Xendit-hosted page.
 4. Confirm reservation changes to `confirmed` and `xendit_payment_status=paid`.
 5. Confirm webhook events are visible in admin `xendit-logs`.
+6. For subscriptions: subscribe with **Card**, confirm `billing_mode=auto_card` after payment; subscribe with **GCash**, confirm renewals stay manual.
 

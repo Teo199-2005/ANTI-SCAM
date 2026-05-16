@@ -19,7 +19,9 @@ use App\Modules\Admin\Http\Controllers\XenditLogController;
 use App\Modules\Audit\Http\Controllers\AuditLogController;
 use App\Modules\Auth\Http\Controllers\AuthController;
 use App\Modules\Billing\Http\Controllers\SubscriptionInvoiceController;
+use App\Modules\Billing\Http\Controllers\SubscriptionRecurringController;
 use App\Modules\Billing\Http\Controllers\SubscriptionWebhookController;
+use App\Modules\Billing\Http\Controllers\XenditRecurringWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditInvoiceController;
 use App\Modules\Billing\Http\Controllers\XenditPayoutWebhookController;
 use App\Modules\Billing\Http\Controllers\XenditExpiredPhWebhookController;
@@ -63,6 +65,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/webhooks/xendit/invoices', [XenditUnifiedInvoiceWebhookController::class, 'handle']);
         Route::post('/webhooks/xendit/invoice', [XenditWebhookController::class, 'invoice']);
         Route::post('/webhooks/xendit/subscription-invoice', [SubscriptionWebhookController::class, 'invoice']);
+        Route::post('/webhooks/xendit/recurring', [XenditRecurringWebhookController::class, 'handle']);
         Route::post('/webhooks/xendit/expired-ph', [XenditExpiredPhWebhookController::class, 'handle']);
         Route::post('/webhooks/xendit/payout', [XenditPayoutWebhookController::class, 'payout']);
     });
@@ -92,6 +95,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/public/resorts/slug/{slug}', [PublicCatalogController::class, 'resortBySlug']);
     Route::get('/public/resorts/{resort}', [PublicCatalogController::class, 'resort']);
     Route::get('/public/rooms/{room}', [PublicCatalogController::class, 'room']);
+    Route::get('/public/rooms/{room}/images/{image}/file', [PublicCatalogController::class, 'roomImageFile']);
     Route::get('/public/rooms/{room}/availability', [PublicCatalogController::class, 'checkAvailability']);
     Route::get('/public/rooms/{room}/availability-calendar', [PublicCatalogController::class, 'availabilityCalendar']);
 
@@ -180,6 +184,7 @@ Route::prefix('v1')->group(function (): void {
             // Marketing management
             Route::get('/admin/marketers', [MarketingController::class, 'marketers']);
             Route::get('/admin/marketers/monitoring', [MarketingController::class, 'marketersMonitoring']);
+            Route::get('/admin/marketers/{marketer}/detail', [MarketingController::class, 'marketerDetail']);
             Route::post('/admin/marketers/assign', [MarketingController::class, 'assign']);
             Route::post('/admin/marketers/unassign', [MarketingController::class, 'unassign']);
             Route::post('/admin/commissions/{commission}/release', [MarketingController::class, 'release']);
@@ -235,6 +240,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/resorts/{resort}/subscriptions/refresh', [SubscriptionController::class, 'refresh']);
             Route::post('/resorts/{resort}/subscriptions/pay-invoice', [SubscriptionInvoiceController::class, 'create']);
             Route::post('/resorts/{resort}/subscriptions/sync-invoice', [SubscriptionInvoiceController::class, 'syncPendingFromGateway']);
+            Route::post('/resorts/{resort}/subscriptions/cancel-recurring', [SubscriptionRecurringController::class, 'cancel']);
             Route::get('/resorts/{resort}/subscriptions/invoices', [SubscriptionInvoiceController::class, 'index']);
         });
 
@@ -261,8 +267,12 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/rooms/{room}/availability/bulk-delete', [BulkDeleteController::class, 'availability']);
         Route::delete('/rooms/{room}/availability/{availability}', [RoomController::class, 'destroyAvailability']);
 
+        Route::get('/rooms/{room}/daily-rates', [RoomController::class, 'dailyRates']);
+        Route::post('/rooms/{room}/daily-rates', [RoomController::class, 'upsertDailyRates']);
+
         // Room images
         Route::get('/rooms/{room}/images', [RoomImageController::class, 'index']);
+        Route::get('/rooms/{room}/images/{image}/file', [RoomImageController::class, 'file']);
         Route::post('/rooms/{room}/images', [RoomImageController::class, 'store']);
         Route::delete('/rooms/{room}/images/{image}', [RoomImageController::class, 'destroy']);
         Route::post('/rooms/{room}/images/{image}/primary', [RoomImageController::class, 'setPrimary']);

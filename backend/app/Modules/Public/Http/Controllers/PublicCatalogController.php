@@ -5,6 +5,9 @@ namespace App\Modules\Public\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Models\Room;
+use App\Models\RoomImage;
+use App\Support\StoredMedia;
+use Illuminate\Support\Facades\Storage;
 use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Tenant;
 use App\Services\LandingReadinessService;
@@ -276,6 +279,29 @@ class PublicCatalogController extends Controller
         ], 'Room availability calendar fetched');
     }
 
+    /** Stream room image bytes for public landing / catalog (no auth). */
+    public function roomImageFile(Room $room, RoomImage $image)
+    {
+        if ($guard = $this->validateRoomPublicBookable($room)) {
+            return $guard;
+        }
+
+        if ($image->room_id !== $room->id) {
+            abort(404, 'Image not found for this room.');
+        }
+
+        if (! StoredMedia::isValidStorageKey($image->path)) {
+            abort(404, 'Image file not found.');
+        }
+
+        $disk = Storage::disk($image->disk);
+        if (! $disk->exists($image->path)) {
+            abort(404, 'Image file not found.');
+        }
+
+        return $disk->response($image->path);
+    }
+
     public function room(Room $room)
     {
         if ($guard = $this->validateRoomPublicBookable($room)) {
@@ -284,12 +310,12 @@ class PublicCatalogController extends Controller
 
         $room->load(['resort', 'images']);
 
-        $images = $room->images->map(fn ($img): array => [
-            'id'         => $img->id,
-            'url'        => $img->url,
-            'caption'    => $img->original_name,
-            'is_primary' => (bool) $img->is_primary,
-        ])->values()->all();
+        $images = $room->images
+            ->sortBy(fn ($img): array => [($img->is_primary ? 0 : 1), (int) $img->sort_order])
+            ->map(fn ($img) => $img->toPublicArray())
+            ->filter()
+            ->values()
+            ->all();
 
         return $this->successResponse([
             'id'             => $room->id,

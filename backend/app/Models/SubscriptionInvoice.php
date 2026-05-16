@@ -22,6 +22,8 @@ class SubscriptionInvoice extends Model
         'referral_code',
         'marketer_id',
         'status',
+        'source',
+        'xendit_recurring_cycle_id',
         'billing_cycle_start',
         'billing_cycle_end',
         'paid_at',

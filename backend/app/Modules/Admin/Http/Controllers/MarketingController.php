@@ -10,6 +10,7 @@ use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\MarketerCommissionPayoutService;
+use App\Services\MarketerReferralDetailService;
 use App\Services\MarketerTierService;
 use App\Support\ResortLocationQuery;
 use App\Shared\Traits\ApiResponseTrait;
@@ -25,6 +26,7 @@ class MarketingController extends Controller
         private readonly AuditLogService $audits,
         private readonly MarketerTierService $marketerTiers,
         private readonly MarketerCommissionPayoutService $marketerPayouts,
+        private readonly MarketerReferralDetailService $marketerReferralDetail,
     ) {}
 
     /** List all marketers with their assigned resort count. */
@@ -192,6 +194,69 @@ class MarketingController extends Controller
                 'tier_policy' => $this->marketerTiers->tierPolicySummary(),
             ],
         ], 'Marketing monitoring snapshot');
+    }
+
+    /** Admin: clients and subscription transactions for one marketing partner. */
+    public function marketerDetail(User $marketer)
+    {
+        if ($marketer->role !== 'marketing') {
+            return $this->errorResponse('User is not a marketing partner.', null, 404);
+        }
+
+        $marketerId = (int) $marketer->id;
+        $convertingClientsCount = $this->marketerTiers->countConvertingClients($marketerId);
+        $tierResolved = $this->marketerTiers->resolveTier($convertingClientsCount);
+
+        $commissionStats = Commission::query()
+            ->selectRaw(
+                'SUM(CASE WHEN status = \'pending\' THEN commission_amount ELSE 0 END) as pending_commission,
+                SUM(CASE WHEN status = \'released\' THEN commission_amount ELSE 0 END) as released_commission_gross,
+                SUM(commission_amount) as total_commission_gross'
+            )
+            ->where('marketer_id', $marketerId)
+            ->first();
+
+        $clients = $this->marketerReferralDetail->clientsForMarketer($marketerId);
+        $transactions = $this->marketerReferralDetail->subscriptionTransactionsForMarketer($marketerId);
+
+        $paidClients = 0;
+        $trialClients = 0;
+        foreach ($clients as $c) {
+            if (($c['source'] ?? '') === 'paid_subscription') {
+                $paidClients++;
+            } elseif (($c['source'] ?? '') === 'signup_trial') {
+                $trialClients++;
+            }
+        }
+
+        return $this->successResponse([
+            'marketer' => [
+                'id' => $marketer->id,
+                'name' => $marketer->name,
+                'email' => $marketer->email,
+                'referral_code' => $marketer->referral_code,
+                'joined_at' => $marketer->created_at?->toIso8601String(),
+                'assigned_resorts_count' => (int) DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count(),
+                'converting_clients_count' => $convertingClientsCount,
+                'marketer_tier_key' => $tierResolved['tier_key'] ?? null,
+                'marketer_tier_label' => $tierResolved['label'] ?? null,
+                'per_payment_php' => $tierResolved['per_payment_php'] ?? null,
+                'commission_pending_php' => $commissionStats ? round((float) $commissionStats->pending_commission, 2) : 0.0,
+                'commission_released_gross_php' => $commissionStats ? round((float) $commissionStats->released_commission_gross, 2) : 0.0,
+                'commission_total_gross_php' => $commissionStats ? round((float) $commissionStats->total_commission_gross, 2) : 0.0,
+            ],
+            'clients' => $clients,
+            'clients_meta' => [
+                'total' => count($clients),
+                'paid_converting' => $paidClients,
+                'signup_trial' => $trialClients,
+            ],
+            'transactions' => $transactions,
+            'transactions_meta' => [
+                'total' => count($transactions),
+                'definition' => 'All subscription invoices attributed to this marketer (paid and pending), newest first. Room add-ons are labeled.',
+            ],
+        ], 'Marketing partner detail');
     }
 
     /** Assign a resort to a marketer. */

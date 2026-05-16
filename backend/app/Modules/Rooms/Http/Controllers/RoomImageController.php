@@ -82,18 +82,30 @@ class RoomImageController extends Controller
 
         $tenantId = TenantContext::tenantId() ?? $request->user()?->tenant_id;
 
-        $disk = StoredMedia::disk();
         $created = [];
         foreach ($files as $file) {
             /** @var UploadedFile $file */
-            $path = $file->store("rooms/{$room->id}", $disk);
+            try {
+                $stored = StoredMedia::storeUploadedFile($file, "rooms/{$room->id}");
+            } catch (\Throwable $e) {
+                $hint = app()->environment('local')
+                    ? ' On local dev, set AWS_HTTP_VERIFY=false or MEDIA_DISK=public in .env if R2 is unavailable.'
+                    : ' Check MEDIA_DISK, R2 credentials, and bucket permissions.';
+
+                return $this->errorResponse(
+                    'Photo could not be saved to storage.',
+                    ['images' => ['"'.$file->getClientOriginalName().'": '.$e->getMessage().$hint]],
+                    500,
+                );
+            }
+
             $isPrimary = $room->images()->count() === 0 && count($created) === 0;
 
             $img = RoomImage::create([
                 'room_id' => $room->id,
                 'tenant_id' => $tenantId,
-                'path' => $path,
-                'disk' => $disk,
+                'path' => $stored['path'],
+                'disk' => $stored['disk'],
                 'original_name' => $file->getClientOriginalName(),
                 'sort_order' => $room->images()->count(),
                 'is_primary' => $isPrimary,
@@ -104,11 +116,33 @@ class RoomImageController extends Controller
         return $this->successResponse($created, 'Images uploaded', 201);
     }
 
+    /**
+     * Stream image bytes for dashboard previews (works for public disk and private R2).
+     */
+    public function file(Room $room, RoomImage $image)
+    {
+        $this->authorizeRoom($room);
+        $this->authorizeImage($room, $image);
+
+        if (! StoredMedia::isValidStorageKey($image->path)) {
+            abort(404, 'Image file not found.');
+        }
+
+        $disk = Storage::disk($image->disk);
+        if (! $disk->exists($image->path)) {
+            abort(404, 'Image file not found.');
+        }
+
+        return $disk->response($image->path);
+    }
+
     public function destroy(Room $room, RoomImage $image)
     {
         $this->authorizeRoom($room);
         $this->authorizeImage($room, $image);
-        Storage::disk($image->disk)->delete($image->path);
+        if (StoredMedia::isValidStorageKey($image->path)) {
+            Storage::disk($image->disk)->delete($image->path);
+        }
         $image->delete();
 
         return $this->successResponse(null, 'Image deleted');
@@ -191,10 +225,11 @@ class RoomImageController extends Controller
     {
         return [
             'id' => $img->id,
-            'url' => Storage::disk($img->disk)->url($img->path),
+            'url' => StoredMedia::urlForStoredFile($img->disk, $img->path),
             'original_name' => $img->original_name,
             'sort_order' => $img->sort_order,
             'is_primary' => (bool) $img->is_primary,
+            'broken' => ! StoredMedia::isValidStorageKey($img->path),
         ];
     }
 }

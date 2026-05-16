@@ -9,6 +9,7 @@ use App\Modules\Billing\Support\CheckoutReturnBaseResolver;
 use App\Modules\Billing\Support\XenditTls;
 use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\SubscriptionReferralCommissionService;
+use App\Modules\Billing\Support\SubscriptionInvoicePlanTag;
 use App\Support\PricingPilot;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -75,6 +76,42 @@ class XenditSubscriptionInvoiceService
         return is_string($status) && $status !== '' ? strtoupper($status) : null;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function fetchXenditInvoicePayload(string $xenditInvoiceId): ?array
+    {
+        if (! $this->isConfigured() || $xenditInvoiceId === '') {
+            return null;
+        }
+
+        $url = 'https://api.xendit.co/v2/invoices/'.rawurlencode($xenditInvoiceId);
+
+        try {
+            $response = Http::withBasicAuth($this->secretKey(), '')
+                ->withOptions(XenditTls::httpClientOptions())
+                ->timeout(30)
+                ->get($url);
+        } catch (ConnectionException $e) {
+            if (app()->isProduction() || ! str_contains($e->getMessage(), 'cURL error 60')) {
+                return null;
+            }
+
+            $response = Http::withBasicAuth($this->secretKey(), '')
+                ->withOptions(['verify' => false])
+                ->timeout(30)
+                ->get($url);
+        }
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
+
+        return is_array($data) ? $data : null;
+    }
+
     public function createInvoice(
         Subscription $subscription,
         array $paymentMethods = [],
@@ -85,6 +122,8 @@ class XenditSubscriptionInvoiceService
         ?string $storedReferralCode = null,
         int $durationMonths = 1,
         ?string $checkoutReturnBase = null,
+        bool $setupRecurring = false,
+        string $invoiceSource = 'checkout',
     ): array {
         $subscription->loadMissing('resort');
 
@@ -148,7 +187,11 @@ class XenditSubscriptionInvoiceService
                 $durationMonths > 1 ? 's' : ''
             );
             $itemName = 'Subscription Plan';
-            $invoicePlan = sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
+            $invoicePlan = SubscriptionInvoicePlanTag::baseMonthly(
+                (string) $subscription->plan,
+                $durationMonths,
+                $setupRecurring
+            );
         }
 
         $invoiceItems = $pilot
@@ -271,6 +314,7 @@ class XenditSubscriptionInvoiceService
             'referral_code' => $storedReferralCode,
             'marketer_id' => $marketerId,
             'status' => 'pending',
+            'source' => $invoiceSource,
             'billing_cycle_start' => $subscription->billing_cycle_start,
             'billing_cycle_end' => $subscription->billing_cycle_end,
         ]);

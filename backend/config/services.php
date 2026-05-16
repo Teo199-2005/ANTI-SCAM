@@ -52,6 +52,8 @@ return [
     'xendit' => [
         'secret_key' => env('XENDIT_SECRET_KEY'),
         'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
+        /** Optional separate callback token for POST /webhooks/xendit/recurring; falls back to XENDIT_WEBHOOK_TOKEN. */
+        'recurring_webhook_token' => env('XENDIT_RECURRING_WEBHOOK_TOKEN'),
         // true (default), absolute path to cacert.pem, or false (local dev only — not production)
         'http_verify' => env('XENDIT_HTTP_VERIFY', true),
         // explicit local-only testing switch: auto-mark invoices as paid without real gateway

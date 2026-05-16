@@ -58,10 +58,28 @@ async function proxy(req: NextRequest, context: Ctx, method: string): Promise<Ne
     return NextResponse.json(data, { status: backendRes.status });
   }
 
-  const text = await backendRes.text();
-  return new NextResponse(text, {
+  const bytes = await backendRes.arrayBuffer();
+  if (!backendRes.ok) {
+    const text = new TextDecoder().decode(bytes.slice(0, 2048));
+    return NextResponse.json(
+      { success: false, message: text.slice(0, 200) || `Server error (${backendRes.status}).` },
+      { status: backendRes.status },
+    );
+  }
+
+  const headers = new Headers();
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+  const len = backendRes.headers.get("content-length");
+  if (len) {
+    headers.set("Content-Length", len);
+  }
+  headers.set("Cache-Control", "public, max-age=3600");
+
+  return new NextResponse(bytes, {
     status: backendRes.status,
-    headers: { "Content-Type": contentType || "text/plain" },
+    headers,
   });
 }
 

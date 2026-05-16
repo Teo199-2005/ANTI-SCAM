@@ -37,6 +37,11 @@ export type LandingComputedAbout = {
   body: string | null;
 };
 
+export type LandingRoomImage = {
+  id: number;
+  url: string;
+};
+
 export type LandingComputedRoom = {
   id: number;
   name: string;
@@ -44,7 +49,7 @@ export type LandingComputedRoom = {
   basePrice: number;
   amenities: string[];
   rules: string | null;
-  images: string[];
+  images: LandingRoomImage[];
 };
 
 export type LandingComputedFooter = {
@@ -78,6 +83,10 @@ export type OwnerLandingPageResponse = {
   subscription_status: string | null | undefined;
   subscription_plan?: string | null;
   subscription_end_at?: string | null;
+  subscription_billing_mode?: "manual" | "auto_card" | string | null;
+  subscription_renewal_duration_months?: number;
+  subscription_recurring_cancelled_at?: string | null;
+  subscription_next_due_date?: string | null;
   is_ready: boolean;
   missing_fields: LandingMissingField[];
   computed: LandingComputedPayload | null;

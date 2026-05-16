@@ -16,7 +16,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ResortRoomDetailsBookingModal } from "@/components/resort-page/ResortRoomDetailsBookingModal";
 import ScrollReveal from "@/components/shared/ScrollReveal";
-import { laravelPublicUrl } from "@/lib/publicAsset";
+import { normalizeRoomImages, roomImageDisplaySrc } from "@/lib/roomImagePreview";
 import { amenityMeta, extractRoomMeta, formatPhpPerNight } from "@/lib/roomPreviewDisplay";
 import type { ResortLandingSurface } from "@/components/resort-page/resortLandingSurface";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
@@ -35,7 +35,8 @@ type RoomPreviewTileProps = {
 };
 
 function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPreviewTileProps) {
-  const primaryImage = room.images[0];
+  const gallery = normalizeRoomImages(room.images);
+  const primaryImage = gallery[0];
   const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities);
 
   return (
@@ -53,14 +54,13 @@ function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPre
         }}
       >
         {primaryImage ? (
-          <div className="relative aspect-[2/1] w-full overflow-hidden bg-zinc-100">
+          <div className="relative flex aspect-[2/1] w-full items-center justify-center overflow-hidden bg-zinc-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={laravelPublicUrl(primaryImage)}
+              src={roomImageDisplaySrc(room.id, primaryImage, "public")}
               alt={room.name}
-              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+              className="max-h-full max-w-full object-contain object-center"
             />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy/10 via-transparent to-transparent" />
           </div>
         ) : (
           <div className="flex aspect-[2/1] w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-zinc-100 to-zinc-200 text-[11px] text-zinc-500">
@@ -147,8 +147,7 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
       className={`resort-landing-section !py-5 sm:!py-6 lg:!py-7 scroll-mt-24 border-t border-zinc-200/70 ${band}`}
     >
       <ScrollReveal className="resort-landing-container" direction={revealDir} delayMs={50}>
-        <p className="resort-landing-muted text-[10px] tracking-[0.12em]">Stay with us</p>
-        <h2 className="font-pop mt-0.5 text-xl font-extrabold tracking-tight text-navy sm:text-2xl">
+        <h2 className="font-pop text-xl font-extrabold tracking-tight text-navy sm:text-2xl">
           Our rooms
         </h2>
         <p className="mt-1.5 max-w-2xl text-pretty text-xs leading-snug text-zinc-600 max-lg:max-w-[20rem]">

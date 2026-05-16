@@ -102,6 +102,7 @@ export default function ChangePasswordCard({
               id={`${idPrefix}-current`}
               className="dash-input pl-9 pr-10"
               type={showCurrent ? "text" : "password"}
+              placeholder="Enter current password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
@@ -129,6 +130,7 @@ export default function ChangePasswordCard({
                 id={`${idPrefix}-new`}
                 className="dash-input pl-9 pr-10"
                 type={showNew ? "text" : "password"}
+                placeholder="At least 8 characters"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
@@ -157,6 +159,7 @@ export default function ChangePasswordCard({
                 id={`${idPrefix}-confirm`}
                 className="dash-input pl-9 pr-10"
                 type={showNew ? "text" : "password"}
+                placeholder="Re-enter new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required

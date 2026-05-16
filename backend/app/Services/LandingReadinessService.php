@@ -76,7 +76,10 @@ class LandingReadinessService
         foreach ($rooms as $room) {
             $img = $room->images->firstWhere('is_primary', true) ?? $room->images->first();
             if ($img) {
-                $gallery[] = Storage::disk($img->disk)->url($img->path);
+                $public = $img->toPublicArray();
+                if ($public !== null) {
+                    $gallery[] = $public['url'];
+                }
             }
             if (count($gallery) >= 6) {
                 break;
@@ -124,9 +127,12 @@ class LandingReadinessService
                 'basePrice' => (float) $room->base_price,
                 'amenities' => $room->amenities ?? [],
                 'rules' => $room->rules,
-                'images' => $room->images->map(
-                    fn ($img): string => Storage::disk($img->disk)->url($img->path)
-                )->values()->all(),
+                'images' => $room->images
+                    ->sortBy(fn ($img): array => [($img->is_primary ? 0 : 1), (int) $img->sort_order])
+                    ->map(fn ($img) => $img->toPublicArray())
+                    ->filter()
+                    ->values()
+                    ->all(),
             ])->values()->all(),
             'gallery' => $gallery,
             'footer' => [

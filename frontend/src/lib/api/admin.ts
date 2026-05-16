@@ -562,6 +562,77 @@ export type AdminMarketerMonitoringPayload = {
   };
 };
 
+export type AdminMarketerDetailClient = {
+  source: "paid_subscription" | "signup_trial";
+  tenant_id: number | null;
+  tenant_name: string;
+  tenant_slug: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  first_qualifying_paid_at: string | null;
+  last_qualifying_paid_at: string | null;
+  qualifying_subscription_invoices: number;
+  referred_resorts_count: number;
+  total_subscription_volume_php: number;
+  trial_ends_at: string | null;
+  referral_code: string | null;
+  trial_active: boolean;
+  referred_user_id: number | null;
+};
+
+export type AdminMarketerDetailTransaction = {
+  id: number;
+  resort_id: number | null;
+  resort_name: string | null;
+  tenant_id: number | null;
+  tenant_name: string | null;
+  plan: string | null;
+  is_room_addon: boolean;
+  amount_php: number;
+  status: string;
+  paid_at: string | null;
+  referral_code: string | null;
+  acknowledgment_receipt_no: string | null;
+  billing_cycle_start: string | null;
+  billing_cycle_end: string | null;
+};
+
+export type AdminMarketerDetailPayload = {
+  marketer: {
+    id: number;
+    name: string;
+    email: string;
+    referral_code: string | null;
+    joined_at: string | null;
+    assigned_resorts_count: number;
+    converting_clients_count: number;
+    marketer_tier_key: string | null;
+    marketer_tier_label: string | null;
+    per_payment_php: number | null;
+    commission_pending_php: number;
+    commission_released_gross_php: number;
+    commission_total_gross_php: number;
+  };
+  clients: AdminMarketerDetailClient[];
+  clients_meta: {
+    total: number;
+    paid_converting: number;
+    signup_trial: number;
+  };
+  transactions: AdminMarketerDetailTransaction[];
+  transactions_meta: {
+    total: number;
+    definition: string;
+  };
+};
+
+export async function getAdminMarketerDetail(marketerId: number): Promise<AdminMarketerDetailPayload> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminMarketerDetailPayload>>(
+    `/admin/marketers/${marketerId}/detail`,
+  );
+  return data.data;
+}
+
 export async function getAdminMarketersMonitoring(
   search?: string,
   location?: { province_psgc?: string | null; city_municipality_psgc?: string | null },

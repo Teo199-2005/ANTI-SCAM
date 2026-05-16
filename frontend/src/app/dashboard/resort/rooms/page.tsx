@@ -915,6 +915,10 @@ export default function ResortRoomsPage() {
             </div>
           </div>
 
+          <p className="text-[11px] leading-snug text-zinc-500">
+            Room slots are billed per invoice and are not included in card auto-renewal.
+          </p>
+
           <div className="flex flex-wrap justify-end gap-2 pt-1">
             <button
               type="button"

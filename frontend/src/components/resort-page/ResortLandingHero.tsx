@@ -4,8 +4,7 @@ import { ResortLandingHeroBackground } from "@/components/resort-page/ResortLand
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import type { PublicAdminLandingEmbed } from "@/lib/api/landingPage";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { Facebook, Instagram, ShieldCheck, Star } from "lucide-react";
+import { Facebook, Instagram, MapPin, Phone, ShieldCheck, Star } from "lucide-react";
 
 /**
  * Public resort hero — full-bleed photo + glass panel.
@@ -13,18 +12,12 @@ import { Facebook, Instagram, ShieldCheck, Star } from "lucide-react";
  * Mobile stacks the video panel under the hero card.
  */
 
-const GOLD = "#f5a623";
-const REGISTER_GOLD_BACKGROUND = `linear-gradient(165deg, #ffd47a 0%, ${GOLD} 40%, #c9840f 100%)`;
-const REGISTER_GOLD_SHINE_CORE =
-  "relative isolate inline-flex items-center justify-center overflow-hidden text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_5px_14px_rgba(180,110,0,0.22)] transition [text-shadow:0_1px_0_rgba(0,0,0,0.12)] hover:brightness-[1.05] active:brightness-[0.98]";
-const REGISTER_GOLD_SHINE_BASE = `${REGISTER_GOLD_SHINE_CORE} border border-amber-200/50`;
-const REGISTER_GOLD_GLOSS_LAYER =
-  "pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,transparent_0%,transparent_42%,rgba(255,255,255,0.22)_50%,transparent_58%,transparent_100%)] opacity-90";
-
-const registerGoldButtonStyle = {
-  background: REGISTER_GOLD_BACKGROUND,
-  fontFamily: "var(--font-inter), system-ui, sans-serif",
-} as const;
+function telHref(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 7) return null;
+  return `tel:+${digits.startsWith("63") ? digits : `63${digits.replace(/^0/, "")}`}`;
+}
 
 function safeHttpHref(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
@@ -50,9 +43,10 @@ type Props = {
   logoUrl: string | null;
   bgPath: string | null;
   heading: string;
-  ctaLabel: string;
-  ctaHref: string;
-  /** Optional second hero button (e.g. About / Find us) — no default when omitted. */
+  /** Resort address / location label for the hero. */
+  location?: string | null;
+  contactNumber?: string | null;
+  /** Optional hero link (e.g. About / Find us) — no default when omitted. */
   secondaryCta?: { href: string; label: string } | null;
   isVip: boolean;
   facebookUrl?: string | null;
@@ -67,8 +61,8 @@ export function ResortLandingHero({
   logoUrl,
   bgPath,
   heading,
-  ctaLabel,
-  ctaHref,
+  location,
+  contactNumber,
   secondaryCta,
   isVip,
   facebookUrl,
@@ -81,6 +75,14 @@ export function ResortLandingHero({
   const ig = safeHttpHref(instagramUrl);
   const tt = safeHttpHref(tiktokUrl);
   const hasSocials = Boolean(fb || ig || tt);
+  const locationLabel = location?.trim() || null;
+  const phoneLabel = contactNumber?.trim() || null;
+  const phoneLink = telHref(phoneLabel);
+  const hasContact = Boolean(locationLabel || phoneLabel);
+  const showContactRow = hasContact || hasSocials;
+
+  const socialLinkClass =
+    "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/18 bg-white/10 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md transition hover:border-white/26 hover:bg-white/16 hover:text-white";
 
   /** Public API only sets `enabled` when a valid YouTube id exists — both must be true to show the embed column. */
   const showVideoPanel = Boolean(adminEmbed?.enabled && adminEmbed?.youtubeVideoId);
@@ -161,63 +163,87 @@ export function ResortLandingHero({
                 {heading}
               </h1>
 
-              <div className="mt-5 flex w-full max-w-md flex-col items-stretch gap-2.5 max-lg:mx-auto sm:mt-4 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-2">
-                <Link
-                  href={ctaHref}
-                  className={`inline-flex min-h-[44px] w-full items-center justify-center rounded-full px-5 py-2.5 text-sm font-extrabold sm:min-h-[42px] sm:w-auto sm:min-w-[160px] sm:px-6 sm:text-[15px] ${REGISTER_GOLD_SHINE_BASE}`}
-                  style={registerGoldButtonStyle}
+              {showContactRow ? (
+                <div
+                  className="mx-auto mt-5 flex w-full max-w-xl flex-row flex-wrap items-center justify-center gap-x-4 gap-y-2.5 sm:mt-4 sm:justify-evenly sm:gap-x-2 sm:px-1"
+                  aria-label="Resort contact and social links"
                 >
-                  <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
-                  <span className="relative z-10">{ctaLabel}</span>
-                </Link>
-                {secondaryCta ? (
+                  {locationLabel ? (
+                    <p className="inline-flex shrink-0 items-center justify-center gap-1.5 text-xs leading-snug text-zinc-100/95 sm:gap-2 sm:text-sm">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-amber-200/90 sm:h-4 sm:w-4" aria-hidden />
+                      <span className="text-pretty">{locationLabel}</span>
+                    </p>
+                  ) : null}
+                  {locationLabel && phoneLabel ? (
+                    <span className="hidden h-3.5 w-px shrink-0 bg-white/25 sm:block sm:h-4" aria-hidden />
+                  ) : null}
+                  {phoneLabel ? (
+                    phoneLink ? (
+                      <a
+                        href={phoneLink}
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 text-xs font-semibold text-zinc-100 transition hover:text-white sm:gap-2 sm:text-sm"
+                      >
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-amber-200/90 sm:h-4 sm:w-4" aria-hidden />
+                        <span className="whitespace-nowrap">{phoneLabel}</span>
+                      </a>
+                    ) : (
+                      <p className="inline-flex shrink-0 items-center justify-center gap-1.5 text-xs font-semibold text-zinc-100/95 sm:gap-2 sm:text-sm">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-amber-200/90 sm:h-4 sm:w-4" aria-hidden />
+                        <span className="whitespace-nowrap">{phoneLabel}</span>
+                      </p>
+                    )
+                  ) : null}
+                  {hasContact && hasSocials ? (
+                    <span className="hidden h-3.5 w-px shrink-0 bg-white/25 sm:block sm:h-4" aria-hidden />
+                  ) : null}
+                  {hasSocials ? (
+                    <div className="flex shrink-0 items-center justify-center gap-1.5 sm:gap-2">
+                      {fb ? (
+                        <a
+                          href={fb}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${resortName} on Facebook`}
+                          className={socialLinkClass}
+                        >
+                          <Facebook className="h-4 w-4" aria-hidden />
+                        </a>
+                      ) : null}
+                      {ig ? (
+                        <a
+                          href={ig}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${resortName} on Instagram`}
+                          className={socialLinkClass}
+                        >
+                          <Instagram className="h-4 w-4" aria-hidden />
+                        </a>
+                      ) : null}
+                      {tt ? (
+                        <a
+                          href={tt}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${resortName} on TikTok`}
+                          className={socialLinkClass}
+                        >
+                          <TikTokGlyph className="h-4 w-4" />
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {secondaryCta ? (
+                <div className="mt-4 flex justify-center sm:mt-3">
                   <a
                     href={secondaryCta.href}
-                    className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md transition hover:border-white/28 hover:bg-white/16 sm:min-h-[42px] sm:w-auto"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md transition hover:border-white/28 hover:bg-white/16 sm:min-h-[42px]"
                   >
                     {secondaryCta.label}
                   </a>
-                ) : null}
-              </div>
-
-              {hasSocials ? (
-                <div
-                  className="mt-4 flex flex-wrap items-center justify-center gap-3 max-lg:gap-4 sm:mt-3 sm:gap-2.5"
-                  aria-label="Resort social links"
-                >
-                  {fb ? (
-                    <a
-                      href={fb}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${resortName} on Facebook`}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/18 bg-white/10 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md transition hover:border-white/26 hover:bg-white/16 hover:text-white sm:h-9 sm:w-9"
-                    >
-                      <Facebook className="h-[17px] w-[17px]" aria-hidden />
-                    </a>
-                  ) : null}
-                  {ig ? (
-                    <a
-                      href={ig}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${resortName} on Instagram`}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/18 bg-white/10 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md transition hover:border-white/26 hover:bg-white/16 hover:text-white sm:h-9 sm:w-9"
-                    >
-                      <Instagram className="h-[17px] w-[17px]" aria-hidden />
-                    </a>
-                  ) : null}
-                  {tt ? (
-                    <a
-                      href={tt}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${resortName} on TikTok`}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/18 bg-white/10 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md transition hover:border-white/26 hover:bg-white/16 hover:text-white sm:h-9 sm:w-9"
-                    >
-                      <TikTokGlyph className="h-[17px] w-[17px]" />
-                    </a>
-                  ) : null}
                 </div>
               ) : null}
 

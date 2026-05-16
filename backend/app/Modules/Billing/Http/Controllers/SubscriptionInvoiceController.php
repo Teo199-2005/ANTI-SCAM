@@ -5,8 +5,10 @@ namespace App\Modules\Billing\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Models\SubscriptionInvoice;
+use App\Modules\Billing\Services\XenditRecurringSubscriptionService;
 use App\Modules\Billing\Services\XenditSubscriptionInvoiceService;
 use App\Modules\Billing\Services\XenditSubscriptionWebhookService;
+use App\Modules\Billing\Support\SubscriptionInvoicePlanTag;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -18,6 +20,7 @@ class SubscriptionInvoiceController extends Controller
     public function __construct(
         private readonly XenditSubscriptionInvoiceService $service,
         private readonly XenditSubscriptionWebhookService $subscriptionWebhook,
+        private readonly XenditRecurringSubscriptionService $recurring,
     ) {}
 
     /**
@@ -118,9 +121,23 @@ class SubscriptionInvoiceController extends Controller
             ->whereNull('xendit_invoice_id')
             ->update(['status' => 'expired']);
 
-        // Optional: restrict Xendit checkout to one payment method the resort owner chose
-        $paymentMethod = $request->input('payment_method'); // e.g. 'GCASH', 'CREDIT_CARD'
-        $paymentMethods = $paymentMethod ? [(string) $paymentMethod] : [];
+        $paymentMethod = $request->input('payment_method');
+        if ($paymentMethod !== null && $paymentMethod !== '') {
+            $paymentMethod = strtoupper(trim((string) $paymentMethod));
+        } else {
+            $paymentMethod = null;
+        }
+
+        if ($billingScope === 'monthly' && $paymentMethod === null && ! $force) {
+            return $this->errorResponse(
+                'Choose a payment method (card for auto-renewal, or GCash and others for manual renewal).',
+                ['payment_method' => ['required']],
+                422
+            );
+        }
+
+        $paymentMethods = $this->recurring->resolveCheckoutPaymentMethods($paymentMethod);
+        $setupRecurring = $this->recurring->shouldSetupRecurringOnCheckout($paymentMethod, $billingScope);
         $referralCode = trim((string) $request->input('referral_code', ''));
         if ($referralCode !== '') {
             return $this->errorResponse(
@@ -132,7 +149,7 @@ class SubscriptionInvoiceController extends Controller
 
         $invoicePlanTag = $billingScope === 'room_addon'
             ? sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths)
-            : sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
+            : SubscriptionInvoicePlanTag::baseMonthly((string) $subscription->plan, $durationMonths, $setupRecurring);
 
         $existingPendingGatewayInvoice = SubscriptionInvoice::query()
             ->where('subscription_id', $subscription->id)
@@ -183,7 +200,9 @@ class SubscriptionInvoiceController extends Controller
                 null,
                 null,
                 $durationMonths,
-                $checkoutReturnBase
+                $checkoutReturnBase,
+                $setupRecurring,
+                'checkout',
             );
         } catch (RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), null, 502);
@@ -237,11 +256,15 @@ class SubscriptionInvoiceController extends Controller
             ], 'Invoice is not marked paid yet.');
         }
 
-        $this->subscriptionWebhook->handleInvoiceWebhook([
+        $paidInvoice = $this->subscriptionWebhook->handleInvoiceWebhook([
             'id' => $invoice->xendit_invoice_id,
             'status' => 'PAID',
             'event' => 'invoice.paid',
         ]);
+
+        if ($paidInvoice) {
+            $this->recurring->activateRecurringAfterFirstPaid($paidInvoice);
+        }
 
         return $this->successResponse(['synced' => true], 'Subscription updated from payment.');
     }

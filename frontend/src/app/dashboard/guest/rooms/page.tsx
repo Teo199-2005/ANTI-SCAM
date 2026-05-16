@@ -6,12 +6,12 @@ import { BulkSelectMobile } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ResortRoomDetailsBookingModal } from "@/components/resort-page/ResortRoomDetailsBookingModal";
-import type { LandingComputedRoom } from "@/lib/api/landingPage";
+import type { LandingComputedRoom, LandingRoomImage } from "@/lib/api/landingPage";
 import { apiClient } from "@/lib/api/client";
 import { bulkDeleteGuestFavorites, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
-import { laravelPublicUrl } from "@/lib/publicAsset";
+import { normalizeRoomImages, roomImageDisplaySrc } from "@/lib/roomImagePreview";
 import { amenityMeta, extractRoomMeta, formatPhp, formatPhpPerNight } from "@/lib/roomPreviewDisplay";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 import { BedDouble, Heart, ImageOff, Loader2, Users } from "lucide-react";
@@ -25,7 +25,7 @@ type RoomRow = {
   basePrice: number;
   amenities: string[];
   rules: string | null;
-  images: string[];
+  images: LandingRoomImage[];
   reservationFee: number;
 };
 
@@ -159,7 +159,7 @@ export default function GuestRoomsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rooms.map((room) => {
-            const primaryImage = room.images[0];
+            const primaryImage = normalizeRoomImages(room.images)[0];
             const { bedCount, bedType, visibleAmenities } = extractRoomMeta(room.amenities ?? []);
             const isFav = favIds.has(room.id);
             return (
@@ -182,7 +182,7 @@ export default function GuestRoomsPage() {
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={laravelPublicUrl(primaryImage)}
+                        src={roomImageDisplaySrc(room.id, primaryImage, "session")}
                         alt={room.name}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                       />
@@ -298,6 +298,7 @@ export default function GuestRoomsPage() {
         <ResortRoomDetailsBookingModal
           room={selectedRoom}
           resortId={resort.id}
+          imageAccess="session"
           onClose={() => setSelectedRoom(null)}
         />
       ) : null}

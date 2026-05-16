@@ -819,7 +819,7 @@ export default function ResortReservationsPage() {
               className="dash-input w-full"
               value={manualForm.guestName}
               onChange={(e) => setManualForm((f) => ({ ...f, guestName: e.target.value }))}
-              placeholder="Guest or party name"
+              placeholder="e.g. Juan Dela Cruz"
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -830,6 +830,7 @@ export default function ResortReservationsPage() {
                 className="dash-input w-full"
                 value={manualForm.guestEmail}
                 onChange={(e) => setManualForm((f) => ({ ...f, guestEmail: e.target.value }))}
+                placeholder="guest@example.com"
               />
             </div>
             <div>
@@ -838,6 +839,7 @@ export default function ResortReservationsPage() {
                 className="dash-input w-full"
                 value={manualForm.guestPhone}
                 onChange={(e) => setManualForm((f) => ({ ...f, guestPhone: e.target.value }))}
+                placeholder="09xx xxx xxxx"
               />
             </div>
           </div>
@@ -848,6 +850,7 @@ export default function ResortReservationsPage() {
                 type="number"
                 min={1}
                 className="dash-input w-full"
+                placeholder="e.g. 2"
                 value={manualForm.guestCount}
                 onChange={(e) => setManualForm((f) => ({ ...f, guestCount: Math.max(1, Number(e.target.value) || 1) }))}
               />
@@ -859,6 +862,7 @@ export default function ResortReservationsPage() {
                 min={0}
                 step="0.01"
                 className="dash-input w-full"
+                placeholder="e.g. 8500"
                 value={manualForm.totalAmount}
                 onChange={(e) => setManualForm((f) => ({ ...f, totalAmount: e.target.value }))}
               />
