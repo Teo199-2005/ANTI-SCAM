@@ -3,13 +3,13 @@
 namespace App\Jobs;
 
 use App\Models\EmailLog;
+use App\Support\BrandedMailHtml;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class SendTransactionalEmailJob implements ShouldQueue
@@ -52,10 +52,12 @@ class SendTransactionalEmailJob implements ShouldQueue
         Log::info('transactional_email_send_attempt', $ctx);
 
         try {
-            Mail::html($log->html_body, function ($message) use ($log): void {
-                $message->to($log->to_email, $log->to_name ?? '')
-                    ->subject((string) ($log->subject ?? ''));
-            });
+            BrandedMailHtml::sendHtml(
+                $log->to_email,
+                $log->to_name,
+                (string) ($log->subject ?? ''),
+                (string) $log->html_body
+            );
 
             $log->update(['status' => 'sent', 'sent_at' => now(), 'error' => null]);
 

@@ -21,7 +21,7 @@
                 <tr>
                   <td align="left" style="vertical-align:middle;">
                     @if(!empty($logoUrl))
-                      <img src="{{ $logoUrl }}" alt="{{ $brandName }} logo" style="height:42px;max-width:190px;object-fit:contain;display:block;">
+                      <img src="{{ $logoUrl }}" data-brand-logo="1" alt="{{ $brandName }}" width="190" height="42" style="height:42px;max-width:190px;width:auto;object-fit:contain;display:block;border:0;">
                     @else
                       <div style="font-size:21px;font-weight:700;color:#0f172a;letter-spacing:0.2px;">{{ $brandName }}</div>
                     @endif

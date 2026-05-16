@@ -5,11 +5,11 @@ namespace App\Services;
 use App\Models\EmailLog;
 use App\Models\EmailVerificationOtp;
 use App\Models\User;
+use App\Support\BrandedMailHtml;
 use App\Support\OutboundMail;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 
 class EmailVerificationOtpService
 {
@@ -95,22 +95,17 @@ class EmailVerificationOtpService
             ]);
 
             try {
-                Mail::send([], [], function ($message) use ($user, $plainCode, $expiresAt): void {
-                    $content = "<h2 style=\"margin:0 0 10px 0;font-size:22px;color:#0f172a;\">Verify your email address</h2>"
+                $html = $this->templateService->render(
+                    'Email verification code',
+                    "<h2 style=\"margin:0 0 10px 0;font-size:22px;color:#0f172a;\">Verify your email address</h2>"
                         . "<p style=\"margin:0 0 12px 0;color:#334155;line-height:1.65;\">Hello {$user->name},</p>"
                         . "<p style=\"margin:0 0 14px 0;color:#334155;line-height:1.65;\">Use this one-time code to verify your account and continue in the dashboard:</p>"
                         . "<div style=\"display:inline-block;padding:12px 18px;border-radius:10px;border:1px solid #dbeafe;background:#eff6ff;font-size:28px;font-weight:700;letter-spacing:5px;color:#1e3a8a;\">{$plainCode}</div>"
                         . "<p style=\"margin:14px 0 0 0;color:#475569;line-height:1.65;\">This code expires at {$expiresAt->format('M d, Y h:i A')}.</p>"
-                        . "<p style=\"margin:8px 0 0 0;color:#64748b;line-height:1.65;font-size:13px;\">If you did not request this, you can ignore this email.</p>";
-
-                    $message->to($user->email, $user->name)
-                        ->subject('Anti-Scam PH email verification code')
-                        ->html($this->templateService->render(
-                            'Email verification code',
-                            $content,
-                            'Your OTP code for account verification is ready.'
-                        ));
-                });
+                        . "<p style=\"margin:8px 0 0 0;color:#64748b;line-height:1.65;font-size:13px;\">If you did not request this, you can ignore this email.</p>",
+                    'Your OTP code for account verification is ready.'
+                );
+                BrandedMailHtml::sendHtml($user->email, $user->name, 'Anti-Scam PH email verification code', $html);
                 $log->update(['status' => 'sent', 'sent_at' => now()]);
             } catch (\Throwable $th) {
                 $log->update([

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\EmailLog;
-use Illuminate\Support\Facades\Mail;
+use App\Support\BrandedMailHtml;
 use Throwable;
 
 class MailHealthService
@@ -32,14 +32,14 @@ class MailHealthService
         $timestamp = now()->toDateTimeString();
 
         try {
-            Mail::send([], [], function ($m) use ($toEmail, $subject, $timestamp): void {
-                $content = "<h2 style=\"margin:0 0 8px;color:#1e3a5f\">Brevo Mail Health Check</h2>"
-                    . "<p style=\"margin:0 0 8px;color:#334155;line-height:1.65;\">Your SMTP integration is active and accepted this test message.</p>"
-                    . "<p style=\"margin:0;color:#64748b;font-size:13px;\">Timestamp: {$timestamp}</p>";
-                $m->to($toEmail)
-                    ->subject($subject)
-                    ->html($this->templateService->render('Mail health check', $content, 'SMTP mail test successful.'));
-            });
+            $html = $this->templateService->render(
+                'Mail health check',
+                "<h2 style=\"margin:0 0 8px;color:#1e3a5f\">Brevo Mail Health Check</h2>"
+                    ."<p style=\"margin:0 0 8px;color:#334155;line-height:1.65;\">Your SMTP integration is active and accepted this test message.</p>"
+                    ."<p style=\"margin:0;color:#64748b;font-size:13px;\">Timestamp: {$timestamp}</p>",
+                'SMTP mail test successful.'
+            );
+            BrandedMailHtml::sendHtml($toEmail, null, $subject, $html);
             $log->update(['status' => 'sent', 'sent_at' => now()]);
 
             return [

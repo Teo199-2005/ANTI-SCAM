@@ -5,11 +5,11 @@ namespace App\Services;
 use App\Models\EmailLog;
 use App\Models\PasswordResetOtp;
 use App\Models\User;
+use App\Support\BrandedMailHtml;
 use App\Support\OutboundMail;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 
 class PasswordResetOtpService
 {
@@ -114,22 +114,17 @@ class PasswordResetOtpService
             ]);
 
             try {
-                Mail::send([], [], function ($message) use ($user, $plainCode, $expiresAt): void {
-                    $content = "<h2 style=\"margin:0 0 10px 0;font-size:22px;color:#0f172a;\">Reset your password</h2>"
+                $html = $this->templateService->render(
+                    'Password reset code',
+                    "<h2 style=\"margin:0 0 10px 0;font-size:22px;color:#0f172a;\">Reset your password</h2>"
                         . "<p style=\"margin:0 0 12px 0;color:#334155;line-height:1.65;\">Hello {$user->name},</p>"
                         . "<p style=\"margin:0 0 14px 0;color:#334155;line-height:1.65;\">Use this one-time code to set a new password for your Anti-Scam PH account:</p>"
                         . "<div style=\"display:inline-block;padding:12px 18px;border-radius:10px;border:1px solid #dbeafe;background:#eff6ff;font-size:28px;font-weight:700;letter-spacing:5px;color:#1e3a8a;\">{$plainCode}</div>"
                         . "<p style=\"margin:14px 0 0 0;color:#475569;line-height:1.65;\">This code expires at {$expiresAt->format('M d, Y h:i A')}.</p>"
-                        . "<p style=\"margin:8px 0 0 0;color:#64748b;line-height:1.65;font-size:13px;\">If you did not request a password reset, you can ignore this email.</p>";
-
-                    $message->to($user->email, $user->name)
-                        ->subject('Anti-Scam PH password reset code')
-                        ->html($this->templateService->render(
-                            'Password reset code',
-                            $content,
-                            'Your one-time code to reset your password is ready.'
-                        ));
-                });
+                        . "<p style=\"margin:8px 0 0 0;color:#64748b;line-height:1.65;font-size:13px;\">If you did not request a password reset, you can ignore this email.</p>",
+                    'Your one-time code to reset your password is ready.'
+                );
+                BrandedMailHtml::sendHtml($user->email, $user->name, 'Anti-Scam PH password reset code', $html);
                 $log->update(['status' => 'sent', 'sent_at' => now()]);
             } catch (\Throwable $th) {
                 $log->update([
