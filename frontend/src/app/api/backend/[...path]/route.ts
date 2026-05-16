@@ -5,6 +5,7 @@
  * This keeps the auth token exclusively server-side (httpOnly cookie) while allowing
  * the React SPA to make authenticated requests without ever touching the token directly.
  */
+import { jsonFromNonJsonUpstream } from "@/lib/api/bffUpstreamResponse";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -103,31 +104,7 @@ async function proxy(req: NextRequest, context: RouteContext): Promise<NextRespo
   // Non-JSON response (binary streams, HTML error pages, etc.)
   const bytes = await backendRes.arrayBuffer();
   if (!backendRes.ok) {
-    const text = new TextDecoder().decode(bytes.slice(0, 2048));
-    console.error(`[BFF proxy] Non-JSON error from backend (${backendRes.status}):`, text.slice(0, 500));
-    const lower = text.toLowerCase();
-    const looksCfChallenge =
-      lower.includes("cloudflare") &&
-      (lower.includes("checking your browser") ||
-        lower.includes("cf-mitigated") ||
-        lower.includes("challenge") ||
-        lower.includes("cf-ray") ||
-        lower.includes("__cf_bm"));
-    const cfOpsHint =
-      "Request blocked (403) before Laravel — usually the Next.js server is calling your public site through Cloudflare (HTML challenge). On the VPS, set LARAVEL_API_BASE_URL to an internal URL (e.g. http://127.0.0.1:8080/api/v1 per deployment/nginx-laravel-loopback.example.conf), not https://your-domain/.... Then pm2 restart the frontend with --update-env. In Cloudflare: Security → Events if you must use the public URL.";
-    const cfUserMessage =
-      "We could not reach the booking system from the app server (connection blocked). Please try again in a moment. If this continues, contact support — the host may need an internal API URL for the dashboard.";
-    const message =
-      backendRes.status === 403 && looksCfChallenge
-        ? process.env.NODE_ENV === "production"
-          ? cfUserMessage
-          : cfOpsHint
-        : `Server error (${backendRes.status}). Check API logs.`;
-    const body: Record<string, unknown> = { success: false, message };
-    if (backendRes.status === 403 && looksCfChallenge && process.env.NODE_ENV === "production") {
-      body.code = "bff_upstream_cloudflare_html";
-    }
-    return NextResponse.json(body, { status: backendRes.status });
+    return jsonFromNonJsonUpstream(backendRes.status, bytes, "BFF proxy");
   }
 
   const headers = new Headers();

@@ -29,7 +29,7 @@ class RoomImageController extends Controller
 
     public function store(Request $request, Room $room)
     {
-        $this->authorizeRoom($room);
+        $this->authorizeRoom($room, 'update');
 
         $files = $this->normalizeUploadedImages($request);
         if ($files === null) {
@@ -138,7 +138,7 @@ class RoomImageController extends Controller
 
     public function destroy(Room $room, RoomImage $image)
     {
-        $this->authorizeRoom($room);
+        $this->authorizeRoom($room, 'update');
         $this->authorizeImage($room, $image);
         if (StoredMedia::isValidStorageKey($image->path)) {
             Storage::disk($image->disk)->delete($image->path);
@@ -150,7 +150,7 @@ class RoomImageController extends Controller
 
     public function setPrimary(Room $room, RoomImage $image)
     {
-        $this->authorizeRoom($room);
+        $this->authorizeRoom($room, 'update');
         $this->authorizeImage($room, $image);
         $room->images()->update(['is_primary' => false]);
         $image->update(['is_primary' => true]);
@@ -165,14 +165,9 @@ class RoomImageController extends Controller
         }
     }
 
-    private function authorizeRoom(Room $room): void
+    private function authorizeRoom(Room $room, string $ability = 'view'): void
     {
-        $user = auth()->user();
-        $tenantId = TenantContext::tenantId() ?? $user?->tenant_id;
-
-        if ($tenantId && $room->tenant_id !== $tenantId) {
-            abort(403, 'Access denied.');
-        }
+        $this->authorize($ability, $room);
     }
 
     /**

@@ -157,6 +157,53 @@ class RoomUnitsAndPlanBehaviorTest extends TestCase
         $this->assertSame('active', $roomB->status);
     }
 
+    public function test_resort_owner_cannot_upload_images_for_another_tenants_room(): void
+    {
+        Storage::fake('public');
+
+        $tenant = Tenant::create([
+            'name' => 'Owner Tenant',
+            'slug' => 'owner-tenant',
+            'subdomain' => 'ownertest',
+            'status' => 'active',
+        ]);
+
+        $other = Tenant::create([
+            'name' => 'Other Tenant',
+            'slug' => 'other-tenant',
+            'subdomain' => 'othertest',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Owner Resort',
+            'is_publicly_listed' => true,
+        ]);
+
+        $room = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'name' => 'Owner Room',
+            'code' => 'OR',
+            'status' => 'active',
+            'base_price' => 500,
+            'capacity' => 2,
+            'units' => 1,
+        ]);
+
+        $intruder = User::factory()->create([
+            'tenant_id' => $other->id,
+            'role' => 'resort_owner',
+        ]);
+        Sanctum::actingAs($intruder);
+
+        $file = UploadedFile::fake()->image('room.jpg', 40, 40);
+
+        $this->post("/api/v1/rooms/{$room->id}/images", ['images' => [$file]])
+            ->assertForbidden();
+    }
+
     public function test_room_images_total_capped_at_five_across_requests(): void
     {
         Storage::fake('public');

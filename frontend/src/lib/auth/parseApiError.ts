@@ -187,7 +187,9 @@ export function parseApiErrorMessage(error: unknown, fallback = "Something went 
     }
 
     if (error.response?.status === 401) return "Your session expired. Please sign in again.";
-    if (error.response?.status === 403) return "You are not allowed to do that.";
+    if (error.response?.status === 403) {
+      return "You are not allowed to do that.";
+    }
     if (error.response?.status === 500)
       return typeof data?.message === "string" && data.message.trim() !== ""
         ? data.message.trim()

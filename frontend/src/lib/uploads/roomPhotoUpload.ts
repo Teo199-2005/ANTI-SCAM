@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { RoomImageRow } from "@/lib/roomImageTypes";
-import axios, { type AxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig } from "axios";
 import {
   ROOM_PHOTO_MAX_EDGE,
   SHRINK_FOR_UPLOAD_MAX_BYTES,
@@ -68,22 +68,8 @@ async function postRoomImages(
   formData: FormData,
   config: AxiosRequestConfig,
 ): Promise<{ data: { success: boolean; data: RoomImageRow[] } }> {
-  try {
-    return await axios.post<{ success: boolean; data: RoomImageRow[] }>(
-      `/api/upload/rooms/${roomId}/images`,
-      formData,
-      { withCredentials: true, ...config },
-    );
-  } catch (err) {
-    if (axios.isAxiosError(err) && [404, 405, 502, 503].includes(err.response?.status ?? 0)) {
-      return apiClient.post<{ success: boolean; data: RoomImageRow[] }>(
-        `/rooms/${roomId}/images`,
-        formData,
-        config,
-      );
-    }
-    throw err;
-  }
+  // Same BFF as GET /rooms/{id}/images — handles loopback Laravel + Cloudflare HTML 403.
+  return apiClient.post<{ success: boolean; data: RoomImageRow[] }>(`/rooms/${roomId}/images`, formData, config);
 }
 
 /**

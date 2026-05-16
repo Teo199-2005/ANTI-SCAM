@@ -2,6 +2,7 @@
  * Room photo uploads: buffer the multipart body once, then POST to Laravel on loopback.
  * Streaming (fetch duplex) often hangs on production Node/nginx; files are ~2 MB after browser compress.
  */
+import { jsonFromNonJsonUpstream } from "@/lib/api/bffUpstreamResponse";
 import { serverLaravelApiV1BaseUrl } from "@/lib/api/laravelApiBase";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -71,11 +72,11 @@ export async function POST(req: NextRequest, context: RouteContext): Promise<Nex
       return NextResponse.json(data, { status: backendRes.status });
     }
 
-    const text = await backendRes.text();
+    const bytes = await backendRes.arrayBuffer();
     if (!backendRes.ok) {
-      console.error(`[room upload proxy] ${backendRes.status} from ${targetUrl}:`, text.slice(0, 500));
+      return jsonFromNonJsonUpstream(backendRes.status, bytes, "room upload proxy");
     }
-    return new NextResponse(text, {
+    return new NextResponse(bytes, {
       status: backendRes.status,
       headers: resContentType ? { "Content-Type": resContentType } : undefined,
     });
