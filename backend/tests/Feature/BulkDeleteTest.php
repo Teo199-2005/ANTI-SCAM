@@ -220,8 +220,14 @@ class BulkDeleteTest extends TestCase
             'guest_name' => 'Removed guest',
             'guest_email' => null,
             'client_id' => null,
+            'status' => 'cancelled',
         ]);
         $this->assertNull(User::query()->where('email', 'bulk-guest@example.com')->first());
+
+        $index = $this->getJson('/api/v1/resort/guests?perPage=100');
+        $index->assertSuccessful();
+        $keys = collect($index->json('data.data'))->pluck('guestKey')->all();
+        $this->assertNotContains('bulk-guest@example.com', $keys);
     }
 
     public function test_resort_owner_can_bulk_delete_discount_codes_and_availability(): void

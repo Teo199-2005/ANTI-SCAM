@@ -45,6 +45,7 @@ type Guest = {
   email: string | null;
   phone: string | null;
   reservationCount: number;
+  activeReservationCount?: number;
   lastCheckIn: string | null;
   lastCheckOut: string | null;
   totalSpent: number;
@@ -93,6 +94,39 @@ function extractReservationRows(payload: unknown): ReservationRow[] {
 function formatStay(checkIn: string | null, checkOut: string | null): string {
   if (!checkIn) return "—";
   return `${checkIn.slice(0, 10)} → ${checkOut ? checkOut.slice(0, 10) : "?"}`;
+}
+
+function guestDeleteConfirmBody(
+  label: string,
+  activeCount: number,
+  hasLogin: boolean,
+): ReactNode {
+  return (
+    <div className="space-y-3 text-sm text-zinc-600">
+      <p>
+        Remove <strong className="font-medium text-navy">{label}</strong> from your guest directory? This cannot be
+        undone.
+      </p>
+      <ul className="list-disc space-y-1.5 pl-5">
+        {hasLogin ? <li>Their login account will be permanently deleted.</li> : null}
+        {activeCount > 0 ? (
+          <li>
+            <strong className="font-medium text-dsError">
+              {activeCount} active reservation{activeCount === 1 ? "" : "s"}
+            </strong>{" "}
+            (pending or confirmed) will be <strong className="font-medium text-dsError">cancelled</strong>.
+          </li>
+        ) : (
+          <li>No active reservations will be cancelled.</li>
+        )}
+        <li>Contact details on past bookings will be cleared; booking records remain for your records.</li>
+      </ul>
+    </div>
+  );
+}
+
+function sumActiveReservations(guestList: Guest[]): number {
+  return guestList.reduce((sum, g) => sum + (g.activeReservationCount ?? 0), 0);
 }
 
 function Modal({
@@ -323,8 +357,18 @@ export default function ResortGuestsPage() {
   const handleDelete = async (g: Guest) => {
     setDeletingKey(g.guestKey);
     try {
-      await apiClient.delete(`/resort/guests/${encodeURIComponent(g.guestKey)}`);
-      pushToast({ title: "Guest removed", tone: "success" });
+      const { data } = await apiClient.delete<ApiEnvelope<{ cancelledReservations?: number }>>(
+        `/resort/guests/${encodeURIComponent(g.guestKey)}`,
+      );
+      const cancelled = data.data?.cancelledReservations ?? 0;
+      pushToast({
+        title: "Guest removed",
+        description:
+          cancelled > 0
+            ? `${cancelled} active reservation${cancelled === 1 ? "" : "s"} cancelled. Login and contact details cleared.`
+            : "Login and contact details cleared from your directory.",
+        tone: "success",
+      });
       if (detailOpen && detail?.guestKey === g.guestKey) setDetailOpen(false);
       setConfirmSingleDelete(null);
       await load(search);
@@ -352,6 +396,10 @@ export default function ResortGuestsPage() {
   });
 
   const bulk = useBulkSelection(filtered, (g) => g.guestKey);
+
+  const selectedGuestsForDelete = filtered.filter((g) => bulk.selectedIds.includes(g.guestKey));
+  const bulkActiveReservations = sumActiveReservations(selectedGuestsForDelete);
+  const bulkHasLogin = selectedGuestsForDelete.some((g) => g.hasLoginAccount);
 
   const onBulkDelete = async () => {
     const keys = bulk.selectedIds;
@@ -450,12 +498,7 @@ export default function ResortGuestsPage() {
 
       <ConfirmDialog
         open={confirmSingleDelete !== null}
-        title="Remove guest?"
-        description={
-          confirmSingleDelete
-            ? `Remove ${confirmSingleDelete.name || confirmSingleDelete.email || "this guest"}? Their login is removed and contact details on past bookings are cleared.`
-            : undefined
-        }
+        title="Remove guest from directory?"
         confirmLabel="Remove guest"
         tone="danger"
         loading={deletingKey !== null}
@@ -463,18 +506,33 @@ export default function ResortGuestsPage() {
         onConfirm={() => {
           if (confirmSingleDelete) void handleDelete(confirmSingleDelete);
         }}
-      />
+      >
+        {confirmSingleDelete
+          ? guestDeleteConfirmBody(
+              confirmSingleDelete.name || confirmSingleDelete.email || "this guest",
+              confirmSingleDelete.activeReservationCount ?? 0,
+              Boolean(confirmSingleDelete.hasLoginAccount),
+            )
+          : null}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Remove selected guests?"
-        description={`Remove ${bulk.selectedCount} guest${bulk.selectedCount === 1 ? "" : "s"} on this page. Login accounts are deleted and contact details on past bookings are cleared.`}
         confirmLabel="Remove selected"
         tone="danger"
         loading={bulkDeleting}
         onCancel={() => setConfirmBulkDelete(false)}
         onConfirm={() => void onBulkDelete()}
-      />
+      >
+        {bulk.selectedCount > 0
+          ? guestDeleteConfirmBody(
+              `${bulk.selectedCount} guest${bulk.selectedCount === 1 ? "" : "s"}`,
+              bulkActiveReservations,
+              bulkHasLogin,
+            )
+          : null}
+      </ConfirmDialog>
 
       {createOpen ? (
         <Modal

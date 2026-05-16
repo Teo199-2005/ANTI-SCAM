@@ -20,6 +20,9 @@ class Reservation extends Model
      */
     public const REVENUE_ELIGIBLE_STATUSES = ['confirmed', 'completed', 'no_show'];
 
+    /** Statuses the resort may cancel when removing a guest from the directory. */
+    public const CANCELLABLE_STATUSES = ['pending_payment', 'confirmed'];
+
     /** Comma-separated quoted literals for raw SQL `IN (...)` fragments. */
     public static function revenueEligibleStatusesSqlList(): string
     {

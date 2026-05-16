@@ -35,10 +35,15 @@ class ResortGuestController extends Controller
 
         $guestKeyExpr = ResortGuestKey::sqlExpression();
         $revIn = Reservation::revenueEligibleStatusesSqlList();
+        $cancellableIn = implode(',', array_map(
+            static fn (string $s): string => "'{$s}'",
+            Reservation::CANCELLABLE_STATUSES
+        ));
 
         $guests = DB::table('reservations')
             ->leftJoin('users', 'users.id', '=', 'reservations.client_id')
             ->where('reservations.tenant_id', $tenantId)
+            ->whereRaw('NOT '.ResortGuestKey::isAnonymizedDirectoryRowSql())
             ->when($search !== '', function ($q) use ($search): void {
                 $like = '%'.$search.'%';
                 $q->where(function ($inner) use ($like): void {
@@ -56,6 +61,7 @@ class ResortGuestController extends Controller
                 MAX(COALESCE(NULLIF(reservations.guest_phone, ''), users.phone)) AS phone,
                 MAX(reservations.client_id) AS client_id,
                 COUNT(*) AS reservationCount,
+                SUM(CASE WHEN reservations.status IN ({$cancellableIn}) THEN 1 ELSE 0 END) AS activeReservationCount,
                 SUM(CASE WHEN reservations.status IN ({$revIn}) THEN COALESCE(reservations.reservation_fee, 0) ELSE 0 END) AS totalSpent,
                 MAX(reservations.check_in_date) AS lastCheckIn,
                 MAX(reservations.check_out_date) AS lastCheckOut,
@@ -108,6 +114,7 @@ class ResortGuestController extends Controller
                 'email' => $row->email,
                 'phone' => $row->phone,
                 'reservationCount' => (int) $row->reservationCount,
+                'activeReservationCount' => (int) ($row->activeReservationCount ?? 0),
                 'totalSpent' => (float) $row->totalSpent,
                 'lastCheckIn' => $row->lastCheckIn,
                 'lastCheckOut' => $row->lastCheckOut,
@@ -179,9 +186,9 @@ class ResortGuestController extends Controller
             return $this->errorResponse('No tenant context', null, 422);
         }
 
-        $this->guests->destroy($tenantId, $guestKey);
+        $result = $this->guests->destroy($tenantId, $guestKey);
 
-        return $this->successResponse(null, 'Guest removed');
+        return $this->successResponse($result, 'Guest removed');
     }
 
     public function reservationsForGuest(Request $request, string $guestKey)

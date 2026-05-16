@@ -5,6 +5,7 @@ namespace App\Modules\Resorts\Services;
 use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\User;
+use App\Modules\Reservations\Services\ReservationService;
 use App\Support\ResortGuestKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class ResortGuestService
 {
+    public function __construct(private readonly ReservationService $reservations) {}
     public function primaryResortForTenant(int $tenantId): ?Resort
     {
         return Resort::withoutGlobalScopes()
@@ -141,10 +143,15 @@ class ResortGuestService
         $reservations = $this->reservationsMatchingKey($tenantId, $guestKey);
         $user = $this->findGuestUserForKey($tenantId, $guestKey);
         $revIn = Reservation::revenueEligibleStatusesSqlList();
+        $cancellableIn = implode(',', array_map(
+            static fn (string $s): string => "'{$s}'",
+            Reservation::CANCELLABLE_STATUSES
+        ));
 
         $stats = (clone $reservations)
             ->selectRaw("
                 COUNT(*) AS reservation_count,
+                SUM(CASE WHEN status IN ({$cancellableIn}) THEN 1 ELSE 0 END) AS active_reservation_count,
                 SUM(CASE WHEN status IN ({$revIn}) THEN COALESCE(reservation_fee, 0) ELSE 0 END) AS total_spent,
                 MAX(check_in_date) AS last_check_in,
                 MAX(check_out_date) AS last_check_out,
@@ -197,6 +204,7 @@ class ResortGuestService
             'email' => $email,
             'phone' => $phone,
             'reservationCount' => (int) ($stats->reservation_count ?? 0),
+            'activeReservationCount' => (int) ($stats->active_reservation_count ?? 0),
             'totalSpent' => (float) ($stats->total_spent ?? 0),
             'lastCheckIn' => $stats->last_check_in ?? null,
             'lastCheckOut' => $stats->last_check_out ?? null,
@@ -306,7 +314,10 @@ class ResortGuestService
         return $this->show($tenantId, $resolvedKey);
     }
 
-    public function destroy(int $tenantId, string $guestKey): void
+    /**
+     * @return array{cancelledReservations: int}
+     */
+    public function destroy(int $tenantId, string $guestKey): array
     {
         $guestKey = rawurldecode($guestKey);
         $user = $this->findGuestUserForKey($tenantId, $guestKey);
@@ -318,6 +329,21 @@ class ResortGuestService
             ]);
         }
 
+        if ($user && $this->isProtectedStaffUser($user)) {
+            throw ValidationException::withMessages([
+                'guestKey' => ['This email belongs to a staff or owner account and cannot be removed from the guest directory.'],
+            ]);
+        }
+
+        $cancelled = 0;
+        foreach ($reservations->get() as $reservation) {
+            if (! in_array($reservation->status, Reservation::CANCELLABLE_STATUSES, true)) {
+                continue;
+            }
+            $this->reservations->cancelForGuestRemoval($reservation);
+            $cancelled++;
+        }
+
         $this->updateReservationsForGuestKey($tenantId, $guestKey, [
             'guest_name' => 'Removed guest',
             'guest_email' => null,
@@ -326,12 +352,6 @@ class ResortGuestService
         ]);
 
         if ($user) {
-            if ($this->isProtectedStaffUser($user)) {
-                throw ValidationException::withMessages([
-                    'guestKey' => ['This email belongs to a staff or owner account and cannot be removed from the guest directory.'],
-                ]);
-            }
-
             $user->tokens()->delete();
 
             try {
@@ -346,6 +366,15 @@ class ResortGuestService
                 ])->save();
             }
         }
+
+        return ['cancelledReservations' => $cancelled];
+    }
+
+    public function activeReservationCount(int $tenantId, string $guestKey): int
+    {
+        return (int) $this->reservationsMatchingKey($tenantId, $guestKey)
+            ->whereIn('reservations.status', Reservation::CANCELLABLE_STATUSES)
+            ->count();
     }
 
     private function linkReservationsToUser(int $tenantId, string $email, User $user): void
@@ -399,6 +428,7 @@ class ResortGuestService
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'reservationCount' => 0,
+                    'activeReservationCount' => 0,
                     'totalSpent' => 0.0,
                     'lastCheckIn' => null,
                     'lastCheckOut' => null,

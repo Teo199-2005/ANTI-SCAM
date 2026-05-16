@@ -409,6 +409,38 @@ class ReservationService
         return $reservation->refresh();
     }
 
+    /**
+     * Cancel pending or confirmed reservations when a guest is removed from the directory.
+     * Applies to manual and online bookings (unlike {@see cancelByResort}).
+     */
+    public function cancelForGuestRemoval(Reservation $reservation, ?string $reason = null): Reservation
+    {
+        if (! in_array($reservation->status, Reservation::CANCELLABLE_STATUSES, true)) {
+            throw new RuntimeException('Reservation is not eligible for cancellation.');
+        }
+
+        $oldValues = $reservation->only(['status', 'refund_status']);
+        $reservation->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancellation_reason' => $reason ?? 'Guest removed from directory',
+            'refund_status' => config('reservations.reservation_fee_non_refundable', true)
+                ? 'non_refundable_fee_retained'
+                : 'refunded',
+        ]);
+
+        $this->audits->log(
+            'reservation_cancelled_guest_removed',
+            'reservation',
+            $reservation->id,
+            $oldValues,
+            $reservation->only(['status', 'refund_status']),
+            ['reason' => $reason ?? 'Guest removed from directory']
+        );
+
+        return $reservation->refresh();
+    }
+
     public function cancelByClient(Reservation $reservation, int $clientId, ?string $reason = null): Reservation
     {
         if ($reservation->client_id !== $clientId) {
