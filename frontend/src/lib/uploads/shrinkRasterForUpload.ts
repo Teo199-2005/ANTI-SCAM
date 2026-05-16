@@ -3,6 +3,9 @@
  * `upload_max_filesize` defaults (often 2M) when the API is not started with raised `-d` flags.
  */
 
+/** Room gallery — enough for listing; smaller = faster browser prep. */
+export const ROOM_PHOTO_MAX_EDGE = 1920;
+
 const DEFAULT_MAX_EDGE = 2560;
 
 /** Stay under typical 2M PHP `upload_max_filesize` with margin for multipart framing. */
@@ -20,10 +23,16 @@ export async function shrinkRasterForUpload(
   file: File,
   maxBytes: number = SHRINK_FOR_UPLOAD_MAX_BYTES,
   maxEdge: number = DEFAULT_MAX_EDGE,
+  onProgress?: (ratio: number) => void,
 ): Promise<File> {
+  const report = (ratio: number) => onProgress?.(Math.min(1, Math.max(0, ratio)));
+
   if (!isProbablyRaster(file) || file.size <= maxBytes) {
+    report(1);
     return file;
   }
+
+  report(0.05);
 
   let bitmap: ImageBitmap;
   try {
@@ -47,16 +56,20 @@ export async function shrinkRasterForUpload(
       throw new Error("Could not prepare canvas for this image.");
     }
     ctx.drawImage(bitmap, 0, 0, w, h);
+    report(0.15);
 
     const baseName = file.name.replace(/\.[^.]+$/i, "") || "room-photo";
     let quality = 0.88;
     let blob: Blob | null = null;
+    const maxAttempts = 14;
 
-    for (let attempt = 0; attempt < 22; attempt++) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      report(0.15 + (0.8 * (attempt + 1)) / maxAttempts);
       blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
       });
       if (blob && blob.size > 0 && blob.size <= maxBytes) {
+        report(1);
         return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
       }
       quality -= 0.06;
@@ -74,9 +87,11 @@ export async function shrinkRasterForUpload(
       canvas.toBlob((b) => resolve(b), "image/jpeg", 0.35);
     });
     if (blob && blob.size > 0 && blob.size <= maxBytes) {
+      report(1);
       return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
     }
 
+    report(1);
     throw new Error("Could not shrink this image enough for your server upload limit. Try a smaller source file.");
   } finally {
     bitmap.close();

@@ -3,26 +3,23 @@
 import { apiClient } from "@/lib/api/client";
 import { flattenLaravelApiErrors, parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { useToast } from "@/components/shared/ToastProvider";
+import UploadProgressBar from "@/components/shared/UploadProgressBar";
 import { roomImagePreviewSrc } from "@/lib/roomImagePreview";
+import type { RoomImageRow } from "@/lib/roomImageTypes";
 import {
   ACCEPT_RASTER_IMAGES,
   RASTER_IMAGE_FORMATS_LABEL,
-  RESORT_ROOM_PHOTO_MAX_BYTES,
   RESORT_ROOM_PHOTO_MAX_MB,
 } from "@/lib/uploads/resortProfileUploads";
-import { shrinkRasterForUpload } from "@/lib/uploads/shrinkRasterForUpload";
+import {
+  uploadRoomPhotosSequential,
+  type RoomPhotoUploadProgress,
+} from "@/lib/uploads/roomPhotoUpload";
 import { Loader2, Star, Trash2, Upload } from "lucide-react";
 import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type RoomImageRow = {
-  id: number;
-  url: string;
-  is_primary: boolean;
-  original_name: string;
-  /** API marks rows whose storage key is missing or invalid (e.g. failed R2 upload). */
-  broken?: boolean;
-};
+export type { RoomImageRow } from "@/lib/roomImageTypes";
 
 type Props = {
   roomId: number;
@@ -30,11 +27,20 @@ type Props = {
   onDoneClick?: () => void;
 };
 
+function mergeUploadedImages(existing: RoomImageRow[], incoming: RoomImageRow[]): RoomImageRow[] {
+  const byId = new Map(existing.map((img) => [img.id, img]));
+  for (const img of incoming) {
+    byId.set(img.id, img);
+  }
+  return Array.from(byId.values()).sort((a, b) => a.id - b.id);
+}
+
 export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
   const { pushToast } = useToast();
   const [images, setImages] = useState<RoomImageRow[]>([]);
   const [loadingImages, setLoadingImages] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<RoomPhotoUploadProgress | null>(null);
   const [deletingImg, setDeletingImg] = useState<number | null>(null);
   /** Last upload failure — subtle on-page detail for debugging (HTTP code + API messages). */
   const [lastUploadDetail, setLastUploadDetail] = useState<string | null>(null);
@@ -74,52 +80,28 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
+
     setUploading(true);
+    setUploadProgress({
+      percent: 0,
+      phase: "preparing",
+      fileIndex: 0,
+      fileCount: incoming,
+      fileName: files[0]?.name ?? "photo",
+      label: "Starting…",
+    });
+
     try {
       const raw = Array.from(files);
-      const toUpload: File[] = [];
-      let didShrinkInBrowser = false;
-      for (const f of raw) {
-        try {
-          const prepared = await shrinkRasterForUpload(f);
-          if (prepared.size > RESORT_ROOM_PHOTO_MAX_BYTES) {
-            setLastUploadDetail(
-              `After preparing for upload, this file is still ${(prepared.size / (1024 * 1024)).toFixed(1)} MB. Max ${RESORT_ROOM_PHOTO_MAX_MB} MB each.`,
-            );
-            pushToast({
-              title: "Photo too large",
-              description: `Each file must end up under ${RESORT_ROOM_PHOTO_MAX_MB} MB.`,
-              tone: "error",
-            });
-            return;
-          }
-          if (prepared.size < f.size) {
-            didShrinkInBrowser = true;
-          }
-          toUpload.push(prepared);
-        } catch (prepErr) {
-          const msg = prepErr instanceof Error ? prepErr.message : "Could not prepare this image.";
-          setLastUploadDetail(msg);
-          pushToast({ title: "Could not prepare photo", description: msg, tone: "error" });
-          return;
-        }
-      }
+      const { uploaded, didShrinkInBrowser } = await uploadRoomPhotosSequential(roomId, raw, setUploadProgress);
 
-      const formData = new FormData();
-      toUpload.forEach((f) => formData.append("images", f));
-      const { data } = await apiClient.post<{ success: boolean; data: RoomImageRow[] }>(`/rooms/${roomId}/images`, formData, {
-        timeout: 180_000,
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-      });
-      if (Array.isArray(data.data)) {
-        await loadImages();
-        const n = data.data.length;
+      if (uploaded.length > 0) {
+        setImages((prev) => mergeUploadedImages(prev, uploaded));
         setLastUploadDetail(null);
         pushToast({
-          title: n === 1 ? "Photo uploaded" : `${n} photos uploaded`,
+          title: uploaded.length === 1 ? "Photo uploaded" : `${uploaded.length} photos uploaded`,
           description: didShrinkInBrowser
-            ? "Large images were resized in your browser so they fit typical server limits."
+            ? "Large images were resized in your browser before upload."
             : "They appear in the gallery below.",
           tone: "success",
         });
@@ -146,6 +128,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
       });
     } finally {
       setUploading(false);
+      setUploadProgress(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -177,6 +160,15 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
     }
   };
 
+  const progressSublabel =
+    uploadProgress && uploadProgress.fileCount > 1
+      ? uploadProgress.phase === "saving"
+        ? "Finishing on server — large files can take a moment through our secure proxy."
+        : "Uploading one photo at a time for reliable progress."
+      : uploadProgress?.phase === "saving"
+        ? "Finishing on server…"
+        : undefined;
+
   return (
     <div className="space-y-3 md:space-y-4">
       <p className="rounded-xl border border-skyBlue/25 bg-sky-50/90 px-3 py-2 text-xs leading-relaxed text-sky-950 md:px-4 md:py-3 md:text-sm">
@@ -186,28 +178,45 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
       </p>
 
       <div
-        className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-softBorder bg-softGray py-8 transition hover:border-skyBlue hover:bg-metalFace"
-        onClick={() => fileRef.current?.click()}
+        className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-8 transition ${
+          uploading
+            ? "cursor-default border-skyBlue/40 bg-sky-50/50"
+            : "cursor-pointer border-softBorder bg-softGray hover:border-skyBlue hover:bg-metalFace"
+        }`}
+        onClick={() => {
+          if (!uploading) fileRef.current?.click();
+        }}
         onKeyDown={(e) => {
+          if (uploading) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             fileRef.current?.click();
           }
         }}
         role="button"
-        tabIndex={0}
+        tabIndex={uploading ? -1 : 0}
+        aria-busy={uploading}
       >
-        {uploading ? (
+        {uploading && uploadProgress ? (
+          <div className="w-full max-w-md px-6">
+            <UploadProgressBar
+              percent={uploadProgress.percent}
+              label={uploadProgress.label}
+              sublabel={progressSublabel}
+            />
+          </div>
+        ) : uploading ? (
           <span className="inline-flex items-center gap-2 text-sm text-zinc-500">
-            <Loader2 size={16} className="animate-spin" /> Uploading…
+            <Loader2 size={16} className="animate-spin" aria-hidden />
+            Starting upload…
           </span>
         ) : (
           <>
-            <Upload size={22} className="mb-2 text-zinc-400" />
+            <Upload size={22} className="mb-2 text-zinc-400" aria-hidden />
             <p className="text-sm font-medium text-zinc-600">Click to upload photos</p>
             <p className="mt-1 max-w-sm text-center text-xs leading-relaxed text-zinc-400">
               {RASTER_IMAGE_FORMATS_LABEL} · up to {RESORT_ROOM_PHOTO_MAX_MB} MB each · any aspect ratio · up to 5 files
-              total per room. Very large files are resized in your browser so uploads work on typical PHP hosts.
+              total per room. Large files are resized in your browser before upload.
             </p>
           </>
         )}
@@ -217,6 +226,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
           accept={ACCEPT_RASTER_IMAGES}
           multiple
           className="hidden"
+          disabled={uploading}
           onChange={handleUpload}
         />
       </div>
@@ -245,52 +255,52 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
             const src = roomImagePreviewSrc(roomId, img);
 
             return (
-            <div key={img.id} className="group relative aspect-video overflow-hidden rounded-xl bg-softGray">
-              {broken ? (
-                <div className="flex h-full flex-col items-center justify-center gap-1 bg-zinc-100 px-2 text-center">
-                  <p className="text-[11px] font-semibold text-rose-700">Preview unavailable</p>
-                  <p className="text-[10px] leading-snug text-zinc-500">
-                    Upload did not finish. Remove this tile and upload again.
-                  </p>
-                </div>
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={src}
-                  alt={img.original_name}
-                  className="h-full w-full object-contain object-center"
-                  loading="lazy"
-                />
-              )}
-              {img.is_primary ? (
-                <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/90 px-2 py-0.5 text-[10px] font-bold text-white">
-                  <Star size={8} fill="white" /> Primary
-                </span>
-              ) : null}
-              <div className="absolute inset-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                {!img.is_primary ? (
+              <div key={img.id} className="group relative aspect-video overflow-hidden rounded-xl bg-softGray">
+                {broken ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-1 bg-zinc-100 px-2 text-center">
+                    <p className="text-[11px] font-semibold text-rose-700">Preview unavailable</p>
+                    <p className="text-[10px] leading-snug text-zinc-500">
+                      Upload did not finish. Remove this tile and upload again.
+                    </p>
+                  </div>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={src}
+                    alt={img.original_name}
+                    className="h-full w-full object-contain object-center"
+                    loading="lazy"
+                  />
+                )}
+                {img.is_primary ? (
+                  <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/90 px-2 py-0.5 text-[10px] font-bold text-white">
+                    <Star size={8} fill="white" /> Primary
+                  </span>
+                ) : null}
+                <div className="absolute inset-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  {!img.is_primary ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleSetPrimary(img.id)}
+                      className="rounded-lg bg-amber-400/90 p-1.5 text-white hover:bg-amber-500"
+                      title="Set as primary"
+                    >
+                      <Star size={12} />
+                    </button>
+                  ) : (
+                    <span />
+                  )}
                   <button
                     type="button"
-                    onClick={() => void handleSetPrimary(img.id)}
-                    className="rounded-lg bg-amber-400/90 p-1.5 text-white hover:bg-amber-500"
-                    title="Set as primary"
+                    disabled={deletingImg === img.id || uploading}
+                    onClick={() => void handleDelete(img.id)}
+                    className="ml-auto rounded-lg bg-rose-500/90 p-1.5 text-white hover:bg-rose-600 disabled:opacity-50"
+                    title="Delete image"
                   >
-                    <Star size={12} />
+                    {deletingImg === img.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                   </button>
-                ) : (
-                  <span />
-                )}
-                <button
-                  type="button"
-                  disabled={deletingImg === img.id}
-                  onClick={() => void handleDelete(img.id)}
-                  className="ml-auto rounded-lg bg-rose-500/90 p-1.5 text-white hover:bg-rose-600 disabled:opacity-50"
-                  title="Delete image"
-                >
-                  {deletingImg === img.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                </button>
+                </div>
               </div>
-            </div>
             );
           })}
         </div>
@@ -298,7 +308,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
 
       {onDoneClick ? (
         <div className="flex justify-end pt-2 max-md:w-full [&_button]:max-md:w-full">
-          <button type="button" onClick={onDoneClick} className="dash-btn-primary px-5 py-2">
+          <button type="button" onClick={onDoneClick} disabled={uploading} className="dash-btn-primary px-5 py-2 disabled:opacity-50">
             Done
           </button>
         </div>
