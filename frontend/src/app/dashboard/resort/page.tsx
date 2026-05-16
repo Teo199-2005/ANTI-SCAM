@@ -17,7 +17,19 @@ import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { syncPendingSubscriptionInvoice } from "@/lib/api/subscription";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, ReceiptText, RefreshCw, TrendingUp } from "lucide-react";
+import {
+  BadgeDollarSign,
+  CalendarCheck2,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  DoorOpen,
+  Loader2,
+  LockKeyhole,
+  ReceiptText,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
@@ -42,20 +54,31 @@ export default function ResortOverviewPage() {
   const [setupRequired, setSetupRequired] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [paymentThankYou, setPaymentThankYou] = useState<SubscriptionPaymentThankVariant | null>(null);
+  const [calendarYm, setCalendarYm] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
-  const calendarMonth = useMemo(() => new Date(), []);
+  const [calendarYear, calendarMonthIndex] = calendarYm.split("-").map(Number);
   const monthStart = useMemo(
-    () => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1),
-    [calendarMonth],
+    () => new Date(calendarYear, calendarMonthIndex - 1, 1),
+    [calendarYear, calendarMonthIndex],
   );
   const monthEnd = useMemo(
-    () => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0),
-    [calendarMonth],
+    () => new Date(calendarYear, calendarMonthIndex, 0),
+    [calendarYear, calendarMonthIndex],
   );
   const monthLabel = useMemo(
     () => monthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
     [monthStart],
   );
+
+  const shiftCalendarMonth = (delta: number) => {
+    const d = new Date(calendarYear, calendarMonthIndex - 1 + delta, 1);
+    setCalendarYm(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedDate(null);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -108,38 +131,39 @@ export default function ResortOverviewPage() {
     notifyTopbar();
   }, [pushToast]);
 
+  const loadCalendar = useCallback(async (year: number, month: number) => {
+    setCalendarLoading(true);
+    try {
+      const data = await getResortBookingCalendar(year, month);
+      setCalendarReservations(data.reservations);
+    } catch {
+      setCalendarReservations([]);
+    } finally {
+      setCalendarLoading(false);
+    }
+  }, []);
+
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     setSetupRequired(false);
     try {
-      const now = new Date();
-      const [statsResult, calendarResult] = await Promise.allSettled([
-        getResortStats(),
-        getResortBookingCalendar(now.getFullYear(), now.getMonth() + 1),
-      ]);
-      if (statsResult.status !== "fulfilled") {
-        const reason = statsResult.reason;
-        const noResortLinked =
-          isAxiosError(reason) &&
-          reason.response?.status === 422 &&
-          String(reason.response?.data?.message ?? "")
-            .toLowerCase()
-            .includes("no resort is linked");
-        if (noResortLinked) {
-          setSetupRequired(true);
-          setStats(null);
-          setCalendarReservations([]);
-          setError(null);
-          return;
-        }
-        throw new Error("stats_failed");
-      }
-      setStats(statsResult.value);
-      setCalendarReservations(
-        calendarResult.status === "fulfilled" ? calendarResult.value.reservations : [],
-      );
+      const statsResult = await getResortStats();
+      setStats(statsResult);
       setError(null);
-    } catch {
+    } catch (err) {
+      const noResortLinked =
+        isAxiosError(err) &&
+        err.response?.status === 422 &&
+        String(err.response?.data?.message ?? "")
+          .toLowerCase()
+          .includes("no resort is linked");
+      if (noResortLinked) {
+        setSetupRequired(true);
+        setStats(null);
+        setCalendarReservations([]);
+        setError(null);
+        return;
+      }
       setError(
         "We could not load your dashboard. This is usually a brief network or server hiccup — try again in a moment.",
       );
@@ -151,6 +175,11 @@ export default function ResortOverviewPage() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (loading || setupRequired || !stats) return;
+    void loadCalendar(calendarYear, calendarMonthIndex);
+  }, [loading, setupRequired, stats, calendarYear, calendarMonthIndex, loadCalendar]);
 
   if (loading) {
     return (
@@ -364,17 +393,46 @@ export default function ResortOverviewPage() {
         {/* ── Booking calendar ──────────────────────────────── */}
         <DashCard className="min-w-0 overflow-hidden p-0">
           <div className="border-b border-softBorder px-4 py-3 sm:px-6 sm:py-4">
-            <div className="flex items-center gap-2.5">
-              <div className="inline-flex rounded-lg bg-primaryBlue/10 p-2">
-                <CalendarDays size={16} className="text-primaryBlue" />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="inline-flex rounded-lg bg-primaryBlue/10 p-2">
+                  <CalendarDays size={16} className="text-primaryBlue" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-dash text-base font-semibold text-navy">Booking calendar</h2>
+                  <p className="text-xs text-zinc-400">Browse past and upcoming bookings</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="font-dash text-base font-semibold text-navy">Booking calendar</h2>
-                <p className="text-xs text-zinc-400">{monthLabel}</p>
+              <div className="flex items-center gap-1 rounded-xl border border-softBorder bg-white px-1 py-0.5">
+                <button
+                  type="button"
+                  onClick={() => shiftCalendarMonth(-1)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-600 hover:bg-softGray/80"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="min-w-[9rem] px-1 text-center text-sm font-semibold text-navy">{monthLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => shiftCalendarMonth(1)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-600 hover:bg-softGray/80"
+                  aria-label="Next month"
+                >
+                  <ChevronRight size={18} />
+                </button>
               </div>
             </div>
           </div>
-          <div className="space-y-3 p-3 sm:p-4">
+          <div className="relative space-y-3 p-3 sm:p-4">
+            {calendarLoading ? (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-b-2xl bg-white/70"
+                aria-live="polite"
+              >
+                <Loader2 size={22} className="animate-spin text-primaryBlue" />
+              </div>
+            ) : null}
             <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-400 sm:gap-1 sm:text-[10px]">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
                 <span key={day} className="min-w-0 truncate px-0.5 py-1">
