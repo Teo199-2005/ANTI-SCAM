@@ -260,21 +260,14 @@ class PublicCatalogController extends Controller
 
         $tenantId = (int) $room->tenant_id;
         $units = max(1, (int) ($room->units ?? 1));
-        $daysInMonth = (int) \Carbon\Carbon::create($year, $month, 1)->daysInMonth;
-        $today = now()->toDateString();
 
-        $days = [];
-        for ($d = 1; $d <= $daysInMonth; $d++) {
-            $iso = sprintf('%04d-%02d-%02d', $year, $month, $d);
-            if ($iso < $today) {
-                $days[$iso] = 'past';
-
-                continue;
-            }
-            $days[$iso] = RoomOccupancyService::oneNightStartAvailable($tenantId, (int) $room->id, $iso, $units)
-                ? 'free'
-                : 'busy';
-        }
+        $days = RoomOccupancyService::buildMonthOneNightStartMap(
+            $tenantId,
+            (int) $room->id,
+            $year,
+            $month,
+            $units,
+        );
 
         return $this->successResponse([
             'year' => $year,

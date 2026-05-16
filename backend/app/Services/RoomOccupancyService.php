@@ -30,14 +30,156 @@ class RoomOccupancyService
     ): bool {
         $checkOut = \Carbon\Carbon::parse($nightStartIso)->addDay()->toDateString();
 
-        if (self::hasBlockedAvailabilityWindow($roomId, $nightStartIso, $checkOut)) {
+        return self::stayWindowHasCapacity($tenantId, $roomId, $nightStartIso, $checkOut, $units);
+    }
+
+    /**
+     * Month heatmap in a few queries (used by public availability calendar).
+     *
+     * @return array<string, 'past'|'free'|'busy'>
+     */
+    public static function buildMonthOneNightStartMap(
+        int $tenantId,
+        int $roomId,
+        int $year,
+        int $month,
+        int $units,
+    ): array {
+        $daysInMonth = (int) \Carbon\Carbon::create($year, $month, 1)->daysInMonth;
+        $today = now()->toDateString();
+        $monthStart = sprintf('%04d-%02d-%02d', $year, $month, 1);
+        $windowEnd = \Carbon\Carbon::create($year, $month, $daysInMonth)->addDay()->toDateString();
+
+        $reservations = Reservation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('room_id', $roomId)
+            ->whereIn('status', ['pending_payment', 'confirmed'])
+            ->where('check_in_date', '<', $windowEnd)
+            ->where('check_out_date', '>', $monthStart)
+            ->get(['check_in_date', 'check_out_date']);
+
+        $locks = BookingLock::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('room_id', $roomId)
+            ->where('status', 'locked')
+            ->where('expires_at', '>', now())
+            ->where('check_in_date', '<', $windowEnd)
+            ->where('check_out_date', '>', $monthStart)
+            ->get(['check_in_date', 'check_out_date']);
+
+        $blocks = RoomAvailability::withoutGlobalScopes()
+            ->where('room_id', $roomId)
+            ->whereIn('status', ['blocked', 'maintenance'])
+            ->where('start_date', '<', $windowEnd)
+            ->where('end_date', '>', $monthStart)
+            ->get(['start_date', 'end_date']);
+
+        $days = [];
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $iso = sprintf('%04d-%02d-%02d', $year, $month, $d);
+            if ($iso < $today) {
+                $days[$iso] = 'past';
+
+                continue;
+            }
+            $nightEnd = \Carbon\Carbon::parse($iso)->addDay()->toDateString();
+            $days[$iso] = self::stayWindowHasCapacityFromRows(
+                $reservations,
+                $locks,
+                $blocks,
+                $iso,
+                $nightEnd,
+                $units,
+            ) ? 'free' : 'busy';
+        }
+
+        return $days;
+    }
+
+    public static function stayWindowHasCapacity(
+        int $tenantId,
+        int $roomId,
+        string $checkIn,
+        string $checkOut,
+        int $units,
+    ): bool {
+        if (self::hasBlockedAvailabilityWindow($roomId, $checkIn, $checkOut)) {
             return false;
         }
 
-        $resCount = self::overlappingReservationCount($tenantId, $roomId, $nightStartIso, $checkOut);
-        $lockCount = self::overlappingActiveLockCount($tenantId, $roomId, $nightStartIso, $checkOut);
+        $resCount = self::overlappingReservationCount($tenantId, $roomId, $checkIn, $checkOut);
+        $lockCount = self::overlappingActiveLockCount($tenantId, $roomId, $checkIn, $checkOut);
 
         return ($resCount + $lockCount) < $units;
+    }
+
+    /**
+     * @param  iterable<Reservation|BookingLock>  $stays
+     * @param  iterable<RoomAvailability>  $blocks
+     */
+    private static function stayWindowHasCapacityFromRows(
+        iterable $stays,
+        iterable $locks,
+        iterable $blocks,
+        string $checkIn,
+        string $checkOut,
+        int $units,
+    ): bool {
+        if (self::anyBlockOverlaps($blocks, $checkIn, $checkOut)) {
+            return false;
+        }
+
+        $held = 0;
+        foreach ($stays as $row) {
+            if (self::dateRangesOverlap(
+                self::dateToIso($row->check_in_date),
+                self::dateToIso($row->check_out_date),
+                $checkIn,
+                $checkOut,
+            )) {
+                $held++;
+            }
+        }
+        foreach ($locks as $row) {
+            if (self::dateRangesOverlap(
+                self::dateToIso($row->check_in_date),
+                self::dateToIso($row->check_out_date),
+                $checkIn,
+                $checkOut,
+            )) {
+                $held++;
+            }
+        }
+
+        return $held < $units;
+    }
+
+    /** @param  iterable<RoomAvailability>  $blocks */
+    private static function anyBlockOverlaps(iterable $blocks, string $checkIn, string $checkOut): bool
+    {
+        foreach ($blocks as $block) {
+            $start = self::dateToIso($block->start_date);
+            $end = self::dateToIso($block->end_date);
+            if ($start <= $checkOut && $end >= $checkIn) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function dateRangesOverlap(string $stayIn, string $stayOut, string $windowIn, string $windowOut): bool
+    {
+        return $stayIn < $windowOut && $stayOut > $windowIn;
+    }
+
+    private static function dateToIso(mixed $value): string
+    {
+        if ($value instanceof CarbonInterface) {
+            return $value->toDateString();
+        }
+
+        return substr((string) $value, 0, 10);
     }
 
     public static function overlappingReservationCount(int $tenantId, int $roomId, string $checkIn, string $checkOut): int

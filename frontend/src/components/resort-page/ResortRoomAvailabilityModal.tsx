@@ -25,6 +25,43 @@ function todayIsoLocal(): string {
   return d.toISOString().slice(0, 10);
 }
 
+function addDaysIso(iso: string, days: number): string {
+  const dt = new Date(`${iso}T12:00:00`);
+  dt.setDate(dt.getDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Fallback when the month calendar API is missing or errors (e.g. stale route cache). */
+async function probeMonthByDay(
+  roomId: number,
+  year: number,
+  month: number,
+  dim: number,
+  todayStr: string,
+): Promise<Record<string, DayState>> {
+  const isos: string[] = [];
+  for (let d = 1; d <= dim; d++) {
+    const iso = isoFromYmd(year, month, d);
+    if (iso >= todayStr) isos.push(iso);
+  }
+  const mapped: Record<string, DayState> = {};
+  const batch = 6;
+  for (let i = 0; i < isos.length; i += batch) {
+    const chunk = isos.slice(i, i + batch);
+    await Promise.all(
+      chunk.map(async (iso) => {
+        try {
+          const r = await checkRoomAvailability(roomId, iso, addDaysIso(iso, 1));
+          mapped[iso] = r.available ? "free" : "busy";
+        } catch {
+          mapped[iso] = "unknown";
+        }
+      }),
+    );
+  }
+  return mapped;
+}
+
 type DayState = "past" | "loading" | "free" | "busy" | "unknown";
 
 type Props = {
@@ -49,6 +86,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
   const [rangeChecking, setRangeChecking] = useState(false);
   const [rangeResult, setRangeResult] = useState<"idle" | "available" | "unavailable" | "error">("idle");
   const [verifyDetail, setVerifyDetail] = useState<string | null>(null);
+  const [calendarNote, setCalendarNote] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -63,6 +101,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
     }
     setRangeResult("idle");
     setVerifyDetail(null);
+    setCalendarNote(null);
   }, [open, checkIn, todayStr]);
 
   const [y, m] = monthYm.split("-").map(Number);
@@ -92,13 +131,21 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
         mapped[iso] = st === "busy" ? "busy" : st === "free" ? "free" : "unknown";
       }
       setDayMap(mapped);
-    } catch {
-      const fallback: Record<string, DayState> = {};
+      setCalendarNote(null);
+    } catch (err) {
+      const msg = parseApiErrorMessage(err, "Could not load month calendar.");
+      const probed = await probeMonthByDay(roomId, y, m, dim, todayStr);
+      const mapped: Record<string, DayState> = {};
       for (let d = 1; d <= dim; d++) {
         const iso = isoFromYmd(y, m, d);
-        fallback[iso] = iso < todayStr ? "past" : "unknown";
+        mapped[iso] = iso < todayStr ? "past" : (probed[iso] ?? "unknown");
       }
-      setDayMap(fallback);
+      setDayMap(mapped);
+      setCalendarNote(
+        Object.values(probed).some((s) => s === "free" || s === "busy")
+          ? `Using per-day checks (${msg}).`
+          : msg,
+      );
     } finally {
       setMonthLoading(false);
     }
@@ -186,6 +233,10 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           Colors show whether a <strong>one-night</strong> stay can start on that date (booked, blocked, or on hold).
           Confirm your <strong>full</strong> stay with the button below.
         </p>
+
+        {calendarNote ? (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{calendarNote}</p>
+        ) : null}
 
         <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3">
           <div className="mb-2 flex items-center justify-between">

@@ -124,15 +124,38 @@ export async function fetchRoomAvailabilityCalendar(
   if (!Number.isFinite(id) || id <= 0) {
     throw new Error("Invalid room.");
   }
-  const res = await apiClient.get<ApiEnvelope<AvailabilityCalendarResult>>(
-    `/public/rooms/${id}/availability-calendar`,
-    { params: { year, month } },
-  );
-  const body = res.data;
-  if (!body?.success || !body.data?.days) {
-    throw new Error(body?.message ?? "Could not load availability calendar.");
+  try {
+    const res = await apiClient.get<ApiEnvelope<AvailabilityCalendarResult>>(
+      `/public/rooms/${id}/availability-calendar`,
+      {
+        params: { year, month },
+        timeout: 30_000,
+        validateStatus: () => true,
+      },
+    );
+    const body = res.data;
+    if (res.status >= 400) {
+      const msg =
+        typeof body?.message === "string" && body.message.trim() !== ""
+          ? body.message
+          : `Calendar request failed (${res.status}).`;
+      throw new Error(msg);
+    }
+    const days = body?.data?.days;
+    if (!body?.success || typeof days !== "object" || days === null || Array.isArray(days)) {
+      throw new Error(
+        typeof body?.message === "string" && body.message.trim() !== ""
+          ? body.message
+          : "Could not load availability calendar.",
+      );
+    }
+    return { year: body.data.year ?? year, month: body.data.month ?? month, days };
+  } catch (e) {
+    if (axios.isAxiosError(e)) {
+      throw new Error(parseApiErrorMessage(e, "Could not reach the availability calendar."));
+    }
+    throw e instanceof Error ? e : new Error("Could not load availability calendar.");
   }
-  return body.data;
 }
 
 export async function checkRoomAvailability(
