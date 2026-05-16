@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Legal\PlatformTerms;
 use App\Models\EmailLog;
+use App\Support\PlatformTransactionalEmailContent;
+use App\Support\PricingPilot;
 use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Subscription;
@@ -165,6 +167,75 @@ class EmailNotificationService
             $fullHtml,
             ['reservation_id' => $reservation->id],
             $reservation->tenant_id
+        );
+    }
+
+    /**
+     * 7 / 3 / 1 day before billing_cycle_end — manual renewal vs auto-card copy.
+     */
+    public function sendSubscriptionExpiryReminder(
+        Subscription $subscription,
+        int $daysBefore,
+        bool $isAutoCard,
+    ): void {
+        if (! in_array($daysBefore, [7, 3, 1], true)) {
+            return;
+        }
+
+        $subscription->loadMissing('resort');
+
+        $owner = User::withoutGlobalScopes()
+            ->where('tenant_id', $subscription->tenant_id)
+            ->where('role', 'resort_owner')
+            ->first();
+
+        if (! $owner?->email) {
+            return;
+        }
+
+        $ownerName = trim((string) ($owner->name ?: 'Resort Owner'));
+        $dashboardUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/').'/dashboard/resort';
+        $renewalLabel = '₱'.number_format($this->estimateNextRenewalAmountPhp($subscription), 2);
+
+        $bodyHtml = PlatformTransactionalEmailContent::subscriptionExpiryReminderBody(
+            $subscription,
+            $ownerName,
+            $daysBefore,
+            $isAutoCard,
+            $renewalLabel,
+            $dashboardUrl,
+        );
+
+        $dayWord = $daysBefore === 1 ? '1 day' : $daysBefore.' days';
+        $billingLabel = $isAutoCard ? 'Auto-renewal reminder' : 'Renewal reminder';
+        $resortName = (string) ($subscription->resort?->name ?? 'Resort');
+
+        $fullHtml = $this->templateService->render(
+            $billingLabel.' — '.$dayWord.' remaining',
+            '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;padding:8px 4px">'
+            .$bodyHtml
+            .'</div>',
+            $billingLabel.' for '.$resortName.' ('.$dayWord.' before period ends).'
+        );
+
+        $this->queueMail(
+            'subscription_expiry_reminder',
+            $owner->email,
+            $owner->name,
+            sprintf(
+                '%s — %s before subscription ends · %s',
+                $isAutoCard ? 'Auto-renewal reminder' : 'Subscription renewal reminder',
+                $dayWord,
+                $resortName
+            ),
+            $fullHtml,
+            [
+                'subscription_id' => $subscription->id,
+                'days_before' => $daysBefore,
+                'billing_cycle_end' => $subscription->billing_cycle_end?->toDateString(),
+                'billing_mode' => $isAutoCard ? 'auto_card' : 'manual',
+            ],
+            $subscription->tenant_id
         );
     }
 
@@ -371,24 +442,26 @@ class EmailNotificationService
 
     private function bookingConfirmationHtml(Reservation $r): string
     {
-        $fee = number_format($r->reservation_fee, 2);
-        $total = number_format($r->total_amount, 2);
-        $balance = number_format($r->total_amount - $r->reservation_fee, 2);
+        $recipient = $this->resolveReservationRecipient($r);
+        $guestName = $recipient['name'] ?? trim((string) ($r->guest_name ?? 'Guest'));
 
-        return <<<HTML
-<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
-  <h2 style="color:#1E3A5F">Booking Confirmed!</h2>
-  <p>Your reservation <strong>{$r->reference_no}</strong> is confirmed.</p>
-  <table style="width:100%;border-collapse:collapse;margin-top:16px">
-    <tr><td style="padding:8px 0;color:#6b7280">Check-in</td><td style="padding:8px 0;font-weight:600">{$r->check_in_date}</td></tr>
-    <tr><td style="padding:8px 0;color:#6b7280">Check-out</td><td style="padding:8px 0;font-weight:600">{$r->check_out_date}</td></tr>
-    <tr><td style="padding:8px 0;color:#6b7280">Reservation fee paid</td><td style="padding:8px 0;font-weight:600;color:#10b981">₱{$fee}</td></tr>
-    <tr><td style="padding:8px 0;color:#6b7280">Balance due at resort</td><td style="padding:8px 0;font-weight:600;color:#f97316">₱{$balance}</td></tr>
-    <tr><td style="padding:8px 0;color:#6b7280">Total booking amount</td><td style="padding:8px 0;font-weight:600">₱{$total}</td></tr>
-  </table>
-  <p style="margin-top:16px;font-size:12px;color:#9ca3af">The reservation fee is non-refundable. The remaining balance is paid directly at the resort upon check-in.</p>
-</div>
-HTML;
+        return '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;padding:8px 4px">'
+            .PlatformTransactionalEmailContent::bookingConfirmationBody($r->loadMissing(['resort', 'room', 'client']), $guestName)
+            .'</div>';
+    }
+
+    private function estimateNextRenewalAmountPhp(Subscription $subscription): float
+    {
+        if (PricingPilot::enabled()) {
+            return PricingPilot::flatInvoiceAmount();
+        }
+
+        $months = max(1, (int) $subscription->renewal_duration_months);
+        $months = in_array($months, [1, 3, 6, 12], true) ? $months : 1;
+        $tier = PricingPilot::subscriptionTierMonthlyPhp();
+        $monthly = $tier[$months] ?? $tier[1];
+
+        return round($monthly * $months, 2);
     }
 
     private function paymentReceiptHtml(Reservation $r): string
