@@ -13,17 +13,31 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class RoomOccupancyService
 {
-    /** Overlap predicate matching reservation/lock availability queries (inclusive date ranges). */
+    /**
+     * Stay interval overlap for date-only check-in / check-out (check-out day is departure, not another occupied night).
+     */
     public static function applyDateOverlap(Builder $query, string $checkIn, string $checkOut): void
     {
-        $query->where(function ($q) use ($checkIn, $checkOut): void {
-            $q->whereBetween('check_in_date', [$checkIn, $checkOut])
-                ->orWhereBetween('check_out_date', [$checkIn, $checkOut])
-                ->orWhere(function ($inner) use ($checkIn, $checkOut): void {
-                    $inner->where('check_in_date', '<=', $checkIn)
-                        ->where('check_out_date', '>=', $checkOut);
-                });
-        });
+        $query->where('check_in_date', '<', $checkOut)
+            ->where('check_out_date', '>', $checkIn);
+    }
+
+    public static function oneNightStartAvailable(
+        int $tenantId,
+        int $roomId,
+        string $nightStartIso,
+        int $units,
+    ): bool {
+        $checkOut = \Carbon\Carbon::parse($nightStartIso)->addDay()->toDateString();
+
+        if (self::hasBlockedAvailabilityWindow($roomId, $nightStartIso, $checkOut)) {
+            return false;
+        }
+
+        $resCount = self::overlappingReservationCount($tenantId, $roomId, $nightStartIso, $checkOut);
+        $lockCount = self::overlappingActiveLockCount($tenantId, $roomId, $nightStartIso, $checkOut);
+
+        return ($resCount + $lockCount) < $units;
     }
 
     public static function overlappingReservationCount(int $tenantId, int $roomId, string $checkIn, string $checkOut): int

@@ -1,6 +1,11 @@
 "use client";
 
-import { checkRoomAvailability } from "@/lib/api/public";
+import {
+  checkRoomAvailability,
+  fetchRoomAvailabilityCalendar,
+  type AvailabilityCalendarDayState,
+} from "@/lib/api/public";
+import { formatStayRange } from "@/lib/formatPhp";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -12,12 +17,6 @@ function pad2(n: number): string {
 
 function isoFromYmd(y: number, m: number, d: number): string {
   return `${y}-${pad2(m)}-${pad2(d)}`;
-}
-
-function addDaysIso(iso: string, days: number): string {
-  const dt = new Date(iso + "T12:00:00");
-  dt.setDate(dt.getDate() + days);
-  return dt.toISOString().slice(0, 10);
 }
 
 function todayIsoLocal(): string {
@@ -33,13 +32,12 @@ type Props = {
   onClose: () => void;
   roomId: number;
   roomName: string;
-  /** Dates selected in the parent room modal (checked with “Check full stay for these dates”). */
   checkIn: string;
   checkOut: string;
 };
 
 /**
- * Month heatmap using public one-night probes (start night → next day).
+ * Month heatmap from server-side occupancy (reservations, locks, blocks).
  * Full range is re-checked explicitly for the guest’s chosen check-in / check-out.
  */
 export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, checkIn, checkOut }: Props) {
@@ -75,34 +73,35 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
   const loadMonth = useCallback(async () => {
     setMonthLoading(true);
     const nextMap: Record<string, DayState> = {};
-    const isos: string[] = [];
     for (let d = 1; d <= dim; d++) {
       const iso = isoFromYmd(y, m, d);
-      if (iso < todayStr) {
-        nextMap[iso] = "past";
-      } else {
-        nextMap[iso] = "loading";
-        isos.push(iso);
-      }
+      nextMap[iso] = iso < todayStr ? "past" : "loading";
     }
     setDayMap(nextMap);
 
-    const batch = 6;
-    for (let i = 0; i < isos.length; i += batch) {
-      const chunk = isos.slice(i, i + batch);
-      await Promise.all(
-        chunk.map(async (iso) => {
-          const out = addDaysIso(iso, 1);
-          try {
-            const r = await checkRoomAvailability(roomId, iso, out);
-            setDayMap((prev) => ({ ...prev, [iso]: r.available ? "free" : "busy" }));
-          } catch {
-            setDayMap((prev) => ({ ...prev, [iso]: "unknown" }));
-          }
-        }),
-      );
+    try {
+      const cal = await fetchRoomAvailabilityCalendar(roomId, y, m);
+      const mapped: Record<string, DayState> = {};
+      for (let d = 1; d <= dim; d++) {
+        const iso = isoFromYmd(y, m, d);
+        if (iso < todayStr) {
+          mapped[iso] = "past";
+          continue;
+        }
+        const st = cal.days[iso] as AvailabilityCalendarDayState | undefined;
+        mapped[iso] = st === "busy" ? "busy" : st === "free" ? "free" : "unknown";
+      }
+      setDayMap(mapped);
+    } catch {
+      const fallback: Record<string, DayState> = {};
+      for (let d = 1; d <= dim; d++) {
+        const iso = isoFromYmd(y, m, d);
+        fallback[iso] = iso < todayStr ? "past" : "unknown";
+      }
+      setDayMap(fallback);
+    } finally {
+      setMonthLoading(false);
     }
-    setMonthLoading(false);
   }, [roomId, y, m, dim, todayStr]);
 
   useEffect(() => {
@@ -151,8 +150,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
   for (let i = 0; i < firstDow; i++) cells.push(null);
   for (let d = 1; d <= dim; d++) cells.push(d);
 
-  const inSelectedRange = (iso: string) =>
-    Boolean(checkIn && checkOut && iso >= checkIn && iso < checkOut);
+  const inSelectedRange = (iso: string) => Boolean(checkIn && checkOut && iso >= checkIn && iso < checkOut);
 
   return createPortal(
     <div
@@ -185,8 +183,8 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
         </div>
 
         <p className="mb-3 text-xs leading-relaxed text-zinc-600">
-          Colors show a quick <strong>one-night</strong> availability probe from each date (open vs blocked for that
-          single night only — not the nightly rate). Confirm your <strong>full</strong> stay with the button below.
+          Colors show whether a <strong>one-night</strong> stay can start on that date (booked, blocked, or on hold).
+          Confirm your <strong>full</strong> stay with the button below.
         </p>
 
         <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3">
@@ -245,11 +243,11 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
                       } ${selected && st !== "past" ? "ring-2 ring-navy ring-offset-1" : ""}`}
                       title={
                         st === "free"
-                          ? "Room can start a one-night stay on this date"
+                          ? "Available to start a stay on this date"
                           : st === "busy"
-                            ? "Room cannot start a one-night stay on this date (booked, blocked, or on hold)"
+                            ? "Not available — booked, blocked, or on hold"
                             : st === "unknown"
-                              ? "Could not verify — try changing month or reopening this calendar"
+                              ? "Could not load — try another month"
                               : ""
                       }
                     >
@@ -266,7 +264,11 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
         <div className="mt-4 rounded-xl border border-sky-200/80 bg-sky-50/50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-sky-900">Your selected stay</p>
           <p className="mt-1 text-sm text-zinc-700">
-            Check-in <strong>{checkIn || "—"}</strong> → Check-out <strong>{checkOut || "—"}</strong>
+            {checkIn && checkOut ? (
+              <strong>{formatStayRange(checkIn, checkOut)}</strong>
+            ) : (
+              <span className="text-zinc-500">Pick check-in and check-out in the room window.</span>
+            )}
           </p>
           <button
             type="button"
@@ -282,14 +284,12 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           ) : null}
           {rangeResult === "unavailable" ? (
             <p className="mt-2 text-sm font-medium text-rose-700">
-              These dates are not available (booked, on hold, or blocked). Adjust your stay in the room window
-              behind this dialog.
+              These dates are not available (booked, on hold, or blocked). Adjust your stay in the room window.
             </p>
           ) : null}
           {rangeResult === "error" ? (
             <p className="mt-2 text-sm font-medium text-amber-800">
-              {verifyDetail ??
-                "Pick valid check-in and check-out in the room details dialog, then try again."}
+              {verifyDetail ?? "Pick valid check-in and check-out in the room details dialog, then try again."}
             </p>
           ) : null}
         </div>
@@ -302,22 +302,21 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           <div className="flex gap-2" role="listitem">
             <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm bg-emerald-200" aria-hidden />
             <span>
-              <span className="font-semibold text-zinc-800">Available (one-night)</span> — that night can start a
-              one-night booking. This is availability only, not “free” pricing.
+              <span className="font-semibold text-zinc-800">Available</span> — you can start a one-night stay on this
+              date.
             </span>
           </div>
           <div className="flex gap-2" role="listitem">
             <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm bg-rose-200" aria-hidden />
             <span>
-              <span className="font-semibold text-zinc-800">Not available (one-night)</span> — booked, blocked, or on
-              hold for that one-night starting window.
+              <span className="font-semibold text-zinc-800">Not available</span> — confirmed booking, pending payment,
+              block, or hold.
             </span>
           </div>
           <div className="flex gap-2" role="listitem">
             <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm bg-amber-100" aria-hidden />
             <span>
-              <span className="font-semibold text-zinc-800">Could not verify</span> — the one-night check failed
-              (network or server). Change month or reopen this calendar to retry.
+              <span className="font-semibold text-zinc-800">Could not verify</span> — reload or change month.
             </span>
           </div>
         </div>

@@ -93,6 +93,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/public/resorts/{resort}', [PublicCatalogController::class, 'resort']);
     Route::get('/public/rooms/{room}', [PublicCatalogController::class, 'room']);
     Route::get('/public/rooms/{room}/availability', [PublicCatalogController::class, 'checkAvailability']);
+    Route::get('/public/rooms/{room}/availability-calendar', [PublicCatalogController::class, 'availabilityCalendar']);
 
     // Discount code validation (public, called from checkout)
     Route::middleware('throttle:public-forms')->group(function (): void {

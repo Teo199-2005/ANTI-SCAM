@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { formatPhp } from "@/lib/formatPhp";
+import { formatPhp, formatStayRange } from "@/lib/formatPhp";
 
 type ReservationRow = {
   id: number;
@@ -151,7 +151,7 @@ function GuestHistoryInner() {
                 <div>
                   <p className="font-semibold text-navy">{r.room?.name ?? "Room"}</p>
                   <p className="text-xs text-zinc-600">
-                    {r.checkInDate} → {r.checkOutDate} · {r.referenceNo}
+                    {formatStayRange(r.checkInDate, r.checkOutDate)} · {r.referenceNo}
                   </p>
                   <p className="text-xs text-zinc-500">Fee {formatPhp(Number(r.reservationFee))}</p>
                 </div>

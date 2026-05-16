@@ -241,6 +241,48 @@ class PublicCatalogController extends Controller
         ], $isAvailable ? 'Room is available' : 'Room is not available for selected dates');
     }
 
+    /**
+     * Month heatmap: for each future day, whether a one-night stay may start that night.
+     *
+     * @return array{year:int,month:int,days:array<string, 'past'|'free'|'busy'>}
+     */
+    public function availabilityCalendar(Room $room)
+    {
+        if ($guard = $this->validateRoomPublicBookable($room)) {
+            return $guard;
+        }
+
+        $year = (int) request()->integer('year', (int) now()->format('Y'));
+        $month = (int) request()->integer('month', (int) now()->format('n'));
+        if ($month < 1 || $month > 12) {
+            return $this->errorResponse('Invalid month.', null, 422);
+        }
+
+        $tenantId = (int) $room->tenant_id;
+        $units = max(1, (int) ($room->units ?? 1));
+        $daysInMonth = (int) \Carbon\Carbon::create($year, $month, 1)->daysInMonth;
+        $today = now()->toDateString();
+
+        $days = [];
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $iso = sprintf('%04d-%02d-%02d', $year, $month, $d);
+            if ($iso < $today) {
+                $days[$iso] = 'past';
+
+                continue;
+            }
+            $days[$iso] = RoomOccupancyService::oneNightStartAvailable($tenantId, (int) $room->id, $iso, $units)
+                ? 'free'
+                : 'busy';
+        }
+
+        return $this->successResponse([
+            'year' => $year,
+            'month' => $month,
+            'days' => $days,
+        ], 'Room availability calendar fetched');
+    }
+
     public function room(Room $room)
     {
         if ($guard = $this->validateRoomPublicBookable($room)) {

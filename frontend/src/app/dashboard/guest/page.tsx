@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import { createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
+import { formatStayRange } from "@/lib/formatPhp";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { BadgeCheck, CalendarDays, Clock, MapPin } from "lucide-react";
 import Image from "next/image";
@@ -151,7 +152,7 @@ export default function GuestDashboardPage() {
                 <div>
                   <p className="font-semibold text-navy">{r.room?.name ?? "Room"}</p>
                   <p className="text-xs text-zinc-600">
-                    {r.checkInDate} → {r.checkOutDate} · {r.referenceNo}
+                    {formatStayRange(r.checkInDate, r.checkOutDate)} · {r.referenceNo}
                   </p>
                 </div>
                 <Button
@@ -194,7 +195,7 @@ export default function GuestDashboardPage() {
                   )}
                   <span className="font-medium text-navy">{r.room?.name ?? "Room"}</span>
                   <span className="text-zinc-500">
-                    {r.checkInDate} → {r.checkOutDate}
+                    {formatStayRange(r.checkInDate, r.checkOutDate)}
                   </span>
                 </div>
                 <span className="rounded-full bg-softGray px-2 py-0.5 text-xs font-semibold uppercase text-zinc-600">

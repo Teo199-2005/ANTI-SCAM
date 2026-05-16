@@ -53,6 +53,14 @@ export type AvailabilityResult = {
   check_out_date: string;
 };
 
+export type AvailabilityCalendarDayState = "past" | "free" | "busy";
+
+export type AvailabilityCalendarResult = {
+  year: number;
+  month: number;
+  days: Record<string, AvailabilityCalendarDayState>;
+};
+
 export type RoomDetail = PublicRoom & {
   resort: {
     id: number;
@@ -105,6 +113,26 @@ export async function getPublicResortBySlug(slug: string): Promise<PublicResort>
 export async function getPublicRoom(roomId: number | string): Promise<RoomDetail> {
   const { data } = await apiClient.get<ApiEnvelope<RoomDetail>>(`/public/rooms/${roomId}`);
   return data.data;
+}
+
+export async function fetchRoomAvailabilityCalendar(
+  roomId: number,
+  year: number,
+  month: number,
+): Promise<AvailabilityCalendarResult> {
+  const id = Number(roomId);
+  if (!Number.isFinite(id) || id <= 0) {
+    throw new Error("Invalid room.");
+  }
+  const res = await apiClient.get<ApiEnvelope<AvailabilityCalendarResult>>(
+    `/public/rooms/${id}/availability-calendar`,
+    { params: { year, month } },
+  );
+  const body = res.data;
+  if (!body?.success || !body.data?.days) {
+    throw new Error(body?.message ?? "Could not load availability calendar.");
+  }
+  return body.data;
 }
 
 export async function checkRoomAvailability(
