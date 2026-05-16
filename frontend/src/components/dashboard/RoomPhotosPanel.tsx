@@ -161,13 +161,13 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
   };
 
   const progressSublabel =
-    uploadProgress && uploadProgress.fileCount > 1
-      ? uploadProgress.phase === "saving"
-        ? "Finishing on server — large files can take a moment through our secure proxy."
-        : "Uploading one photo at a time for reliable progress."
-      : uploadProgress?.phase === "saving"
-        ? "Finishing on server…"
-        : undefined;
+    uploadProgress?.phase === "saving"
+      ? "Storing on server (R2). This step has no upload meter — wait until it reaches 100%."
+      : uploadProgress?.phase === "preparing"
+        ? "Resizing in your browser so uploads stay fast."
+        : uploadProgress && uploadProgress.fileCount > 1
+          ? "One photo at a time — each is compressed to about 2 MB before upload."
+          : undefined;
 
   return (
     <div className="space-y-3 md:space-y-4">
@@ -216,7 +216,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
             <p className="text-sm font-medium text-zinc-600">Click to upload photos</p>
             <p className="mt-1 max-w-sm text-center text-xs leading-relaxed text-zinc-400">
               {RASTER_IMAGE_FORMATS_LABEL} · up to {RESORT_ROOM_PHOTO_MAX_MB} MB each · any aspect ratio · up to 5 files
-              total per room. Large files are resized in your browser before upload.
+              total per room. Large files are compressed to about 2 MB in your browser before upload.
             </p>
           </>
         )}
