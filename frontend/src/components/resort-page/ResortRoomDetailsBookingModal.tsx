@@ -14,8 +14,7 @@ import {
 } from "@/lib/publicBookingLinks";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { amenityMeta, extractRoomMeta, formatPhp } from "@/lib/roomPreviewDisplay";
-import { pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
-import { RESERVATION_FEE_REFERENCE_TOTAL } from "@/lib/reservationFeeBreakdown";
+import { defaultReservationFeeFallbackPhp, pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 import { CalendarDays, ImageOff, Loader2, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -294,9 +293,7 @@ export function ResortRoomDetailsBookingModal({ room, resortId, onClose }: Props
 
                 <ReservationFeeBreakdownPanel
                   totalPhp={
-                    pricingPilotEnabled()
-                      ? pricingPilotUnitPhp()
-                      : Number(room.reservationFee ?? RESERVATION_FEE_REFERENCE_TOTAL)
+                    pricingPilotEnabled() ? pricingPilotUnitPhp() : defaultReservationFeeFallbackPhp()
                   }
                   variant="compact"
                   className="mb-0"
