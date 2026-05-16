@@ -19,6 +19,7 @@ import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch"
 import { BadgeCheck, CalendarDays, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Reservation = {
@@ -205,7 +206,7 @@ function ClientBookingsContent() {
                       </span>
                     ),
                   },
-                  { label: "Fee", value: `₱${Number(r.reservationFee).toLocaleString()}` },
+                  { label: "Fee", value: formatPhp(Number(r.reservationFee)) },
                   {
                     label: "Status",
                     value: (
@@ -269,7 +270,7 @@ function ClientBookingsContent() {
                 <td className="font-mono font-semibold text-navy">{r.referenceNo}</td>
                 <td className="text-zinc-600">{r.checkInDate}</td>
                 <td className="text-zinc-600">{r.checkOutDate}</td>
-                <td className="text-zinc-700">₱{Number(r.reservationFee).toLocaleString()}</td>
+                <td className="text-zinc-700">{formatPhp(Number(r.reservationFee))}</td>
                 <td>
                   <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
                     {r.status === "confirmed" ? (

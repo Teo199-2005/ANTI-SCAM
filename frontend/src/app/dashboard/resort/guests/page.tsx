@@ -36,6 +36,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type Guest = {
   id: number;
@@ -689,7 +690,7 @@ function GuestDetailView({
         </div>
         <div>
           <dt className="text-xs text-zinc-500">Total spent</dt>
-          <dd className="font-medium text-emerald-700">₱{Number(detail.totalSpent).toLocaleString()}</dd>
+          <dd className="font-medium text-emerald-700">{formatPhp(Number(detail.totalSpent))}</dd>
         </div>
         <div>
           <dt className="text-xs text-zinc-500">Last stay</dt>
@@ -739,7 +740,7 @@ function GuestDetailView({
                     <td className="text-xs text-zinc-600">
                       {r.checkInDate?.slice(0, 10)} → {r.checkOutDate?.slice(0, 10)}
                     </td>
-                    <td>₱{Number(r.reservationFee).toLocaleString()}</td>
+                    <td>{formatPhp(Number(r.reservationFee))}</td>
                     <td className="text-xs uppercase text-zinc-600">{r.status.replace("_", " ")}</td>
                   </tr>
                 ))}
@@ -850,7 +851,7 @@ function GuestList({
                   </span>
                 ),
               },
-              { label: "Total spent", value: `₱${Number(g.totalSpent).toLocaleString()}` },
+              { label: "Total spent", value: formatPhp(Number(g.totalSpent)) },
               { label: "Last stay", value: formatStay(g.lastCheckIn, g.lastCheckOut) },
             ]}
             actions={
@@ -926,7 +927,7 @@ function GuestList({
                     {g.reservationCount}
                   </span>
                 </td>
-                <td className="font-semibold text-emerald-700">₱{Number(g.totalSpent).toLocaleString()}</td>
+                <td className="font-semibold text-emerald-700">{formatPhp(Number(g.totalSpent))}</td>
                 <td className="text-zinc-600 text-xs">{formatStay(g.lastCheckIn, g.lastCheckOut)}</td>
                 <td className="text-xs">
                   {g.hasLoginAccount ? <span className="text-emerald-700">Yes</span> : <span className="text-zinc-400">—</span>}

@@ -23,6 +23,8 @@ import {
   Users,
 } from "lucide-react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
+import { formatPhp } from "@/lib/formatPhp";
+import { pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
 import ScrollReveal from "@/components/shared/ScrollReveal";
 import { cn } from "@/lib/utils";
@@ -350,17 +352,53 @@ export function LandingPremiumPage() {
         <div className="mx-auto mb-4 h-px w-full max-w-[min(1100px,100%)] bg-gradient-to-r from-transparent via-zinc-300/80 to-transparent sm:mb-4" aria-hidden />
         <ScrollReveal className="mx-auto w-full max-w-[min(1100px,100%)]" direction="up" delayMs={30}>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 lg:gap-3">
-            <PricingCard label="MONTHLY PLAN" original="₱3,000" price="₱2,100" note="Perfect for startup resorts" highlight={false} />
-            <PricingCard label="3-MONTH PLAN" original="₱2,700" price="₱1,900" note="Save ₱2,400 vs monthly" highlight={false} />
-            <PricingCard label="6-MONTH PLAN" original="₱2,500" price="₱1,700" note="Save ₱7,800 vs monthly" highlight={false} />
-            <PricingCard
-              label="12-MONTH PLAN"
-              original="₱2,300"
-              price="₱1,500"
-              note="Save ₱9,600 yearly"
-              highlight
-              badge="BEST VALUE"
-            />
+            {pricingPilotEnabled() ? (
+              <>
+                <PricingCard
+                  label="MONTHLY PLAN"
+                  original={formatPhp(pricingPilotUnitPhp())}
+                  price={formatPhp(pricingPilotUnitPhp())}
+                  note="Pilot: flat rate per checkout"
+                  highlight={false}
+                />
+                <PricingCard
+                  label="3-MONTH PLAN"
+                  original={formatPhp(pricingPilotUnitPhp())}
+                  price={formatPhp(pricingPilotUnitPhp())}
+                  note="Pilot: flat rate per checkout"
+                  highlight={false}
+                />
+                <PricingCard
+                  label="6-MONTH PLAN"
+                  original={formatPhp(pricingPilotUnitPhp())}
+                  price={formatPhp(pricingPilotUnitPhp())}
+                  note="Pilot: flat rate per checkout"
+                  highlight={false}
+                />
+                <PricingCard
+                  label="12-MONTH PLAN"
+                  original={formatPhp(pricingPilotUnitPhp())}
+                  price={formatPhp(pricingPilotUnitPhp())}
+                  note="Pilot: flat rate per checkout"
+                  highlight
+                  badge="BEST VALUE"
+                />
+              </>
+            ) : (
+              <>
+                <PricingCard label="MONTHLY PLAN" original={formatPhp(3000)} price={formatPhp(2100)} note="Perfect for startup resorts" highlight={false} />
+                <PricingCard label="3-MONTH PLAN" original={formatPhp(2700)} price={formatPhp(1900)} note={`Save ${formatPhp(2400)} vs monthly`} highlight={false} />
+                <PricingCard label="6-MONTH PLAN" original={formatPhp(2500)} price={formatPhp(1700)} note={`Save ${formatPhp(7800)} vs monthly`} highlight={false} />
+                <PricingCard
+                  label="12-MONTH PLAN"
+                  original={formatPhp(2300)}
+                  price={formatPhp(1500)}
+                  note={`Save ${formatPhp(9600)} yearly`}
+                  highlight
+                  badge="BEST VALUE"
+                />
+              </>
+            )}
           </div>
         </ScrollReveal>
       </section>

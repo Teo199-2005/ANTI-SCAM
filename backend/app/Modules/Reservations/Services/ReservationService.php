@@ -9,6 +9,7 @@ use App\Models\Room;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Support\PricingPilot;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,6 +22,10 @@ class ReservationService
     /** Fixed guest reservation fee (PHP), from `system_settings` or config fallback. */
     public static function reservationFeeAmount(): float
     {
+        if (PricingPilot::enabled()) {
+            return PricingPilot::unit();
+        }
+
         $raw = SystemSetting::getValue('reservation_fee');
         if ($raw !== null && is_numeric($raw)) {
             return max(0, (float) $raw);

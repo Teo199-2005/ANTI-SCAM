@@ -111,7 +111,7 @@ class XenditWebhookService
                     $reservation->only(['status', 'xendit_payment_status', 'client_id', 'acknowledgment_receipt_no'])
                 );
 
-                $reservationForNotifications = $reservation->load(['client', 'resort']);
+                $reservationForNotifications = $reservation->load(['client', 'resort', 'room']);
                 DB::afterCommit(function () use ($reservationForNotifications): void {
                     $this->emails->sendBookingConfirmation($reservationForNotifications);
                     $this->emails->sendPaymentReceipt($reservationForNotifications);

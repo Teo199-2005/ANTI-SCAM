@@ -7,6 +7,7 @@ import { BedDouble, CalendarDays, MapPin, PhoneCall, Users } from "lucide-react"
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 export default function ResortDetailPage() {
   const { id: idParam } = useParams();
@@ -137,7 +138,7 @@ function RoomCard({ room, resortId }: { room: PublicRoom; resortId: string }) {
       <div className="mt-4 flex items-end justify-between">
         <div>
           <p className="text-xs text-zinc-500">from</p>
-          <p className="font-heading text-3xl text-zinc-900">₱{Number(room.basePrice).toLocaleString()}</p>
+          <p className="font-heading text-3xl text-zinc-900">{formatPhp(Number(room.basePrice))}</p>
           <p className="text-xs text-zinc-500">per night</p>
         </div>
         <Link href={`/resorts/${resortId}/rooms/${room.id}`} className="cl-btn-primary">

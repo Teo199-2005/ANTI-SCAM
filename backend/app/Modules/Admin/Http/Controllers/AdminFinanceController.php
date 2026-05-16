@@ -34,9 +34,11 @@ class AdminFinanceController extends Controller
             ->where('status', 'pending')
             ->sum('amount');
 
+        // Only realized stays: paid-then-cancelled must not count as platform booking inflow.
         $bookingPaid = (float) Reservation::withoutGlobalScopes()
             ->where('xendit_payment_status', 'paid')
-            ->sum('total_amount');
+            ->revenueEligible()
+            ->sum('reservation_fee');
 
         $commissionGrossPending = (float) Commission::query()
             ->where('status', 'pending')
@@ -76,7 +78,10 @@ class AdminFinanceController extends Controller
             'counts' => [
                 'subscription_invoices_paid' => SubscriptionInvoice::withoutGlobalScopes()->where('status', 'paid')->count(),
                 'subscription_invoices_unpaid' => SubscriptionInvoice::withoutGlobalScopes()->whereIn('status', ['pending', 'failed', 'expired'])->count(),
-                'reservations_paid' => Reservation::withoutGlobalScopes()->where('xendit_payment_status', 'paid')->count(),
+                'reservations_paid' => Reservation::withoutGlobalScopes()
+                    ->where('xendit_payment_status', 'paid')
+                    ->revenueEligible()
+                    ->count(),
                 'commissions_pending' => Commission::query()->where('status', 'pending')->count(),
                 'commissions_released' => Commission::query()->where('status', 'released')->count(),
                 'payout_batches_total' => MarketerPayoutBatch::query()->count(),
@@ -117,10 +122,13 @@ class AdminFinanceController extends Controller
                 DB::raw('COALESCE(res.xendit_invoice_id, res.reference_no) as reference'),
                 'r.id as resort_id',
                 'r.name as resort_name',
-                'res.total_amount as amount',
+                'res.reservation_fee as amount',
                 DB::raw("'PHP' as currency"),
                 DB::raw(
-                    "CASE WHEN LOWER(COALESCE(res.xendit_payment_status,'')) = 'paid' THEN 'paid' ELSE COALESCE(res.xendit_payment_status, res.status) END as status"
+                    "CASE WHEN res.status = 'cancelled' THEN 'cancelled'
+                          WHEN res.status = 'expired' THEN 'expired'
+                          WHEN LOWER(COALESCE(res.xendit_payment_status,'')) = 'paid' THEN 'paid'
+                          ELSE COALESCE(res.xendit_payment_status, res.status) END as status"
                 ),
                 DB::raw('NULL as referral_code'),
                 DB::raw('NULL as marketer_id'),

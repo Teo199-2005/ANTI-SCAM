@@ -46,6 +46,8 @@ class DashboardController extends Controller
      */
     private function computeResortDashboardStats(int $tenantId): array
     {
+        $revIn = Reservation::revenueEligibleStatusesSqlList();
+
         $recentReservations = Reservation::query()
             ->where('tenant_id', $tenantId)
             ->latest()
@@ -55,9 +57,9 @@ class DashboardController extends Controller
         $agg = Reservation::query()
             ->where('tenant_id', $tenantId)
             ->selectRaw("
-                SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as total_reservation_fees,
-                SUM(CASE WHEN status = 'confirmed' THEN total_amount ELSE 0 END) as total_gross_bookings,
-                SUM(CASE WHEN status = 'confirmed' AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month,
+                SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as total_reservation_fees,
+                SUM(CASE WHEN status IN ({$revIn}) THEN total_amount ELSE 0 END) as total_gross_bookings,
+                SUM(CASE WHEN status IN ({$revIn}) AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month,
                 SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as total_confirmed,
                 SUM(CASE WHEN status = 'pending_payment' THEN 1 ELSE 0 END) as total_pending,
                 SUM(CASE WHEN status = 'confirmed' AND DATE(created_at) = ? THEN 1 ELSE 0 END) as confirmed_today
@@ -114,6 +116,7 @@ class DashboardController extends Controller
             $from,
             $to
         ) {
+            $revIn = Reservation::revenueEligibleStatusesSqlList();
             $base = Reservation::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId);
 
@@ -134,9 +137,9 @@ class DashboardController extends Controller
 
             $summary = (clone $base)
                 ->selectRaw("
-                    SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as total_reservation_fees,
-                    SUM(CASE WHEN status = 'confirmed' THEN total_amount ELSE 0 END) as total_gross_bookings,
-                    SUM(CASE WHEN status = 'confirmed' AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month,
+                    SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as total_reservation_fees,
+                    SUM(CASE WHEN status IN ({$revIn}) THEN total_amount ELSE 0 END) as total_gross_bookings,
+                    SUM(CASE WHEN status IN ({$revIn}) AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month,
                     SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as total_confirmed,
                     SUM(CASE WHEN status = 'pending_payment' THEN 1 ELSE 0 END) as total_pending
                 ", [now()->startOfMonth()])
@@ -146,9 +149,9 @@ class DashboardController extends Controller
                 ->selectRaw("
                     DATE(created_at) as day,
                     COUNT(*) as reservations_count,
-                    SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as fees_collected,
-                    SUM(CASE WHEN status = 'confirmed' THEN total_amount ELSE 0 END) as gross_bookings,
-                    SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_count
+                    SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as fees_collected,
+                    SUM(CASE WHEN status IN ({$revIn}) THEN total_amount ELSE 0 END) as gross_bookings,
+                    SUM(CASE WHEN status IN ({$revIn}) THEN 1 ELSE 0 END) as confirmed_count
                 ")
                 ->groupBy(DB::raw('DATE(created_at)'))
                 ->orderBy('day')

@@ -335,7 +335,7 @@ HTML;
 
     private function paymentReceiptHtml(Reservation $r): string
     {
-        $fee = number_format($r->reservation_fee, 2);
+        $fee = number_format((float) $r->reservation_fee, 2);
         $ref = htmlspecialchars((string) $r->reference_no, ENT_QUOTES, 'UTF-8');
         $ackRaw = (string) ($r->acknowledgment_receipt_no ?? '');
         $ack = htmlspecialchars($ackRaw, ENT_QUOTES, 'UTF-8');
@@ -343,16 +343,52 @@ HTML;
             ? '<tr><td style="padding:8px 0;color:#6b7280">Digital acknowledgment receipt</td><td style="padding:8px 0;font-weight:600;font-family:monospace">'.$ack.'</td></tr>'
             : '';
 
+        $tz = (string) config('app.timezone', 'UTC');
+        $paidRow = '';
+        if ($r->reserved_at) {
+            $paidFmt = htmlspecialchars(
+                $r->reserved_at->timezone($tz)->format('M j, Y g:i A T'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+            $paidRow = '<tr><td style="padding:8px 0;color:#6b7280">Paid on</td><td style="padding:8px 0;font-weight:600">'.$paidFmt.'</td></tr>';
+        }
+
+        $xid = (string) ($r->xendit_invoice_id ?? '');
+        $xidRow = $xid !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Payment reference (Xendit)</td><td style="padding:8px 0;font-weight:600;font-family:monospace;font-size:12px">'
+            .htmlspecialchars($xid, ENT_QUOTES, 'UTF-8').'</td></tr>'
+            : '';
+
+        $resortRow = '';
+        if ($r->relationLoaded('resort') && $r->resort) {
+            $rn = htmlspecialchars((string) $r->resort->name, ENT_QUOTES, 'UTF-8');
+            $resortRow = '<tr><td style="padding:8px 0;color:#6b7280">Resort</td><td style="padding:8px 0;font-weight:600">'.$rn.'</td></tr>';
+        }
+        $roomRow = '';
+        if ($r->relationLoaded('room') && $r->room) {
+            $rm = htmlspecialchars((string) $r->room->name, ENT_QUOTES, 'UTF-8');
+            $roomRow = '<tr><td style="padding:8px 0;color:#6b7280">Room</td><td style="padding:8px 0;font-weight:600">'.$rm.'</td></tr>';
+        }
+
+        $statusRow = '<tr><td style="padding:8px 0;color:#6b7280">Payment status</td><td style="padding:8px 0;font-weight:700;color:#059669">Paid</td></tr>';
+
         return <<<HTML
-<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
-  <h2 style="color:#1E3A5F">Digital Acknowledgment Receipt</h2>
-  <p style="font-size:13px;color:#374151">Official receipt for the <strong>Anti-Scam PH</strong> platform reservation fee (non-refundable).</p>
-  <table style="width:100%;border-collapse:collapse;margin-top:16px">
+<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;padding:28px;border:1px solid #e2e8f0;border-radius:14px;background:#ffffff">
+  <p style="margin:0 0 6px 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#64748b">Official receipt</p>
+  <h2 style="margin:0 0 10px 0;color:#0f172a;font-size:22px;line-height:1.25">Reservation fee — paid</h2>
+  <p style="font-size:14px;line-height:1.55;color:#334155;margin:0 0 18px 0">Thank you. This email confirms that your <strong>Anti-Scam PH</strong> platform reservation fee was received. This fee is <strong>non-refundable</strong>.</p>
+  <table style="width:100%;border-collapse:collapse;margin:0 0 8px 0;border-top:1px solid #e2e8f0">
+    {$statusRow}
+    {$paidRow}
     {$ackRow}
+    {$xidRow}
+    {$resortRow}
+    {$roomRow}
     <tr><td style="padding:8px 0;color:#6b7280">Booking reference</td><td style="padding:8px 0;font-weight:600">{$ref}</td></tr>
-    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:600;color:#10b981">₱{$fee}</td></tr>
+    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:700;color:#059669;font-size:18px">₱{$fee}</td></tr>
   </table>
-  <p style="margin-top:16px;font-size:12px;color:#9ca3af">Keep this email for your records. The reservation fee is collected by the platform; remaining balance is paid at the resort on check-in.</p>
+  <p style="margin-top:18px;font-size:12px;line-height:1.5;color:#64748b;border-top:1px solid #f1f5f9;padding-top:14px">Keep this message for your records. The remaining balance for your stay is settled directly with the resort at check-in.</p>
 </div>
 HTML;
     }
@@ -408,17 +444,40 @@ HTML;
             ? '<tr><td style="padding:8px 0;color:#6b7280">Invoice plan</td><td style="padding:8px 0;font-weight:600">'.$plan.'</td></tr>'
             : '';
 
+        $tz = (string) config('app.timezone', 'UTC');
+        $paidRow = '';
+        if ($invoice?->paid_at) {
+            $paidFmt = htmlspecialchars(
+                $invoice->paid_at->timezone($tz)->format('M j, Y g:i A T'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+            $paidRow = '<tr><td style="padding:8px 0;color:#6b7280">Paid on</td><td style="padding:8px 0;font-weight:600">'.$paidFmt.'</td></tr>';
+        }
+
+        $xid = (string) ($invoice?->xendit_invoice_id ?? '');
+        $xidRow = $xid !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Payment reference (Xendit)</td><td style="padding:8px 0;font-weight:600;font-family:monospace;font-size:12px">'
+            .htmlspecialchars($xid, ENT_QUOTES, 'UTF-8').'</td></tr>'
+            : '';
+
+        $statusRow = '<tr><td style="padding:8px 0;color:#6b7280">Payment status</td><td style="padding:8px 0;font-weight:700;color:#15803d">Paid</td></tr>';
+
         return <<<HTML
-<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #bbf7d0;border-radius:12px;background:#f0fdf4">
-  <h2 style="color:#166534">Digital Acknowledgment Receipt</h2>
-  <p style="font-size:13px;color:#374151">Subscription payment received for <strong>{$resortName}</strong>.</p>
-  <table style="width:100%;border-collapse:collapse;margin-top:16px">
+<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;padding:28px;border:1px solid #bbf7d0;border-radius:14px;background:linear-gradient(180deg,#f0fdf4 0%,#ffffff 48%)">
+  <p style="margin:0 0 6px 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#166534">Official acknowledgment</p>
+  <h2 style="margin:0 0 10px 0;color:#14532d;font-size:22px;line-height:1.25">Subscription payment — received</h2>
+  <p style="font-size:14px;line-height:1.55;color:#334155;margin:0 0 18px 0">This confirms that your subscription payment for <strong>{$resortName}</strong> was processed successfully through <strong>Anti-Scam PH</strong>.</p>
+  <table style="width:100%;border-collapse:collapse;margin:0 0 8px 0;border-top:1px solid #bbf7d0">
+    {$statusRow}
+    {$paidRow}
     {$ackRow}
+    {$xidRow}
     {$planRow}
-    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:600;color:#166534">₱{$amount}</td></tr>
+    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:700;color:#15803d;font-size:18px">₱{$amount}</td></tr>
     <tr><td style="padding:8px 0;color:#6b7280">Next due date</td><td style="padding:8px 0;font-weight:600">{$nextDue}</td></tr>
   </table>
-  <p style="margin-top:16px;font-size:12px;color:#9ca3af">This is your official acknowledgment of the subscription payment processed through Anti-Scam PH.</p>
+  <p style="margin-top:18px;font-size:12px;line-height:1.5;color:#64748b;border-top:1px solid #ecfdf5;padding-top:14px">Retain this email for your accounting records. For billing questions, reply to the support address in the footer.</p>
 </div>
 HTML;
     }

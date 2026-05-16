@@ -20,6 +20,7 @@ import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } fro
 import { useToast } from "@/components/shared/ToastProvider";
 import { CheckCircle2, ChevronDown, ChevronUp, Filter, Pencil, Plus, ReceiptText, UserX, XCircle } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type RoomRow = { id: number; resort_id: number; name: string; status: string };
 
@@ -501,7 +502,7 @@ export default function ResortReservationsPage() {
                       value: `${item.checkInDate} → ${item.checkOutDate}`,
                     },
                     { label: "Guests", value: item.guestCount },
-                    { label: "Total", value: `₱${Number(item.totalAmount).toLocaleString()}` },
+                    { label: "Total", value: formatPhp(Number(item.totalAmount)) },
                     {
                       label: "Status",
                       value: <span className={statusBadge[item.status] ?? "dash-badge-slate"}>{item.status}</span>,
@@ -533,7 +534,7 @@ export default function ResortReservationsPage() {
                           </p>
                           <p className="min-w-0">
                             <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Reservation fee</span>
-                            <span className="text-emerald-700">₱{Number(item.reservationFee).toLocaleString()}</span>
+                            <span className="text-emerald-700">{formatPhp(Number(item.reservationFee))}</span>
                           </p>
                           <p className="min-w-0">
                             <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-400">Payment</span>
@@ -632,7 +633,7 @@ export default function ResortReservationsPage() {
                     <td className="text-zinc-600">{item.checkInDate}</td>
                     <td className="text-zinc-600">{item.checkOutDate}</td>
                     <td className="text-zinc-700">{item.guestCount}</td>
-                    <td className="text-emerald-700">₱{Number(item.totalAmount).toLocaleString()}</td>
+                    <td className="text-emerald-700">{formatPhp(Number(item.totalAmount))}</td>
                     <td>
                       <span className={statusBadge[item.status] ?? "dash-badge-slate"}>{item.status}</span>
                     </td>
@@ -703,7 +704,7 @@ export default function ResortReservationsPage() {
                           </p>
                           <p>
                             Reservation fee:{" "}
-                            <span className="font-medium text-emerald-700">₱{Number(item.reservationFee).toLocaleString()}</span>
+                            <span className="font-medium text-emerald-700">{formatPhp(Number(item.reservationFee))}</span>
                           </p>
                           <p>
                             Payment status:{" "}

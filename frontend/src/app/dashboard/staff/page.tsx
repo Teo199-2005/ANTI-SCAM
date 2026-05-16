@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, CalendarDays, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type Reservation = {
   id: number;
@@ -124,7 +125,7 @@ export default function StaffDashboardPage() {
                   fields={[
                     { label: "Check-in", value: r.check_in_date },
                     { label: "Check-out", value: r.check_out_date },
-                    { label: "Amount", value: `₱${Number(r.total_amount).toLocaleString()}` },
+                    { label: "Amount", value: formatPhp(Number(r.total_amount)) },
                     {
                       label: "Status",
                       value: <span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_", " ")}</span>,
@@ -156,7 +157,7 @@ export default function StaffDashboardPage() {
                       <td className="font-mono text-xs font-semibold text-navy">{r.reference_no}</td>
                       <td className="text-zinc-600">{r.check_in_date}</td>
                       <td className="text-zinc-600">{r.check_out_date}</td>
-                      <td className="font-medium text-emerald-700">₱{Number(r.total_amount).toLocaleString()}</td>
+                      <td className="font-medium text-emerald-700">{formatPhp(Number(r.total_amount))}</td>
                       <td><span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_"," ")}</span></td>
                       <DashTableActionsCell>
                         <DashTableActionsInner>

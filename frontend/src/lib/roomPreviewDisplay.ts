@@ -38,18 +38,4 @@ export function amenityMeta(label: string): { icon: LucideIcon } {
   return { icon: ShieldCheck };
 }
 
-export function formatPhp(amount: number): string {
-  const n = Number(amount);
-  if (!Number.isFinite(n)) return "—";
-  const hasFraction = Math.abs(n % 1) > 1e-9;
-  return `₱${n.toLocaleString("en-PH", {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-export function formatPhpPerNight(amount: number): string {
-  const core = formatPhp(amount);
-  if (core === "—") return "—";
-  return `${core}/night`;
-}
+export { formatPhp, formatPhpPerNight } from "@/lib/formatPhp";

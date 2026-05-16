@@ -2,6 +2,7 @@
 
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import type { MarketerTierInfo, TierLadderEntry } from "@/lib/api/marketing";
+import { formatPhp } from "@/lib/formatPhp";
 import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import { cn } from "@/lib/utils";
 import { ShieldCheck, X } from "lucide-react";
@@ -19,10 +20,6 @@ type MarketingTiersInfoModalProps = {
   loading?: boolean;
   title?: string;
 };
-
-function fmtPhp(n: number) {
-  return `₱${Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 
 export default function MarketingTiersInfoModal({
   open,
@@ -111,7 +108,7 @@ export default function MarketingTiersInfoModal({
                 {marketerTier ? (
                   <p className="mt-2 text-sm text-zinc-700">
                     Current commission credit per qualifying paid subscription:{" "}
-                    <strong className="text-navy">{fmtPhp(marketerTier.perPaymentPhp)}</strong>
+                    <strong className="text-navy">{formatPhp(marketerTier.perPaymentPhp)}</strong>
                     {marketerTier.clientsToNextTier != null && marketerTier.nextTierAt != null ? (
                       <span className="block pt-1 text-xs text-zinc-600">
                         {marketerTier.clientsToNextTier > 0 ? (
@@ -153,7 +150,7 @@ export default function MarketingTiersInfoModal({
                             <MarketerTierBadge tierKey={row.tierKey} label={row.label} size="sm" />
                           </td>
                           <td className="px-3 py-2.5 font-medium tabular-nums text-zinc-700">{row.clientRangeLabel}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-navy">{fmtPhp(row.perPaymentPhp)}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-navy">{formatPhp(row.perPaymentPhp)}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -4,6 +4,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { getReservation, cancelReservation, ReservationDetail, createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { formatPhp } from "@/lib/formatPhp";
 import { BadgeCheck, CalendarDays, ChevronLeft, CreditCard, Printer, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -203,11 +204,11 @@ export default function BookingDetailPage() {
           <div className="space-y-2 text-sm text-zinc-700">
             <div className="flex justify-between gap-4">
               <span className="text-zinc-500">Reservation fee</span>
-              <span className="font-semibold text-emerald-700">₱{Number(reservation.reservationFee).toLocaleString()}</span>
+              <span className="font-semibold text-emerald-700">{formatPhp(Number(reservation.reservationFee))}</span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-zinc-500">Total (incl. balance)</span>
-              <span className="font-medium text-zinc-900">₱{Number(reservation.totalAmount).toLocaleString()}</span>
+              <span className="font-medium text-zinc-900">{formatPhp(Number(reservation.totalAmount))}</span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-zinc-500">Payment status</span>
@@ -246,7 +247,8 @@ export default function BookingDetailPage() {
         <div className="dash-card p-5">
           <h3 className="mb-2 font-semibold text-navy">Cancel booking</h3>
           <p className="mb-4 text-sm text-zinc-600">
-            Cancellation is only allowed at least 24 hours before check-in. The ₱500 reservation fee is non-refundable.
+            Cancellation is only allowed at least 24 hours before check-in. The {formatPhp(Number(reservation.reservationFee))}{" "}
+            reservation fee is non-refundable.
           </p>
           <button
             type="button"

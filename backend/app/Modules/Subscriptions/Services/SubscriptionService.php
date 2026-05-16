@@ -7,6 +7,7 @@ use App\Models\Subscription;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\EmailNotificationService;
 use App\Services\ReferralSignupTrialService;
+use App\Support\PricingPilot;
 
 class SubscriptionService
 {
@@ -22,6 +23,21 @@ class SubscriptionService
         // - ₱2,100 base (1-month standard)
         // - ₱300 per extra active room
         $plan = 'basic';
+        if (PricingPilot::enabled()) {
+            $u = PricingPilot::unit();
+            $included = 3;
+            $extraRooms = max(0, $roomCount - $included);
+
+            return [
+                'plan' => $plan,
+                'base_price' => $u,
+                'included_rooms' => $included,
+                'extra_room_fee' => $u,
+                'active_room_count' => $roomCount,
+                'total_monthly_fee' => $u + ($extraRooms * $u),
+            ];
+        }
+
         $base = 2100.00;
         $included = 3;
         $extraFee = 300.00;

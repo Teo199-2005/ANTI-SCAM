@@ -28,6 +28,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
 
 type TabId = "overview" | "ledger" | "commissions" | "withholding" | "releases";
 
@@ -38,12 +39,6 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "withholding", label: "Withholding & payouts", icon: Landmark },
   { id: "releases", label: "Release log", icon: BookOpen },
 ];
-
-function fmtPhp(n: number | string | null | undefined) {
-  const v = typeof n === "string" ? parseFloat(n) : Number(n ?? 0);
-  if (Number.isNaN(v)) return "PHP 0.00";
-  return `PHP ${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 /** ≥16px on phones avoids iOS input zoom on native selects */
 const financeSelectCls =

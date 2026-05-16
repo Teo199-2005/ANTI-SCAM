@@ -3,12 +3,13 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Badge from "@/components/ui/Badge";
 import { Tag } from "lucide-react";
 import { images } from "@/lib/content/images";
+import { formatPhpPerNight } from "@/lib/formatPhp";
 import Image from "next/image";
 
 const properties = [
-  { name: "Azure Cliff Suites", image: images.property1, price: "From ₱7,900/night" },
-  { name: "Sienna Coast Villas", image: images.property2, price: "From ₱9,200/night" },
-  { name: "Skyline Cove Retreat", image: images.property3, price: "From ₱6,500/night" }
+  { name: "Azure Cliff Suites", image: images.property1, priceFrom: 7900 },
+  { name: "Sienna Coast Villas", image: images.property2, priceFrom: 9200 },
+  { name: "Skyline Cove Retreat", image: images.property3, priceFrom: 6500 },
 ];
 
 export default function FeaturedProperties({ dark = false }: { dark?: boolean }) {
@@ -27,7 +28,7 @@ export default function FeaturedProperties({ dark = false }: { dark?: boolean })
             </div>
             <p className="mt-2 inline-flex items-center gap-2 text-zinc-700">
               <Tag size={14} />
-              {property.price}
+              {`From ${formatPhpPerNight(property.priceFrom)}`}
             </p>
           </Card>
         ))}

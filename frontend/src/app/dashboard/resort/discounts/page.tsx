@@ -23,6 +23,7 @@ import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { Loader2, Percent, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type DiscountCode = {
   id: number;
@@ -292,7 +293,7 @@ export default function ResortDiscountsPage() {
                       label: "Value",
                       value: (
                         <span className="font-semibold text-accentOrange">
-                          {c.type === "percentage" ? `${c.value}%` : `₱${c.value.toLocaleString()}`}
+                          {c.type === "percentage" ? `${c.value}%` : formatPhp(Number(c.value))}
                         </span>
                       ),
                     },
@@ -365,7 +366,7 @@ export default function ResortDiscountsPage() {
                         <span className="dash-badge-slate capitalize">{c.type}</span>
                       </td>
                       <td className="font-semibold text-accentOrange">
-                        {c.type === "percentage" ? `${c.value}%` : `₱${c.value.toLocaleString()}`}
+                        {c.type === "percentage" ? `${c.value}%` : formatPhp(Number(c.value))}
                       </td>
                       <td className="text-zinc-600">
                         {c.uses_count}

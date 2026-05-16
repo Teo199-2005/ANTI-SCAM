@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BadgeCheck, CalendarDays, Clock, Heart, MapPin, MessageSquare, XCircle, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type ReservationSummary = {
   id: number;
@@ -40,6 +41,9 @@ const statusIcon: Record<string, React.ReactNode> = {
   completed:       <BadgeCheck size={13} />,
   no_show:         <XCircle size={13} />,
 };
+
+/** Match backend Reservation::REVENUE_ELIGIBLE_STATUSES — fees count toward "total paid" only here. */
+const REVENUE_ELIGIBLE_STATUSES = new Set(["confirmed", "completed", "no_show"]);
 
 export default function ClientOverviewPage() {
   const { user } = useAuth();
@@ -77,7 +81,10 @@ export default function ClientOverviewPage() {
   const recentFive = reservations.slice(0, 5);
   const confirmed = reservations.filter((r) => r.status === "confirmed").length;
   const pending   = reservations.filter((r) => r.status === "pending_payment").length;
-  const totalSpent = reservations.reduce((s, r) => s + Number(r.reservationFee ?? 0), 0);
+  const totalSpent = reservations.reduce((s, r) => {
+    if (!REVENUE_ELIGIBLE_STATUSES.has(r.status)) return s;
+    return s + Number(r.reservationFee ?? 0);
+  }, 0);
   const completedCount = reservations.filter((r) => r.status === "completed").length;
 
   return (
@@ -125,7 +132,7 @@ export default function ClientOverviewPage() {
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <StatCard compact label="Confirmed bookings" value={confirmed} icon={CalendarDays} iconTone="emerald" />
         <StatCard compact label="Pending payment"    value={pending}   icon={Clock}        iconTone="orange" />
-        <StatCard compact label="Total fees paid" value={`₱${totalSpent.toLocaleString()}`} icon={TrendingUp} iconTone="sky" />
+        <StatCard compact label="Total fees paid" value={formatPhp(totalSpent)} icon={TrendingUp} iconTone="sky" />
         <StatCard compact label="Completed stays" value={completedCount} icon={BadgeCheck} iconTone="navy" />
       </div>
 
@@ -181,7 +188,7 @@ export default function ClientOverviewPage() {
                   }
                   fields={[
                     { label: "Dates", value: `${r.checkInDate} → ${r.checkOutDate}` },
-                    { label: "Total", value: `₱${Number(r.totalAmount).toLocaleString()}` },
+                    { label: "Total", value: formatPhp(Number(r.totalAmount)) },
                     {
                       label: "Resort",
                       fullWidth: true,
@@ -218,7 +225,7 @@ export default function ClientOverviewPage() {
                   {r.resort ? <p className="text-sm text-zinc-600">{r.resort.name}{r.room?.name ? ` — ${r.room.name}` : ""}</p> : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-sm font-semibold text-zinc-800">₱{Number(r.totalAmount).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-zinc-800">{formatPhp(Number(r.totalAmount))}</p>
                   <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
                     {statusIcon[r.status] ?? null}
                     {r.status.replaceAll("_", " ")}

@@ -10,10 +10,7 @@ import LocationFilterBar, {
 import { getMarketingClients, type MarketingClientRow } from "@/lib/api/marketing";
 import { ChevronLeft, ChevronRight, Gift, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-
-function fmtPhp(n: number) {
-  return `₱${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
 
 function fmtWhen(iso: string | null) {
   if (!iso) return "—";

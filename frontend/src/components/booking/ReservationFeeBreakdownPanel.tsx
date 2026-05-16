@@ -1,6 +1,7 @@
 "use client";
 
-import { getReservationFeeComponents, RESERVATION_FEE_COPY, formatPhp } from "@/lib/reservationFeeBreakdown";
+import { formatPhpCents as formatPhp } from "@/lib/formatPhp";
+import { getReservationFeeComponents, RESERVATION_FEE_COPY } from "@/lib/reservationFeeBreakdown";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";

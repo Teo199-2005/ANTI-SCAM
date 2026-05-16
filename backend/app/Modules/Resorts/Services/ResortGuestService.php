@@ -87,15 +87,16 @@ class ResortGuestService
         $guestKey = rawurldecode($guestKey);
         $reservations = $this->reservationsMatchingKey($tenantId, $guestKey);
         $user = $this->findGuestUserForKey($tenantId, $guestKey);
+        $revIn = Reservation::revenueEligibleStatusesSqlList();
 
         $stats = (clone $reservations)
-            ->selectRaw('
+            ->selectRaw("
                 COUNT(*) AS reservation_count,
-                SUM(COALESCE(reservation_fee, 0)) AS total_spent,
+                SUM(CASE WHEN status IN ({$revIn}) THEN COALESCE(reservation_fee, 0) ELSE 0 END) AS total_spent,
                 MAX(check_in_date) AS last_check_in,
                 MAX(check_out_date) AS last_check_out,
                 MIN(DATE(created_at)) AS first_booking
-            ')
+            ")
             ->first();
 
         $name = $user?->name;

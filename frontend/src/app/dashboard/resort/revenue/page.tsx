@@ -23,6 +23,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { formatPhp, formatPhpLedger } from "@/lib/formatPhp";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -114,7 +115,7 @@ export default function ResortRevenuePage() {
       const left = 12;
       const right = pageWidth - 12;
       let y = 12;
-      const fmtMoney = (value: number) => `PHP ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const fmtMoney = (value: number) => formatPhpLedger(value);
       const drawFooter = (pageNum: number) => {
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.15);
@@ -264,7 +265,7 @@ export default function ResortRevenuePage() {
   const kpis = [
     {
       label: "Fees collected",
-      value: `₱${totals.totalReservationFees.toLocaleString()}`,
+      value: formatPhp(totals.totalReservationFees),
       sub: "Reservation fees paid to date",
       icon: BadgeDollarSign,
       accent: color.semantic.success,
@@ -272,7 +273,7 @@ export default function ResortRevenuePage() {
     },
     {
       label: "Gross bookings",
-      value: `₱${totals.totalGrossBookings.toLocaleString()}`,
+      value: formatPhp(totals.totalGrossBookings),
       sub: "Total booking value (all time)",
       icon: TrendingUp,
       accent: color.brand.accentHover,
@@ -280,7 +281,7 @@ export default function ResortRevenuePage() {
     },
     {
       label: "Revenue this month",
-      value: `₱${totals.revenueThisMonth.toLocaleString()}`,
+      value: formatPhp(totals.revenueThisMonth),
       sub: "Confirmed bookings · current month",
       icon: ReceiptText,
       accent: color.data.skyBright,
@@ -485,8 +486,8 @@ export default function ResortRevenuePage() {
                       label: "Confirmed",
                       value: <span className="dash-badge-emerald">{row.confirmed}</span>,
                     },
-                    { label: "Fees collected", value: `₱${Number(row.feesCollected).toLocaleString()}` },
-                    { label: "Gross bookings", value: `₱${Number(row.grossBookings).toLocaleString()}` },
+                    { label: "Fees collected", value: formatPhp(Number(row.feesCollected)) },
+                    { label: "Gross bookings", value: formatPhp(Number(row.grossBookings)) },
                   ]}
                 />
               ))}
@@ -510,8 +511,8 @@ export default function ResortRevenuePage() {
                       <td>
                         <span className="dash-badge-emerald">{row.confirmed}</span>
                       </td>
-                      <td className="font-semibold text-emerald-700">₱{Number(row.feesCollected).toLocaleString()}</td>
-                      <td className="text-zinc-700">₱{Number(row.grossBookings).toLocaleString()}</td>
+                      <td className="font-semibold text-emerald-700">{formatPhp(Number(row.feesCollected))}</td>
+                      <td className="text-zinc-700">{formatPhp(Number(row.grossBookings))}</td>
                     </tr>
                   ))}
                 </tbody>

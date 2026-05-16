@@ -26,6 +26,7 @@ import {
   slotPrepayTotal,
   type SlotPrepayDuration,
 } from "@/lib/billing/slotPrepay";
+import { defaultExtraRoomFeeFallbackPhp } from "@/lib/pricingPilot";
 import { bulkDeleteRooms, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
@@ -46,6 +47,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatPhp, formatPhpLedger } from "@/lib/formatPhp";
 
 type RoomItem = {
   id: number;
@@ -224,7 +226,7 @@ export default function ResortRoomsPage() {
     typeof subIncludedCap === "number"
       ? Math.max(0, subIncludedCap - activeRoomsCount)
       : null;
-  const extraRoomFee = Number(resort?.subscription?.extra_room_fee ?? 300);
+  const extraRoomFee = Number(resort?.subscription?.extra_room_fee ?? defaultExtraRoomFeeFallbackPhp());
   const slotMonthlyPrepay = slotPrepayMonthlyRate(extraRoomFee, roomAddonDuration);
   const addonPrepayTotal = slotPrepayTotal(extraRoomFee, roomAddonDuration, roomAddonQuantity);
   const atIncludedRoomLimit = resort ? activeRoomsCount >= includedRooms : false;
@@ -490,7 +492,7 @@ export default function ResortRoomsPage() {
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
                 <p className="text-xs text-zinc-500">
                   Extra slots:{" "}
-                  <span className="font-mono font-medium text-zinc-700">₱{extraRoomFee.toLocaleString()}</span>
+                  <span className="font-mono font-medium text-zinc-700">{formatPhp(extraRoomFee)}</span>
                   /mo each
                 </p>
                 <button
@@ -604,7 +606,7 @@ export default function ResortRoomsPage() {
                         { label: "Code", value: room.code || "—" },
                         { label: "Capacity", value: String(room.capacity) },
                         { label: "Units", value: String(room.units ?? 1) },
-                        { label: "Base price", value: `₱${Number(room.base_price).toLocaleString()}` },
+                        { label: "Base price", value: formatPhp(Number(room.base_price)) },
                         {
                           label: "Status",
                           value: <span className={roomStatusClass[room.status] ?? "dash-badge-slate"}>{room.status}</span>,
@@ -694,7 +696,7 @@ export default function ResortRoomsPage() {
                     <td className="text-zinc-600">{room.code || "—"}</td>
                     <td className="text-zinc-700">{room.capacity}</td>
                     <td className="text-zinc-700 tabular-nums">{room.units ?? 1}</td>
-                    <td className="text-zinc-700">₱{Number(room.base_price).toLocaleString()}</td>
+                    <td className="text-zinc-700">{formatPhp(Number(room.base_price))}</td>
                     <td>
                       <span className={roomStatusClass[room.status] ?? "dash-badge-slate"}>{room.status}</span>
                     </td>
@@ -843,7 +845,7 @@ export default function ResortRoomsPage() {
             <div className="mt-4 flex flex-wrap items-end gap-x-2 gap-y-1">
               <p className="inline-flex items-end gap-2 text-3xl font-black leading-none tracking-tight text-zinc-950 sm:text-4xl">
                 <WalletCards size={20} className="mb-1 text-primaryBlue" />
-                ₱{slotMonthlyPrepay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatPhpLedger(slotMonthlyPrepay)}
               </p>
               <p className="pb-1 text-xs font-medium lowercase text-zinc-500">/ slot / month (prepay tier)</p>
             </div>
@@ -851,7 +853,7 @@ export default function ResortRoomsPage() {
               <Crown size={13} className="text-primaryBlue" />
               Total due now:{" "}
               <span className="font-semibold text-navy">
-                ₱{addonPrepayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatPhpLedger(addonPrepayTotal)}
               </span>
             </p>
           </div>
@@ -873,7 +875,7 @@ export default function ResortRoomsPage() {
               className="dash-input max-w-[200px]"
             />
             <p className="mt-2 text-xs text-zinc-500">
-              List price per slot overage is ₱{extraRoomFee.toLocaleString()}/mo; prepay uses the tiered rate above for{" "}
+              List price per slot overage is {formatPhp(extraRoomFee)}/mo; prepay uses the tiered rate above for{" "}
               {roomAddonDuration} month{roomAddonDuration > 1 ? "s" : ""}.
             </p>
           </div>
@@ -904,11 +906,11 @@ export default function ResortRoomsPage() {
                 {roomAddonDuration > 1 ? "s" : ""}
               </p>
               <p>
-                Effective rate: ₱{slotMonthlyPrepay.toLocaleString(undefined, { minimumFractionDigits: 2 })} ×{" "}
+                Effective rate: {formatPhpLedger(slotMonthlyPrepay)} ×{" "}
                 {roomAddonQuantity} × {roomAddonDuration}
               </p>
               <p className="border-t border-primaryBlue/10 pt-2 font-semibold text-navy">
-                Total: ₱{addonPrepayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Total: {formatPhpLedger(addonPrepayTotal)}
               </p>
             </div>
           </div>

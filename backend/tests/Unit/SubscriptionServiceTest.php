@@ -5,7 +5,7 @@ namespace Tests\Unit;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Modules\Subscriptions\Services\SubscriptionService;
 use App\Services\EmailNotificationService;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class SubscriptionServiceTest extends TestCase
 {

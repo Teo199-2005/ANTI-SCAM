@@ -21,6 +21,7 @@ import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, R
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
+import { formatPhp } from "@/lib/formatPhp";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -305,7 +306,7 @@ export default function ResortOverviewPage() {
               <p className="min-w-0 font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Fees collected</p>
             </div>
             <p className="relative break-words font-dash text-base font-bold leading-tight text-navy md:text-lg">
-              ₱{Number(stats.totalReservationFees ?? 0).toLocaleString()}
+              {formatPhp(Number(stats.totalReservationFees ?? 0))}
             </p>
             <p className="relative mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Reservation fees paid to date</p>
           </div>
@@ -328,7 +329,7 @@ export default function ResortOverviewPage() {
               <p className="min-w-0 font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Gross bookings</p>
             </div>
             <p className="relative break-words font-dash text-base font-bold leading-tight text-navy md:text-lg">
-              ₱{Number(stats.totalGrossBookings ?? 0).toLocaleString()}
+              {formatPhp(Number(stats.totalGrossBookings ?? 0))}
             </p>
             <p className="relative mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Total booking value (all time)</p>
           </div>
@@ -351,7 +352,7 @@ export default function ResortOverviewPage() {
               <p className="min-w-0 font-dash text-[10px] font-medium leading-tight text-zinc-600 md:text-[11px]">Revenue this month</p>
             </div>
             <p className="relative break-words font-dash text-base font-bold leading-tight text-navy md:text-lg">
-              ₱{Number(stats.revenueThisMonth ?? 0).toLocaleString()}
+              {formatPhp(Number(stats.revenueThisMonth ?? 0))}
             </p>
             <p className="relative mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 md:text-[10px]">Confirmed bookings · current month</p>
           </div>
@@ -458,7 +459,7 @@ export default function ResortOverviewPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <p className="text-sm font-semibold text-emerald-700">
-                      ₱{Number(item.total_amount).toLocaleString()}
+                      {formatPhp(Number(item.total_amount))}
                     </p>
                     <span className={statusBadge[item.status] ?? "dash-badge-slate"}>
                       {item.status.replaceAll("_", " ")}
@@ -502,7 +503,7 @@ export default function ResortOverviewPage() {
                   {item.check_in_date} → {item.check_out_date}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-emerald-700">
-                  ₱{Number(item.total_amount).toLocaleString()}
+                  {formatPhp(Number(item.total_amount))}
                 </p>
               </div>
             ))}

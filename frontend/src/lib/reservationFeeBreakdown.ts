@@ -36,7 +36,3 @@ export function getReservationFeeComponents(total: number): ReservationFeeCompon
   const platformService = roundPhp(total - vatIncluded - paymentProcessing);
   return { total: roundPhp(total), vatIncluded, paymentProcessing, platformService };
 }
-
-export function formatPhp(amount: number): string {
-  return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}

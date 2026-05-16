@@ -18,6 +18,7 @@ import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch"
 import { CalendarDays, ChevronLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type Reservation = {
   id: number;
@@ -210,7 +211,7 @@ export default function StaffReservationsPage() {
                     { label: "Check-in", value: r.checkInDate },
                     { label: "Check-out", value: r.checkOutDate },
                     { label: "Guests", value: r.guestCount },
-                    { label: "Total", value: `₱${Number(r.totalAmount).toLocaleString()}` },
+                    { label: "Total", value: formatPhp(Number(r.totalAmount)) },
                     {
                       label: "Status",
                       value: (
@@ -249,7 +250,7 @@ export default function StaffReservationsPage() {
                       <td className="text-zinc-600">{r.checkInDate}</td>
                       <td className="text-zinc-600">{r.checkOutDate}</td>
                       <td className="text-zinc-600">{r.guestCount}</td>
-                      <td className="font-medium text-emerald-700">₱{Number(r.totalAmount).toLocaleString()}</td>
+                      <td className="font-medium text-emerald-700">{formatPhp(Number(r.totalAmount))}</td>
                       <td>
                         <span className={statusBadge[r.status] ?? "dash-badge-slate"}>{r.status.replaceAll("_", " ")}</span>
                       </td>

@@ -23,6 +23,7 @@ import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/ta
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import { Activity, Info, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
 
 const SORT_FIRST: Record<string, SortDir> = {
   name: "asc",
@@ -39,12 +40,6 @@ const SORT_FIRST: Record<string, SortDir> = {
   marketer_tier_key: "desc",
   per_payment_php: "desc",
 };
-
-function fmtPhp(n: number | null | undefined) {
-  const v = Number(n ?? 0);
-  if (Number.isNaN(v)) return "PHP 0.00";
-  return `PHP ${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -289,7 +284,7 @@ export default function AdminMarketingMonitorPage() {
               >
                 <MarketerTierBadge tierKey={t.tier_key} label={t.label} size="sm" />
                 <span className="tabular-nums text-zinc-600">{t.client_range_label} resorts</span>
-                <span className="font-semibold tabular-nums text-navy">₱{Number(t.per_payment_php).toLocaleString()}</span>
+                <span className="font-semibold tabular-nums text-navy">{fmtPhp(t.per_payment_php)}</span>
               </div>
             ))}
           </div>
@@ -342,7 +337,7 @@ export default function AdminMarketingMonitorPage() {
                           <MarketerTierBadge tierKey={r.marketer_tier_key} label={r.marketer_tier_label} size="sm" />
                           {r.per_payment_php != null ? (
                             <div className="text-[11px] font-semibold text-navy tabular-nums">
-                              ₱{Number(r.per_payment_php).toLocaleString()} / credit
+                              {fmtPhp(r.per_payment_php)} / credit
                             </div>
                           ) : null}
                         </div>
@@ -508,7 +503,7 @@ export default function AdminMarketingMonitorPage() {
                       <MarketerTierBadge tierKey={r.marketer_tier_key} label={r.marketer_tier_label} size="sm" />
                       {r.per_payment_php != null ? (
                         <div className="text-[11px] font-medium tabular-nums text-navy">
-                          ₱{Number(r.per_payment_php).toLocaleString()} / credit
+                          {fmtPhp(r.per_payment_php)} / credit
                         </div>
                       ) : null}
                       {r.clients_to_next_tier != null && r.next_tier_at != null && r.clients_to_next_tier > 0 ? (

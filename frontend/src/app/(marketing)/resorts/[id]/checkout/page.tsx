@@ -28,6 +28,8 @@ import {
 } from "@/lib/inputRestrictions";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import Link from "next/link";
+import { formatPhp } from "@/lib/formatPhp";
+import { defaultReservationFeeFallbackPhp } from "@/lib/pricingPilot";
 
 type Step = "auth" | "confirm" | "paying";
 
@@ -78,13 +80,10 @@ export default function CheckoutPage() {
     ? Math.max(0, (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)
     : 0;
 
-  const reservationFeePhp = room ? Number(room.reservationFee ?? 500) : 500;
+  const reservationFeePhp = room
+    ? Number(room.reservationFee ?? defaultReservationFeeFallbackPhp())
+    : defaultReservationFeeFallbackPhp();
   const balanceAtResortTotal = room && nights > 0 ? Number(room.basePrice) * nights : 0;
-  const formatPhp = (amount: number, maxFrac = 2) =>
-    `₱${amount.toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: maxFrac,
-    })}`;
 
   useEffect(() => {
     const load = async () => {
@@ -404,7 +403,7 @@ export default function CheckoutPage() {
                     <>
                       {" "}
                       <span className="text-zinc-500">
-                        ({nights} night{nights === 1 ? "" : "s"} · {formatPhp(Number(room.basePrice), 0)}/night).
+                        ({nights} night{nights === 1 ? "" : "s"} · {formatPhp(Number(room.basePrice))} per night).
                       </span>
                     </>
                   ) : null}

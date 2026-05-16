@@ -26,6 +26,7 @@ import { CreditCard, RefreshCw } from "lucide-react";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/tableSortPagination";
 import { useEffect, useMemo, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 const SORT_FIRST: Record<string, SortDir> = {
   name: "asc",
@@ -220,7 +221,7 @@ export default function AdminSubscriptionsPage() {
                     { label: "Active rooms", value: String(sub?.active_room_count ?? 0) },
                     {
                       label: "Monthly fee",
-                      value: sub ? `₱${Number(sub.total_monthly_fee).toLocaleString()}` : "—",
+                      value: sub ? formatPhp(Number(sub.total_monthly_fee)) : "—",
                     },
                     {
                       label: "Status",
@@ -299,7 +300,7 @@ export default function AdminSubscriptionsPage() {
                   <td className="capitalize text-zinc-700">{sub?.plan ?? "—"}</td>
                   <td className="text-zinc-600">{sub?.active_room_count ?? 0}</td>
                   <td className="text-zinc-700">
-                    {sub ? `₱${Number(sub.total_monthly_fee).toLocaleString()}` : "—"}
+                    {sub ? formatPhp(Number(sub.total_monthly_fee)) : "—"}
                   </td>
                   <td>
                     {sub ? (

@@ -13,6 +13,7 @@ import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch"
 import { Building2, Heart, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { formatPhpPerNight } from "@/lib/formatPhp";
 
 export default function ExplorePage() {
   const [resorts, setResorts] = useState<PublicResortListItem[]>([]);
@@ -125,7 +126,7 @@ export default function ExplorePage() {
                 <p className="mt-3 line-clamp-2 text-sm text-zinc-500">{r.description ?? "Discover rooms and book your stay."}</p>
                 {r.priceFrom != null && Number(r.priceFrom) > 0 ? (
                   <p className="mt-2 text-sm font-semibold text-navy">
-                    From ₱{Number(r.priceFrom).toLocaleString()} <span className="font-normal text-zinc-500">/ night</span>
+                    From {formatPhpPerNight(Number(r.priceFrom))}
                   </p>
                 ) : null}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-softBorder pt-4">

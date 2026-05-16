@@ -1,4 +1,5 @@
 import type { PublicResort } from "@/lib/api/public";
+import { formatPhp } from "@/lib/formatPhp";
 import { siteUrl } from "@/lib/site";
 
 type Props = { resort: PublicResort };
@@ -24,7 +25,7 @@ export default function ResortJsonLd({ resort }: Props) {
         }
       : undefined,
     priceRange: resort.rooms?.length
-      ? `₱${Math.min(...resort.rooms.map((r) => r.basePrice))}+`
+      ? `${formatPhp(Math.min(...resort.rooms.map((r) => r.basePrice)))}+`
       : undefined,
   };
 

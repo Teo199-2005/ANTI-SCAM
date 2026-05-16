@@ -7,6 +7,7 @@ import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { getMarketingStats, type MarketingStats } from "@/lib/api/marketing";
 import { formatRoleLabel } from "@/lib/utils";
+import { formatPhpLedger } from "@/lib/formatPhp";
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
 import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
@@ -15,6 +16,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { formatOwnerConsoleStatusLabel } from "@/lib/billing/subscriptionStatus";
+import { pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { createPortal } from "react-dom";
 
 function segmentLabel(segment: string): string {
@@ -65,12 +67,25 @@ type PlanOffer = {
   billingType: "Monthly" | "Upfront";
 };
 
-const STANDARD_OFFERS: PlanOffer[] = [
-  { duration: 1, monthlyRate: 2100, listMonthlyRate: 3000, billingType: "Monthly" },
-  { duration: 3, monthlyRate: 1900, listMonthlyRate: 2700, billingType: "Upfront" },
-  { duration: 6, monthlyRate: 1700, listMonthlyRate: 2500, billingType: "Upfront" },
-  { duration: 12, monthlyRate: 1500, listMonthlyRate: 2300, billingType: "Upfront" },
-];
+function buildStandardOffers(): PlanOffer[] {
+  if (pricingPilotEnabled()) {
+    const u = pricingPilotUnitPhp();
+    return [
+      { duration: 1, monthlyRate: u, listMonthlyRate: u, billingType: "Monthly" },
+      { duration: 3, monthlyRate: u, listMonthlyRate: u, billingType: "Upfront" },
+      { duration: 6, monthlyRate: u, listMonthlyRate: u, billingType: "Upfront" },
+      { duration: 12, monthlyRate: u, listMonthlyRate: u, billingType: "Upfront" },
+    ];
+  }
+  return [
+    { duration: 1, monthlyRate: 2100, listMonthlyRate: 3000, billingType: "Monthly" },
+    { duration: 3, monthlyRate: 1900, listMonthlyRate: 2700, billingType: "Upfront" },
+    { duration: 6, monthlyRate: 1700, listMonthlyRate: 2500, billingType: "Upfront" },
+    { duration: 12, monthlyRate: 1500, listMonthlyRate: 2300, billingType: "Upfront" },
+  ];
+}
+
+const STANDARD_OFFERS: PlanOffer[] = buildStandardOffers();
 
 export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const pathname = usePathname();
@@ -118,7 +133,9 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
   const isPaidSubscriptionActive = subscriptionStatus === "active";
   const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
-  const totalCharge = selectedOffer.monthlyRate * selectedDuration;
+  const totalCharge = pricingPilotEnabled()
+    ? pricingPilotUnitPhp()
+    : selectedOffer.monthlyRate * selectedDuration;
 
   useEffect(() => {
     setMounted(true);
@@ -508,10 +525,10 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                         </span>
                         <span className="mt-0.5 flex min-w-0 flex-col gap-0.5 font-dash text-[10px] font-bold tabular-nums leading-tight text-navy sm:text-[11px]">
                           <span className="whitespace-nowrap text-zinc-400 line-through decoration-zinc-400 decoration-1">
-                            ₱{offer.listMonthlyRate.toLocaleString()}
+                            {formatPhpLedger(offer.listMonthlyRate)}
                           </span>
                           <span className="whitespace-nowrap text-navy">
-                            ₱{offer.monthlyRate.toLocaleString()}
+                            {formatPhpLedger(offer.monthlyRate)}
                             <span className="font-semibold text-zinc-500">/mo</span>
                           </span>
                         </span>
@@ -524,10 +541,10 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     <WalletCards size={18} className="shrink-0 text-primaryBlue sm:mb-1 sm:h-[22px] sm:w-[22px]" />
                     <span className="inline-flex flex-wrap items-end gap-x-1.5 sm:gap-x-2">
                       <span className="text-lg font-bold tabular-nums text-zinc-400 line-through decoration-zinc-400 decoration-2 sm:text-3xl">
-                        ₱{selectedOffer.listMonthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatPhpLedger(selectedOffer.listMonthlyRate)}
                       </span>
                       <span className="tabular-nums">
-                        ₱{selectedOffer.monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatPhpLedger(selectedOffer.monthlyRate)}
                       </span>
                     </span>
                   </p>
@@ -540,7 +557,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   <span>
                     Total due now:{" "}
                     <span className="font-semibold text-navy">
-                      ₱{totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatPhpLedger(totalCharge)}
                     </span>
                   </span>
                 </p>

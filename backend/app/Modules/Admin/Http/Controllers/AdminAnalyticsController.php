@@ -28,6 +28,8 @@ class AdminAnalyticsController extends Controller
         $payload = CacheSafe::remember($cacheKey, now()->addSeconds(60), function () use (
             $resortId, $year, $month, $minRevenue, $maxRevenue
         ) {
+            $revIn = Reservation::revenueEligibleStatusesSqlList();
+
             // ── Base scoped query builder ───────────────────────────────────────
             $base = Reservation::withoutGlobalScopes()
                 ->whereYear('created_at', $year)
@@ -41,8 +43,9 @@ class AdminAnalyticsController extends Controller
             $confirmedCount = (clone $base)->where('status', 'confirmed')->count();
             $cancelledCount = (clone $base)->where('status', 'cancelled')->count();
             $pendingCount   = (clone $base)->where('status', 'pending_payment')->count();
-            $totalRevenue   = (float) (clone $base)->where('status', 'confirmed')->sum('reservation_fee');
-            $avgValue       = $confirmedCount > 0 ? round($totalRevenue / $confirmedCount, 2) : 0;
+            $revenueEligibleCount = (clone $base)->whereIn('status', Reservation::REVENUE_ELIGIBLE_STATUSES)->count();
+            $totalRevenue   = (float) (clone $base)->whereIn('status', Reservation::REVENUE_ELIGIBLE_STATUSES)->sum('reservation_fee');
+            $avgValue       = $revenueEligibleCount > 0 ? round($totalRevenue / $revenueEligibleCount, 2) : 0;
 
             // ── Status breakdown ────────────────────────────────────────────────
             $statusRows = (clone $base)
@@ -64,7 +67,7 @@ class AdminAnalyticsController extends Controller
                 ->selectRaw("
                     DATE(created_at) as day,
                     COUNT(*) as reservations_count,
-                    SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as revenue
+                    SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as revenue
                 ")
                 ->groupBy(DB::raw('DATE(created_at)'))
                 ->orderBy('day')
@@ -77,7 +80,7 @@ class AdminAnalyticsController extends Controller
                 ->selectRaw("
                     {$monthNumExpr} as month_num,
                     COUNT(*) as reservations_count,
-                    SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as revenue,
+                    SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as revenue,
                     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_count
                 ")
                 ->groupBy(DB::raw($monthGrpExpr))
@@ -111,7 +114,7 @@ class AdminAnalyticsController extends Controller
                 ->when($resortId,   fn ($q) => $q->where('resort_id', $resortId))
                 ->when($minRevenue !== null, fn ($q) => $q->where('reservation_fee', '>=', $minRevenue))
                 ->when($maxRevenue !== null, fn ($q) => $q->where('reservation_fee', '<=', $maxRevenue))
-                ->where('status', 'confirmed')
+                ->whereIn('status', Reservation::REVENUE_ELIGIBLE_STATUSES)
                 ->select('resort_id', DB::raw('SUM(reservation_fee) as total_revenue'), DB::raw('COUNT(*) as total_count'))
                 ->groupBy('resort_id')
                 ->orderByDesc('total_revenue')
@@ -137,7 +140,7 @@ class AdminAnalyticsController extends Controller
                 ->when($resortId,   fn ($q) => $q->where('resort_id', $resortId))
                 ->when($minRevenue !== null, fn ($q) => $q->where('reservation_fee', '>=', $minRevenue))
                 ->when($maxRevenue !== null, fn ($q) => $q->where('reservation_fee', '<=', $maxRevenue))
-                ->select('resort_id', DB::raw('COUNT(*) as total_count'), DB::raw('SUM(CASE WHEN status = \'confirmed\' THEN reservation_fee ELSE 0 END) as confirmed_revenue'))
+                ->select('resort_id', DB::raw('COUNT(*) as total_count'), DB::raw('SUM(CASE WHEN status IN ('.$revIn.') THEN reservation_fee ELSE 0 END) as confirmed_revenue'))
                 ->groupBy('resort_id')
                 ->orderByDesc('total_count')
                 ->limit(5)

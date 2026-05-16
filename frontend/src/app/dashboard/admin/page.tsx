@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -140,7 +141,7 @@ export default function AdminOverviewPage() {
         <StatCard compact label="Total resorts"      value={stats.totalResorts}                         icon={Building2}    iconTone="navy" />
         <StatCard compact label="Total users"        value={stats.totalUsers}                           icon={Users}        iconTone="violet" />
         <StatCard compact label="Total reservations" value={stats.totalReservations}                    icon={CalendarDays} iconTone="sky" />
-        <StatCard compact label="Total revenue"      value={`₱${stats.totalRevenue.toLocaleString()}`} icon={DollarSign}   iconTone="emerald" />
+        <StatCard compact label="Total revenue"      value={formatPhp(stats.totalRevenue)} icon={DollarSign}   iconTone="emerald" />
       </div>
 
       <DashCard className="overflow-hidden p-0">
@@ -256,7 +257,7 @@ export default function AdminOverviewPage() {
                 <p className="mt-0.5 font-dash text-[10px] text-zinc-500">From confirmed reservations</p>
               </div>
             </div>
-            <p className="relative mt-2 break-words font-dash text-2xl font-bold leading-tight text-navy md:text-3xl">₱{stats.revenueThisMonth.toLocaleString()}</p>
+            <p className="relative mt-2 break-words font-dash text-2xl font-bold leading-tight text-navy md:text-3xl">{formatPhp(stats.revenueThisMonth)}</p>
           </div>
 
           {/* New users panel */}
@@ -306,7 +307,7 @@ export default function AdminOverviewPage() {
                   fields={[
                     { label: "Check-in", value: r.check_in_date },
                     { label: "Check-out", value: r.check_out_date },
-                    { label: "Fee", value: `₱${Number(r.reservation_fee).toLocaleString()}` },
+                    { label: "Fee", value: formatPhp(Number(r.reservation_fee)) },
                     {
                       label: "Status",
                       value: (
@@ -341,7 +342,7 @@ export default function AdminOverviewPage() {
                       <td className="font-mono text-xs font-semibold text-navy">{r.reference_no}</td>
                       <td className="text-zinc-600">{r.check_in_date}</td>
                       <td className="text-zinc-600">{r.check_out_date}</td>
-                      <td className="font-semibold text-zinc-800">₱{Number(r.reservation_fee).toLocaleString()}</td>
+                      <td className="font-semibold text-zinc-800">{formatPhp(Number(r.reservation_fee))}</td>
                       <td>
                         <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
                           {r.status.replaceAll("_", " ")}

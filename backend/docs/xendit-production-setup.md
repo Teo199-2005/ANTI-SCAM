@@ -98,10 +98,29 @@ curl -sS -o /dev/null -w "%{http_code}\n" -X POST \
 
 Expect **200** (or **401** if token is wrong — fix `.env`, not the URL).
 
-## 6) Verify end-to-end flow
+## 6) Optional: pilot pricing (flat ₱1 per Xendit invoice)
+
+For live Xendit smoke tests without real amounts, set in `backend/.env`:
+
+```env
+PRICING_PILOT_MODE=true
+PRICING_PILOT_AMOUNT=1
+```
+
+On the Next.js app, set matching public vars so subscribe/marketing UI matches checkout:
+
+```env
+NEXT_PUBLIC_PRICING_PILOT_MODE=true
+NEXT_PUBLIC_PRICING_PILOT_AMOUNT=1
+```
+
+Then `php artisan config:clear` (and rebuild the frontend). **Turn pilot mode off** before real customers pay normal prices. After disabling, refresh resort subscriptions (or rely on the next `refreshForResort`) so `base_price` / `extra_room_fee` in the database match production again.
+
+## 7) Verify end-to-end flow
 
 1. Create reservation from frontend checkout.
 2. Confirm Laravel returns a real `invoice_url` from Xendit.
 3. Complete payment in Xendit-hosted page.
 4. Confirm reservation changes to `confirmed` and `xendit_payment_status=paid`.
 5. Confirm webhook events are visible in admin `xendit-logs`.
+

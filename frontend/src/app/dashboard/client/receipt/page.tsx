@@ -5,6 +5,7 @@ import DashCard from "@/components/dash/DashCard";
 import { apiClient } from "@/lib/api/client";
 import { BadgeCheck, CalendarDays, CreditCard, Printer } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 import { useSearchParams } from "next/navigation";
 
 type Reservation = {
@@ -164,21 +165,21 @@ function ReceiptContent() {
         <div className="mt-6 rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-zinc-600">Reservation fee paid (non-refundable)</span>
-            <span className="font-bold text-emerald-700">₱{Number(reservation.reservation_fee).toLocaleString()}</span>
+            <span className="font-bold text-emerald-700">{formatPhp(Number(reservation.reservation_fee))}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-zinc-600">Remaining balance (pay at resort)</span>
-            <span className="font-bold text-orange-600">₱{balance.toLocaleString()}</span>
+            <span className="font-bold text-orange-600">{formatPhp(balance)}</span>
           </div>
           <div className="flex justify-between border-t border-emerald-200 pt-2 text-base font-bold">
             <span className="text-navy">Total booking amount</span>
-            <span className="text-navy">₱{Number(reservation.total_amount).toLocaleString()}</span>
+            <span className="text-navy">{formatPhp(Number(reservation.total_amount))}</span>
           </div>
         </div>
 
         <p className="mt-4 text-center text-xs text-zinc-400">
-          The ₱{Number(reservation.reservation_fee).toLocaleString()} reservation fee is non-refundable.
-          The remaining balance of ₱{balance.toLocaleString()} is payable directly at the resort upon check-in.
+          The {formatPhp(Number(reservation.reservation_fee))} reservation fee is non-refundable. The remaining balance of{" "}
+          {formatPhp(balance)} is payable directly at the resort upon check-in.
         </p>
       </DashCard>
     </div>

@@ -11,6 +11,7 @@ import LocationFilterBar, {
 import { getSuspensionList, SuspensionItem } from "@/lib/api/admin";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 export default function SuspensionsPage() {
   const [items, setItems]   = useState<SuspensionItem[]>([]);
@@ -99,7 +100,7 @@ export default function SuspensionsPage() {
                   fields={[
                     { label: "Address", value: item.resort?.address ?? "—" },
                     { label: "Plan", value: <span className="capitalize">{item.plan}</span> },
-                    { label: "Monthly fee", value: `₱${Number(item.totalMonthlyFee).toLocaleString()}` },
+                    { label: "Monthly fee", value: formatPhp(Number(item.totalMonthlyFee)) },
                     { label: "Next due", value: item.nextDueDate },
                     { label: "Grace until", value: item.graceUntil ?? "—" },
                     {
@@ -136,7 +137,7 @@ export default function SuspensionsPage() {
                         {item.resort?.address ? <p className="text-xs text-zinc-400">{item.resort.address}</p> : null}
                       </td>
                       <td className="capitalize">{item.plan}</td>
-                      <td>₱{Number(item.totalMonthlyFee).toLocaleString()}</td>
+                      <td>{formatPhp(Number(item.totalMonthlyFee))}</td>
                       <td className="text-zinc-500">{item.nextDueDate}</td>
                       <td className="text-zinc-500">{item.graceUntil ?? "—"}</td>
                       <td><span className={statusClass(item.status)}>{item.status.replaceAll("_"," ")}</span></td>

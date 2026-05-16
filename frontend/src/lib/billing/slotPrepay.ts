@@ -1,3 +1,5 @@
+import { pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
+
 /** Matches backend XenditSubscriptionInvoiceService: extra_room_fee × (tier / 2100) per month of prepay. */
 export type SlotPrepayDuration = 1 | 3 | 6 | 12;
 
@@ -10,11 +12,17 @@ const STANDARD_TIER: Record<SlotPrepayDuration, number> = {
 };
 
 export function slotPrepayMonthlyRate(extraRoomFee: number, duration: SlotPrepayDuration): number {
+  if (pricingPilotEnabled()) {
+    return pricingPilotUnitPhp();
+  }
   const tier = STANDARD_TIER[duration];
   return Math.round(extraRoomFee * (tier / REFERENCE_BASE) * 100) / 100;
 }
 
 export function slotPrepayTotal(extraRoomFee: number, duration: SlotPrepayDuration, quantity: number): number {
+  if (pricingPilotEnabled()) {
+    return pricingPilotUnitPhp();
+  }
   const monthly = slotPrepayMonthlyRate(extraRoomFee, duration);
   return Math.round(monthly * quantity * duration * 100) / 100;
 }

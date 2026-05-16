@@ -10,6 +10,7 @@ import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import { BadgeCheck, Building2, Clock, DollarSign, Link2, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 const statusBadge: Record<string, string> = {
   pending:  "dash-badge-amber",
@@ -101,7 +102,7 @@ export default function MarketingDashboardPage() {
                     ? `${stats.convertingResortsWithReferralCount} resorts billed; same owner still counts as one client for your tier.`
                     : null,
                   stats.marketerTier
-                    ? `${stats.marketerTier.label} · ₱${Number(stats.marketerTier.perPaymentPhp).toLocaleString()} per paid credit`
+                    ? `${stats.marketerTier.label} · ${formatPhp(stats.marketerTier.perPaymentPhp)} per paid credit`
                     : "No tier until your first paid referral subscription",
                 ]
                   .filter(Boolean)
@@ -111,14 +112,14 @@ export default function MarketingDashboardPage() {
           icon={Users}
           iconTone="navy"
         />
-        <StatCard compact label="Total commissions" value={stats ? `₱${Number(stats.totalCommissions).toLocaleString()}` : "–"}    icon={TrendingUp}  iconTone="emerald" />
+        <StatCard compact label="Total commissions" value={stats ? formatPhp(stats.totalCommissions) : "–"}    icon={TrendingUp}  iconTone="emerald" />
         <StatCard
           compact
           label="Pending (gross)"
-          value={stats ? `₱${Number(stats.pendingCommissions).toLocaleString()}` : "–"}
+          value={stats ? formatPhp(stats.pendingCommissions) : "–"}
           subtitle={
             stats
-              ? `Est. payout ₱${Number(stats.pendingPayoutNetEstimate).toLocaleString()} (${Math.round(stats.payoutWithholdingRate * 100)}% taxes & fees)`
+              ? `Est. payout ${formatPhp(stats.pendingPayoutNetEstimate)} (${Math.round(stats.payoutWithholdingRate * 100)}% taxes & fees)`
               : undefined
           }
           icon={Clock}
@@ -127,10 +128,10 @@ export default function MarketingDashboardPage() {
         <StatCard
           compact
           label="Paid out (net)"
-          value={stats ? `₱${Number(stats.releasedCommissions).toLocaleString()}` : "–"}
+          value={stats ? formatPhp(stats.releasedCommissions) : "–"}
           subtitle={
             stats && stats.releasedCommissionsGross > 0
-              ? `Booked gross ₱${Number(stats.releasedCommissionsGross).toLocaleString()}`
+              ? `Booked gross ${formatPhp(stats.releasedCommissionsGross)}`
               : undefined
           }
           icon={DollarSign}
@@ -235,7 +236,7 @@ export default function MarketingDashboardPage() {
                   title={<span className="font-mono text-sm">{c.period}</span>}
                   fields={[
                     { label: "Resort", value: c.resort?.name ?? "–" },
-                    { label: "Gross bookings", value: `₱${Number(c.grossBookings).toLocaleString()}` },
+                    { label: "Gross bookings", value: formatPhp(c.grossBookings) },
                     { label: "Rate", value: `${(Number(c.commissionRate) * 100).toFixed(1)}%` },
                     {
                       label: "Tier (last credit)",
@@ -250,8 +251,8 @@ export default function MarketingDashboardPage() {
                       label: "Unit / total",
                       value:
                         c.unitCommissionPhp != null
-                          ? `₱${Number(c.unitCommissionPhp).toLocaleString()} · ₱${Number(c.commissionAmount).toLocaleString()}`
-                          : `₱${Number(c.commissionAmount).toLocaleString()}`,
+                          ? `${formatPhp(c.unitCommissionPhp)} · ${formatPhp(c.commissionAmount)}`
+                          : formatPhp(c.commissionAmount),
                     },
                     {
                       label: "Status",
@@ -279,7 +280,7 @@ export default function MarketingDashboardPage() {
                     <tr key={c.id}>
                       <td className="font-mono text-xs text-navy">{c.period}</td>
                       <td className="font-semibold text-navy">{c.resort?.name ?? "–"}</td>
-                      <td>₱{Number(c.grossBookings).toLocaleString()}</td>
+                      <td>{formatPhp(c.grossBookings)}</td>
                       <td>{(Number(c.commissionRate) * 100).toFixed(1)}%</td>
                       <td>
                         {c.marketerTier ? (
@@ -289,10 +290,10 @@ export default function MarketingDashboardPage() {
                         )}
                       </td>
                       <td className="font-semibold text-emerald-700">
-                        ₱{Number(c.commissionAmount).toLocaleString()}
+                        {formatPhp(c.commissionAmount)}
                         {c.unitCommissionPhp != null ? (
                           <span className="ml-1 text-[11px] font-normal text-zinc-500">
-                            (@ ₱{Number(c.unitCommissionPhp).toLocaleString()})
+                            (@ {formatPhp(c.unitCommissionPhp)})
                           </span>
                         ) : null}
                       </td>
@@ -326,7 +327,7 @@ export default function MarketingDashboardPage() {
             {releases.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-4 px-6 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-navy">₱{Number(r.amount).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-navy">{formatPhp(r.amount)}</p>
                   {r.notes ? <p className="text-xs text-zinc-400">{r.notes}</p> : null}
                 </div>
                 <p className="text-xs text-zinc-400">{new Date(r.released_at).toLocaleDateString()}</p>

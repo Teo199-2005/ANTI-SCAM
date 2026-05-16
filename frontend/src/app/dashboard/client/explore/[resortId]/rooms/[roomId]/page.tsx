@@ -6,6 +6,7 @@ import { CalendarRange, ChevronLeft, ChevronRight, ExternalLink, Loader2, Users 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -298,7 +299,7 @@ export default function ClientRoomExplorePage() {
               <Users size={16} />
               Up to {room.capacity} guests
             </p>
-            <p className="mt-3 font-dash text-2xl font-bold text-navy">₱{Number(room.basePrice).toLocaleString()}</p>
+            <p className="mt-3 font-dash text-2xl font-bold text-navy">{formatPhp(Number(room.basePrice))}</p>
             <p className="text-xs text-zinc-500">per night (estimate before fees &amp; taxes)</p>
 
             <div className="mt-5 space-y-3 border-t border-softBorder pt-4">
@@ -329,7 +330,7 @@ export default function ClientRoomExplorePage() {
               {nights > 0 ? (
                 <p className="text-sm text-zinc-700">
                   <span className="font-semibold">{nights}</span> night{nights === 1 ? "" : "s"} · Est.{" "}
-                  <span className="font-semibold text-navy">₱{estimatedTotal.toLocaleString()}</span>
+                  <span className="font-semibold text-navy">{formatPhp(estimatedTotal)}</span>
                 </p>
               ) : null}
 

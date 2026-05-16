@@ -16,6 +16,8 @@ import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFe
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
+import { defaultReservationFeeFallbackPhp } from "@/lib/pricingPilot";
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T12:00:00");
@@ -107,7 +109,7 @@ function RoomDetailInner() {
 
   const checkoutHref = `/resorts/${resortId}/checkout?roomId=${roomId}&checkIn=${checkIn}&checkOut=${checkOut}&resortId=${resortId}`;
   const checkOutMin = checkIn ? addDays(checkIn, 1) : today;
-  const reservationFeePhp = Number(room.reservationFee ?? 500);
+  const reservationFeePhp = Number(room.reservationFee ?? defaultReservationFeeFallbackPhp());
 
   return (
     <PageContainer className="section-padding">
@@ -146,7 +148,7 @@ function RoomDetailInner() {
 
             <div className="mt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Base price</p>
-              <p className="font-heading text-4xl text-zinc-900">₱{Number(room.basePrice).toLocaleString()}</p>
+              <p className="font-heading text-4xl text-zinc-900">{formatPhp(Number(room.basePrice))}</p>
               <p className="text-xs text-zinc-500">per night (excl. reservation fee)</p>
             </div>
           </div>
@@ -259,19 +261,19 @@ function RoomDetailInner() {
                 <div className="space-y-1.5 text-sm text-zinc-700">
                   <div className="flex justify-between">
                     <span>
-                      ₱{Number(room.basePrice).toLocaleString()} × {nights} night{nights > 1 ? "s" : ""}
+                      {formatPhp(Number(room.basePrice))} × {nights} night{nights > 1 ? "s" : ""}
                     </span>
-                    <span>₱{(Number(room.basePrice) * nights).toLocaleString()}</span>
+                    <span>{formatPhp(Number(room.basePrice) * nights)}</span>
                   </div>
                   <div className="flex justify-between text-amber-700">
                     <span>Reservation fee (now)</span>
                     <span>
-                      ₱{reservationFeePhp.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      {formatPhp(reservationFeePhp)}
                     </span>
                   </div>
                   <div className="flex justify-between border-t border-zinc-200 pt-2 font-semibold text-zinc-900">
                     <span>Balance at resort</span>
-                    <span>₱{(Number(room.basePrice) * nights).toLocaleString()}</span>
+                    <span>{formatPhp(Number(room.basePrice) * nights)}</span>
                   </div>
                 </div>
                 <ReservationFeeBreakdownPanel totalPhp={reservationFeePhp} variant="compact" className="mt-3" />

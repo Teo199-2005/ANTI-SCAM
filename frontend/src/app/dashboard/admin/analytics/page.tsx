@@ -22,6 +22,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPhp } from "@/lib/formatPhp";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const MONTHS = [
@@ -201,7 +202,7 @@ export default function AdminAnalyticsPage() {
 
           {/* Min Revenue */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-500">Min Revenue (₱)</label>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Min revenue</label>
             <input
               type="number"
               min={0}
@@ -214,7 +215,7 @@ export default function AdminAnalyticsPage() {
 
           {/* Max Revenue */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-500">Max Revenue (₱)</label>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Max revenue</label>
             <input
               type="number"
               min={0}
@@ -247,8 +248,8 @@ export default function AdminAnalyticsPage() {
             <span className="self-center text-xs text-zinc-400">
               Showing results for {applied.resort_id ? `Resort #${applied.resort_id}` : "all resorts"} ·{" "}
               {applied.month ? MONTHS[(applied.month as number) - 1] : "all months"} · {applied.year}
-              {applied.min_revenue ? ` · min ₱${Number(applied.min_revenue).toLocaleString()}` : ""}
-              {applied.max_revenue ? ` · max ₱${Number(applied.max_revenue).toLocaleString()}` : ""}
+              {applied.min_revenue ? ` · min ${formatPhp(Number(applied.min_revenue))}` : ""}
+              {applied.max_revenue ? ` · max ${formatPhp(Number(applied.max_revenue))}` : ""}
             </span>
           )}
         </div>
@@ -269,14 +270,14 @@ export default function AdminAnalyticsPage() {
             <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
             <StatBadge
               label="Total Revenue"
-              value={`₱${Number(summary?.totalRevenue ?? 0).toLocaleString()}`}
+              value={formatPhp(Number(summary?.totalRevenue ?? 0))}
               sub="Confirmed reservations only"
               color="text-emerald-700"
               icon={<DollarSign size={18} className="text-emerald-500" />}
             />
             <StatBadge
               label="Avg. Reservation Value"
-              value={`₱${Number(summary?.avgValue ?? 0).toLocaleString()}`}
+              value={formatPhp(Number(summary?.avgValue ?? 0))}
               sub="Per confirmed booking"
               color="text-skyBlue"
               icon={<TrendingUp size={18} className="text-skyBlue" />}
@@ -371,7 +372,7 @@ export default function AdminAnalyticsPage() {
                     {/* Tooltip */}
                     <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-36 -translate-x-1/2 rounded-xl border border-softBorder bg-white p-2 text-xs shadow-lg group-hover:block">
                       <p className="font-semibold text-navy">{MONTHS[m.month - 1]}</p>
-                      <p className="text-emerald-700">₱{m.revenue.toLocaleString()}</p>
+                      <p className="text-emerald-700">{formatPhp(m.revenue)}</p>
                       <p className="text-zinc-500">{m.reservationsCount} bookings</p>
                       {m.cancelledCount > 0 && <p className="text-rose-500">{m.cancelledCount} cancelled</p>}
                     </div>
@@ -445,7 +446,7 @@ export default function AdminAnalyticsPage() {
                       <div key={d.day}>
                         <div className="mb-0.5 flex items-center justify-between text-xs text-zinc-500">
                           <span>{d.day}</span>
-                          <span>{d.reservationsCount} · ₱{d.revenue.toLocaleString()}</span>
+                          <span>{d.reservationsCount} · {formatPhp(d.revenue)}</span>
                         </div>
                         <div className="h-2 rounded-full bg-softGray">
                           <div className="h-2 rounded-full bg-skyBlue transition-all" style={{ width: `${w}%` }} />
@@ -482,7 +483,7 @@ export default function AdminAnalyticsPage() {
                             <Building2 size={12} className="text-zinc-400" />
                             {r.name}
                           </span>
-                          <span className="font-semibold text-emerald-700">₱{r.revenue.toLocaleString()}</span>
+                          <span className="font-semibold text-emerald-700">{formatPhp(r.revenue)}</span>
                         </div>
                         <div className="h-2 rounded-full bg-softGray">
                           <div className="h-2 rounded-full bg-emerald-500 transition-all" style={{ width: `${w}%` }} />
@@ -522,7 +523,7 @@ export default function AdminAnalyticsPage() {
                         <div className="h-2 rounded-full bg-softGray">
                           <div className="h-2 rounded-full bg-skyBlue transition-all" style={{ width: `${w}%` }} />
                         </div>
-                        <p className="mt-0.5 text-right text-[10px] text-zinc-400">₱{r.confirmedRevenue.toLocaleString()} confirmed revenue</p>
+                        <p className="mt-0.5 text-right text-[10px] text-zinc-400">{formatPhp(r.confirmedRevenue)} confirmed revenue</p>
                       </div>
                     );
                   })}

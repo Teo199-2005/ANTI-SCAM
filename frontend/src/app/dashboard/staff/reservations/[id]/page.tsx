@@ -8,6 +8,7 @@ import { AlertTriangle, ChevronLeft, Loader2, MessageSquare, Send } from "lucide
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type Reservation = {
   id: number;
@@ -145,9 +146,9 @@ export default function StaffReservationDetailPage() {
             { label: "Check-in",   value: reservation.check_in_date },
             { label: "Check-out",  value: reservation.check_out_date },
             { label: "Guests",     value: String(reservation.guest_count) },
-            { label: "Fee paid",   value: `₱${Number(reservation.reservation_fee).toLocaleString()}` },
-            { label: "Total",      value: `₱${Number(reservation.total_amount).toLocaleString()}` },
-            { label: "Balance due", value: `₱${(Number(reservation.total_amount) - Number(reservation.reservation_fee)).toLocaleString()}` },
+            { label: "Fee paid",   value: formatPhp(Number(reservation.reservation_fee)) },
+            { label: "Total",      value: formatPhp(Number(reservation.total_amount)) },
+            { label: "Balance due", value: formatPhp(Number(reservation.total_amount) - Number(reservation.reservation_fee)) },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-xl border border-softBorder/80 bg-softGray/80 p-3">
               <p className="text-xs text-zinc-400">{label}</p>

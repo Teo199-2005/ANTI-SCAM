@@ -3,6 +3,7 @@
 namespace App\Modules\Resorts\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Reservation;
 use App\Models\User;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
 use App\Modules\Resorts\Http\Requests\StoreResortGuestRequest;
@@ -33,6 +34,7 @@ class ResortGuestController extends Controller
         $perPage = min(100, max(1, (int) $request->integer('perPage', 50)));
 
         $guestKeyExpr = ResortGuestKey::sqlExpression();
+        $revIn = Reservation::revenueEligibleStatusesSqlList();
 
         $guests = DB::table('reservations')
             ->leftJoin('users', 'users.id', '=', 'reservations.client_id')
@@ -54,7 +56,7 @@ class ResortGuestController extends Controller
                 MAX(COALESCE(NULLIF(reservations.guest_phone, ''), users.phone)) AS phone,
                 MAX(reservations.client_id) AS client_id,
                 COUNT(*) AS reservationCount,
-                SUM(COALESCE(reservations.reservation_fee, 0)) AS totalSpent,
+                SUM(CASE WHEN reservations.status IN ({$revIn}) THEN COALESCE(reservations.reservation_fee, 0) ELSE 0 END) AS totalSpent,
                 MAX(reservations.check_in_date) AS lastCheckIn,
                 MAX(reservations.check_out_date) AS lastCheckOut,
                 MIN(DATE(reservations.created_at)) AS firstBooking

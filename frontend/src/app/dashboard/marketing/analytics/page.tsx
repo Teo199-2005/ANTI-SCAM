@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/marketing";
 import { BarChart3, Building2, DollarSign, PieChart, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatPhpLedger as fmtMoney } from "@/lib/formatPhp";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
@@ -90,14 +91,14 @@ export default function MarketingAnalyticsPage() {
           <StatCard
             compact
             label="Pending commission (YTD)"
-            value={data ? `₱${data.totals.commission_pending_ytd.toLocaleString()}` : "–"}
+            value={data ? fmtMoney(data.totals.commission_pending_ytd) : "–"}
             icon={PieChart}
             iconTone="amber"
           />
           <StatCard
             compact
             label="Released commission (YTD)"
-            value={data ? `₱${data.totals.commission_released_ytd.toLocaleString()}` : "–"}
+            value={data ? fmtMoney(data.totals.commission_released_ytd) : "–"}
             icon={DollarSign}
             iconTone="emerald"
           />
@@ -111,7 +112,7 @@ export default function MarketingAnalyticsPage() {
           <StatCard
             compact
             label="Referral volume (YTD)"
-            value={data ? `₱${data.totals.referral_subscription_volume_ytd.toLocaleString()}` : "–"}
+            value={data ? fmtMoney(data.totals.referral_subscription_volume_ytd) : "–"}
             icon={TrendingUp}
             iconTone="violet"
           />
@@ -157,7 +158,7 @@ export default function MarketingAnalyticsPage() {
                         <div
                           className="flex w-full flex-col-reverse overflow-hidden rounded-md"
                           style={{ height: `${barPct}%` }}
-                          title={`Pending ₱${m.commission_pending} · Released ₱${m.commission_released}`}
+                          title={`Pending ${fmtMoney(m.commission_pending)} · Released ${fmtMoney(m.commission_released)}`}
                         >
                           {pendingFlex > 0 ? (
                             <div className="min-h-[2px] w-full bg-amber-400" style={{ flex: pendingFlex }} />
@@ -209,9 +210,9 @@ export default function MarketingAnalyticsPage() {
                 {data.by_resort.map((r) => (
                   <tr key={r.resort_id}>
                     <td className="font-semibold text-navy">{r.resort_name}</td>
-                    <td>₱{r.commission_total.toLocaleString()}</td>
-                    <td>₱{r.commission_pending.toLocaleString()}</td>
-                    <td className="text-emerald-700">₱{r.commission_released.toLocaleString()}</td>
+                    <td>{fmtMoney(r.commission_total)}</td>
+                    <td>{fmtMoney(r.commission_pending)}</td>
+                    <td className="text-emerald-700">{fmtMoney(r.commission_released)}</td>
                   </tr>
                 ))}
               </tbody>

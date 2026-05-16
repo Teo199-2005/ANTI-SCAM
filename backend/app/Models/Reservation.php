@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,29 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Reservation extends Model
 {
     use BelongsToTenant;
+
+    /**
+     * Reservation rows whose fees and gross booking totals count toward revenue / KPIs.
+     * Excludes cancelled, expired, and unpaid pending — e.g. a paid-then-cancelled row must not inflate totals.
+     *
+     * @var list<string>
+     */
+    public const REVENUE_ELIGIBLE_STATUSES = ['confirmed', 'completed', 'no_show'];
+
+    /** Comma-separated quoted literals for raw SQL `IN (...)` fragments. */
+    public static function revenueEligibleStatusesSqlList(): string
+    {
+        return implode(',', array_map(
+            static fn (string $s): string => "'{$s}'",
+            self::REVENUE_ELIGIBLE_STATUSES
+        ));
+    }
+
+    /** @param  Builder<Reservation>  $query */
+    public function scopeRevenueEligible(Builder $query): Builder
+    {
+        return $query->whereIn('status', self::REVENUE_ELIGIBLE_STATUSES);
+    }
 
     protected $fillable = [
         'tenant_id',

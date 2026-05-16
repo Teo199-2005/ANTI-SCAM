@@ -4,6 +4,7 @@ import DashModal from "@/components/dash/DashModal";
 import { getResort, type ResortItem } from "@/lib/api/resort";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { formatPhp } from "@/lib/formatPhp";
 import { ExternalLink, Globe, Loader2, PenLine } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -31,13 +32,6 @@ function formatDate(value: string | null | undefined): string {
   } catch {
     return value;
   }
-}
-
-function formatMoney(value: string | number | null | undefined): string {
-  if (value === null || value === undefined || value === "") return "—";
-  const n = Number(value);
-  if (Number.isNaN(n)) return String(value);
-  return `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 function publicResortHref(subdomain: string | null | undefined): string | null {
@@ -184,10 +178,10 @@ export default function AdminResortViewModal({ resortId, open, onClose }: AdminR
                   {" · "}
                   {formatSubscriptionStatusLabel(resort.subscription.status)}
                 </DetailRow>
-                <DetailRow label="Monthly fee">{formatMoney(resort.subscription.total_monthly_fee)}</DetailRow>
+                <DetailRow label="Monthly fee">{formatPhp(resort.subscription.total_monthly_fee)}</DetailRow>
                 <DetailRow label="Included rooms">{resort.subscription.included_rooms}</DetailRow>
                 <DetailRow label="Active rooms">{resort.subscription.active_room_count}</DetailRow>
-                <DetailRow label="Extra room fee">{formatMoney(resort.subscription.extra_room_fee)}</DetailRow>
+                <DetailRow label="Extra room fee">{formatPhp(resort.subscription.extra_room_fee)}</DetailRow>
                 <DetailRow label="Billing cycle">
                   {resort.subscription.billing_cycle_start} → {resort.subscription.billing_cycle_end}
                 </DetailRow>

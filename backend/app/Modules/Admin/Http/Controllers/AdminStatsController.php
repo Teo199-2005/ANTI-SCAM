@@ -24,13 +24,14 @@ class AdminStatsController extends Controller
                 ->get(['id', 'reference_no', 'status', 'check_in_date', 'check_out_date',
                     'reservation_fee', 'total_amount', 'resort_id', 'room_id', 'created_at']);
 
+            $revIn = Reservation::revenueEligibleStatusesSqlList();
             $reservationAgg = Reservation::withoutGlobalScopes()
                 ->selectRaw("
                     COUNT(*) as total_reservations,
                     SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_reservations,
                     SUM(CASE WHEN status = 'pending_payment' THEN 1 ELSE 0 END) as pending_payment,
-                    SUM(CASE WHEN status = 'confirmed' THEN reservation_fee ELSE 0 END) as total_revenue,
-                    SUM(CASE WHEN status = 'confirmed' AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month
+                    SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as total_revenue,
+                    SUM(CASE WHEN status IN ({$revIn}) AND created_at >= ? THEN reservation_fee ELSE 0 END) as revenue_this_month
                 ", [now()->startOfMonth()])
                 ->first();
 

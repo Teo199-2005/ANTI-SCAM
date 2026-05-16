@@ -9,6 +9,7 @@ use App\Modules\Billing\Support\CheckoutReturnBaseResolver;
 use App\Modules\Billing\Support\XenditTls;
 use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\SubscriptionReferralCommissionService;
+use App\Support\PricingPilot;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -115,18 +116,25 @@ class XenditSubscriptionInvoiceService
             $hasReferral ? '-ref' : ''
         );
 
+        $pilot = PricingPilot::enabled();
+
         if ($isRoomAddon) {
             $roomAddonQuantity = max(1, $roomAddonQuantity);
             $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
             $baseExtra = (float) $subscription->extra_room_fee;
-            if ($baseExtra <= 0) {
+            if (! $pilot && $baseExtra <= 0) {
                 throw new RuntimeException('Extra room fee is not configured for this subscription.');
             }
-            // Same duration discounts as the main subscription (standard tier), applied to per-slot fee.
-            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / 2100.0), 2);
-            $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
-            if ($chargeAmount <= 0) {
-                throw new RuntimeException('Could not compute room add-on amount.');
+            if (! $pilot) {
+                $ref = PricingPilot::subscriptionTierReference();
+                $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / $ref), 2);
+                $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
+                if ($chargeAmount <= 0) {
+                    throw new RuntimeException('Could not compute room add-on amount.');
+                }
+            } else {
+                $slotMonthly = 0.0;
+                $chargeAmount = PricingPilot::flatInvoiceAmount();
             }
             $description = sprintf(
                 'Extra room slots ×%d · %d-month prepay — %s (%s)',
@@ -140,7 +148,7 @@ class XenditSubscriptionInvoiceService
         } else {
             $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
             $monthlyRate = $this->monthlyRate($durationMonths);
-            $chargeAmount = $monthlyRate * $durationMonths;
+            $chargeAmount = $pilot ? PricingPilot::flatInvoiceAmount() : $monthlyRate * $durationMonths;
             $description = sprintf(
                 'Subscription fee — %s (%s) · %d month%s',
                 $subscription->resort?->name,
@@ -151,6 +159,28 @@ class XenditSubscriptionInvoiceService
             $itemName = 'Subscription Plan';
             $invoicePlan = sprintf('%s_m%d_b0', (string) $subscription->plan, $durationMonths);
         }
+
+        if ($pilot) {
+            $chargeAmount = PricingPilot::flatInvoiceAmount();
+        }
+
+        $invoiceItems = $pilot
+            ? [[
+                'name' => $itemName,
+                'quantity' => 1,
+                'price' => $chargeAmount,
+                'category' => 'Subscription',
+            ]]
+            : [[
+                'name' => $itemName,
+                'quantity' => $isRoomAddon
+                    ? $roomAddonQuantity * $durationMonths
+                    : max(1, $durationMonths),
+                'price' => $isRoomAddon
+                    ? $slotMonthly
+                    : $monthlyRate,
+                'category' => 'Subscription',
+            ]];
 
         if (! $this->isConfigured()) {
             if ($this->canUseLocalMockPaid()) {
@@ -185,16 +215,7 @@ class XenditSubscriptionInvoiceService
             ],
             'success_redirect_url' => $successUrl,
             'failure_redirect_url' => $failureUrl,
-            'items' => [[
-                'name' => $itemName,
-                'quantity' => $isRoomAddon
-                    ? $roomAddonQuantity * $durationMonths
-                    : max(1, $durationMonths),
-                'price' => $isRoomAddon
-                    ? $slotMonthly
-                    : $monthlyRate,
-                'category' => 'Subscription',
-            ]],
+            'items' => $invoiceItems,
         ];
 
         // Restrict to the payment method the resort owner selected (if any)
@@ -391,7 +412,7 @@ class XenditSubscriptionInvoiceService
 
     private function monthlyRate(int $durationMonths): float
     {
-        $standard = [1 => 2100.0, 3 => 1900.0, 6 => 1700.0, 12 => 1500.0];
+        $standard = PricingPilot::subscriptionTierMonthlyPhp();
 
         return $standard[$durationMonths] ?? $standard[1];
     }

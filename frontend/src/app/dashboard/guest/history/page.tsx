@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { formatPhp } from "@/lib/formatPhp";
 
 type ReservationRow = {
   id: number;
@@ -152,7 +153,7 @@ function GuestHistoryInner() {
                   <p className="text-xs text-zinc-600">
                     {r.checkInDate} → {r.checkOutDate} · {r.referenceNo}
                   </p>
-                  <p className="text-xs text-zinc-500">Fee ₱{Number(r.reservationFee).toLocaleString()}</p>
+                  <p className="text-xs text-zinc-500">Fee {formatPhp(Number(r.reservationFee))}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-softGray px-2 py-0.5 text-xs font-semibold uppercase text-zinc-600">
