@@ -13,6 +13,8 @@ class BrandedMailHtml
         foreach ([
             public_path('brand/mainlogo.png'),
             base_path('../frontend/public/mainlogo.png'),
+            public_path('brand/mainlogo-bimi.png'),
+            base_path('../frontend/public/mainlogo-bimi.png'),
         ] as $path) {
             if (is_readable($path)) {
                 return $path;
@@ -22,7 +24,7 @@ class BrandedMailHtml
         return null;
     }
 
-    /** Public HTTPS URL for clients that load remote images; prefer APP_URL-hosted asset. */
+    /** Public HTTPS URL for clients that load remote images; prefer the marketing site asset. */
     public static function resolveLogoUrl(): string
     {
         $configured = trim((string) config('services.mail_brand.logo_url', ''));
@@ -30,14 +32,14 @@ class BrandedMailHtml
             return $configured;
         }
 
-        $appUrl = rtrim((string) config('app.url', ''), '/');
-        if ($appUrl !== '' && self::logoFilePath() !== null && is_readable(public_path('brand/mainlogo.png'))) {
-            return "{$appUrl}/brand/mainlogo.png";
-        }
-
         $frontend = rtrim((string) config('app.frontend_url', ''), '/');
         if ($frontend !== '') {
             return "{$frontend}/mainlogo.png";
+        }
+
+        $appUrl = rtrim((string) config('app.url', ''), '/');
+        if ($appUrl !== '' && is_readable(public_path('brand/mainlogo.png'))) {
+            return "{$appUrl}/brand/mainlogo.png";
         }
 
         return '';
