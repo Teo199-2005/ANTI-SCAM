@@ -156,18 +156,23 @@ export async function uploadRoomPhotosSequential(
         fileName,
         label: phaseLabel("saving", fileName, fileIndex, fileCount, prepared.size),
       });
+      let creepTicks = 0;
       saveCreepTimer = setInterval(() => {
+        creepTicks++;
         if (current < cap) {
           current = Math.min(cap, current + 1.2);
-          onProgress({
-            percent: current,
-            phase: "saving",
-            fileIndex,
-            fileCount,
-            fileName,
-            label: phaseLabel("saving", fileName, fileIndex, fileCount, prepared.size),
-          });
+        } else if (creepTicks < 90) {
+          // Server still working — nudge bar slowly so it does not look frozen at ~25%
+          current = Math.min(slicePercent(fileIndex, fileCount, 0.99), current + 0.15);
         }
+        onProgress({
+          percent: current,
+          phase: "saving",
+          fileIndex,
+          fileCount,
+          fileName,
+          label: phaseLabel("saving", fileName, fileIndex, fileCount, prepared.size),
+        });
       }, 400);
     };
 
