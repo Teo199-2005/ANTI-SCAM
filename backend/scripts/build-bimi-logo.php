@@ -53,12 +53,12 @@ foreach ([9, 8, 7, 6, 5, 4, 3, 2, 1, 0] as $quality) {
 
 imagepng($dst, $outPng, $bestQuality);
 $pngBytes = file_get_contents($outPng);
-$b64 = base64_encode($pngBytes);
 
+$logoHost = rtrim((string) (getenv('BIMI_LOGO_HOST') ?: 'https://anti-scamph.com'), '/');
 $svg = '<?xml version="1.0" encoding="UTF-8"?>'."\n"
-    .'<svg version="1.2" baseProfile="tiny-ps" xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">'."\n"
+    .'<svg version="1.2" baseProfile="tiny-ps" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="96" height="96" viewBox="0 0 96 96">'."\n"
     .'  <title>Anti-Scam PH</title>'."\n"
-    .'  <image width="96" height="96" href="data:image/png;base64,'.$b64.'"/>'."\n"
+    .'  <image width="96" height="96" xlink:href="'.$logoHost.'/mainlogo-bimi.png"/>'."\n"
     .'</svg>'."\n";
 
 file_put_contents($outSvg, $svg);
