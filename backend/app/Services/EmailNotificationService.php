@@ -16,7 +16,42 @@ use Illuminate\Support\Str;
 
 class EmailNotificationService
 {
+    /** Payment-related mail sends immediately (OTP-style) so it works without a queue worker. */
+    private const IMMEDIATE_MAIL_TYPES = [
+        'booking_confirmation',
+        'payment_receipt',
+        'subscription_renewal',
+        'new_booking_resort',
+    ];
+
     public function __construct(private readonly BrandedEmailTemplateService $templateService) {}
+
+    /** After a booking invoice is paid: guest confirmation, receipt, and resort owner alert. */
+    public function sendReservationPaymentNotifications(Reservation $reservation): void
+    {
+        $reservation = $reservation->loadMissing(['client', 'resort', 'room']);
+        $this->sendBookingConfirmation($reservation);
+        $this->sendPaymentReceipt($reservation);
+        $this->sendNewBookingToResort($reservation);
+    }
+
+    /**
+     * Idempotent: send payment emails only if they were never marked sent (e.g. webhook retry).
+     */
+    public function sendReservationPaymentNotificationsIfMissing(Reservation $reservation): void
+    {
+        $reservation = $reservation->loadMissing(['client', 'resort', 'room']);
+
+        if (! $this->reservationEmailAlreadySent($reservation->id, 'booking_confirmation')) {
+            $this->sendBookingConfirmation($reservation);
+        }
+        if (! $this->reservationEmailAlreadySent($reservation->id, 'payment_receipt')) {
+            $this->sendPaymentReceipt($reservation);
+        }
+        if (! $this->reservationEmailAlreadySent($reservation->id, 'new_booking_resort')) {
+            $this->sendNewBookingToResort($reservation);
+        }
+    }
 
     /** Send full Terms & Conditions to the user after explicit acceptance (registration or onboarding). */
     public function sendTermsAccepted(User $user, string $contextLabel): void
@@ -51,8 +86,8 @@ class EmailNotificationService
     /** Send a booking confirmation email to the guest. */
     public function sendBookingConfirmation(Reservation $reservation): void
     {
-        $user = $reservation->client;
-        if (! $user?->email) {
+        $recipient = $this->resolveReservationRecipient($reservation);
+        if ($recipient === null) {
             return;
         }
 
@@ -64,8 +99,8 @@ class EmailNotificationService
 
         $this->queueMail(
             'booking_confirmation',
-            $user->email,
-            $user->name,
+            $recipient['email'],
+            $recipient['name'],
             'Booking Confirmed – '.$reservation->reference_no,
             $fullHtml,
             ['reservation_id' => $reservation->id],
@@ -76,8 +111,8 @@ class EmailNotificationService
     /** Send a payment receipt email. */
     public function sendPaymentReceipt(Reservation $reservation): void
     {
-        $user = $reservation->client;
-        if (! $user?->email) {
+        $recipient = $this->resolveReservationRecipient($reservation);
+        if ($recipient === null) {
             return;
         }
 
@@ -92,8 +127,8 @@ class EmailNotificationService
 
         $this->queueMail(
             'payment_receipt',
-            $user->email,
-            $user->name,
+            $recipient['email'],
+            $recipient['name'],
             'Digital Acknowledgment Receipt – '.$subjectSuffix,
             $fullHtml,
             [
@@ -107,13 +142,8 @@ class EmailNotificationService
     /** Notify resort of a new booking. */
     public function sendNewBookingToResort(Reservation $reservation): void
     {
-        $resort = $reservation->resort;
-        if (! $resort?->contact_number) {
-            return;
-        }
-
         $resortOwner = User::withoutGlobalScopes()
-            ->where('tenant_id', $resort->tenant_id)
+            ->where('tenant_id', $reservation->tenant_id)
             ->where('role', 'resort_owner')
             ->first();
 
@@ -289,22 +319,50 @@ class EmailNotificationService
             'correlation_id' => $correlationId,
         ]);
 
-        if (! config('mail.queue_transactional', true)) {
-            Bus::dispatchSync(new SendTransactionalEmailJob($log->id));
+        $sendImmediately = in_array($type, self::IMMEDIATE_MAIL_TYPES, true)
+            || ! config('mail.queue_transactional', true)
+            || config('queue.default') === 'sync';
 
-            return;
-        }
-
-        // When the queue connection is `sync`, run immediately so HTTP tests and local dev
-        // see final `email_logs` state. For Redis/database workers, defer until after commit
-        // so workers never read a row that rolled back with the HTTP transaction.
-        if (config('queue.default') === 'sync') {
+        if ($sendImmediately) {
             Bus::dispatchSync(new SendTransactionalEmailJob($log->id));
 
             return;
         }
 
         SendTransactionalEmailJob::dispatch($log->id)->afterCommit();
+    }
+
+    /**
+     * @return array{email: string, name: string}|null
+     */
+    private function resolveReservationRecipient(Reservation $reservation): ?array
+    {
+        $client = $reservation->client;
+        if ($client?->email && filter_var($client->email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'email' => $client->email,
+                'name' => trim((string) ($client->name ?: $reservation->guest_name ?: 'Guest')),
+            ];
+        }
+
+        $guestEmail = trim((string) ($reservation->guest_email ?? ''));
+        if ($guestEmail !== '' && filter_var($guestEmail, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'email' => $guestEmail,
+                'name' => trim((string) ($reservation->guest_name ?? '')) ?: 'Guest',
+            ];
+        }
+
+        return null;
+    }
+
+    private function reservationEmailAlreadySent(int $reservationId, string $type): bool
+    {
+        return EmailLog::query()
+            ->where('type', $type)
+            ->where('status', 'sent')
+            ->where('metadata->reservation_id', $reservationId)
+            ->exists();
     }
 
     // ──────────────────────────────────────────────────────────────────

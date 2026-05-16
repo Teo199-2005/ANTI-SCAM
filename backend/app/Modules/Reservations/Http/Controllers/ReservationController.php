@@ -13,6 +13,7 @@ use App\Modules\Reservations\Http\Requests\StoreReservationRequest;
 use App\Modules\Reservations\Http\Requests\UpdateManualReservationRequest;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
 use App\Modules\Reservations\Services\ReservationService;
+use App\Services\EmailNotificationService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\SafeSort;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +26,7 @@ class ReservationController extends Controller
     public function __construct(
         private readonly ReservationService $service,
         private readonly BookingPaymentReconciliationService $bookingPaymentReconciliation,
+        private readonly EmailNotificationService $emails,
     ) {}
 
     public function store(StoreReservationRequest $request)
@@ -152,6 +154,15 @@ class ReservationController extends Controller
     public function show(Reservation $reservation)
     {
         $this->authorize('view', $reservation);
+
+        if ($reservation->status === 'pending_payment' && $reservation->xendit_invoice_id) {
+            $this->bookingPaymentReconciliation->reconcileReservation($reservation);
+            $reservation->refresh();
+        }
+
+        if ($reservation->status === 'confirmed' && $reservation->xendit_payment_status === 'paid') {
+            $this->emails->sendReservationPaymentNotificationsIfMissing($reservation);
+        }
 
         $reservation->loadMissing([
             'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',

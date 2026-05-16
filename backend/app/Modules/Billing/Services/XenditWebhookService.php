@@ -75,6 +75,11 @@ class XenditWebhookService
 
             if (XenditInvoiceWebhookStatus::isPaid($payload)) {
                 if ($reservation->xendit_payment_status === 'paid' && $reservation->status === 'confirmed') {
+                    $alreadyPaid = $reservation->load(['client', 'resort', 'room']);
+                    DB::afterCommit(function () use ($alreadyPaid): void {
+                        $this->emails->sendReservationPaymentNotificationsIfMissing($alreadyPaid);
+                    });
+
                     return $reservation->refresh();
                 }
 
@@ -83,7 +88,11 @@ class XenditWebhookService
                     $guestUser = $this->ensureGuestAccount($payload, $reservation);
                     if ($guestUser) {
                         $reservation->client_id = $guestUser->id;
+                        $this->syncReservationGuestContact($reservation, $guestUser, $payload);
                     }
+                } else {
+                    $client = User::withoutGlobalScopes()->find($reservation->client_id);
+                    $this->syncReservationGuestContact($reservation, $client, $payload);
                 }
 
                 $paidMoment = now();
@@ -116,9 +125,7 @@ class XenditWebhookService
 
                 $reservationForNotifications = $reservation->load(['client', 'resort', 'room']);
                 DB::afterCommit(function () use ($reservationForNotifications): void {
-                    $this->emails->sendBookingConfirmation($reservationForNotifications);
-                    $this->emails->sendPaymentReceipt($reservationForNotifications);
-                    $this->emails->sendNewBookingToResort($reservationForNotifications);
+                    $this->emails->sendReservationPaymentNotifications($reservationForNotifications);
                 });
 
             } elseif (XenditInvoiceWebhookStatus::isExpiredOrFailed($payload)) {
@@ -153,11 +160,9 @@ class XenditWebhookService
     private function ensureGuestAccount(array $payload, Reservation $reservation): ?User
     {
         // Xendit invoice payload may contain payer_email or description-embedded info.
-        $email = Arr::get($payload, 'payer_email')
-            ?? Arr::get($payload, 'customer.email')
-            ?? null;
+        $email = $this->extractPayerEmail($payload);
 
-        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if ($email === null) {
             return null;
         }
 
@@ -166,15 +171,13 @@ class XenditWebhookService
             return $existing;
         }
 
-        $name = Arr::get($payload, 'customer.given_names')
-            ?? Arr::get($payload, 'customer.surname')
-            ?? 'Guest';
+        $name = $this->extractPayerName($payload);
 
         $user = User::create([
             'name' => $name,
             'email' => $email,
             'password' => bcrypt(Str::random(24)),
-            'role' => 'client',
+            'role' => 'guest',
             'email_verified_at' => now(),
         ]);
 
@@ -187,5 +190,47 @@ class XenditWebhookService
         );
 
         return $user;
+    }
+
+    private function extractPayerEmail(array $payload): ?string
+    {
+        $candidates = [
+            Arr::get($payload, 'payer_email'),
+            Arr::get($payload, 'customer.email'),
+            Arr::get($payload, 'email'),
+        ];
+
+        foreach ($candidates as $email) {
+            if (is_string($email) && filter_var(trim($email), FILTER_VALIDATE_EMAIL)) {
+                return strtolower(trim($email));
+            }
+        }
+
+        return null;
+    }
+
+    private function extractPayerName(array $payload): string
+    {
+        $given = trim((string) (Arr::get($payload, 'customer.given_names') ?? ''));
+        $family = trim((string) (Arr::get($payload, 'customer.surname') ?? ''));
+        $combined = trim($given.' '.$family);
+
+        return $combined !== '' ? $combined : 'Guest';
+    }
+
+    private function syncReservationGuestContact(Reservation $reservation, ?User $user, array $payload): void
+    {
+        $updates = [];
+        $email = $user?->email ?? $this->extractPayerEmail($payload);
+        if ($email && ! $reservation->guest_email) {
+            $updates['guest_email'] = $email;
+        }
+        $name = $user?->name ?? $this->extractPayerName($payload);
+        if ($name !== 'Guest' && ! $reservation->guest_name) {
+            $updates['guest_name'] = $name;
+        }
+        if ($updates !== []) {
+            $reservation->update($updates);
+        }
     }
 }
