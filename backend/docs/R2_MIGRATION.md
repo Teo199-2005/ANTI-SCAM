@@ -51,6 +51,25 @@ You can script this in PHP/Tinker: for each row with `avatar_url` starting with 
 - Upload a new file; confirm it appears in the bucket and the API returns the new URL.
 - Delete/replace an image; confirm the object is removed or replaced in R2.
 
+## Cloudflare (production)
+
+Uploads (logo, room photos, profile) go to **`https://anti-scamph.com/api/backend/...`** or **`/api/upload/...`** — they do **not** upload to `files.anti-scamph.com`. The files subdomain is only for **reading** objects from R2.
+
+| Setting | Recommendation |
+|--------|----------------|
+| **DNS `files.anti-scamph.com`** | R2 custom domain in bucket settings; prefer **DNS only** (grey cloud) for the files hostname unless you need Cloudflare features on that host |
+| **Cache rules** on `anti-scamph.com` | **Bypass cache** for `/api/*` and `/_next/static/*` after each deploy (or purge all) so dashboard JS updates |
+| **WAF** | Allow **POST** multipart to `/api/backend/*` and `/api/upload/*` |
+| **Speed → Optimization** | Turn off **Rocket Loader** for the dashboard (can break uploads/progress) |
+| **SSL/TLS** | Full (strict) on main site |
+| **Origin timeouts** | Nginx `proxy_read_timeout` ≥ **300s** for large photo uploads through Next.js |
+
+Verify R2 from the VPS after `.env` changes:
+
+```bash
+cd backend && php artisan config:clear && php artisan media:verify
+```
+
 ## Monitoring
 
 Use **Cloudflare** dashboard: **Traffic / Analytics** for HTTP, **R2** metrics for storage and operations. Optional **Logpush** for long-term HTTP or R2 logs. On the VPS, keep **nginx** access logs and Laravel logs for origin-side correlation.
