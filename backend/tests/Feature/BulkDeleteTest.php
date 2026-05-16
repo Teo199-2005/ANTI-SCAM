@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\DiscountCode;
 use App\Models\GuestFavoriteRoom;
+use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Room;
 use App\Models\RoomAvailability;
@@ -156,6 +157,71 @@ class BulkDeleteTest extends TestCase
             'user_id' => $guest->id,
             'room_id' => $room->id,
         ]);
+    }
+
+    public function test_resort_owner_can_bulk_delete_guest_with_reservations(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Guest Bulk Tenant',
+            'slug' => 'guest-bulk-tenant',
+            'subdomain' => 'guest-bulk',
+            'status' => 'active',
+        ]);
+        $owner = User::factory()->create(['role' => 'resort_owner', 'tenant_id' => $tenant->id]);
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Guest Bulk Resort',
+            'is_publicly_listed' => true,
+        ]);
+        $room = Room::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'name' => 'Deluxe',
+            'code' => 'DLX',
+            'status' => 'active',
+            'base_price' => 1000,
+            'capacity' => 2,
+        ]);
+        $guest = User::factory()->create([
+            'role' => 'guest',
+            'email' => 'bulk-guest@example.com',
+            'home_resort_id' => null,
+        ]);
+        Reservation::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'room_id' => $room->id,
+            'client_id' => $guest->id,
+            'reference_no' => 'RSV-BULK-GUEST',
+            'check_in_date' => '2026-10-17',
+            'check_out_date' => '2026-10-18',
+            'guest_count' => 1,
+            'guest_name' => 'Bulk Guest',
+            'guest_email' => 'bulk-guest@example.com',
+            'reservation_fee' => 1,
+            'total_amount' => 0,
+            'status' => 'confirmed',
+            'xendit_payment_status' => 'paid',
+            'reserved_at' => now(),
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->postJson('/api/v1/resort/guests/bulk-delete', [
+            'guest_keys' => ['bulk-guest@example.com'],
+        ]);
+
+        $response->assertSuccessful()
+            ->assertJsonPath('data.deleted', 1)
+            ->assertJsonPath('data.failed', []);
+
+        $this->assertDatabaseHas('reservations', [
+            'reference_no' => 'RSV-BULK-GUEST',
+            'guest_name' => 'Removed guest',
+            'guest_email' => null,
+            'client_id' => null,
+        ]);
+        $this->assertNull(User::query()->where('email', 'bulk-guest@example.com')->first());
     }
 
     public function test_resort_owner_can_bulk_delete_discount_codes_and_availability(): void

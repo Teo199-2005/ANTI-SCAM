@@ -42,5 +42,10 @@ export function bulkDeleteToastDescription(result: BulkDeletePayload): string {
   if (result.failed.length === 0) {
     return `${result.deleted} item${result.deleted === 1 ? "" : "s"} removed.`;
   }
-  return `${result.deleted} removed, ${result.failed.length} failed.`;
+  const summary = `${result.deleted} removed, ${result.failed.length} failed.`;
+  const firstReason = result.failed[0]?.message?.trim();
+  if (!firstReason) {
+    return summary;
+  }
+  return `${summary} ${firstReason}`;
 }

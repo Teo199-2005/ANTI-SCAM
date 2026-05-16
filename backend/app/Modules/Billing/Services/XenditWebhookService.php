@@ -168,6 +168,10 @@ class XenditWebhookService
 
         $existing = User::withoutGlobalScopes()->where('email', $email)->first();
         if ($existing) {
+            if ($existing->role === 'guest' && ! $existing->home_resort_id) {
+                $existing->forceFill(['home_resort_id' => $reservation->resort_id])->save();
+            }
+
             return $existing;
         }
 
@@ -178,6 +182,7 @@ class XenditWebhookService
             'email' => $email,
             'password' => bcrypt(Str::random(24)),
             'role' => 'guest',
+            'home_resort_id' => $reservation->resort_id,
             'email_verified_at' => now(),
         ]);
 

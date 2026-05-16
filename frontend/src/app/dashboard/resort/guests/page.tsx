@@ -193,6 +193,7 @@ export default function ResortGuestsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [confirmSingleDelete, setConfirmSingleDelete] = useState<Guest | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const load = useCallback(async (q = "") => {
@@ -320,19 +321,12 @@ export default function ResortGuestsPage() {
   };
 
   const handleDelete = async (g: Guest) => {
-    const label = g.name || g.email || "this guest";
-    if (
-      !confirm(
-        `Remove ${label}? Their login account is deleted and contact details on past bookings are cleared.`,
-      )
-    ) {
-      return;
-    }
     setDeletingKey(g.guestKey);
     try {
       await apiClient.delete(`/resort/guests/${encodeURIComponent(g.guestKey)}`);
       pushToast({ title: "Guest removed", tone: "success" });
       if (detailOpen && detail?.guestKey === g.guestKey) setDetailOpen(false);
+      setConfirmSingleDelete(null);
       await load(search);
     } catch (err) {
       pushToast({ title: "Delete failed", description: parseApiErrorMessage(err), tone: "error" });
@@ -441,9 +435,26 @@ export default function ResortGuestsPage() {
           bulk={bulk}
           onDetail={(g) => void openDetail(g)}
           onEdit={openEdit}
-          onDelete={(g) => void handleDelete(g)}
+          onDelete={(g) => setConfirmSingleDelete(g)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmSingleDelete !== null}
+        title="Remove guest?"
+        description={
+          confirmSingleDelete
+            ? `Remove ${confirmSingleDelete.name || confirmSingleDelete.email || "this guest"}? Their login is removed and contact details on past bookings are cleared.`
+            : undefined
+        }
+        confirmLabel="Remove guest"
+        tone="danger"
+        loading={deletingKey !== null}
+        onCancel={() => setConfirmSingleDelete(null)}
+        onConfirm={() => {
+          if (confirmSingleDelete) void handleDelete(confirmSingleDelete);
+        }}
+      />
 
       <ConfirmDialog
         open={confirmBulkDelete}
@@ -535,7 +546,7 @@ export default function ResortGuestsPage() {
                 });
               }}
               onDelete={() =>
-                void handleDelete({
+                setConfirmSingleDelete({
                   guestKey: detail.guestKey,
                   name: detail.name,
                   email: detail.email,

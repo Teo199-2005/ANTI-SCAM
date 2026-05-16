@@ -9,6 +9,7 @@ use App\Support\ResortGuestKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ResortGuestService
@@ -53,6 +54,11 @@ class ResortGuestService
     public function findGuestUserForKey(int $tenantId, string $guestKey): ?User
     {
         $guestKey = rawurldecode($guestKey);
+
+        foreach ($this->linkedDirectoryUsersForKey($tenantId, $guestKey) as $user) {
+            return $user;
+        }
+
         $resortIds = Resort::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->pluck('id');
@@ -62,21 +68,61 @@ class ResortGuestService
         }
 
         if (ctype_digit($guestKey)) {
-            $byClient = User::query()
-                ->where('id', (int) $guestKey)
-                ->where('role', 'guest')
-                ->whereIn('home_resort_id', $resortIds)
-                ->first();
-            if ($byClient) {
+            $byClient = User::query()->find((int) $guestKey);
+            if ($this->isDirectoryGuestUser($byClient)) {
                 return $byClient;
             }
         }
 
+        $email = mb_strtolower(trim($guestKey));
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
         return User::query()
-            ->where('role', 'guest')
-            ->whereIn('home_resort_id', $resortIds)
-            ->whereRaw('LOWER(email) = ?', [mb_strtolower($guestKey)])
+            ->whereIn('role', ['guest', 'client', 'user'])
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->where(function ($q) use ($resortIds, $tenantId): void {
+                $q->whereIn('home_resort_id', $resortIds)
+                    ->orWhereExists(function ($sub) use ($tenantId): void {
+                        $sub->selectRaw('1')
+                            ->from('reservations')
+                            ->whereColumn('reservations.client_id', 'users.id')
+                            ->where('reservations.tenant_id', $tenantId);
+                    });
+            })
             ->first();
+    }
+
+    /**
+     * @return list<User>
+     */
+    private function linkedDirectoryUsersForKey(int $tenantId, string $guestKey): array
+    {
+        $clientIds = $this->reservationsMatchingKey($tenantId, $guestKey)
+            ->whereNotNull('client_id')
+            ->distinct()
+            ->pluck('client_id');
+
+        $users = [];
+        foreach ($clientIds as $clientId) {
+            $user = User::query()->find((int) $clientId);
+            if ($this->isDirectoryGuestUser($user)) {
+                $users[] = $user;
+            }
+        }
+
+        return $users;
+    }
+
+    private function isDirectoryGuestUser(?User $user): bool
+    {
+        return $user !== null && in_array($user->role, ['guest', 'client', 'user'], true);
+    }
+
+    private function isProtectedStaffUser(User $user): bool
+    {
+        return in_array($user->role, ['admin', 'resort_owner', 'marketing', 'admin_staff'], true);
     }
 
     /**
@@ -273,8 +319,25 @@ class ResortGuestService
         ]);
 
         if ($user) {
+            if ($this->isProtectedStaffUser($user)) {
+                throw ValidationException::withMessages([
+                    'guestKey' => ['This email belongs to a staff or owner account and cannot be removed from the guest directory.'],
+                ]);
+            }
+
             $user->tokens()->delete();
-            $user->delete();
+
+            try {
+                $user->delete();
+            } catch (\Throwable) {
+                $user->forceFill([
+                    'name' => 'Removed guest',
+                    'email' => 'removed-guest-'.$user->id.'-'.Str::lower(Str::random(8)).'@invalid.local',
+                    'phone' => null,
+                    'password' => Hash::make(Str::random(32)),
+                    'home_resort_id' => null,
+                ])->save();
+            }
         }
     }
 

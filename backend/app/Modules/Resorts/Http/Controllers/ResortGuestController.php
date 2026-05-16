@@ -72,9 +72,17 @@ class ResortGuestController extends Controller
         $guestAccountsByEmail = [];
         if ($resortIds->isNotEmpty()) {
             $guestAccountsByEmail = User::query()
-                ->where('role', 'guest')
-                ->whereIn('home_resort_id', $resortIds)
-                ->get(['id', 'email'])
+                ->whereIn('role', ['guest', 'client', 'user'])
+                ->where(function ($q) use ($resortIds, $tenantId): void {
+                    $q->whereIn('home_resort_id', $resortIds)
+                        ->orWhereExists(function ($sub) use ($tenantId): void {
+                            $sub->selectRaw('1')
+                                ->from('reservations')
+                                ->whereColumn('reservations.client_id', 'users.id')
+                                ->where('reservations.tenant_id', $tenantId);
+                        });
+                })
+                ->get(['id', 'email', 'role'])
                 ->mapWithKeys(fn (User $u) => [mb_strtolower((string) $u->email) => $u->id])
                 ->all();
         }
@@ -85,6 +93,12 @@ class ResortGuestController extends Controller
             $existingKeys[] = $guestKey;
             $emailKey = mb_strtolower(trim((string) ($row->email ?? '')));
             $accountUserId = $emailKey !== '' ? ($guestAccountsByEmail[$emailKey] ?? null) : null;
+            if ($accountUserId === null && ! empty($row->client_id)) {
+                $linked = User::query()->find((int) $row->client_id);
+                if ($linked && in_array($linked->role, ['guest', 'client', 'user'], true)) {
+                    $accountUserId = $linked->id;
+                }
+            }
             $hasLogin = $accountUserId !== null;
 
             return [
