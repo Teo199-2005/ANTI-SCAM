@@ -59,14 +59,32 @@ final class StoredMedia
     }
 
     /**
-     * Store an uploaded file on the configured media disk, with a local-only public-disk fallback if S3 fails.
+     * Store an uploaded file on the configured media disk.
+     * When R2 (s3) is primary, stages on the public disk first for a fast HTTP response; promote with {@see promotePublicPathToS3}.
      *
-     * @return array{disk: string, path: string}
+     * @return array{disk: string, path: string, pending_s3?: bool}
      */
     public static function storeUploadedFile(UploadedFile $file, string $directory): array
     {
         $primary = self::disk();
         $lastError = null;
+
+        // When R2 is configured, save to local public first so the HTTP response returns quickly.
+        // Call {@see promotePublicPathToS3} after the response (e.g. Bus::dispatchAfterResponse).
+        if ($primary === 's3' && ! app()->runningUnitTests()) {
+            try {
+                $path = self::putOnDisk($file, $directory, 'public');
+                if ($path !== null) {
+                    return ['disk' => 'public', 'path' => $path, 'pending_s3' => true];
+                }
+            } catch (Throwable $e) {
+                $lastError = $e;
+                Log::warning('Fast local media staging failed; trying S3 directly', [
+                    'file' => $file->getClientOriginalName(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         try {
             $path = self::putOnDisk($file, $directory, $primary);
@@ -82,11 +100,11 @@ final class StoredMedia
             ]);
         }
 
-        if ($primary === 's3' && app()->environment('local')) {
+        if ($primary === 's3') {
             try {
                 $path = self::putOnDisk($file, $directory, 'public');
                 if ($path !== null) {
-                    Log::info('Stored upload on public disk after S3 failure (local dev)', [
+                    Log::info('Stored upload on public disk after S3 failure', [
                         'file' => $file->getClientOriginalName(),
                         'path' => $path,
                     ]);
@@ -101,6 +119,45 @@ final class StoredMedia
         $message = $lastError?->getMessage() ?? 'Unknown storage error';
 
         throw new \RuntimeException($message, 0, $lastError);
+    }
+
+    /**
+     * Copy a file from the public disk to R2 after the HTTP response has been sent.
+     *
+     * @return array{disk: string, path: string}|null New disk metadata on success
+     */
+    public static function promotePublicPathToS3(string $relativePath): ?array
+    {
+        if (self::disk() !== 's3' || ! self::isValidStorageKey($relativePath)) {
+            return null;
+        }
+
+        if (! Storage::disk('public')->exists($relativePath)) {
+            return null;
+        }
+
+        try {
+            $stream = Storage::disk('public')->readStream($relativePath);
+            if ($stream === false) {
+                throw new \RuntimeException('Could not read staged public file.');
+            }
+
+            Storage::disk('s3')->writeStream($relativePath, $stream, ['visibility' => 'public']);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+
+            Storage::disk('public')->delete($relativePath);
+
+            return ['disk' => 's3', 'path' => $relativePath];
+        } catch (Throwable $e) {
+            Log::warning('R2 promote failed; keeping public disk copy', [
+                'path' => $relativePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     private static function putOnDisk(UploadedFile $file, string $directory, string $disk): ?string

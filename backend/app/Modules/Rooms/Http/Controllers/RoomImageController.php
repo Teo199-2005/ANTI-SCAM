@@ -10,6 +10,7 @@ use App\Support\StoredMedia;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -86,6 +87,7 @@ class RoomImageController extends Controller
         }
 
         $created = [];
+        $promoteToS3 = [];
         foreach ($files as $file) {
             /** @var UploadedFile $file */
             try {
@@ -113,7 +115,26 @@ class RoomImageController extends Controller
                 'sort_order' => $room->images()->count(),
                 'is_primary' => $isPrimary,
             ]);
+            if (! empty($stored['pending_s3'])) {
+                $promoteToS3[] = $img->id;
+            }
             $created[] = $this->format($img);
+        }
+
+        if ($promoteToS3 !== []) {
+            $ids = $promoteToS3;
+            Bus::dispatchAfterResponse(function () use ($ids): void {
+                foreach ($ids as $imageId) {
+                    $image = RoomImage::query()->find($imageId);
+                    if (! $image || $image->disk !== 'public') {
+                        continue;
+                    }
+                    $promoted = StoredMedia::promotePublicPathToS3($image->path);
+                    if ($promoted !== null) {
+                        $image->update($promoted);
+                    }
+                }
+            });
         }
 
         return $this->successResponse($created, 'Images uploaded', 201);

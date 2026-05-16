@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const BFF_UPSTREAM_TIMEOUT_MS = 120_000;
+export const BFF_UPSTREAM_TIMEOUT_MS = 180_000;
 
 function looksLikeCloudflareChallenge(html: string): boolean {
   const lower = html.toLowerCase();

@@ -188,9 +188,9 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
   };
 
   const progressSublabel = uploadStallHint
-    ? "Still working… If this never moves, rebuild the frontend on the server (git pull + npm run build) and set LARAVEL_API_BASE_URL to http://127.0.0.1:8000/api/v1 in frontend env."
+    ? "Still working… Set LARAVEL_API_BASE_URL=http://127.0.0.1:8080/api/v1 in frontend/.env.production, rebuild (npm run build), then pm2 restart --update-env."
     : uploadProgress?.phase === "saving"
-      ? "Storing on server (R2). Can take 1–2 minutes on first upload after deploy — do not close the tab."
+      ? "Saving on server — should finish in a few seconds after the latest deploy."
       : uploadProgress?.phase === "preparing"
         ? "Resizing in your browser so uploads stay fast."
         : uploadProgress && uploadProgress.fileCount > 1
