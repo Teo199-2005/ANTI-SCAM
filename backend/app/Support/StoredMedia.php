@@ -60,31 +60,14 @@ final class StoredMedia
 
     /**
      * Store an uploaded file on the configured media disk.
-     * When R2 (s3) is primary, stages on the public disk first for a fast HTTP response; promote with {@see promotePublicPathToS3}.
+     * Falls back to the public disk when S3 fails on local dev.
      *
-     * @return array{disk: string, path: string, pending_s3?: bool}
+     * @return array{disk: string, path: string}
      */
     public static function storeUploadedFile(UploadedFile $file, string $directory): array
     {
         $primary = self::disk();
         $lastError = null;
-
-        // When R2 is configured, save to local public first so the HTTP response returns quickly.
-        // Call {@see promotePublicPathToS3} after the response (e.g. Bus::dispatchAfterResponse).
-        if ($primary === 's3' && ! app()->runningUnitTests()) {
-            try {
-                $path = self::putOnDisk($file, $directory, 'public');
-                if ($path !== null) {
-                    return ['disk' => 'public', 'path' => $path, 'pending_s3' => true];
-                }
-            } catch (Throwable $e) {
-                $lastError = $e;
-                Log::warning('Fast local media staging failed; trying S3 directly', [
-                    'file' => $file->getClientOriginalName(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
 
         try {
             $path = self::putOnDisk($file, $directory, $primary);
@@ -100,11 +83,11 @@ final class StoredMedia
             ]);
         }
 
-        if ($primary === 's3') {
+        if ($primary === 's3' && app()->environment('local')) {
             try {
                 $path = self::putOnDisk($file, $directory, 'public');
                 if ($path !== null) {
-                    Log::info('Stored upload on public disk after S3 failure', [
+                    Log::info('Stored upload on public disk after S3 failure (local dev)', [
                         'file' => $file->getClientOriginalName(),
                         'path' => $path,
                     ]);
