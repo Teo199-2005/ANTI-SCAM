@@ -1,5 +1,5 @@
-import { apiClient } from "@/lib/api/client";
 import type { RoomImageRow } from "@/lib/roomImageTypes";
+import axios from "axios";
 import {
   ROOM_PHOTO_MAX_EDGE,
   SHRINK_FOR_UPLOAD_MAX_BYTES,
@@ -31,15 +31,26 @@ function slicePercent(fileIndex: number, fileCount: number, withinSlice: number)
   return Math.min(100, start + slice * Math.min(1, withinSlice));
 }
 
-function phaseLabel(phase: RoomPhotoUploadPhase, fileName: string, fileIndex: number, fileCount: number): string {
+function formatMb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function phaseLabel(
+  phase: RoomPhotoUploadPhase,
+  fileName: string,
+  fileIndex: number,
+  fileCount: number,
+  preparedBytes?: number,
+): string {
   const ordinal = fileCount > 1 ? ` (${fileIndex + 1} of ${fileCount})` : "";
+  const sizeHint = preparedBytes != null && phase !== "preparing" ? ` · ${formatMb(preparedBytes)}` : "";
   switch (phase) {
     case "preparing":
       return `Preparing ${fileName}${ordinal}`;
     case "uploading":
-      return `Uploading ${fileName}${ordinal}`;
+      return `Uploading ${fileName}${ordinal}${sizeHint}`;
     case "saving":
-      return `Saving ${fileName} on server${ordinal}`;
+      return `Saving ${fileName} on server${ordinal}${sizeHint}`;
   }
 }
 
@@ -119,7 +130,7 @@ export async function uploadRoomPhotosSequential(
         fileIndex,
         fileCount,
         fileName,
-        label: phaseLabel("saving", fileName, fileIndex, fileCount),
+        label: phaseLabel("saving", fileName, fileIndex, fileCount, prepared.size),
       });
       saveCreepTimer = setInterval(() => {
         if (current < cap) {
@@ -130,17 +141,18 @@ export async function uploadRoomPhotosSequential(
             fileIndex,
             fileCount,
             fileName,
-            label: phaseLabel("saving", fileName, fileIndex, fileCount),
+            label: phaseLabel("saving", fileName, fileIndex, fileCount, prepared.size),
           });
         }
       }, 400);
     };
 
     try {
-      const { data } = await apiClient.post<{ success: boolean; data: RoomImageRow[] }>(
-        `/rooms/${roomId}/images`,
+      const { data } = await axios.post<{ success: boolean; data: RoomImageRow[] }>(
+        `/api/upload/rooms/${roomId}/images`,
         formData,
         {
+          withCredentials: true,
           timeout: UPLOAD_TIMEOUT_MS,
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
@@ -161,7 +173,7 @@ export async function uploadRoomPhotosSequential(
               fileIndex,
               fileCount,
               fileName,
-              label: phaseLabel("uploading", fileName, fileIndex, fileCount),
+              label: phaseLabel("uploading", fileName, fileIndex, fileCount, prepared.size),
             });
           },
         },

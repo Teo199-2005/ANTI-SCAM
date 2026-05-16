@@ -19,6 +19,8 @@ import { Loader2, Star, Trash2, Upload } from "lucide-react";
 import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const UPLOAD_STALL_HINT_MS = 25_000;
+
 export type { RoomImageRow } from "@/lib/roomImageTypes";
 
 type Props = {
@@ -44,6 +46,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
   const [deletingImg, setDeletingImg] = useState<number | null>(null);
   /** Last upload failure — subtle on-page detail for debugging (HTTP code + API messages). */
   const [lastUploadDetail, setLastUploadDetail] = useState<string | null>(null);
+  const [uploadStallHint, setUploadStallHint] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadImages = useCallback(async () => {
@@ -64,6 +67,19 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
     void loadImages();
   }, [loadImages]);
 
+  useEffect(() => {
+    if (!uploading) {
+      setUploadStallHint(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (uploadProgress && uploadProgress.percent < 20) {
+        setUploadStallHint(true);
+      }
+    }, UPLOAD_STALL_HINT_MS);
+    return () => window.clearTimeout(timer);
+  }, [uploading, uploadProgress?.percent]);
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setLastUploadDetail(null);
     const files = e.target.files;
@@ -81,6 +97,7 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
       return;
     }
 
+    setUploadStallHint(false);
     setUploading(true);
     setUploadProgress({
       percent: 0,
@@ -160,8 +177,9 @@ export function RoomPhotosPanel({ roomId, onDoneClick }: Props) {
     }
   };
 
-  const progressSublabel =
-    uploadProgress?.phase === "saving"
+  const progressSublabel = uploadStallHint
+    ? "Still working… If this never moves, rebuild the frontend on the server (git pull + npm run build) and set LARAVEL_API_BASE_URL to http://127.0.0.1:8000/api/v1 in frontend env."
+    : uploadProgress?.phase === "saving"
       ? "Storing on server (R2). This step has no upload meter — wait until it reaches 100%."
       : uploadProgress?.phase === "preparing"
         ? "Resizing in your browser so uploads stay fast."
