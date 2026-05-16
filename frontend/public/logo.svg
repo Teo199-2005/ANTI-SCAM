@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.2" baseProfile="tiny-ps" xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <title>Anti-Scam PH</title>
+  <rect width="96" height="96" fill="#ffffff"/>
+  <path fill="#1e3a8a" d="M48 10 74 22.5 74 46.5C74 62.5 61 76.5 48 86 35 76.5 22 62.5 22 46.5L22 22.5 48 10Z"/>
+  <path fill="#dc2626" d="M48 28 58 34 58 44C58 51 53.5 56 48 60 42.5 56 38 51 38 44L38 34 48 28Z"/>
+  <circle fill="#facc15" cx="62" cy="30" r="5"/>
+  <path fill="#facc15" d="M66 38 70 42 66 46 62 42Z"/>
+  <path fill="#1e3a8a" d="M34 58H62V64H34Z"/>
+  <path fill="#dc2626" d="M40 64H56V68H40Z"/>
+</svg>
