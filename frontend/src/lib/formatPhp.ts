@@ -36,33 +36,28 @@ export function formatPhpCents(amount: unknown): string {
   })}`;
 }
 
-/** Ledger-style: coerce invalid → 0 then show two decimals. */
 /** Guest-friendly stay dates, e.g. "June 18 → 19, 2026" */
 export function formatStayRange(checkIn: string | null | undefined, checkOut?: string | null): string {
   if (!checkIn) return "—";
   const inIso = checkIn.slice(0, 10);
   const outIso = checkOut ? checkOut.slice(0, 10) : "";
-  const parse = (iso: string) => {
+  const fmt = (iso: string, opts: Intl.DateTimeFormatOptions): string => {
     const dt = new Date(`${iso}T12:00:00`);
     if (Number.isNaN(dt.getTime())) return iso;
-    return dt;
+    return dt.toLocaleDateString("en-PH", opts);
   };
-  const inDate = parse(inIso);
   const inYear = inIso.slice(0, 4);
   if (!outIso) {
-    return inDate.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
+    return fmt(inIso, { month: "long", day: "numeric", year: "numeric" });
   }
-  const outDate = parse(outIso);
   const outYear = outIso.slice(0, 4);
   if (inYear === outYear) {
-    const start = inDate.toLocaleDateString("en-PH", { month: "long", day: "numeric" });
-    const end = outDate.toLocaleDateString("en-PH", { month: "long", day: "numeric" });
-    return `${start} → ${end}, ${inYear}`;
+    return `${fmt(inIso, { month: "long", day: "numeric" })} → ${fmt(outIso, { month: "long", day: "numeric" })}, ${inYear}`;
   }
-  const start = inDate.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
-  const end = outDate.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
-  return `${start} → ${end}`;
+  return `${fmt(inIso, { month: "long", day: "numeric", year: "numeric" })} → ${fmt(outIso, { month: "long", day: "numeric", year: "numeric" })}`;
 }
+
+/** Ledger-style: coerce invalid → 0 then show two decimals. */
 
 export function formatPhpLedger(amount: unknown): string {
   const n = coerceNumber(amount);
