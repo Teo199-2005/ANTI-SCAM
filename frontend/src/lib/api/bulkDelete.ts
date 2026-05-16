@@ -38,14 +38,40 @@ export function bulkDeleteGuestFavorites(roomIds: number[]) {
   return postBulkDelete("/guest/favorites/bulk-delete", { room_ids: roomIds });
 }
 
+function sanitizeBulkDeleteMessage(raw: string | undefined): string {
+  const msg = (raw ?? "").trim();
+  if (!msg) {
+    return "Could not remove this item.";
+  }
+  if (/SQLSTATE|General error:|Connection:\s*mysql|can't specify target table/i.test(msg)) {
+    return "Something went wrong on the server. Please try again.";
+  }
+  if (msg.length > 120) {
+    return "Could not remove this item. Please try again.";
+  }
+  return msg;
+}
+
 export function bulkDeleteToastDescription(result: BulkDeletePayload): string {
-  if (result.failed.length === 0) {
-    return `${result.deleted} item${result.deleted === 1 ? "" : "s"} removed.`;
+  return bulkDeleteToastDescriptionGeneric(result, "item");
+}
+
+export function bulkDeleteToastDescriptionGeneric(
+  result: BulkDeletePayload,
+  itemLabel: string,
+): string {
+  const deleted = result.deleted ?? 0;
+  const failed = result.failed ?? [];
+
+  if (failed.length === 0) {
+    return `${deleted} ${itemLabel}${deleted === 1 ? "" : "s"} removed.`;
   }
-  const summary = `${result.deleted} removed, ${result.failed.length} failed.`;
-  const firstReason = result.failed[0]?.message?.trim();
-  if (!firstReason) {
-    return summary;
+
+  const reason = sanitizeBulkDeleteMessage(failed[0]?.message);
+
+  if (deleted === 0) {
+    return failed.length === 1 ? reason : `Could not remove selected ${itemLabel}s. ${reason}`;
   }
-  return `${summary} ${firstReason}`;
+
+  return `${deleted} removed. ${failed.length} failed — ${reason}`;
 }

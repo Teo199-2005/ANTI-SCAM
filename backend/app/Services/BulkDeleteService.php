@@ -12,6 +12,7 @@ use App\Modules\Resorts\Services\ResortGuestService;
 use App\Modules\Rooms\Services\RoomService;
 use App\Modules\Users\Services\UserService;
 use App\Support\BulkDeleteResult;
+use App\Support\FriendlyExceptionMessage;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
@@ -49,7 +50,7 @@ class BulkDeleteService
             } catch (AuthorizationException $e) {
                 $result->recordFailure($id, $e->getMessage() ?: 'Not allowed.');
             } catch (\Throwable $e) {
-                $result->recordFailure($id, $e->getMessage() ?: 'Delete failed.');
+                $result->recordFailure($id, FriendlyExceptionMessage::forBulkDelete($e));
             }
         }
 
@@ -78,7 +79,7 @@ class BulkDeleteService
             } catch (AuthorizationException $e) {
                 $result->recordFailure($id, $e->getMessage() ?: 'Not allowed.');
             } catch (\Throwable $e) {
-                $result->recordFailure($id, $e->getMessage() ?: 'Delete failed.');
+                $result->recordFailure($id, FriendlyExceptionMessage::forBulkDelete($e));
             }
         }
 
@@ -109,10 +110,9 @@ class BulkDeleteService
                 $this->resortGuests->destroy($tenantId, $guestKey);
                 $result->recordSuccess();
             } catch (ValidationException $e) {
-                $message = collect($e->errors())->flatten()->first();
-                $result->recordFailure($guestKey, is_string($message) ? $message : 'Guest not found.');
+                $result->recordFailure($guestKey, FriendlyExceptionMessage::forBulkDelete($e));
             } catch (\Throwable $e) {
-                $result->recordFailure($guestKey, $e->getMessage() ?: 'Delete failed.');
+                $result->recordFailure($guestKey, FriendlyExceptionMessage::forBulkDelete($e));
             }
         }
 
@@ -144,7 +144,7 @@ class BulkDeleteService
                 $code->delete();
                 $result->recordSuccess();
             } catch (\Throwable $e) {
-                $result->recordFailure($id, $e->getMessage() ?: 'Delete failed.');
+                $result->recordFailure($id, FriendlyExceptionMessage::forBulkDelete($e));
             }
         }
 
@@ -177,7 +177,7 @@ class BulkDeleteService
             } catch (AuthorizationException $e) {
                 $result->recordFailure($id, $e->getMessage() ?: 'Not allowed.');
             } catch (\Throwable $e) {
-                $result->recordFailure($id, $e->getMessage() ?: 'Delete failed.');
+                $result->recordFailure($id, FriendlyExceptionMessage::forBulkDelete($e));
             }
         }
 
@@ -219,7 +219,7 @@ class BulkDeleteService
                     $result->recordFailure($roomId, 'Favorite not found.');
                 }
             } catch (\Throwable $e) {
-                $result->recordFailure($roomId, $e->getMessage() ?: 'Remove failed.');
+                $result->recordFailure($roomId, FriendlyExceptionMessage::forBulkDelete($e));
             }
         }
 

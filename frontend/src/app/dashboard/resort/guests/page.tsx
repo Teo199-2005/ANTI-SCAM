@@ -14,7 +14,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import Button from "@/components/ui/Button";
 import { apiClient } from "@/lib/api/client";
-import { bulkDeleteResortGuests, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
+import { bulkDeleteResortGuests, bulkDeleteToastDescriptionGeneric } from "@/lib/api/bulkDelete";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
@@ -362,10 +362,18 @@ export default function ResortGuestsPage() {
       if (detailOpen && detail && keys.includes(detail.guestKey)) setDetailOpen(false);
       await load(search);
       bulk.clear();
+      const toastDesc = bulkDeleteToastDescriptionGeneric(result, "guest");
       pushToast({
-        title: result.failed.length ? "Bulk delete completed with errors" : "Guests removed",
-        description: bulkDeleteToastDescription(result),
-        tone: result.failed.length ? "warning" : "success",
+        title:
+          result.failed.length === 0
+            ? result.deleted === 1
+              ? "Guest removed"
+              : "Guests removed"
+            : result.deleted === 0
+              ? "Could not remove guests"
+              : "Some guests were not removed",
+        description: toastDesc,
+        tone: result.failed.length === 0 ? "success" : result.deleted === 0 ? "error" : "warning",
       });
     } catch (err) {
       pushToast({

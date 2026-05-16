@@ -33,22 +33,29 @@ class ResortGuestService
     public function reservationsMatchingKey(int $tenantId, string $guestKey): Builder
     {
         $guestKey = rawurldecode($guestKey);
-        $keyExprSub = str_replace(
-            ['reservations.', 'users.'],
-            ['reservations_sub.', 'users_sub.'],
-            ResortGuestKey::sqlExpression()
-        );
 
         return Reservation::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereExists(function ($sub) use ($tenantId, $guestKey, $keyExprSub): void {
-                $sub->selectRaw('1')
-                    ->from('reservations as reservations_sub')
-                    ->leftJoin('users as users_sub', 'users_sub.id', '=', 'reservations_sub.client_id')
-                    ->whereColumn('reservations_sub.id', 'reservations.id')
-                    ->where('reservations_sub.tenant_id', $tenantId)
-                    ->whereRaw('('.$keyExprSub.') = ?', [$guestKey]);
-            });
+            ->from('reservations')
+            ->leftJoin('users', 'users.id', '=', 'reservations.client_id')
+            ->where('reservations.tenant_id', $tenantId)
+            ->whereRaw('('.ResortGuestKey::sqlExpression().') = ?', [$guestKey])
+            ->select('reservations.*');
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function updateReservationsForGuestKey(int $tenantId, string $guestKey, array $attributes): void
+    {
+        $ids = $this->reservationsMatchingKey($tenantId, $guestKey)->pluck('reservations.id');
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        Reservation::withoutGlobalScopes()
+            ->whereIn('id', $ids)
+            ->update($attributes);
     }
 
     public function findGuestUserForKey(int $tenantId, string $guestKey): ?User
@@ -272,7 +279,7 @@ class ResortGuestService
         }
 
         if ($reservationUpdates !== []) {
-            $reservations->update($reservationUpdates);
+            $this->updateReservationsForGuestKey($tenantId, $guestKey, $reservationUpdates);
         }
 
         if ($user) {
@@ -311,7 +318,7 @@ class ResortGuestService
             ]);
         }
 
-        $reservations->update([
+        $this->updateReservationsForGuestKey($tenantId, $guestKey, [
             'guest_name' => 'Removed guest',
             'guest_email' => null,
             'guest_phone' => null,
