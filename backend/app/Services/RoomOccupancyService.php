@@ -93,6 +93,21 @@ class RoomOccupancyService
             ) ? 'free' : 'busy';
         }
 
+        // Guest calendar: highlight each booked date from check-in through check-out (inclusive).
+        foreach (array_keys($days) as $iso) {
+            if ($days[$iso] === 'past') {
+                continue;
+            }
+            foreach ($reservations as $row) {
+                $in = self::dateToIso($row->check_in_date);
+                $out = self::dateToIso($row->check_out_date);
+                if ($in <= $iso && $iso <= $out) {
+                    $days[$iso] = 'busy';
+                    break;
+                }
+            }
+        }
+
         return $days;
     }
 

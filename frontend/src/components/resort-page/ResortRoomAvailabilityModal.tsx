@@ -128,7 +128,8 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           continue;
         }
         const st = cal.days[iso] as AvailabilityCalendarDayState | undefined;
-        mapped[iso] = st === "busy" ? "busy" : st === "free" ? "free" : "unknown";
+        mapped[iso] =
+          st === "busy" ? "busy" : st === "free" ? "free" : st === "past" ? "past" : "unknown";
       }
       setDayMap(mapped);
       setCalendarNote(null);

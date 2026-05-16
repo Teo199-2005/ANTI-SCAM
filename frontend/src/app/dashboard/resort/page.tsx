@@ -21,7 +21,8 @@ import { BadgeDollarSign, CalendarCheck2, CalendarDays, DoorOpen, LockKeyhole, R
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
-import { formatPhp } from "@/lib/formatPhp";
+import { formatPhp, formatStayRange } from "@/lib/formatPhp";
+import { reservationCoversCalendarDay, reservationCheckIn, reservationCheckOut } from "@/lib/api/reservationDates";
 
 const statusBadge: Record<string, string> = {
   confirmed:       "dash-badge-emerald",
@@ -202,21 +203,21 @@ export default function ResortOverviewPage() {
       ? Math.round((stats.lockedBookings / stats.activeRooms) * 100)
       : 0;
 
-  const normalizeDate = (value: string) => {
-    const [y, m, d] = value.split("-").map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
-  };
   const dateToKey = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  const isDateInRange = (target: Date, start: Date, end: Date) => target >= start && target <= end;
 
   const daysInMonth = monthEnd.getDate();
   const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
     const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1);
     const key = dateToKey(date);
-    const reservations = calendarReservations.filter((item) =>
-      isDateInRange(date, normalizeDate(item.check_in_date), normalizeDate(item.check_out_date)),
-    );
+    const reservations = calendarReservations.filter((item) => {
+      const row = item as unknown as Record<string, unknown>;
+      return reservationCoversCalendarDay(
+        reservationCheckIn(row),
+        reservationCheckOut(row),
+        key,
+      );
+    });
     const hasConfirmed = reservations.some((r) => r.status === "confirmed");
     const hasPending = reservations.some((r) => r.status === "pending_payment");
     return { key, day: i + 1, reservations, hasConfirmed, hasPending };
@@ -454,7 +455,7 @@ export default function ResortOverviewPage() {
                   <div>
                     <p className="font-mono text-xs font-semibold text-navy">{item.reference_no}</p>
                     <p className="mt-0.5 text-xs text-zinc-500">
-                      {item.check_in_date} → {item.check_out_date}
+                      {formatStayRange(item.check_in_date, item.check_out_date)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

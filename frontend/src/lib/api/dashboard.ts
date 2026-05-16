@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import { reservationCheckIn, reservationCheckOut } from "@/lib/api/reservationDates";
 import type { ApiEnvelope } from "@/lib/api/types";
 
 export type RecentReservation = {
@@ -23,9 +24,21 @@ export type ResortDashboardStats = {
   recentReservations: RecentReservation[];
 };
 
+function normalizeRecentReservationRow(row: unknown): RecentReservation {
+  const r = (row ?? {}) as Record<string, unknown>;
+  return {
+    id: Number(r.id ?? 0),
+    reference_no: String(r.reference_no ?? r.referenceNo ?? ""),
+    status: String(r.status ?? ""),
+    check_in_date: reservationCheckIn(r),
+    check_out_date: reservationCheckOut(r),
+    total_amount: String(r.total_amount ?? r.totalAmount ?? "0"),
+  };
+}
+
 function normalizeRecentReservations(value: unknown): RecentReservation[] {
   if (Array.isArray(value)) {
-    return value as RecentReservation[];
+    return value.map(normalizeRecentReservationRow);
   }
 
   if (
@@ -34,7 +47,14 @@ function normalizeRecentReservations(value: unknown): RecentReservation[] {
     "data" in value &&
     Array.isArray((value as { data?: unknown }).data)
   ) {
-    return (value as { data: RecentReservation[] }).data;
+    return (value as { data: unknown[] }).data.map(normalizeRecentReservationRow);
+  }
+
+  if (value && typeof value === "object") {
+    const values = Object.values(value as Record<string, unknown>);
+    if (values.length > 0 && values.every((v) => v && typeof v === "object")) {
+      return values.map(normalizeRecentReservationRow);
+    }
   }
 
   return [];
@@ -42,10 +62,12 @@ function normalizeRecentReservations(value: unknown): RecentReservation[] {
 
 export async function getResortStats() {
   const { data } = await apiClient.get<ApiEnvelope<ResortDashboardStats>>("/dashboard/resort-stats");
-  const payload = data.data;
+  const payload = (data.data ?? {}) as Record<string, unknown>;
+  const recentRaw =
+    payload.recentReservations ?? payload.recent_reservations ?? [];
   return {
-    ...payload,
-    recentReservations: normalizeRecentReservations(payload?.recentReservations),
+    ...(payload as ResortDashboardStats),
+    recentReservations: normalizeRecentReservations(recentRaw),
   };
 }
 
@@ -195,11 +217,11 @@ function normalizeBookingCalendarPayload(value: unknown): ResortBookingCalendarP
       const item = (row ?? {}) as Record<string, unknown>;
       return {
         id: Number(item.id ?? 0),
-        reference_no: String(item.reference_no ?? ""),
+        reference_no: String(item.reference_no ?? item.referenceNo ?? ""),
         status: String(item.status ?? "pending_payment"),
-        check_in_date: String(item.check_in_date ?? ""),
-        check_out_date: String(item.check_out_date ?? ""),
-        total_amount: String(item.total_amount ?? "0"),
+        check_in_date: reservationCheckIn(item),
+        check_out_date: reservationCheckOut(item),
+        total_amount: String(item.total_amount ?? item.totalAmount ?? "0"),
       };
     }),
   };

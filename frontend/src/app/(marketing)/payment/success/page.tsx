@@ -4,6 +4,7 @@ import PageContainer from "@/components/layout/PageContainer";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPublicResort } from "@/lib/api/public";
 import { getReservation, ReservationDetail } from "@/lib/api/payment";
+import { formatStayRange } from "@/lib/formatPhp";
 import {
   postPaymentBookingsHref,
   postPaymentBookingsLabel,
@@ -109,7 +110,7 @@ function PaymentSuccessContent() {
               {reservation ? (
                 <p className="inline-flex items-center gap-1.5 pt-1 text-emerald-700">
                   <CalendarDays size={13} />
-                  {reservation.checkInDate} → {reservation.checkOutDate}
+                  {formatStayRange(reservation.checkInDate, reservation.checkOutDate)}
                 </p>
               ) : null}
             </div>

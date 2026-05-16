@@ -78,6 +78,7 @@ class RoomAvailabilityCalendarTest extends TestCase
         $days = $response->json('data.days');
         $this->assertIsArray($days);
         $this->assertSame('busy', $days['2026-06-18'] ?? null);
+        $this->assertSame('busy', $days['2026-06-19'] ?? null);
     }
 
     public function test_availability_endpoint_rejects_overlapping_confirmed_stay(): void

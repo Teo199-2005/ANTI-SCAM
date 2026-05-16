@@ -34,7 +34,7 @@ class DashboardController extends Controller
             return $this->errorResponse('No resort is linked to this account yet.', null, 422);
         }
 
-        $cacheKey = "dashboard:resort_stats:{$tenantId}";
+        $cacheKey = "dashboard:resort_stats:v2:{$tenantId}";
 
         $payload = CacheSafe::remember($cacheKey, now()->addSeconds(45), fn () => $this->computeResortDashboardStats($tenantId));
 
@@ -48,13 +48,24 @@ class DashboardController extends Controller
     {
         $revIn = Reservation::revenueEligibleStatusesSqlList();
 
-        $recentReservations = Reservation::query()
+        $recentReservations = Reservation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->latest()
+            ->orderByDesc('created_at')
             ->limit(5)
-            ->get(['id', 'reference_no', 'status', 'check_in_date', 'check_out_date', 'total_amount', 'reservation_fee']);
+            ->get(['id', 'reference_no', 'status', 'check_in_date', 'check_out_date', 'total_amount', 'reservation_fee'])
+            ->map(static fn (Reservation $r): array => [
+                'id' => $r->id,
+                'reference_no' => $r->reference_no,
+                'status' => $r->status,
+                'check_in_date' => $r->check_in_date?->format('Y-m-d') ?? substr((string) $r->check_in_date, 0, 10),
+                'check_out_date' => $r->check_out_date?->format('Y-m-d') ?? substr((string) $r->check_out_date, 0, 10),
+                'total_amount' => (string) $r->total_amount,
+                'reservation_fee' => (string) $r->reservation_fee,
+            ])
+            ->values()
+            ->all();
 
-        $agg = Reservation::query()
+        $agg = Reservation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->selectRaw("
                 SUM(CASE WHEN status IN ({$revIn}) THEN reservation_fee ELSE 0 END) as total_reservation_fees,
@@ -212,6 +223,7 @@ class DashboardController extends Controller
 
         $rows = Reservation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['pending_payment', 'confirmed', 'completed'])
             ->whereDate('check_in_date', '<=', $end->toDateString())
             ->whereDate('check_out_date', '>=', $start->toDateString())
             ->orderBy('check_in_date')
@@ -222,7 +234,17 @@ class DashboardController extends Controller
                 'check_in_date',
                 'check_out_date',
                 'total_amount',
-            ]);
+            ])
+            ->map(static fn (Reservation $r): array => [
+                'id' => $r->id,
+                'reference_no' => $r->reference_no,
+                'status' => $r->status,
+                'check_in_date' => $r->check_in_date?->format('Y-m-d') ?? substr((string) $r->check_in_date, 0, 10),
+                'check_out_date' => $r->check_out_date?->format('Y-m-d') ?? substr((string) $r->check_out_date, 0, 10),
+                'total_amount' => (string) $r->total_amount,
+            ])
+            ->values()
+            ->all();
 
         return $this->successResponse([
             'year' => $year,
