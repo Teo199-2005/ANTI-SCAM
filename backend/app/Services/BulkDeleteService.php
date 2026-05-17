@@ -26,7 +26,38 @@ class BulkDeleteService
         private readonly UserService $users,
         private readonly RoomService $rooms,
         private readonly ResortGuestService $resortGuests,
+        private readonly AdminResortDeletionService $adminResortDeletion,
     ) {}
+
+    /**
+     * @param  list<int>  $ids
+     */
+    public function deleteResorts(User $auth, array $ids): BulkDeleteResult
+    {
+        abort_unless($auth->role === 'admin', 403);
+
+        $result = new BulkDeleteResult;
+
+        foreach ($this->capIds($ids) as $id) {
+            $resort = Resort::query()->find($id);
+            if (! $resort) {
+                $result->recordFailure($id, 'Resort not found.');
+
+                continue;
+            }
+
+            try {
+                $this->adminResortDeletion->deleteResortWithWorkspace($auth, $resort);
+                $result->recordSuccess();
+            } catch (AuthorizationException $e) {
+                $result->recordFailure($id, $e->getMessage() ?: 'Not allowed.');
+            } catch (\Throwable $e) {
+                $result->recordFailure($id, FriendlyExceptionMessage::forBulkDelete($e));
+            }
+        }
+
+        return $result;
+    }
 
     /**
      * @param  list<int>  $ids

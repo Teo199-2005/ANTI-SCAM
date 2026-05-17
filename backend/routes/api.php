@@ -148,6 +148,7 @@ Route::prefix('v1')->group(function (): void {
         // Admin-only routes
         Route::middleware('role:admin')->group(function (): void {
             Route::post('/users/bulk-delete', [BulkDeleteController::class, 'users']);
+            Route::post('/admin/resorts/bulk-delete', [BulkDeleteController::class, 'resorts']);
             Route::get('/admin/stats', [AdminStatsController::class, 'stats']);
             Route::get('/admin/location-stats', [AdminLocationStatsController::class, 'index']);
             Route::get('/admin/analytics', [AdminAnalyticsController::class, 'index']);

@@ -18,6 +18,10 @@ export function bulkDeleteUsers(ids: number[]) {
   return postBulkDelete("/users/bulk-delete", { ids });
 }
 
+export function bulkDeleteResorts(ids: number[]) {
+  return postBulkDelete("/admin/resorts/bulk-delete", { ids });
+}
+
 export function bulkDeleteRooms(ids: number[]) {
   return postBulkDelete("/rooms/bulk-delete", { ids });
 }

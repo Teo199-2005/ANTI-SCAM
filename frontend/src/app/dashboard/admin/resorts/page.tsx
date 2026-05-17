@@ -7,7 +7,11 @@ import LocationFilterBar, {
 } from "@/components/locations/LocationFilterBar";
 import { listResorts, ResortItem, updateResort } from "@/lib/api/resort";
 import { setResortVip } from "@/lib/api/admin";
+import { bulkDeleteResorts, bulkDeleteToastDescriptionGeneric } from "@/lib/api/bulkDelete";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DataTable from "@/components/shared/DataTable";
 import {
@@ -22,6 +26,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import AdminResortViewModal from "@/components/dashboard/AdminResortViewModal";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { BadgeCheck, Building2, Crown, Eye, PenLine, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -56,7 +61,11 @@ export default function AdminResortsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const [viewResortId, setViewResortId] = useState<number | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { pushToast } = useToast();
+
+  const bulk = useBulkSelection(resorts, (r) => r.id);
 
   const load = async (
     s: string,
@@ -156,6 +165,31 @@ export default function AdminResortsPage() {
     }
   };
 
+  const onBulkDelete = async () => {
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const result = await bulkDeleteResorts(ids);
+      await load(search, page, perPage, sortBy, sortDir);
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Resorts deleted",
+        description: bulkDeleteToastDescriptionGeneric(result, "resort"),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete selected resorts."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
+    }
+  };
+
   const toggleVip = async (resort: ResortItem) => {
     setTogglingVip(resort.id);
     const newVip = !resort.is_vip;
@@ -245,6 +279,14 @@ export default function AdminResortsPage() {
         {search ? <p className="mt-2 text-xs text-zinc-600">Results for &quot;{search}&quot;</p> : null}
       </div>
 
+      <BulkActionBar
+        count={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setConfirmBulkDelete(true)}
+        deleting={bulkDeleting}
+        deleteLabel="Delete selected resorts"
+      />
+
       {/* Mobile: stacked cards (no horizontal table scroll) */}
       <div className="md:hidden">
         {loading ? (
@@ -258,7 +300,16 @@ export default function AdminResortsPage() {
             {resorts.map((resort) => (
               <DashMobileTableCard
                 key={resort.id}
-                title={resort.name}
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <BulkSelectMobile
+                      checked={bulk.isSelected(resort.id)}
+                      onChange={() => bulk.toggle(resort.id)}
+                      ariaLabel={`Select ${resort.name}`}
+                    />
+                    <span>{resort.name}</span>
+                  </span>
+                }
                 fields={[
                   { label: "Address", value: resort.address ?? "—" },
                   { label: "Subscription", value: subscriptionCell(resort) },
@@ -313,6 +364,14 @@ export default function AdminResortsPage() {
       <div className="hidden md:block">
         <DataTable
           footer={paginationFooter}
+          leadingHeader={
+            <BulkSelectTh
+              checked={bulk.isAllSelected}
+              indeterminate={bulk.isSomeSelected}
+              onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
+              disabled={loading || resorts.length === 0}
+            />
+          }
           headers={
             <>
               <SortableTh label="Name" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
@@ -325,9 +384,14 @@ export default function AdminResortsPage() {
             </>
           }
         >
-          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={7}>
+          <AsyncStatePanel loading={loading} error={error} isEmpty={resorts.length === 0} emptyText="No resorts found." withinTable colSpan={8}>
             {resorts.map((resort) => (
               <tr key={resort.id} className="group">
+                <BulkSelectTd
+                  checked={bulk.isSelected(resort.id)}
+                  onChange={() => bulk.toggle(resort.id)}
+                  ariaLabel={`Select ${resort.name}`}
+                />
                 <td className="font-semibold text-navy">{resort.name}</td>
                 <td className="text-zinc-600">{resort.address ?? "—"}</td>
                 <td className="text-xs text-zinc-500 whitespace-nowrap">
@@ -383,6 +447,17 @@ export default function AdminResortsPage() {
           </AsyncStatePanel>
         </DataTable>
       </div>
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected resorts?"
+        description={`Delete ${bulk.selectedCount} resort${bulk.selectedCount === 1 ? "" : "s"} and their workspace data. When a tenant has no resorts left, the resort owner login${bulk.selectedCount === 1 ? " is" : "s are"} removed too. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        tone="danger"
+        loading={bulkDeleting}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void onBulkDelete()}
+      />
 
       <AdminResortViewModal
         resortId={viewResortId}

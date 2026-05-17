@@ -281,4 +281,79 @@ class BulkDeleteTest extends TestCase
         $this->assertDatabaseMissing('discount_codes', ['id' => $code->id]);
         $this->assertDatabaseMissing('room_availability', ['id' => $block->id]);
     }
+
+    public function test_admin_bulk_delete_resort_removes_owner_when_last_resort_on_tenant(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $tenant = Tenant::create([
+            'name' => 'Delete Me Resort Co',
+            'slug' => 'delete-me-resort',
+            'subdomain' => 'delete-me-resort',
+            'status' => 'active',
+        ]);
+        $owner = User::factory()->create([
+            'role' => 'resort_owner',
+            'tenant_id' => $tenant->id,
+        ]);
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Sunset Cove',
+            'is_publicly_listed' => false,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/admin/resorts/bulk-delete', ['ids' => [$resort->id]])
+            ->assertSuccessful()
+            ->assertJsonPath('data.deleted', 1);
+
+        $this->assertDatabaseMissing('resorts', ['id' => $resort->id]);
+        $this->assertDatabaseMissing('users', ['id' => $owner->id]);
+        $this->assertDatabaseMissing('tenants', ['id' => $tenant->id]);
+    }
+
+    public function test_admin_bulk_delete_resort_keeps_owner_when_tenant_has_other_resorts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $tenant = Tenant::create([
+            'name' => 'Multi Resort Co',
+            'slug' => 'multi-resort-co',
+            'subdomain' => 'multi-resort-co',
+            'status' => 'active',
+        ]);
+        $owner = User::factory()->create([
+            'role' => 'resort_owner',
+            'tenant_id' => $tenant->id,
+        ]);
+        $first = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Resort A',
+            'is_publicly_listed' => false,
+        ]);
+        $second = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Resort B',
+            'is_publicly_listed' => false,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/admin/resorts/bulk-delete', ['ids' => [$first->id]])
+            ->assertSuccessful()
+            ->assertJsonPath('data.deleted', 1);
+
+        $this->assertDatabaseMissing('resorts', ['id' => $first->id]);
+        $this->assertDatabaseHas('resorts', ['id' => $second->id]);
+        $this->assertDatabaseHas('users', ['id' => $owner->id]);
+        $this->assertDatabaseHas('tenants', ['id' => $tenant->id]);
+    }
+
+    public function test_non_admin_cannot_bulk_delete_resorts(): void
+    {
+        $owner = User::factory()->create(['role' => 'resort_owner']);
+        Sanctum::actingAs($owner);
+
+        $this->postJson('/api/v1/admin/resorts/bulk-delete', ['ids' => [1]])
+            ->assertForbidden();
+    }
 }

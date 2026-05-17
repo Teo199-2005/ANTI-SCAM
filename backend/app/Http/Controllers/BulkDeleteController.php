@@ -31,6 +31,21 @@ class BulkDeleteController extends Controller
         return $this->successResponse($result->toArray(), 'Bulk delete completed');
     }
 
+    public function resorts(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->role === 'admin', 403);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'max:'.BulkDeleteService::MAX_BATCH],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $result = $this->bulkDelete->deleteResorts($auth, $validated['ids']);
+
+        return $this->successResponse($result->toArray(), 'Bulk delete completed');
+    }
+
     public function rooms(Request $request)
     {
         $auth = $request->user();
