@@ -72,6 +72,13 @@ export function formatStayRange(checkIn: string | null | undefined, checkOut?: s
   return `${fmt(inIso, { month: "long", day: "numeric", year: "numeric" })} → ${fmt(outIso, { month: "long", day: "numeric", year: "numeric" })}`;
 }
 
+/** jsPDF built-in fonts cannot render ₱ — use "PHP" prefix in PDF exports. */
+export function formatPhpForPdf(amount: unknown): string {
+  const core = formatPhp(amount);
+  if (core === "—") return core;
+  return core.replace(/₱/g, "PHP ");
+}
+
 /** Ledger-style: coerce invalid → 0 then show two decimals. */
 
 export function formatPhpLedger(amount: unknown): string {

@@ -155,11 +155,11 @@ export default function AdminAnalyticsPage() {
           onClick={() => {
             if (!data) return;
             setExportingPdf(true);
-            try {
-              exportAdminAnalyticsPdf(data, applied);
-            } finally {
-              setExportingPdf(false);
-            }
+            void exportAdminAnalyticsPdf(data, applied)
+              .catch(() => {
+                /* toast could be added; export throws on empty PDF */
+              })
+              .finally(() => setExportingPdf(false));
           }}
           disabled={loading || exportingPdf || !data}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-softBorder bg-white px-4 py-2.5 text-sm font-semibold text-navy shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"

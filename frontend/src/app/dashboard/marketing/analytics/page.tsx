@@ -85,11 +85,7 @@ export default function MarketingAnalyticsPage() {
               onClick={() => {
                 if (!data) return;
                 setExportingPdf(true);
-                try {
-                  exportMarketingAnalyticsPdf(data, year);
-                } finally {
-                  setExportingPdf(false);
-                }
+                void exportMarketingAnalyticsPdf(data, year).finally(() => setExportingPdf(false));
               }}
               disabled={loading || exportingPdf || !data}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/95 px-4 py-2 font-dash text-dash-sm font-semibold text-navy shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"

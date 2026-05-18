@@ -26,7 +26,8 @@ import {
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { useEffect, useMemo, useState } from "react";
-import { formatPhp, formatPhpLedger } from "@/lib/formatPhp";
+import { formatPhp, formatPhpForPdf } from "@/lib/formatPhp";
+import { loadBrandLogoDataUrlForPdf } from "@/lib/pdf/brandedAnalyticsPdf";
 import Link from "next/link";
 
 const MONTHS = [
@@ -120,6 +121,7 @@ export default function ResortRevenuePage() {
     if (!payload) return;
     setExportingPdf(true);
     try {
+      const brandLogo = await loadBrandLogoDataUrlForPdf();
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -130,7 +132,7 @@ export default function ResortRevenuePage() {
       const left = 12;
       const right = pageWidth - 12;
       let y = 12;
-      const fmtMoney = (value: number) => formatPhpLedger(value);
+      const fmtMoney = (value: number) => formatPhpForPdf(value);
       const drawFooter = (pageNum: number) => {
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.15);
@@ -170,39 +172,46 @@ export default function ResortRevenuePage() {
         doc.restoreGraphicsState();
       };
 
-      let logoDataUrl: string | null = null;
+      let resortLogoDataUrl: string | null = null;
       if (payload.resort.logo_url) {
         try {
           const logoUrl = laravelPublicUrl(payload.resort.logo_url);
           const res = await fetch(logoUrl, { mode: "cors" });
           const blob = await res.blob();
-          logoDataUrl = await new Promise((resolve) => {
+          resortLogoDataUrl = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(String(reader.result));
             reader.readAsDataURL(blob);
           });
         } catch {
-          logoDataUrl = null;
+          resortLogoDataUrl = null;
         }
       }
 
-      // Header (black & white)
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(0, 0, 0);
-      doc.rect(left, y, right - left, 24, "S");
-      if (logoDataUrl) {
-        doc.addImage(logoDataUrl, "PNG", left + 3, y + 4, 14, 14);
+      const headerLogo = brandLogo ?? resortLogoDataUrl;
+      const headerH = 32;
+      doc.setFillColor(13, 30, 66);
+      doc.rect(0, y - 2, pageWidth, headerH, "F");
+      doc.setFillColor(204, 27, 46);
+      doc.rect(0, y - 2 + headerH, pageWidth, 1, "F");
+      if (headerLogo) {
+        doc.addImage(headerLogo, "PNG", left, y + 2, 18, 18);
       }
-      doc.setTextColor(0, 0, 0);
+      const titleX = headerLogo ? left + 22 : left;
+      doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(payload.resort.name || "Resort Revenue Report", logoDataUrl ? left + 20 : left + 3, y + 9);
+      doc.setFontSize(13);
+      doc.text("ANTI-SCAM PH", titleX, y + 10);
+      doc.setFontSize(11);
+      doc.text(payload.resort.name || "Resort Revenue Report", titleX, y + 17);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text("Anti-Scam PH - Revenue Analytics Report", logoDataUrl ? left + 20 : left + 3, y + 15);
-      doc.text(`Period: ${applied.period.toUpperCase()}`, right - 2, y + 9, { align: "right" });
-      doc.text(`Generated: ${new Date().toLocaleString()}`, right - 2, y + 15, { align: "right" });
-      y += 30;
+      doc.setFontSize(8.5);
+      doc.setTextColor(220, 230, 245);
+      doc.text("Revenue & analytics report", titleX, y + 22);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Period: ${applied.period.toUpperCase()}`, right - 2, y + 10, { align: "right" });
+      doc.text(`Generated: ${new Date().toLocaleString("en-PH")}`, right - 2, y + 17, { align: "right" });
+      y += headerH + 6;
 
       drawWatermark();
 

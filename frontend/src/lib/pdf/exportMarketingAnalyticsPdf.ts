@@ -1,69 +1,61 @@
 import type { MarketingAnalyticsPayload } from "@/lib/api/marketing";
-import { formatPhpLedger as fmtMoney } from "@/lib/formatPhp";
+import { formatPhpForPdf } from "@/lib/formatPhp";
 import {
-  createPortraitPdf,
-  downloadPdfDocument,
-  drawPdfFooter,
-  drawPdfReportHeader,
-  drawPdfWatermark,
-  ensurePdfPageSpace,
-} from "@/lib/pdf/analyticsReportPdf";
+  beginBrandedPdf,
+  drawBrandedKpiRow,
+  drawBrandedSection,
+  drawBrandedTable,
+  finishBrandedPdf,
+} from "@/lib/pdf/brandedAnalyticsPdf";
 
 function monthLabel(period: string): string {
   const [y, m] = period.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("en-PH", { month: "short", year: "numeric" });
 }
 
-export function exportMarketingAnalyticsPdf(data: MarketingAnalyticsPayload, year: number): void {
-  const doc = createPortraitPdf();
-  const left = 12;
-  let y = 12;
-  let pageNum = 1;
+export async function exportMarketingAnalyticsPdf(
+  data: MarketingAnalyticsPayload,
+  year: number,
+): Promise<void> {
+  const t = data.totals;
   const reportLabel = "Marketing Analytics Report";
 
-  drawPdfWatermark(doc);
-  y = drawPdfReportHeader(doc, y, {
+  let sess = await beginBrandedPdf(reportLabel, {
     title: "Marketing Analytics",
-    subtitle: "Referral commissions and subscription volume",
-    rightLines: [`Year ${year}`, `Generated: ${new Date().toLocaleString()}`],
+    subtitle: "Referral commissions & subscription volume",
+    metaLines: [`Year ${year}`, `Generated: ${new Date().toLocaleString("en-PH")}`],
   });
 
-  const t = data.totals;
-  const drawLine = (text: string, bold = false) => {
-    const space = ensurePdfPageSpace(doc, y, 7, pageNum, reportLabel, () => 16);
-    y = space.y;
-    pageNum = space.pageNum;
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.text(text, left, y);
-    y += 6;
-  };
+  sess = drawBrandedSection(sess, "Year-to-date totals");
+  sess = drawBrandedKpiRow(sess, [
+    { label: "Pending commission", value: formatPhpForPdf(t.commission_pending_ytd) },
+    { label: "Released commission", value: formatPhpForPdf(t.commission_released_ytd) },
+    { label: "Referral checkouts", value: String(t.referral_subscription_count_ytd) },
+    { label: "Referral volume", value: formatPhpForPdf(t.referral_subscription_volume_ytd) },
+  ]);
 
-  drawLine("Year-to-date totals", true);
-  drawLine(`Pending commission: ${fmtMoney(t.commission_pending_ytd)}`);
-  drawLine(`Released commission: ${fmtMoney(t.commission_released_ytd)}`);
-  drawLine(`Referral checkouts: ${t.referral_subscription_count_ytd}`);
-  drawLine(`Referral volume: ${fmtMoney(t.referral_subscription_volume_ytd)}`);
-  y += 4;
-
-  drawLine("Monthly activity", true);
-  for (const m of data.monthly ?? []) {
-    drawLine(
-      `${monthLabel(m.period)}: pending ${fmtMoney(m.commission_pending)} · released ${fmtMoney(m.commission_released)} · ${m.referral_payment_count} referral payments`,
-    );
-  }
-  y += 4;
-
-  drawLine("By assigned resort", true);
-  for (const r of data.by_resort ?? []) {
-    drawLine(
-      `${r.resort_name}: total ${fmtMoney(r.commission_total)} · pending ${fmtMoney(r.commission_pending)} · released ${fmtMoney(r.commission_released)}`,
-    );
+  const monthlyRows = (data.monthly ?? []).map((m) => [
+    monthLabel(m.period),
+    formatPhpForPdf(m.commission_pending),
+    formatPhpForPdf(m.commission_released),
+    String(m.referral_payment_count),
+  ]);
+  if (monthlyRows.length > 0) {
+    sess = drawBrandedSection(sess, "Monthly activity");
+    sess = drawBrandedTable(sess, ["Month", "Pending", "Released", "Referrals"], monthlyRows);
   }
 
-  drawPdfFooter(doc, pageNum, reportLabel);
+  const resortRows = (data.by_resort ?? []).map((r) => [
+    r.resort_name,
+    formatPhpForPdf(r.commission_total),
+    formatPhpForPdf(r.commission_pending),
+    formatPhpForPdf(r.commission_released),
+  ]);
+  if (resortRows.length > 0) {
+    sess = drawBrandedSection(sess, "By assigned resort");
+    sess = drawBrandedTable(sess, ["Resort", "Total", "Pending", "Released"], resortRows);
+  }
 
   const fileDate = new Date().toISOString().slice(0, 10);
-  downloadPdfDocument(doc, `anti-scamph-marketing-analytics-${year}-${fileDate}.pdf`);
+  finishBrandedPdf(sess, `anti-scamph-marketing-analytics-${year}-${fileDate}.pdf`);
 }
