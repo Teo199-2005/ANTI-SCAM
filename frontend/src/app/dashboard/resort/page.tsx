@@ -14,6 +14,7 @@ import {
   ResortDashboardStats,
 } from "@/lib/api/dashboard";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { syncPendingSubscriptionInvoice } from "@/lib/api/subscription";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
 import { useToast } from "@/components/shared/ToastProvider";
@@ -59,6 +60,7 @@ export default function ResortOverviewPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [hasProAnalytics, setHasProAnalytics] = useState(false);
 
   const [calendarYear, calendarMonthIndex] = calendarYm.split("-").map(Number);
   const monthStart = useMemo(
@@ -147,8 +149,11 @@ export default function ResortOverviewPage() {
     setLoading(true);
     setSetupRequired(false);
     try {
-      const statsResult = await getResortStats();
+      const [statsResult, landing] = await Promise.all([getResortStats(), getOwnerLandingPage().catch(() => null)]);
       setStats(statsResult);
+      setHasProAnalytics(
+        landing ? isBusinessProPlan(landing.subscription_plan, landing.subscription_status) : false,
+      );
       setError(null);
     } catch (err) {
       const noResortLinked =
@@ -315,8 +320,9 @@ export default function ResortOverviewPage() {
         </div>
       </div>
 
-      {/* ── Revenue metrics (2×2 phone → 3 across md+) ───────── */}
-      {(stats.totalReservationFees !== undefined || stats.totalGrossBookings !== undefined) && (
+      {/* ── Revenue metrics (Business Pro) ───────── */}
+      {hasProAnalytics &&
+        (stats.totalReservationFees !== undefined || stats.totalGrossBookings !== undefined) && (
         <div className="grid min-w-0 grid-cols-2 gap-2.5 md:gap-3 md:grid-cols-3">
           {/* Fees collected */}
           <div

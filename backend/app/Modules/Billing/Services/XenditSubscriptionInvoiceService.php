@@ -10,6 +10,8 @@ use App\Modules\Billing\Support\XenditTls;
 use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\SubscriptionReferralCommissionService;
 use App\Modules\Billing\Support\SubscriptionInvoicePlanTag;
+use App\Modules\Billing\Support\XenditCheckoutUrl;
+use App\Modules\Billing\Support\XenditGatewayErrorMessage;
 use App\Support\PricingPilot;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -145,72 +147,35 @@ class XenditSubscriptionInvoiceService
             throw new RuntimeException('Xendit secret key is not configured.');
         }
 
-        $isRoomAddon = $billingScope === 'room_addon';
+        if ($billingScope === 'room_addon') {
+            throw new RuntimeException('Room add-on billing is no longer available. Upgrade to Business Pro for up to 20 rooms.');
+        }
+
         $hasReferral = $referralCode !== '';
         $externalId = sprintf(
-            '%s-%d-%s%s',
-            $isRoomAddon ? 'sub-addon' : 'sub',
+            'sub-pro-%d-%s%s',
             $subscription->id,
-            (string) $subscription->billing_cycle_start,
+            (string) ($subscription->billing_cycle_start ?? now()->toDateString()),
             $hasReferral ? '-ref' : ''
         );
 
         $pilot = PricingPilot::enabled();
+        $durationMonths = 1;
         $chargeAmount = $this->resolveChargeAmount($subscription, $billingScope, $roomAddonQuantity, $durationMonths);
-        $slotMonthly = 0.0;
 
-        if ($isRoomAddon) {
-            $roomAddonQuantity = max(1, $roomAddonQuantity);
-            $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-            if (! $pilot) {
-                $baseExtra = (float) $subscription->extra_room_fee;
-                $ref = PricingPilot::subscriptionTierReference();
-                $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / $ref), 2);
-            }
-            $description = sprintf(
-                'Extra room slots ×%d · %d-month prepay — %s (%s)',
-                $roomAddonQuantity,
-                $durationMonths,
-                $subscription->resort?->name,
-                $subscription->plan
-            );
-            $itemName = 'Extra Room Slot Add-on';
-            $invoicePlan = sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths);
-        } else {
-            $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-            $monthlyRate = $this->monthlyRate($durationMonths);
-            $description = sprintf(
-                'Subscription fee — %s (%s) · %d month%s',
-                $subscription->resort?->name,
-                $subscription->plan,
-                $durationMonths,
-                $durationMonths > 1 ? 's' : ''
-            );
-            $itemName = 'Subscription Plan';
-            $invoicePlan = SubscriptionInvoicePlanTag::baseMonthly(
-                (string) $subscription->plan,
-                $durationMonths,
-                $setupRecurring
-            );
-        }
+        $description = sprintf(
+            'Business Pro — %s · 1 month',
+            $subscription->resort?->name ?? 'Resort'
+        );
+        $itemName = 'Business Pro Subscription';
+        $invoicePlan = SubscriptionInvoicePlanTag::businessProMonthly($setupRecurring);
 
-        $invoiceItems = $pilot
-            ? [[
-                'name' => $itemName,
-                'quantity' => 1,
-                'price' => $chargeAmount,
-                'category' => 'Subscription',
-            ]]
-            : [[
-                'name' => $itemName,
-                'quantity' => $isRoomAddon
-                    ? $roomAddonQuantity * $durationMonths
-                    : max(1, $durationMonths),
-                'price' => $isRoomAddon
-                    ? $slotMonthly
-                    : $monthlyRate,
-                'category' => 'Subscription',
-            ]];
+        $invoiceItems = [[
+            'name' => $itemName,
+            'quantity' => 1,
+            'price' => $chargeAmount,
+            'category' => 'Subscription',
+        ]];
 
         if (! $this->isConfigured()) {
             if ($this->canUseLocalMockPaid()) {
@@ -303,12 +268,17 @@ class XenditSubscriptionInvoiceService
 
         $data = $response->json();
 
+        $invoiceUrl = (string) ($data['invoice_url'] ?? '');
+        if (! XenditCheckoutUrl::isValid($invoiceUrl)) {
+            throw new RuntimeException('Xendit did not return a valid checkout URL. Verify API key permissions and IP allowlist.');
+        }
+
         $invoice = SubscriptionInvoice::create([
             'tenant_id' => $subscription->tenant_id,
             'subscription_id' => $subscription->id,
             'resort_id' => $subscription->resort_id,
             'xendit_invoice_id' => $data['id'] ?? null,
-            'xendit_invoice_url' => $data['invoice_url'] ?? null,
+            'xendit_invoice_url' => $invoiceUrl,
             'amount' => $chargeAmount,
             'plan' => $invoicePlan,
             'referral_code' => $storedReferralCode,
@@ -328,20 +298,7 @@ class XenditSubscriptionInvoiceService
 
     private function buildGatewayErrorMessage(int $status, mixed $errorBody): string
     {
-        $message = is_array($errorBody) ? (string) ($errorBody['message'] ?? '') : '';
-        $code = is_array($errorBody) ? (string) ($errorBody['error_code'] ?? '') : '';
-
-        if ($status === 403 || $code === 'REQUEST_FORBIDDEN_ERROR') {
-            return 'Xendit API key is forbidden for invoice creation. Check key permissions in Xendit Dashboard (Invoices write/create access).';
-        }
-
-        if ($status === 401) {
-            return 'Xendit API key is invalid or unauthorized. Please verify XENDIT_SECRET_KEY.';
-        }
-
-        return $message !== ''
-            ? "Subscription payment gateway error: {$message}"
-            : 'Subscription payment gateway error. Please try again.';
+        return XenditGatewayErrorMessage::fromResponse($status, $errorBody, 'Subscription payment');
     }
 
     private function shouldUseLocalMockOnForbidden(int $status, mixed $errorBody): bool
@@ -350,9 +307,7 @@ class XenditSubscriptionInvoiceService
             return false;
         }
 
-        $code = is_array($errorBody) ? (string) ($errorBody['error_code'] ?? '') : '';
-
-        return $status === 403 || $code === 'REQUEST_FORBIDDEN_ERROR';
+        return XenditGatewayErrorMessage::isRecoverableForbidden($status, $errorBody);
     }
 
     private function createLocalMockPaidInvoice(
@@ -391,43 +346,10 @@ class XenditSubscriptionInvoiceService
         ]);
 
         if ($billingScope === 'room_addon') {
-            $subscription->included_rooms = max(0, (int) $subscription->included_rooms) + max(1, $roomAddonQuantity);
-            $subscription->active_room_count = $subscription->resort
-                ? $subscription->resort->rooms()->where('status', 'active')->count()
-                : (int) $subscription->active_room_count;
-            $subscription->total_monthly_fee = max(
-                0,
-                (float) $subscription->base_price
-                + max(0, $subscription->active_room_count - (int) $subscription->included_rooms) * (float) $subscription->extra_room_fee
-            );
-            $subscription->status = 'active';
-            $subscription->grace_until = null;
-            $subscription->save();
-
-            return [
-                'invoice_id' => $mockInvoiceId,
-                'invoice_url' => $successUrl,
-                'subscription_invoice_id' => $invoice->id,
-            ];
+            throw new RuntimeException('Room add-on billing is no longer available.');
         }
 
-        $newStart = $subscription->billing_cycle_end
-            ? $subscription->billing_cycle_end->copy()->addDay()
-            : now()->startOfMonth();
-        // extractTermFromPlan returns [termMonths, isFmf].
-        // For first-month-free the full term (N months) is credited even though only N-1 were charged.
-        [$termMonths] = $this->extractTermFromPlan($invoicePlan);
-        $newEnd = $newStart->copy()->addMonthsNoOverflow($termMonths)->subDay();
-
-        $subscription->update([
-            'billing_cycle_start' => $newStart->toDateString(),
-            'billing_cycle_end' => $newEnd->toDateString(),
-            'next_due_date' => $newEnd->toDateString(),
-            'status' => 'active',
-            'grace_until' => null,
-        ]);
-
-        app(SubscriptionReferralCommissionService::class)->creditFromPaidMonthlyInvoice($invoice);
+        app(SubscriptionPaymentConfirmationService::class)->applyBaseSubscriptionPayment($invoice);
 
         return [
             'invoice_id' => $mockInvoiceId,
@@ -450,32 +372,15 @@ class XenditSubscriptionInvoiceService
         int $roomAddonQuantity = 1,
         int $durationMonths = 1,
     ): float {
-        $pilot = PricingPilot::enabled();
+        if ($billingScope === 'room_addon') {
+            throw new RuntimeException('Room add-on billing is no longer available.');
+        }
 
-        if ($pilot) {
+        if (PricingPilot::enabled()) {
             return PricingPilot::flatInvoiceAmount();
         }
 
-        if ($billingScope === 'room_addon') {
-            $roomAddonQuantity = max(1, $roomAddonQuantity);
-            $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-            $baseExtra = (float) $subscription->extra_room_fee;
-            if ($baseExtra <= 0) {
-                throw new RuntimeException('Extra room fee is not configured for this subscription.');
-            }
-            $ref = PricingPilot::subscriptionTierReference();
-            $slotMonthly = round($baseExtra * ($this->monthlyRate($durationMonths) / $ref), 2);
-            $chargeAmount = round($slotMonthly * $roomAddonQuantity * $durationMonths, 2);
-            if ($chargeAmount <= 0) {
-                throw new RuntimeException('Could not compute room add-on amount.');
-            }
-
-            return $chargeAmount;
-        }
-
-        $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-
-        return $this->monthlyRate($durationMonths) * $durationMonths;
+        return PricingPilot::businessProMonthlyPhp();
     }
 
     /**
@@ -507,35 +412,4 @@ class XenditSubscriptionInvoiceService
         return $gatewayStatus === null || $gatewayStatus !== 'PENDING';
     }
 
-    private function monthlyRate(int $durationMonths): float
-    {
-        $standard = PricingPilot::subscriptionTierMonthlyPhp();
-
-        return $standard[$durationMonths] ?? $standard[1];
-    }
-
-    /**
-     * Parse the invoice plan tag and return [termMonths, isFirstMonthFree].
-     * For first-month-free (_fmf) plans the full term is credited even though
-     * chargeAmount only covers N-1 months.
-     * For legacy bonus (_b1) plans we preserve the old "+1 bonus" credit.
-     *
-     * @return array{0:int,1:bool}
-     */
-    private function extractTermFromPlan(string $invoicePlan): array
-    {
-        // New first-month-free tag: basic_m12_fmf
-        if (preg_match('/_m(\d+)_fmf$/', $invoicePlan, $m) === 1) {
-            return [max(1, (int) $m[1]), true];
-        }
-        // Legacy bonus tag: basic_m12_b1 (keep creditedMonths = paidMonths + bonusMonths)
-        if (preg_match('/_m(\d+)_b(\d+)$/', $invoicePlan, $m) === 1) {
-            $paidMonths = max(1, (int) $m[1]);
-            $bonusMonths = max(0, (int) $m[2]);
-
-            return [$paidMonths + $bonusMonths, false];
-        }
-
-        return [1, false];
-    }
 }

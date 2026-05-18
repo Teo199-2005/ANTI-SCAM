@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BookingLock;
 use App\Models\Reservation;
 use App\Models\Resort;
+use App\Services\PlanFeatureResolver;
 use App\Models\Room;
 use App\Models\User;
 use App\Support\CacheSafe;
@@ -94,12 +95,15 @@ class DashboardController extends Controller
         ];
     }
 
-    public function resortRevenueAnalytics(Request $request)
+    public function resortRevenueAnalytics(Request $request, PlanFeatureResolver $plans)
     {
         $tenantId = $request->user()->tenant_id;
         if (! $tenantId) {
             return $this->errorResponse('Tenant not found for current user.', null, 422);
         }
+
+        $resort = Resort::withoutGlobalScopes()->where('tenant_id', $tenantId)->with('subscription')->first();
+        $plans->assertFeature($resort?->subscription, 'revenue_reports');
 
         $period = (string) $request->input('period', 'monthly'); // weekly | monthly | yearly | custom
         $year   = (int) $request->input('year', now()->year);

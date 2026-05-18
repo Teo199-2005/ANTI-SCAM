@@ -45,7 +45,8 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         heading={data.hero.heading}
         location={data.address ?? data.map.address}
         contactNumber={data.contactNumber}
-        isVip={data.isVip}
+        isVip={data.isPremiumVerified ?? data.isVip}
+        badgeLabel={data.badgeLabel}
         facebookUrl={data.hero.facebookUrl ?? null}
         instagramUrl={data.hero.instagramUrl ?? null}
         tiktokUrl={data.hero.tiktokUrl ?? null}

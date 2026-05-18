@@ -49,6 +49,7 @@ type Props = {
   /** Optional hero link (e.g. About / Find us) — no default when omitted. */
   secondaryCta?: { href: string; label: string } | null;
   isVip: boolean;
+  badgeLabel?: string;
   facebookUrl?: string | null;
   instagramUrl?: string | null;
   tiktokUrl?: string | null;
@@ -65,6 +66,7 @@ export function ResortLandingHero({
   contactNumber,
   secondaryCta,
   isVip,
+  badgeLabel,
   facebookUrl,
   instagramUrl,
   tiktokUrl,
@@ -132,21 +134,20 @@ export function ResortLandingHero({
                 ) : null}
                 <div className="flex w-full max-w-md flex-wrap items-center justify-center gap-2 sm:w-auto sm:max-w-none">
                   <span
-                    className="inline-flex items-center gap-2 rounded-full border border-white/22 bg-white/12 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md sm:px-3.5 sm:py-2 sm:text-[11px]"
+                    className={
+                      isVip
+                        ? "inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-500/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-50/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md sm:px-3.5 sm:py-2 sm:text-[11px]"
+                        : "inline-flex items-center gap-2 rounded-full border border-white/22 bg-white/12 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md sm:px-3.5 sm:py-2 sm:text-[11px]"
+                    }
                     style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
                   >
-                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-zinc-300 sm:h-4 sm:w-4" aria-hidden />
-                    Verified listing
-                  </span>
-                  {isVip ? (
-                    <span
-                      className="inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-500/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-50/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md sm:px-3.5 sm:py-2 sm:text-[11px]"
-                      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-                    >
+                    {isVip ? (
                       <Star className="h-3.5 w-3.5 shrink-0 text-amber-200/90 sm:h-4 sm:w-4" aria-hidden />
-                      Featured partner
-                    </span>
-                  ) : null}
+                    ) : (
+                      <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-zinc-300 sm:h-4 sm:w-4" aria-hidden />
+                    )}
+                    {badgeLabel ?? (isVip ? "Premium Verified Resort" : "Verified Resort")}
+                  </span>
                 </div>
               </div>
 

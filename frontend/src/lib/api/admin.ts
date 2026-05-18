@@ -5,6 +5,11 @@ import type { ResortItem } from "@/lib/api/resort";
 export type AdminStats = {
   totalResorts: number;
   publicResorts: number;
+  standardResorts?: number;
+  businessProResorts?: number;
+  subscriptionRevenueMonth?: number;
+  expiringSubscriptions?: number;
+  failedPayments?: number;
   suspendedResorts: number;
   gracePeriodResorts: number;
   totalUsers: number;

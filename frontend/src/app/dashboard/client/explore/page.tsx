@@ -5,6 +5,7 @@ import LocationFilterBar, {
   locationFilterToParams,
   type LocationFilterValue,
 } from "@/components/locations/LocationFilterBar";
+import { ResortPlanBadge } from "@/components/badges/ResortPlanBadge";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import { getFavoriteResortIds, toggleFavoriteResortId } from "@/lib/client/favorites";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
@@ -106,6 +107,13 @@ export default function ExplorePage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="font-dash text-lg font-semibold text-navy">{r.name}</h3>
+                    {r.badgeLabel ? (
+                      <ResortPlanBadge
+                        badgeLabel={r.badgeLabel}
+                        isPremiumVerified={r.isPremiumVerified}
+                        className="mt-1.5"
+                      />
+                    ) : null}
                     {r.address ? (
                       <p className="mt-1 flex items-start gap-1 text-sm text-zinc-600">
                         <MapPin size={14} className="mt-0.5 shrink-0 text-zinc-400" />

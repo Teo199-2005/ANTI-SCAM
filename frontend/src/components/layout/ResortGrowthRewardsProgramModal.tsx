@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
+import Link from "next/link";
 import { Gift, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -8,12 +9,14 @@ import { createPortal } from "react-dom";
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** Business Pro resorts see the full program; Standard owners see an upgrade teaser. */
+  eligible?: boolean;
 };
 
 /**
  * Full-width marketing modal for the Resort Growth Rewards Program infographic (`/program.png`).
  */
-export function ResortGrowthRewardsProgramModal({ open, onClose }: Props) {
+export function ResortGrowthRewardsProgramModal({ open, onClose, eligible = true }: Props) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -87,15 +90,32 @@ export function ResortGrowthRewardsProgramModal({ open, onClose }: Props) {
           </div>
 
           <div className="max-h-[min(85dvh,calc(100dvh-7rem))] overflow-y-auto bg-zinc-50/80 p-2 sm:p-3">
-            <ImageWithFallback
-              src="/program.png"
-              alt="Anti-Scam PH Resort Growth Rewards Program — prizes, how it works, eligibility, and contact information"
-              width={1600}
-              height={2200}
-              unoptimized
-              className="mx-auto h-auto w-full max-w-full rounded-lg object-contain shadow-sm"
-              sizes="(max-width: 1024px) 100vw, 896px"
-            />
+            {eligible ? (
+              <ImageWithFallback
+                src="/program.png"
+                alt="Anti-Scam PH Resort Growth Rewards Program — prizes, how it works, eligibility, and contact information"
+                width={1600}
+                height={2200}
+                unoptimized
+                className="mx-auto h-auto w-full max-w-full rounded-lg object-contain shadow-sm"
+                sizes="(max-width: 1024px) 100vw, 896px"
+              />
+            ) : (
+              <div className="mx-auto max-w-lg space-y-4 rounded-xl border border-amber-200/80 bg-white p-6 text-center shadow-sm">
+                <p className="font-pop text-base font-bold text-[#0B1F3A]">Business Pro exclusive</p>
+                <p className="text-sm leading-relaxed text-zinc-600">
+                  The Resort Growth Rewards Program is available to Premium Verified Resorts on the Business Pro plan.
+                  Upgrade from your dashboard to unlock eligibility, priority listing, and analytics.
+                </p>
+                <Link
+                  href="/dashboard/resort"
+                  className="inline-flex rounded-full bg-[#0d1f3c] px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-95"
+                  onClick={onClose}
+                >
+                  Go to dashboard
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

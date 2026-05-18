@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Resort;
 use App\Models\Subscription;
+use App\Models\SubscriptionInvoice;
+use App\Support\SubscriptionPlan;
 use App\Models\User;
 use App\Support\CacheSafe;
 use App\Shared\Traits\ApiResponseTrait;
@@ -35,11 +37,33 @@ class AdminStatsController extends Controller
                 ", [now()->startOfMonth()])
                 ->first();
 
+            $monthStart = now()->startOfMonth();
+            $subscriptionRevenueMonth = (float) SubscriptionInvoice::withoutGlobalScopes()
+                ->where('status', 'paid')
+                ->where('paid_at', '>=', $monthStart)
+                ->where('plan', 'like', SubscriptionPlan::BUSINESS_PRO.'%')
+                ->sum('amount');
+
             return [
                 'totalResorts'           => Resort::withoutGlobalScopes()->count(),
                 'publicResorts'          => Resort::withoutGlobalScopes()->where('is_publicly_listed', true)->count(),
+                'standardResorts'        => Subscription::withoutGlobalScopes()->where('plan', SubscriptionPlan::STANDARD)->count(),
+                'businessProResorts'     => Subscription::withoutGlobalScopes()
+                    ->where('plan', SubscriptionPlan::BUSINESS_PRO)
+                    ->whereIn('status', ['active', 'grace_period'])
+                    ->count(),
+                'subscriptionRevenueMonth' => $subscriptionRevenueMonth,
+                'expiringSubscriptions'  => Subscription::withoutGlobalScopes()
+                    ->where('plan', SubscriptionPlan::BUSINESS_PRO)
+                    ->whereIn('status', ['active', 'grace_period'])
+                    ->whereBetween('next_due_date', [now()->toDateString(), now()->addDays(7)->toDateString()])
+                    ->count(),
+                'failedPayments'         => SubscriptionInvoice::withoutGlobalScopes()
+                    ->whereIn('status', ['failed', 'expired'])
+                    ->where('created_at', '>=', now()->subDays(30))
+                    ->count(),
                 'suspendedResorts'       => Subscription::withoutGlobalScopes()->where('status', 'expired')->count(),
-                'gracePeriodResorts'     => 0,
+                'gracePeriodResorts'     => Subscription::withoutGlobalScopes()->where('status', 'grace_period')->count(),
                 'totalUsers'             => User::count(),
                 'newUsersThisWeek'       => User::where('created_at', '>=', now()->subDays(7))->count(),
                 'totalReservations'      => (int) ($reservationAgg->total_reservations ?? 0),

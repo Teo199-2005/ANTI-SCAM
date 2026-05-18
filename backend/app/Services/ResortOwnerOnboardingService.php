@@ -125,7 +125,7 @@ class ResortOwnerOnboardingService
                 'representative_contact_number' => $input['representative_contact_number'] ?? null,
                 'cancellation_policy' => $input['cancellation_policy'] ?? null,
                 'amenities' => $input['amenities'] ?? [],
-                'is_publicly_listed' => $input['is_publicly_listed'] ?? false,
+                'is_publicly_listed' => $input['is_publicly_listed'] ?? true,
             ];
 
             if (Schema::hasColumn('resorts', 'logo_url')) {
@@ -143,8 +143,7 @@ class ResortOwnerOnboardingService
             $resort = Resort::withoutGlobalScopes()->create($resortPayload);
             $this->locations->syncResortAddressLabel($resort);
 
-            $plan = (string) ($input['plan'] ?? 'basic');
-            $subscription = $this->subscriptions->refreshForResort($resort, $plan);
+            $subscription = $this->subscriptions->refreshForResort($resort, 'standard', activateIfNew: true);
             $subscription = $this->referralSignupTrial->applyTrialAfterOnboard($locked->fresh(), $resort, $subscription);
 
             return [

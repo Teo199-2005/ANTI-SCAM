@@ -9,292 +9,250 @@ use App\Modules\Billing\Services\XenditRecurringSubscriptionService;
 use App\Modules\Billing\Services\XenditSubscriptionInvoiceService;
 use App\Modules\Billing\Services\XenditSubscriptionWebhookService;
 use App\Modules\Billing\Support\SubscriptionInvoicePlanTag;
+use App\Modules\Billing\Support\XenditCheckoutUrl;
+use App\Support\SubscriptionPlan;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use RuntimeException;
 
 class SubscriptionInvoiceController extends Controller
 {
-    use ApiResponseTrait;
+  use ApiResponseTrait;
 
-    public function __construct(
-        private readonly XenditSubscriptionInvoiceService $service,
-        private readonly XenditSubscriptionWebhookService $subscriptionWebhook,
-        private readonly XenditRecurringSubscriptionService $recurring,
-    ) {}
+  public function __construct(
+    private readonly XenditSubscriptionInvoiceService $service,
+    private readonly XenditSubscriptionWebhookService $subscriptionWebhook,
+    private readonly XenditRecurringSubscriptionService $recurring,
+  ) {}
 
-    /**
-     * POST /resort-owner/subscriptions/pay-invoice
-     * Same as {@see create} but resolves the resort from the authenticated owner’s tenant,
-     * avoiding mismatches when the client URL used a stale or wrong resort id.
-     */
-    public function createForOwner(Request $request)
-    {
-        $resort = $this->resolveResortForAuthenticatedOwner($request);
-        if (! $resort) {
-            return $this->errorResponse('No resort found for this account.', null, 404);
-        }
-
-        return $this->create($request, $resort);
+  public function createForOwner(Request $request)
+  {
+    $resort = $this->resolveResortForAuthenticatedOwner($request);
+    if (! $resort) {
+      return $this->errorResponse('No resort found for this account.', null, 404);
     }
 
-    public function index(Request $request, Resort $resort)
-    {
-        $this->authorizeResortAccess($request, $resort);
+    return $this->create($request, $resort);
+  }
 
-        $perPage = (int) $request->integer('perPage', 20);
-        $invoices = SubscriptionInvoice::query()
-            ->where('resort_id', $resort->id)
-            ->latest('id')
-            ->paginate($perPage);
+  public function index(Request $request, Resort $resort)
+  {
+    $this->authorizeResortAccess($request, $resort);
 
-        return $this->successResponse($invoices, 'Subscription invoices fetched');
+    $perPage = (int) $request->integer('perPage', 20);
+    $invoices = SubscriptionInvoice::query()
+      ->where('resort_id', $resort->id)
+      ->latest('id')
+      ->paginate($perPage);
+
+    return $this->successResponse($invoices, 'Subscription invoices fetched');
+  }
+
+  public function create(Request $request, Resort $resort)
+  {
+    $this->authorizeResortAccess($request, $resort);
+
+    $subscription = $resort->subscription()->first();
+    if (! $subscription) {
+      return $this->errorResponse('Subscription not found for this resort.', null, 404);
     }
 
-    public function create(Request $request, Resort $resort)
-    {
-        $this->authorizeResortAccess($request, $resort);
+    $billingScope = (string) $request->input('billing_scope', 'monthly');
+    if ($billingScope === 'room_addon') {
+      return $this->errorResponse(
+        'Room add-on billing is no longer available. Upgrade to Business Pro for up to 20 rooms.',
+        ['billing_scope' => ['deprecated']],
+        422
+      );
+    }
 
-        $subscription = $resort->subscription()->first();
-        if (! $subscription) {
-            return $this->errorResponse('Subscription not found for this resort.', null, 404);
-        }
+    if ($billingScope !== 'monthly') {
+      return $this->errorResponse('Invalid billing scope.', ['billing_scope' => ['invalid']], 422);
+    }
 
-        $billingScope = (string) $request->input('billing_scope', 'monthly');
-        if (! in_array($billingScope, ['monthly', 'room_addon'], true)) {
-            return $this->errorResponse('Invalid billing scope.', ['billing_scope' => ['invalid']], 422);
-        }
-        $durationMonths = (int) $request->integer('subscription_duration_months', 1);
-        $allowedDurations = [1, 3, 6, 12];
-        if (! in_array($durationMonths, $allowedDurations, true)) {
-            return $this->errorResponse('Invalid subscription duration.', ['subscription_duration_months' => ['invalid']], 422);
-        }
-        $roomAddonQuantity = max(1, min(50, (int) $request->integer('room_addon_quantity', 1)));
+    $durationMonths = 1;
+    $roomAddonQuantity = 1;
 
-        $isOverdue = $subscription->next_due_date && now()->toDateString() >= (string) $subscription->next_due_date;
-        $status = (string) $subscription->status;
-        $isAdmin = (string) $request->user()?->role === 'admin';
-        $force = $isAdmin && (bool) $request->boolean('force', false);
+    if (SubscriptionPlan::normalize($subscription->plan) === SubscriptionPlan::BUSINESS_PRO) {
+      $isOverdue = $subscription->next_due_date && now()->toDateString() >= (string) $subscription->next_due_date;
+      $status = (string) $subscription->status;
+      $isAdmin = (string) $request->user()?->role === 'admin';
+      $force = $isAdmin && (bool) $request->boolean('force', false);
 
-        if (
-            $billingScope === 'monthly'
-            && ! $force
-            && $status === 'active'
-            && ! $isOverdue
-        ) {
-            return $this->errorResponse(
-                'Subscription is not due for payment yet.',
-                ['subscription' => ['not_due']],
-                409
-            );
-        }
+      if (! $force && $status === 'active' && ! $isOverdue && ! in_array($status, ['grace_period'], true)) {
+        return $this->errorResponse(
+          'Business Pro is already active and not due for renewal.',
+          ['subscription' => ['not_due']],
+          409
+        );
+      }
+    }
 
-        if (
-            $billingScope === 'monthly'
-            && ! $force
-            && ! in_array($status, ['active', 'expired'], true)
-        ) {
-            return $this->errorResponse(
-                'Subscription cannot be renewed in its current state.',
-                ['subscription' => ['invalid_status']],
-                409
-            );
-        }
+    SubscriptionInvoice::query()
+      ->where('subscription_id', $subscription->id)
+      ->where('status', 'pending')
+      ->whereNull('xendit_invoice_id')
+      ->update(['status' => 'expired']);
 
-        if (
-            $billingScope === 'room_addon'
-            && $status !== 'active'
-        ) {
-            return $this->errorResponse(
-                'Room add-on payment is only available for active subscriptions.',
-                ['subscription' => ['not_active']],
-                409
-            );
-        }
+    $paymentMethod = $request->input('payment_method');
+    if ($paymentMethod !== null && $paymentMethod !== '') {
+      $paymentMethod = strtoupper(trim((string) $paymentMethod));
+    } else {
+      $paymentMethod = null;
+    }
 
-        // Recover from local-only pending rows (e.g., scheduler-created placeholders).
-        SubscriptionInvoice::query()
-            ->where('subscription_id', $subscription->id)
-            ->whereDate('billing_cycle_start', (string) $subscription->billing_cycle_start)
-            ->whereDate('billing_cycle_end', (string) $subscription->billing_cycle_end)
-            ->where('status', 'pending')
-            ->whereNull('xendit_invoice_id')
-            ->update(['status' => 'expired']);
+    $isAdmin = (string) $request->user()?->role === 'admin';
+    $force = $isAdmin && (bool) $request->boolean('force', false);
 
-        $paymentMethod = $request->input('payment_method');
-        if ($paymentMethod !== null && $paymentMethod !== '') {
-            $paymentMethod = strtoupper(trim((string) $paymentMethod));
-        } else {
-            $paymentMethod = null;
-        }
+    // Omit payment_method to let Xendit checkout show all methods enabled on the account.
+    $paymentMethods = $this->recurring->resolveCheckoutPaymentMethods($paymentMethod);
+    $setupRecurring = $this->recurring->shouldSetupRecurringOnCheckout($paymentMethod, $billingScope);
 
-        if ($billingScope === 'monthly' && $paymentMethod === null && ! $force) {
-            return $this->errorResponse(
-                'Choose a payment method (card for auto-renewal, or GCash and others for manual renewal).',
-                ['payment_method' => ['required']],
-                422
-            );
-        }
+    $invoicePlanTag = SubscriptionInvoicePlanTag::businessProMonthly($setupRecurring);
 
-        $paymentMethods = $this->recurring->resolveCheckoutPaymentMethods($paymentMethod);
-        $setupRecurring = $this->recurring->shouldSetupRecurringOnCheckout($paymentMethod, $billingScope);
-        $referralCode = trim((string) $request->input('referral_code', ''));
-        if ($referralCode !== '') {
-            return $this->errorResponse(
-                'Referral benefits are applied when you create your account at registration. Remove the referral code from checkout.',
-                ['referral_code' => ['registration_only']],
-                422
-            );
-        }
+    $existingPendingGatewayInvoice = SubscriptionInvoice::query()
+      ->where('subscription_id', $subscription->id)
+      ->where('plan', $invoicePlanTag)
+      ->where('status', 'pending')
+      ->whereNotNull('xendit_invoice_id')
+      ->latest('id')
+      ->first();
 
-        $invoicePlanTag = $billingScope === 'room_addon'
-            ? sprintf('%s_room_addon_q%d_m%d', $subscription->plan, $roomAddonQuantity, $durationMonths)
-            : SubscriptionInvoicePlanTag::baseMonthly((string) $subscription->plan, $durationMonths, $setupRecurring);
+    if ($existingPendingGatewayInvoice) {
+      if ($this->service->pendingInvoiceShouldBeReplaced(
+        $existingPendingGatewayInvoice,
+        $subscription,
+        $billingScope,
+        $roomAddonQuantity,
+        $durationMonths
+      )) {
+        $existingPendingGatewayInvoice->update(['status' => 'expired']);
+        $existingPendingGatewayInvoice = null;
+      }
+    }
 
-        $existingPendingGatewayInvoice = SubscriptionInvoice::query()
-            ->where('subscription_id', $subscription->id)
-            ->where('plan', $invoicePlanTag)
-            ->where('status', 'pending')
-            ->whereDate('billing_cycle_start', (string) $subscription->billing_cycle_start)
-            ->whereDate('billing_cycle_end', (string) $subscription->billing_cycle_end)
-            ->whereNotNull('xendit_invoice_id')
-            ->latest('id')
-            ->first();
-
-        // Reuse an existing pending gateway invoice for this cycle
-        // so users can continue payment instead of getting blocked by 409.
-        if ($existingPendingGatewayInvoice) {
-            if ($this->service->pendingInvoiceShouldBeReplaced(
-                $existingPendingGatewayInvoice,
-                $subscription,
-                $billingScope,
-                $roomAddonQuantity,
-                $durationMonths
-            )) {
-                $existingPendingGatewayInvoice->update(['status' => 'expired']);
-                $existingPendingGatewayInvoice = null;
-            }
-        }
-
-        if ($existingPendingGatewayInvoice) {
-            return $this->successResponse([
-                'invoice_url' => $existingPendingGatewayInvoice->xendit_invoice_url,
-                'invoice_id' => $existingPendingGatewayInvoice->xendit_invoice_id,
-                'subscription_invoice_id' => $existingPendingGatewayInvoice->id,
-                'reused' => true,
-            ], 'Existing pending subscription invoice reused');
-        }
-
-        $checkoutReturnBase = $request->input('checkout_return_base');
-        if (! is_string($checkoutReturnBase) || strlen($checkoutReturnBase) > 512) {
-            $checkoutReturnBase = null;
-        }
-
-        try {
-            $result = $this->service->createInvoice(
-                $subscription,
-                $paymentMethods,
-                '',
-                $billingScope,
-                $roomAddonQuantity,
-                null,
-                null,
-                $durationMonths,
-                $checkoutReturnBase,
-                $setupRecurring,
-                'checkout',
-            );
-        } catch (RuntimeException $e) {
-            return $this->errorResponse($e->getMessage(), null, 502);
-        }
+    if ($existingPendingGatewayInvoice) {
+      $reuseUrl = (string) ($existingPendingGatewayInvoice->xendit_invoice_url ?? '');
+      if (! XenditCheckoutUrl::isValid($reuseUrl)) {
+        $existingPendingGatewayInvoice->update(['status' => 'expired']);
+        $existingPendingGatewayInvoice = null;
+      } else {
         return $this->successResponse([
-            'invoice_url' => $result['invoice_url'],
-            'invoice_id' => $result['invoice_id'],
-            'subscription_invoice_id' => $result['subscription_invoice_id'],
-        ], 'Subscription payment invoice created');
+          'invoice_url' => $reuseUrl,
+          'invoice_id' => $existingPendingGatewayInvoice->xendit_invoice_id,
+          'subscription_invoice_id' => $existingPendingGatewayInvoice->id,
+          'reused' => true,
+        ], 'Existing pending subscription invoice reused');
+      }
     }
 
-    /**
-     * After returning from Xendit checkout, webhooks may not reach local/dev servers.
-     * Poll gateway for the latest pending invoice and apply the same update as the webhook.
-     */
-    public function syncPendingFromGateway(Request $request, Resort $resort)
-    {
-        $this->authorizeResortAccess($request, $resort);
-
-        $invoice = SubscriptionInvoice::query()
-            ->where('resort_id', $resort->id)
-            ->where('status', 'pending')
-            ->whereNotNull('xendit_invoice_id')
-            ->latest('id')
-            ->first();
-
-        if (! $invoice) {
-            return $this->successResponse([
-                'synced' => false,
-                'reason' => 'no_pending_invoice',
-            ], 'No pending subscription invoice to sync.');
-        }
-
-        if (! $this->service->gatewayConfigured()) {
-            return $this->successResponse([
-                'synced' => false,
-                'reason' => 'gateway_not_configured',
-            ], 'Payment gateway is not configured.');
-        }
-
-        $gatewayStatus = $this->service->fetchXenditInvoiceStatus((string) $invoice->xendit_invoice_id);
-        if ($gatewayStatus === null) {
-            return $this->errorResponse('Could not verify payment with the gateway. Try again in a moment.', null, 502);
-        }
-
-        $paidStatuses = ['PAID', 'SETTLED'];
-        if (! in_array($gatewayStatus, $paidStatuses, true)) {
-            return $this->successResponse([
-                'synced' => false,
-                'gateway_status' => $gatewayStatus,
-            ], 'Invoice is not marked paid yet.');
-        }
-
-        $paidInvoice = $this->subscriptionWebhook->handleInvoiceWebhook([
-            'id' => $invoice->xendit_invoice_id,
-            'status' => 'PAID',
-            'event' => 'invoice.paid',
-        ]);
-
-        if ($paidInvoice) {
-            $this->recurring->activateRecurringAfterFirstPaid($paidInvoice);
-        }
-
-        return $this->successResponse(['synced' => true], 'Subscription updated from payment.');
+    $checkoutReturnBase = $request->input('checkout_return_base');
+    if (! is_string($checkoutReturnBase) || strlen($checkoutReturnBase) > 512) {
+      $checkoutReturnBase = null;
     }
 
-    private function authorizeResortAccess(Request $request, Resort $resort): void
-    {
-        $user = $request->user();
-        if (! $user) {
-            abort(401);
-        }
-
-        if ($user->role === 'admin') {
-            return;
-        }
-
-        if ($user->role !== 'resort_owner' || (int) $user->tenant_id !== (int) $resort->tenant_id) {
-            abort(403, 'You are not allowed to access this resource.');
-        }
+    try {
+      $result = $this->service->createInvoice(
+        $subscription,
+        $paymentMethods,
+        '',
+        $billingScope,
+        $roomAddonQuantity,
+        null,
+        null,
+        $durationMonths,
+        $checkoutReturnBase,
+        $setupRecurring,
+        'checkout',
+      );
+    } catch (RuntimeException $e) {
+      return $this->errorResponse($e->getMessage(), null, 502);
     }
 
-    private function resolveResortForAuthenticatedOwner(Request $request): ?Resort
-    {
-        $user = $request->user();
-        if (! $user || $user->tenant_id === null) {
-            return null;
-        }
+    return $this->successResponse([
+      'invoice_url' => $result['invoice_url'],
+      'invoice_id' => $result['invoice_id'],
+      'subscription_invoice_id' => $result['subscription_invoice_id'],
+    ], 'Business Pro payment invoice created');
+  }
 
-        return Resort::withoutGlobalScopes()
-            ->with(['tenant', 'subscription', 'rooms.images'])
-            ->where('tenant_id', $user->tenant_id)
-            ->first();
+  public function syncPendingFromGateway(Request $request, Resort $resort)
+  {
+    $this->authorizeResortAccess($request, $resort);
+
+    $invoice = SubscriptionInvoice::query()
+      ->where('resort_id', $resort->id)
+      ->where('status', 'pending')
+      ->whereNotNull('xendit_invoice_id')
+      ->latest('id')
+      ->first();
+
+    if (! $invoice) {
+      return $this->successResponse([
+        'synced' => false,
+        'reason' => 'no_pending_invoice',
+      ], 'No pending subscription invoice to sync.');
     }
+
+    if (! $this->service->gatewayConfigured()) {
+      return $this->successResponse([
+        'synced' => false,
+        'reason' => 'gateway_not_configured',
+      ], 'Payment gateway is not configured.');
+    }
+
+    $gatewayStatus = $this->service->fetchXenditInvoiceStatus((string) $invoice->xendit_invoice_id);
+    if ($gatewayStatus === null) {
+      return $this->errorResponse('Could not verify payment with the gateway. Try again in a moment.', null, 502);
+    }
+
+    $paidStatuses = ['PAID', 'SETTLED'];
+    if (! in_array($gatewayStatus, $paidStatuses, true)) {
+      return $this->successResponse([
+        'synced' => false,
+        'gateway_status' => $gatewayStatus,
+      ], 'Invoice is not marked paid yet.');
+    }
+
+    $paidInvoice = $this->subscriptionWebhook->handleInvoiceWebhook([
+      'id' => $invoice->xendit_invoice_id,
+      'status' => 'PAID',
+      'event' => 'invoice.paid',
+    ]);
+
+    if ($paidInvoice) {
+      $this->recurring->activateRecurringAfterFirstPaid($paidInvoice);
+    }
+
+    return $this->successResponse(['synced' => true], 'Subscription updated from payment.');
+  }
+
+  private function authorizeResortAccess(Request $request, Resort $resort): void
+  {
+    $user = $request->user();
+    if (! $user) {
+      abort(401);
+    }
+
+    if ($user->role === 'admin') {
+      return;
+    }
+
+    if ($user->role !== 'resort_owner' || (int) $user->tenant_id !== (int) $resort->tenant_id) {
+      abort(403, 'You are not allowed to access this resource.');
+    }
+  }
+
+  private function resolveResortForAuthenticatedOwner(Request $request): ?Resort
+  {
+    $user = $request->user();
+    if (! $user || $user->tenant_id === null) {
+      return null;
+    }
+
+    return Resort::withoutGlobalScopes()
+      ->with(['tenant', 'subscription', 'rooms.images'])
+      ->where('tenant_id', $user->tenant_id)
+      ->first();
+  }
 }

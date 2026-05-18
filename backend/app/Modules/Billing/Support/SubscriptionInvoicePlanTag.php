@@ -2,38 +2,33 @@
 
 namespace App\Modules\Billing\Support;
 
+use App\Support\SubscriptionPlan;
+
 final class SubscriptionInvoicePlanTag
 {
-    public static function baseMonthly(string $plan, int $durationMonths, bool $setupRecurring): string
-    {
-        $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-        $suffix = $setupRecurring ? '_rec' : '';
+  public static function businessProMonthly(bool $setupRecurring): string
+  {
+    return $setupRecurring
+      ? SubscriptionPlan::BUSINESS_PRO.'_m1_rec'
+      : SubscriptionPlan::BUSINESS_PRO.'_m1';
+  }
 
-        return sprintf('%s_m%d_b0%s', $plan, $durationMonths, $suffix);
+  public static function requestsRecurringSetup(string $invoicePlan): bool
+  {
+    return str_ends_with($invoicePlan, '_rec');
+  }
+
+  public static function creditedMonthsFromPlan(string $invoicePlan): int
+  {
+    if (preg_match('/_m(\d+)(?:_rec)?$/', $invoicePlan, $m) === 1) {
+      return max(1, (int) $m[1]);
     }
 
-    public static function requestsRecurringSetup(string $invoicePlan): bool
-    {
-        return str_ends_with($invoicePlan, '_rec');
-    }
+    return 1;
+  }
 
-    /**
-     * Months credited when a base (non-addon) subscription invoice is paid.
-     */
-    public static function creditedMonthsFromPlan(string $invoicePlan): int
-    {
-        if (preg_match('/_m(\d+)_fmf$/', $invoicePlan, $m) === 1) {
-            return max(1, (int) $m[1]);
-        }
-
-        if (preg_match('/_m(\d+)_b0(?:_rec)?$/', $invoicePlan, $m) === 1) {
-            return max(1, (int) $m[1]);
-        }
-
-        if (preg_match('/_m(\d+)_b(\d+)$/', $invoicePlan, $m) === 1) {
-            return max(1, (int) $m[1] + (int) $m[2]);
-        }
-
-        return 1;
-    }
+  public static function isBusinessProUpgrade(string $invoicePlan): bool
+  {
+    return str_starts_with($invoicePlan, SubscriptionPlan::BUSINESS_PRO);
+  }
 }

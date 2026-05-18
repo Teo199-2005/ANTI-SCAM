@@ -12,6 +12,8 @@ use App\Models\Resort;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
+use App\Modules\Billing\Support\SubscriptionInvoicePlanTag;
+use App\Support\SubscriptionPlan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
@@ -23,6 +25,8 @@ class EmailNotificationService
         'booking_confirmation',
         'payment_receipt',
         'subscription_renewal',
+        'subscription_renewal_confirmation',
+        'subscription_business_pro_activated',
         'new_booking_resort',
     ];
 
@@ -268,15 +272,56 @@ class EmailNotificationService
         );
     }
 
+    /**
+     * First-time Business Pro activation after a paid upgrade invoice (welcome + receipt).
+     */
+    public function sendBusinessProActivatedConfirmation(Subscription $subscription, ?SubscriptionInvoice $invoice = null): void
+    {
+        if ($invoice !== null && $this->subscriptionEmailAlreadySent('subscription_business_pro_activated', $invoice->id)) {
+            return;
+        }
+
+        $owner = $this->resolveSubscriptionOwner($subscription);
+        if ($owner === null) {
+            return;
+        }
+
+        $resortName = (string) ($subscription->resort?->name ?? 'your resort');
+        $fullHtml = $this->templateService->render(
+            'Business Pro activated',
+            $this->businessProActivatedHtml($subscription, $invoice),
+            'Your Premium Verified Resort subscription is now active.'
+        );
+
+        $ack = $invoice?->acknowledgment_receipt_no;
+        $subject = $ack !== null && $ack !== ''
+            ? 'Business Pro activated — Digital Acknowledgment Receipt '.$ack
+            : 'Business Pro activated — '.$resortName;
+
+        $this->queueMail(
+            'subscription_business_pro_activated',
+            $owner['email'],
+            $owner['name'],
+            $subject,
+            $fullHtml,
+            array_filter([
+                'subscription_id' => $subscription->id,
+                'subscription_invoice_id' => $invoice?->id,
+                'acknowledgment_receipt_no' => $ack,
+            ]),
+            $subscription->tenant_id
+        );
+    }
+
     /** Subscription renewal confirmation (includes digital acknowledgment receipt when invoice is paid). */
     public function sendSubscriptionRenewalConfirmation(Subscription $subscription, ?SubscriptionInvoice $invoice = null): void
     {
-        $owner = User::withoutGlobalScopes()
-            ->where('tenant_id', $subscription->tenant_id)
-            ->where('role', 'resort_owner')
-            ->first();
+        if ($invoice !== null && $this->subscriptionEmailAlreadySent('subscription_renewal_confirmation', $invoice->id)) {
+            return;
+        }
 
-        if (! $owner?->email) {
+        $owner = $this->resolveSubscriptionOwner($subscription);
+        if ($owner === null) {
             return;
         }
 
@@ -291,8 +336,8 @@ class EmailNotificationService
 
         $this->queueMail(
             'subscription_renewal_confirmation',
-            $owner->email,
-            $owner->name,
+            $owner['email'],
+            $owner['name'],
             'Digital Acknowledgment Receipt – '.$subjectSuffix,
             $fullHtml,
             array_filter([
@@ -302,6 +347,45 @@ class EmailNotificationService
             ]),
             $subscription->tenant_id
         );
+    }
+
+    /**
+     * Idempotent: send the correct subscription payment email if it was never delivered.
+     */
+    public function sendSubscriptionPaymentConfirmationIfMissing(Subscription $subscription, SubscriptionInvoice $invoice): void
+    {
+        $subscription = $subscription->loadMissing('resort');
+        $invoice = $invoice->refresh();
+
+        if ($this->shouldSendBusinessProActivationEmail($subscription, $invoice)) {
+            if (! $this->subscriptionEmailAlreadySent('subscription_business_pro_activated', $invoice->id)) {
+                $this->sendBusinessProActivatedConfirmation($subscription, $invoice);
+            }
+
+            return;
+        }
+
+        if (! $this->subscriptionEmailAlreadySent('subscription_renewal_confirmation', $invoice->id)) {
+            $this->sendSubscriptionRenewalConfirmation($subscription, $invoice);
+        }
+    }
+
+    public function shouldSendBusinessProActivationEmail(Subscription $subscription, SubscriptionInvoice $invoice): bool
+    {
+        if (! SubscriptionInvoicePlanTag::isBusinessProUpgrade((string) $invoice->plan)) {
+            return false;
+        }
+
+        if ($this->subscriptionEmailAlreadySent('subscription_business_pro_activated', $invoice->id)) {
+            return false;
+        }
+
+        $priorPaid = $subscription->invoices()
+            ->where('status', 'paid')
+            ->where('id', '!=', $invoice->id)
+            ->count();
+
+        return $priorPaid === 0;
     }
 
     /** Grace period alert. */
@@ -327,6 +411,37 @@ class EmailNotificationService
             $owner->email,
             $owner->name,
             'Action Required: Subscription Grace Period – '.$subscription->resort?->name,
+            $fullHtml,
+            ['subscription_id' => $subscription->id],
+            $subscription->tenant_id
+        );
+    }
+
+    /** Business Pro ended — downgraded to Standard. */
+    public function sendSubscriptionDowngradeNotice(Subscription $subscription): void
+    {
+        $owner = User::withoutGlobalScopes()
+            ->where('tenant_id', $subscription->tenant_id)
+            ->where('role', 'resort_owner')
+            ->first();
+
+        if (! $owner?->email) {
+            return;
+        }
+
+        $resortName = $subscription->resort?->name ?? 'your resort';
+        $fullHtml = $this->templateService->render(
+            'Plan downgraded to Standard',
+            '<p>Your Business Pro subscription has ended. Your resort remains listed on the <strong>Verified Resort (Standard)</strong> plan.</p>'
+            .'<p>Upgrade anytime to restore analytics, priority listing, and up to 20 rooms.</p>',
+            'You can upgrade to Business Pro from your dashboard.'
+        );
+
+        $this->queueMail(
+            'subscription_downgraded_standard',
+            $owner->email,
+            $owner->name,
+            'Business Pro ended — '.$resortName.' is on Standard',
             $fullHtml,
             ['subscription_id' => $subscription->id],
             $subscription->tenant_id
@@ -556,6 +671,112 @@ HTML;
   <p>Your subscription of <strong>₱{$amount}/month</strong> is due on <strong>{$due}</strong>.</p>
   <p>Please settle your payment to avoid a grace period and eventual suspension of your public listing.</p>
 </div>
+HTML;
+    }
+
+    /**
+     * @return array{email: string, name: string}|null
+     */
+    private function resolveSubscriptionOwner(Subscription $subscription): ?array
+    {
+        $owner = User::withoutGlobalScopes()
+            ->where('tenant_id', $subscription->tenant_id)
+            ->where('role', 'resort_owner')
+            ->first();
+
+        if (! $owner?->email || ! filter_var($owner->email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        return [
+            'email' => $owner->email,
+            'name' => trim((string) ($owner->name ?: 'Resort Owner')),
+        ];
+    }
+
+    private function subscriptionEmailAlreadySent(string $type, int $subscriptionInvoiceId): bool
+    {
+        return EmailLog::query()
+            ->where('type', $type)
+            ->where('status', 'sent')
+            ->where('metadata->subscription_invoice_id', $subscriptionInvoiceId)
+            ->exists();
+    }
+
+    private function businessProActivatedHtml(Subscription $s, ?SubscriptionInvoice $invoice = null): string
+    {
+        $resortName = htmlspecialchars((string) ($s->resort?->name ?? 'your resort'), ENT_QUOTES, 'UTF-8');
+        $maxRooms = (int) (SubscriptionPlan::config(SubscriptionPlan::BUSINESS_PRO)['max_rooms'] ?? 20);
+        $monthly = number_format(
+            (float) ($invoice?->amount ?? SubscriptionPlan::config(SubscriptionPlan::BUSINESS_PRO)['monthly_price_php'] ?? 1000),
+            2
+        );
+        $nextDue = htmlspecialchars((string) ($s->next_due_date ?? ''), ENT_QUOTES, 'UTF-8');
+        $dashboardUrl = htmlspecialchars(
+            rtrim((string) config('app.frontend_url', config('app.url')), '/').'/dashboard/resort',
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $receiptBlock = $this->subscriptionPaymentReceiptTable($s, $invoice);
+
+        return <<<HTML
+<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;padding:28px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(180deg,#eff6ff 0%,#ffffff 52%)">
+  <p style="margin:0 0 6px 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#1d4ed8">Premium Verified Resort</p>
+  <h2 style="margin:0 0 10px 0;color:#1e3a8a;font-size:22px;line-height:1.25">Business Pro is now active</h2>
+  <p style="font-size:14px;line-height:1.55;color:#334155;margin:0 0 16px 0">Thank you for subscribing. <strong>{$resortName}</strong> is now on <strong>Business Pro (Premium Verified Resort)</strong> on Anti-Scam PH.</p>
+  <ul style="margin:0 0 18px 0;padding-left:20px;font-size:14px;line-height:1.55;color:#334155">
+    <li>Up to <strong>{$maxRooms} active rooms</strong></li>
+    <li>Revenue reports, analytics, and priority listing</li>
+    <li>YouTube intro video on your public booking page</li>
+    <li>Monthly plan: <strong>₱{$monthly}</strong></li>
+  </ul>
+  {$receiptBlock}
+  <p style="margin:16px 0 0 0;font-size:14px;line-height:1.55;color:#334155">Next billing date: <strong>{$nextDue}</strong>. Manage your plan anytime from your <a href="{$dashboardUrl}" style="color:#1d4ed8;font-weight:600">owner dashboard</a>.</p>
+  <p style="margin-top:18px;font-size:12px;line-height:1.5;color:#64748b;border-top:1px solid #dbeafe;padding-top:14px">Retain this email for your records. For billing questions, reply to the support address in the footer.</p>
+</div>
+HTML;
+    }
+
+    private function subscriptionPaymentReceiptTable(Subscription $s, ?SubscriptionInvoice $invoice): string
+    {
+        if ($invoice === null) {
+            return '';
+        }
+
+        $amountVal = (float) $invoice->amount;
+        $amount = number_format($amountVal, 2);
+        $ackRaw = (string) ($invoice->acknowledgment_receipt_no ?? '');
+        $ack = htmlspecialchars($ackRaw, ENT_QUOTES, 'UTF-8');
+        $ackRow = $ackRaw !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Digital acknowledgment receipt</td><td style="padding:8px 0;font-weight:600;font-family:monospace">'.$ack.'</td></tr>'
+            : '';
+
+        $tz = (string) config('app.timezone', 'UTC');
+        $paidRow = '';
+        if ($invoice->paid_at) {
+            $paidFmt = htmlspecialchars(
+                $invoice->paid_at->timezone($tz)->format('M j, Y g:i A T'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+            $paidRow = '<tr><td style="padding:8px 0;color:#6b7280">Paid on</td><td style="padding:8px 0;font-weight:600">'.$paidFmt.'</td></tr>';
+        }
+
+        $xid = (string) ($invoice->xendit_invoice_id ?? '');
+        $xidRow = $xid !== ''
+            ? '<tr><td style="padding:8px 0;color:#6b7280">Payment reference</td><td style="padding:8px 0;font-weight:600;font-family:monospace;font-size:12px">'
+            .htmlspecialchars($xid, ENT_QUOTES, 'UTF-8').'</td></tr>'
+            : '';
+
+        return <<<HTML
+  <table style="width:100%;border-collapse:collapse;margin:0;border-top:1px solid #dbeafe">
+    <tr><td style="padding:8px 0;color:#6b7280">Payment status</td><td style="padding:8px 0;font-weight:700;color:#15803d">Paid</td></tr>
+    {$paidRow}
+    {$ackRow}
+    {$xidRow}
+    <tr><td style="padding:8px 0;color:#6b7280">Amount paid</td><td style="padding:8px 0;font-weight:700;color:#15803d;font-size:18px">₱{$amount}</td></tr>
+  </table>
 HTML;
     }
 

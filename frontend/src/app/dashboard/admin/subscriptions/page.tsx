@@ -58,6 +58,7 @@ export default function AdminSubscriptionsPage() {
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
+  const [planFilter, setPlanFilter] = useState<"all" | "standard" | "business_pro">("all");
   const { pushToast } = useToast();
 
   const load = async (loc: LocationFilterValue = locationFilter) => {
@@ -107,8 +108,13 @@ export default function AdminSubscriptionsPage() {
     void load();
   }, []);
 
+  const filteredResorts = useMemo(() => {
+    if (planFilter === "all") return resorts;
+    return resorts.filter((r) => (r.subscription?.plan ?? "standard") === planFilter);
+  }, [resorts, planFilter]);
+
   const sortedResorts = useMemo(() => {
-    const copy = [...resorts];
+    const copy = [...filteredResorts];
     copy.sort((a, b) => {
       const subA = a.subscription;
       const subB = b.subscription;
@@ -136,7 +142,7 @@ export default function AdminSubscriptionsPage() {
       }
     });
     return copy;
-  }, [resorts, sortBy, sortDir, latestInvoiceStatus]);
+  }, [filteredResorts, sortBy, sortDir, latestInvoiceStatus]);
 
   const { slice: pageResorts, meta: pageMeta } = useMemo(
     () => paginateLocal(sortedResorts, page, perPage),
@@ -188,7 +194,26 @@ export default function AdminSubscriptionsPage() {
           Subscriptions
         </h1>
         <p className="dash-page-sub">Review and refresh billing subscriptions for all resorts.</p>
-        <div className="dash-filter-bar">
+        <div className="dash-filter-bar flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap gap-2">
+            {(["all", "standard", "business_pro"] as const).map((plan) => (
+              <button
+                key={plan}
+                type="button"
+                onClick={() => {
+                  setPlanFilter(plan);
+                  setPage(1);
+                }}
+                className={
+                  planFilter === plan
+                    ? "rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white"
+                    : "rounded-full border border-softBorder bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
+                }
+              >
+                {plan === "all" ? "All plans" : plan === "standard" ? "Standard" : "Business Pro"}
+              </button>
+            ))}
+          </div>
           <LocationFilterBar
             label="Resort location"
             value={locationFilter}

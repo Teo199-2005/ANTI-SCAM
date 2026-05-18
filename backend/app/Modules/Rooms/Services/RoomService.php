@@ -7,6 +7,7 @@ use App\Models\Room;
 use App\Models\RoomAvailability;
 use App\Models\Subscription;
 use App\Modules\Subscriptions\Services\SubscriptionService;
+use App\Support\SubscriptionPlan;
 use App\Services\RoomOccupancyService;
 use App\Support\SafeSort;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -69,18 +70,11 @@ class RoomService
 
                 // try to read subscription included rooms
                 $subscription = Subscription::query()->where('resort_id', $resort->id)->first();
-                $included = $subscription?->included_rooms;
+                $included = SubscriptionPlan::maxRoomsForSubscription($subscription);
 
-                // fallback: derive included from plan via SubscriptionService if missing
-                if ($included === null) {
-                    $plan = $subscription?->plan ?? 'basic';
-                    $pricing = $this->subscriptions->calculateMonthlyBilling($plan, $activeCount);
-                    $included = $pricing['included_rooms'] ?? PHP_INT_MAX;
-                }
-
-                if ($included !== null && $activeCount >= (int) $included) {
+                if ($activeCount >= $included) {
                     throw ValidationException::withMessages([
-                        'resort_id' => ["Active room limit reached for this plan (" . $included . "). Please upgrade your subscription to add more rooms."],
+                        'resort_id' => ["Active room limit reached for this plan ({$included} rooms). Upgrade to Business Pro for up to 20 rooms."],
                     ]);
                 }
             }
@@ -122,6 +116,19 @@ class RoomService
     /**
      * When active room rows exceed subscription included_rooms, deactivate extras while keeping this room (plus others by stable id order).
      */
+  public function reconcileResortActiveRooms(int $resortId): void
+  {
+    $preferred = Room::query()
+      ->where('resort_id', $resortId)
+      ->where('status', 'active')
+      ->orderBy('id')
+      ->value('id');
+
+    if ($preferred) {
+      $this->reconcileActiveRoomCap($resortId, (int) $preferred);
+    }
+  }
+
     private function reconcileActiveRoomCap(int $resortId, int $preferredRoomId): void
     {
         $included = $this->resolveIncludedRooms($resortId);
@@ -161,16 +168,8 @@ class RoomService
     private function resolveIncludedRooms(int $resortId): int
     {
         $subscription = Subscription::query()->where('resort_id', $resortId)->first();
-        $included = $subscription?->included_rooms;
 
-        if ($included === null) {
-            $plan = $subscription?->plan ?? 'basic';
-            $activeCount = Room::query()->where('resort_id', $resortId)->where('status', 'active')->count();
-            $pricing = $this->subscriptions->calculateMonthlyBilling($plan, $activeCount);
-            $included = $pricing['included_rooms'] ?? PHP_INT_MAX;
-        }
-
-        return (int) $included;
+        return SubscriptionPlan::maxRoomsForSubscription($subscription);
     }
 
     public function delete(Room $room): void

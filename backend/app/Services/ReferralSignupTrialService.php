@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Modules\Subscriptions\Services\SubscriptionService;
+use App\Support\SubscriptionPlan;
 use App\Support\TenantPublicIdentifier;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -128,8 +129,8 @@ class ReferralSignupTrialService
         $trialEnd = Carbon::parse($user->referral_trial_ends_at);
         $trialEndDate = $trialEnd->toDateString();
 
+        $this->subscriptions->upgradeToBusinessPro($subscription);
         $subscription->update([
-            'status' => 'active',
             'billing_cycle_start' => now()->toDateString(),
             'billing_cycle_end' => $trialEndDate,
             'next_due_date' => $trialEndDate,
@@ -162,11 +163,10 @@ class ReferralSignupTrialService
             ->count();
     }
 
-    /** After signup trial ends, mark subscription expired so owners can renew via Subscribe. */
+    /** After signup trial ends, downgrade to free Standard (stay listed). */
     public function expireLapsedTrials(): int
     {
         $updated = 0;
-        $today = now()->toDateString();
 
         User::query()
             ->where('role', 'resort_owner')
@@ -174,16 +174,17 @@ class ReferralSignupTrialService
             ->where('referral_trial_ends_at', '<', now())
             ->whereNotNull('tenant_id')
             ->orderBy('id')
-            ->chunkById(50, function ($users) use (&$updated, $today): void {
+            ->chunkById(50, function ($users) use (&$updated): void {
                 foreach ($users as $user) {
-                    $updated += Subscription::query()
+                    $subscription = Subscription::query()
                         ->where('tenant_id', $user->tenant_id)
-                        ->where('status', 'active')
-                        ->whereDate('next_due_date', '<=', $today)
-                        ->update([
-                            'status' => 'expired',
-                            'grace_until' => null,
-                        ]);
+                        ->where('plan', SubscriptionPlan::BUSINESS_PRO)
+                        ->first();
+
+                    if ($subscription && ! $subscription->invoices()->where('status', 'paid')->exists()) {
+                        $this->subscriptions->downgradeToStandard($subscription);
+                        $updated++;
+                    }
                 }
             });
 
@@ -217,7 +218,8 @@ class ReferralSignupTrialService
 
         $resort = Resort::withoutGlobalScopes()->create($resortPayload);
 
-        $subscription = $this->subscriptions->refreshForResort($resort, 'basic');
+        $subscription = $this->subscriptions->refreshForResort($resort, SubscriptionPlan::STANDARD, activateIfNew: true);
+        $this->subscriptions->upgradeToBusinessPro($subscription);
         $trialEndDate = $trialEnds->toDateString();
 
         $subscription->update([

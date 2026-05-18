@@ -5,6 +5,7 @@ import OwnerValuePropsStrip from "@/components/home/OwnerValuePropsStrip";
 import PageContainer from "@/components/layout/PageContainer";
 import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import { ResortPlanBadge } from "@/components/badges/ResortPlanBadge";
 import { BedDouble, MapPin, PhoneCall, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -110,7 +111,16 @@ export default function BrowseResortsPage() {
               className="soft-panel block p-6 transition hover:shadow-float"
             >
               <div className="mb-3 flex items-start justify-between gap-2">
-                <h2 className="font-heading text-2xl text-zinc-900">{resort.name}</h2>
+                <div className="min-w-0">
+                  <h2 className="font-heading text-2xl text-zinc-900">{resort.name}</h2>
+                  {resort.badgeLabel ? (
+                    <ResortPlanBadge
+                      badgeLabel={resort.badgeLabel}
+                      isPremiumVerified={resort.isPremiumVerified}
+                      className="mt-2"
+                    />
+                  ) : null}
+                </div>
                 <span className="glass-tag shrink-0">
                   <BedDouble size={11} className="inline mr-1" />
                   {resort.activeRoomsCount} rooms

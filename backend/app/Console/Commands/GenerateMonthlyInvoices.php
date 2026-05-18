@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Modules\Billing\Services\XenditSubscriptionInvoiceService;
+use App\Support\SubscriptionPlan;
 use App\Modules\Billing\Support\SubscriptionBillingMode;
 use App\Services\EmailNotificationService;
 use Illuminate\Console\Command;
@@ -21,6 +22,7 @@ class GenerateMonthlyInvoices extends Command
         XenditSubscriptionInvoiceService $invoiceService
     ): int {
         $dueSubscriptions = Subscription::withoutGlobalScopes()
+            ->where('plan', SubscriptionPlan::BUSINESS_PRO)
             ->where('status', 'active')
             ->whereDate('next_due_date', '<=', now()->toDateString())
             ->get();
@@ -45,9 +47,6 @@ class GenerateMonthlyInvoices extends Command
                     ->exists();
 
                 if (! $alreadyPendingForCycle) {
-                    $durationMonths = max(1, (int) $subscription->renewal_duration_months);
-                    $durationMonths = in_array($durationMonths, [1, 3, 6, 12], true) ? $durationMonths : 1;
-
                     try {
                         $invoiceService->createInvoice(
                             $subscription,
@@ -57,7 +56,7 @@ class GenerateMonthlyInvoices extends Command
                             1,
                             null,
                             null,
-                            $durationMonths,
+                            1,
                             null,
                             false,
                             'cron_manual',

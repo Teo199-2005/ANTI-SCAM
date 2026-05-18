@@ -32,6 +32,9 @@ import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import Logo from "@/components/layout/Logo";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 
@@ -193,20 +196,47 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [ownerPlan, setOwnerPlan] = useState<string | null>(null);
+  const [ownerSubStatus, setOwnerSubStatus] = useState<string | null>(null);
 
   const role = user?.role ?? "user";
+
+  useEffect(() => {
+    if (role !== "resort_owner") return;
+    let cancelled = false;
+    void getOwnerLandingPage()
+      .then((lp) => {
+        if (!cancelled) {
+          setOwnerPlan(lp.subscription_plan ?? "standard");
+          setOwnerSubStatus(lp.subscription_status ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOwnerPlan("standard");
+          setOwnerSubStatus(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
   const guestResortLogo =
     role === "guest" && user?.home_resort?.logo_url ? laravelPublicUrl(user.home_resort.logo_url) : "";
 
   const isCompactSidebar = role === "admin";
 
-  const groups =
-    role === "admin"        ? adminGroups :
-    role === "resort_owner" ? resortOwnerGroups :
-    role === "marketing"    ? marketingGroups :
-    role === "admin_staff"  ? staffGroups :
-    role === "guest"        ? guestGroups :
-    clientGroups;
+  const groups = useMemo(() => {
+    if (role === "admin") return adminGroups;
+    if (role === "marketing") return marketingGroups;
+    if (role === "admin_staff") return staffGroups;
+    if (role === "guest") return guestGroups;
+    if (role === "resort_owner") {
+      if (isBusinessProPlan(ownerPlan, ownerSubStatus)) return resortOwnerGroups;
+      return resortOwnerGroups.filter((g) => g.label !== "Revenue");
+    }
+    return clientGroups;
+  }, [role, ownerPlan, ownerSubStatus]);
 
   const navIconSize = isCompactSidebar ? 14 : 15;
   function isActive(item: NavItem): boolean {

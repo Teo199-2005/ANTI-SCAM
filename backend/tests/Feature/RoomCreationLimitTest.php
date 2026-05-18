@@ -34,10 +34,10 @@ class RoomCreationLimitTest extends TestCase
         Subscription::create([
             'tenant_id' => $tenant->id,
             'resort_id' => $resort->id,
-            'plan' => 'basic',
-            'base_price' => 2000,
+            'plan' => 'standard',
+            'base_price' => 0,
             'included_rooms' => 1,
-            'extra_room_fee' => 300,
+            'extra_room_fee' => 0,
             'active_room_count' => 1,
             'total_monthly_fee' => 2000,
             'status' => 'active',

@@ -1,81 +1,20 @@
-ANTI-SCAM PH PAYMENT SUMMARY (SIMPLE)
-=====================================
+Anti-ScamPH Subscription Billing (2026-05-18)
+============================================
 
-1) MAIN PAYMENT TYPES
----------------------
-A. Resort Owner Subscription Payment
-   - Who pays: Resort Owner
-   - What it pays for: Monthly platform subscription
-   - Gateway: Xendit checkout page
+PLANS
+- standard: FREE — Verified Resort — up to 10 active rooms — active on owner signup
+- business_pro: PHP 1,000/month — Premium Verified Resort — up to 20 rooms — Xendit monthly invoice/recurring
 
-B. Guest Reservation Fee Payment
-   - Who pays: Guest/Client booking a room
-   - What it pays for: Reservation fee (ex: PHP 500) to confirm booking
-   - Gateway: Xendit checkout page
+CHECKOUT
+- POST /api/v1/resort-owner/subscriptions/pay-invoice
+- billing_scope: monthly only (room_addon removed)
+- Charge: PHP 1,000 × 1 month (or pilot flat amount)
+- Invoice plan tag: business_pro_m1 or business_pro_m1_rec
 
+DOWNGRADE
+- Business Pro overdue → grace_period → downgrade to standard (stay listed)
+- php artisan subscriptions:enforce-grace (scheduled)
 
-2) RESORT OWNER SUBSCRIPTION FLOW
----------------------------------
-1. Owner clicks "Subscribe now" (topbar or "Pay to add room" in Rooms page).
-2. System creates a subscription invoice.
-3. Owner is redirected to Xendit hosted payment page.
-4. Owner pays using available method (GCash, ShopeePay, etc. in test/live mode).
-5. Xendit webhook sends payment result back to backend.
-6. Subscription/invoice status updates in system.
-
-Important:
-- Total subscription amount depends on active room count:
-  total = base plan + extra room charges (if active rooms exceed included rooms).
-- That is why owner can see amounts like PHP 2,600 (example: 2,000 base + 2 extra rooms x 300).
-
-
-3) GUEST BOOKING PAYMENT FLOW
------------------------------
-1. Guest selects room and dates.
-2. System creates a temporary booking lock (to prevent double-booking).
-3. System creates reservation in pending payment status.
-4. System creates Xendit invoice for reservation fee.
-5. Guest is redirected to Xendit to pay.
-6. Webhook confirms payment and reservation status is updated.
-
-
-4) WHERE PAYMENTS ARE SHOWN IN DASHBOARD
-----------------------------------------
-A. Resort Owner Side
-- Rooms page:
-  - If room limit reached, owner sees warning and can click "Pay to add room".
-- Revenue pages:
-  - Shows reservation-related revenue metrics.
-
-B. Admin Side
-- Admin > Subscriptions:
-  - Overview of resort subscription states and invoice status.
-- Admin > Xendit Logs:
-  - Webhook/payment event logs from Xendit.
-
-
-5) TEST MODE VS LIVE MODE
--------------------------
-- If Xendit shows "Test Mode", transactions are simulated (not real money).
-- For real charges, account must be in Live Mode with correct live keys/permissions.
-
-
-6) QUICK TROUBLESHOOTING
-------------------------
-If payment cannot proceed:
-- Check if subscription is due/payable.
-- Check if API keys/permissions are correct in Xendit dashboard.
-- Check webhook token/config.
-- Check Admin > Xendit Logs for exact event/error.
-
-If amount seems incorrect:
-- Verify number of ACTIVE rooms.
-- Verify plan included room count and extra room fee.
-
-
-7) SIMPLE RULE OF THUMB
------------------------
-- Owner pays monthly subscription to keep/upgrade resort operations.
-- Guest pays reservation fee to secure booking.
-- All payment confirmation depends on successful Xendit webhook updates.
-
+MIGRATION (existing data)
+- php artisan migrate
+- php artisan subscriptions:migrate-anti-scamph

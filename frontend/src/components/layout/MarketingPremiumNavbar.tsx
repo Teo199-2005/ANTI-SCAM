@@ -13,6 +13,8 @@ import { Building, Gift, Menu, Shield, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 import { useAuth } from "@/contexts/AuthContext";
+import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { cn } from "@/lib/utils";
 import { ResortGrowthRewardsProgramModal } from "@/components/layout/ResortGrowthRewardsProgramModal";
 import { VerifyResortComingSoonModal } from "@/components/layout/VerifyResortComingSoonModal";
@@ -58,10 +60,31 @@ export function MarketingPremiumNavbar({ mode }: Props) {
   const [mobileNav, setMobileNav] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [programOpen, setProgramOpen] = useState(false);
+  const [rewardsEligible, setRewardsEligible] = useState(true);
 
   useEffect(() => {
     setMobileNav(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!user || user.role !== "resort_owner") {
+      setRewardsEligible(true);
+      return;
+    }
+    let cancelled = false;
+    void getOwnerLandingPage()
+      .then((lp) => {
+        if (!cancelled) {
+          setRewardsEligible(isBusinessProPlan(lp.subscription_plan, lp.subscription_status));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRewardsEligible(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   function desktopLinkClass(href: string, isHome: boolean) {
     if (mode === "hero") {
@@ -401,7 +424,11 @@ export function MarketingPremiumNavbar({ mode }: Props) {
     <>
       <header className={headerShell}>{inner}</header>
       <VerifyResortComingSoonModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
-      <ResortGrowthRewardsProgramModal open={programOpen} onClose={() => setProgramOpen(false)} />
+      <ResortGrowthRewardsProgramModal
+        open={programOpen}
+        onClose={() => setProgramOpen(false)}
+        eligible={rewardsEligible}
+      />
     </>
   );
 }

@@ -5,6 +5,7 @@ namespace App\Modules\Billing\Services;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Modules\Billing\Support\CheckoutReturnBaseResolver;
+use App\Modules\Billing\Support\XenditGatewayErrorMessage;
 use App\Modules\Billing\Support\XenditTls;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
@@ -300,19 +301,6 @@ class XenditInvoiceService
 
     private function buildGatewayErrorMessage(int $status, mixed $errorBody): string
     {
-        $message = is_array($errorBody) ? (string) ($errorBody['message'] ?? '') : '';
-        $code = is_array($errorBody) ? (string) ($errorBody['error_code'] ?? '') : '';
-
-        if ($status === 403 || $code === 'REQUEST_FORBIDDEN_ERROR') {
-            return 'Xendit API key is forbidden for invoice creation. Check key permissions in Xendit Dashboard (Invoices write/create access).';
-        }
-
-        if ($status === 401) {
-            return 'Xendit API key is invalid or unauthorized. Please verify XENDIT_SECRET_KEY.';
-        }
-
-        return $message !== ''
-            ? "Payment gateway error: {$message}"
-            : 'Payment gateway error. Please try again.';
+        return XenditGatewayErrorMessage::fromResponse($status, $errorBody, 'Payment');
     }
 }

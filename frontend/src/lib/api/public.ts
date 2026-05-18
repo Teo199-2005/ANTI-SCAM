@@ -42,6 +42,10 @@ export type PublicResortListItem = {
   description: string | null;
   address: string | null;
   contactNumber: string | null;
+  plan?: string;
+  badgeLabel?: string;
+  isPremiumVerified?: boolean;
+  isVip?: boolean;
   activeRoomsCount: number;
   featuredRoomId: number | null;
   priceFrom?: number | null;

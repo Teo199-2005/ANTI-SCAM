@@ -23,8 +23,7 @@ import {
   Users,
 } from "lucide-react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
-import { formatPhp } from "@/lib/formatPhp";
-import { pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
+import { SubscriptionPlansComparison } from "@/components/marketing/SubscriptionPlansComparison";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
 import ScrollReveal from "@/components/shared/ScrollReveal";
 import { cn } from "@/lib/utils";
@@ -55,114 +54,6 @@ const registerGoldButtonStyle = {
   background: REGISTER_GOLD_BACKGROUND,
   fontFamily: "var(--font-inter), system-ui, sans-serif",
 } as const;
-
-type PricingCardProps = {
-  label: string;
-  original: string;
-  price: string;
-  note: string;
-  highlight: boolean;
-  badge?: string;
-};
-
-function PricingCard({ label, original, price, note, highlight, badge }: PricingCardProps) {
-  const pricePx = highlight ? 38 : 34;
-  return (
-    <div
-      className="relative flex h-full min-w-0 w-full flex-col items-center rounded-xl p-3 text-center sm:p-5"
-      style={{
-        backgroundColor: highlight ? NAVY : "#fff",
-        border: highlight ? `3px solid #ffd47a` : "2px solid #94a3b8",
-        boxShadow: highlight
-          ? "inset 0 1px 0 rgba(255,212,122,0.22), 0 0 0 2px rgba(245,166,35,0.55), 0 0 28px rgba(245,166,35,0.28), 0 10px 36px rgba(13,31,60,0.2)"
-          : "0 2px 8px rgba(0,0,0,0.06)",
-      }}
-    >
-      {badge ? (
-        <span
-          className="absolute -top-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center justify-center isolate overflow-hidden whitespace-nowrap rounded-full border border-amber-200/50 px-4 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_14px_rgba(180,110,0,0.32)] [text-shadow:0_1px_0_rgba(0,0,0,0.12)]"
-          style={registerGoldButtonStyle}
-        >
-          <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
-          <span className="relative z-10">{badge}</span>
-        </span>
-      ) : null}
-
-      <p
-        className="font-pop mb-2 text-[11px] font-semibold uppercase tracking-wide sm:text-xs"
-        style={{
-          color: highlight ? GOLD : "#111",
-        }}
-      >
-        {label}
-      </p>
-
-      <p
-        className="mb-0.5 text-[13px] font-normal line-through"
-        style={{ fontFamily: "var(--font-inter), system-ui, sans-serif", color: "#c0392b" }}
-      >
-        {original}
-      </p>
-
-      <div className="flex items-baseline gap-1">
-        <span
-          className={highlight ? "font-black leading-none" : "font-bold leading-none tracking-tight"}
-          style={{
-            fontFamily: "var(--font-inter), system-ui, sans-serif",
-            fontSize: highlight ? `${pricePx}px` : `${pricePx - 4}px`,
-            color: highlight ? GOLD : "#111",
-          }}
-        >
-          {price}
-        </span>
-        <span
-          className="mb-1 text-xs font-normal"
-          style={{
-            fontFamily: "var(--font-inter), system-ui, sans-serif",
-            color: highlight ? "#b0bcd4" : "#777",
-          }}
-        >
-          /month
-        </span>
-      </div>
-
-      <p
-        className="mb-3 mt-1 text-[11px] font-normal sm:text-xs"
-        style={{
-          fontFamily: "var(--font-inter), system-ui, sans-serif",
-          color: highlight ? GOLD : "#666",
-        }}
-      >
-        {note}
-      </p>
-
-      {highlight ? (
-        <Link
-          href="/register"
-          className={cn(
-            REGISTER_GOLD_SHINE_BASE,
-            "inline-flex w-full justify-center rounded-lg py-2 text-[12px] font-extrabold sm:text-[13px]"
-          )}
-          style={registerGoldButtonStyle}
-        >
-          <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
-          <span className="relative z-10">Get Started</span>
-        </Link>
-      ) : (
-        <Link
-          href="/register"
-          className="w-full rounded-lg py-2 text-center text-[12px] font-extrabold text-white transition hover:opacity-95 sm:text-[13px]"
-          style={{
-            backgroundColor: NAVY,
-            fontFamily: "var(--font-inter), system-ui, sans-serif",
-          }}
-        >
-          Get Started
-        </Link>
-      )}
-    </div>
-  );
-}
 
 export function LandingPremiumPage() {
   return (
@@ -347,59 +238,17 @@ export function LandingPremiumPage() {
         </div>
       </section>
 
-      {/* ── Pricing — odd band (white). Mobile / tablet: 2×2 grid; `lg:` four columns (desktop). ── */}
-      <section className="border-t border-zinc-200/70 bg-white py-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:py-4 lg:pl-6 lg:pr-10">
+      {/* ── Pricing — Standard vs Business Pro ── */}
+      <section
+        className="border-t border-zinc-200/70 py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-7 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:pl-6 lg:pr-10"
+        style={{
+          backgroundColor: "#ffffff",
+          backgroundImage: 'url("/patterns/cloth-alike.png")',
+        }}
+      >
         <div className="mx-auto mb-4 h-px w-full max-w-[min(1100px,100%)] bg-gradient-to-r from-transparent via-zinc-300/80 to-transparent sm:mb-4" aria-hidden />
-        <ScrollReveal className="mx-auto w-full max-w-[min(1100px,100%)]" direction="up" delayMs={30}>
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 lg:gap-3">
-            {pricingPilotEnabled() ? (
-              <>
-                <PricingCard
-                  label="MONTHLY PLAN"
-                  original={formatPhp(pricingPilotUnitPhp())}
-                  price={formatPhp(pricingPilotUnitPhp())}
-                  note="Pilot: flat rate per checkout"
-                  highlight={false}
-                />
-                <PricingCard
-                  label="3-MONTH PLAN"
-                  original={formatPhp(pricingPilotUnitPhp())}
-                  price={formatPhp(pricingPilotUnitPhp())}
-                  note="Pilot: flat rate per checkout"
-                  highlight={false}
-                />
-                <PricingCard
-                  label="6-MONTH PLAN"
-                  original={formatPhp(pricingPilotUnitPhp())}
-                  price={formatPhp(pricingPilotUnitPhp())}
-                  note="Pilot: flat rate per checkout"
-                  highlight={false}
-                />
-                <PricingCard
-                  label="12-MONTH PLAN"
-                  original={formatPhp(pricingPilotUnitPhp())}
-                  price={formatPhp(pricingPilotUnitPhp())}
-                  note="Pilot: flat rate per checkout"
-                  highlight
-                  badge="BEST VALUE"
-                />
-              </>
-            ) : (
-              <>
-                <PricingCard label="MONTHLY PLAN" original={formatPhp(3000)} price={formatPhp(2100)} note="Perfect for startup resorts" highlight={false} />
-                <PricingCard label="3-MONTH PLAN" original={formatPhp(2700)} price={formatPhp(1900)} note={`Save ${formatPhp(2400)} vs monthly`} highlight={false} />
-                <PricingCard label="6-MONTH PLAN" original={formatPhp(2500)} price={formatPhp(1700)} note={`Save ${formatPhp(7800)} vs monthly`} highlight={false} />
-                <PricingCard
-                  label="12-MONTH PLAN"
-                  original={formatPhp(2300)}
-                  price={formatPhp(1500)}
-                  note={`Save ${formatPhp(9600)} yearly`}
-                  highlight
-                  badge="BEST VALUE"
-                />
-              </>
-            )}
-          </div>
+        <ScrollReveal direction="up" delayMs={30}>
+          <SubscriptionPlansComparison />
         </ScrollReveal>
       </section>
 

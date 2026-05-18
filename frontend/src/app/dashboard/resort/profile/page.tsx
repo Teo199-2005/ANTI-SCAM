@@ -10,9 +10,11 @@ import { listResorts, getResort, ownerOnboardResort, updateResort, uploadOwnerRe
 import {
   getOwnerLandingPage,
   LANDING_MISSING_FIELD_LABELS,
+  updateOwnerLandingVideo,
   uploadBgImage,
   type OwnerLandingPageResponse,
 } from "@/lib/api/landingPage";
+import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import { laravelPublicUrl } from "@/lib/publicAsset";
@@ -120,6 +122,9 @@ export default function ResortProfilePage() {
   const [setupBusy, setSetupBusy] = useState(false);
   /** Same readiness rules as the public `/resort/{slug}` page (includes active room + photo). */
   const [ownerLanding, setOwnerLanding] = useState<OwnerLandingPageResponse | null>(null);
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoSaving, setVideoSaving] = useState(false);
 
   const mapRegionGeocodeQuery = useMemo(() => {
     if (!form) return null;
@@ -164,6 +169,8 @@ export default function ResortProfilePage() {
         }
         setSubdomain(ownerSubdomain);
         setOwnerLanding(landing);
+        setVideoEnabled(Boolean((raw.admin_landing_embed_enabled as boolean) ?? false));
+        setVideoUrl((raw.admin_landing_youtube_url as string) ?? "");
 
         setForm({
           id: first.id,
@@ -668,6 +675,63 @@ export default function ResortProfilePage() {
             </div>
             {bgUploadDetail ? <UploadErrorNotice detail={bgUploadDetail} /> : null}
           </div>
+        </div>
+
+        <div className="rounded-xl border border-softBorder bg-softGray/15 p-4">
+          <p className="font-dash text-xs font-semibold text-navy">Landing intro video (Business Pro)</p>
+          <p className="mt-1 font-dash text-xs text-zinc-500">
+            Optional YouTube embed on your public resort page. Requires Business Pro.
+          </p>
+          {isBusinessProPlan(ownerLanding?.subscription_plan, ownerLanding?.subscription_status) ? (
+            <div className="mt-3 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+                <input
+                  type="checkbox"
+                  checked={videoEnabled}
+                  onChange={(e) => setVideoEnabled(e.target.checked)}
+                  className="rounded border-zinc-300"
+                />
+                Show intro video on public landing page
+              </label>
+              <input
+                type="url"
+                className="dash-input"
+                placeholder="https://www.youtube.com/watch?v=…"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                disabled={!videoEnabled}
+              />
+              <button
+                type="button"
+                disabled={videoSaving}
+                onClick={async () => {
+                  setVideoSaving(true);
+                  try {
+                    await updateOwnerLandingVideo({
+                      admin_landing_embed_enabled: videoEnabled,
+                      admin_landing_youtube_url: videoUrl.trim() || null,
+                    });
+                    pushToast({ title: "Video saved", description: "Landing intro video updated.", tone: "success" });
+                  } catch (err) {
+                    pushToast({
+                      title: "Could not save video",
+                      description: parseApiErrorMessage(err, "Check your YouTube URL and try again."),
+                      tone: "error",
+                    });
+                  } finally {
+                    setVideoSaving(false);
+                  }
+                }}
+                className="dash-btn-primary"
+              >
+                {videoSaving ? "Saving…" : "Save video settings"}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-600">
+              Upgrade to Business Pro from the dashboard top bar to add a YouTube intro on your booking site.
+            </p>
+          )}
         </div>
 
         <div className="rounded-xl border border-softBorder bg-softGray/15 p-4">

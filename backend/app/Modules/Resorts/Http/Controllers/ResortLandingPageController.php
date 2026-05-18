@@ -5,10 +5,14 @@ namespace App\Modules\Resorts\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Resort;
 use App\Services\LandingReadinessService;
+use App\Services\PlanFeatureResolver;
+use App\Support\SubscriptionPlan;
+use App\Support\YoutubeVideoId;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\MultipartUploadHints;
 use App\Support\StoredMedia;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ResortLandingPageController extends Controller
 {
@@ -27,6 +31,26 @@ class ResortLandingPageController extends Controller
             ->with(['tenant', 'subscription', 'rooms.images'])
             ->where('tenant_id', $user->tenant_id)
             ->first();
+    }
+
+    private function subscriptionEndAtForOwner(Resort $resort): ?string
+    {
+        $subscription = $resort->subscription;
+        if (! $subscription) {
+            return null;
+        }
+
+        if (SubscriptionPlan::normalize($subscription->plan) !== SubscriptionPlan::BUSINESS_PRO) {
+            if ($subscription->billing_cycle_end !== null || $subscription->next_due_date !== null) {
+                $subscription->billing_cycle_end = null;
+                $subscription->next_due_date = null;
+                $subscription->save();
+            }
+
+            return null;
+        }
+
+        return $subscription->billing_cycle_end?->toDateString();
     }
 
     /**
@@ -51,7 +75,7 @@ class ResortLandingPageController extends Controller
             'resort_id' => $resort->id,
             'subscription_status' => $resort->subscription?->status,
             'subscription_plan' => $resort->subscription?->plan,
-            'subscription_end_at' => $resort->subscription?->billing_cycle_end?->toDateString(),
+            'subscription_end_at' => $this->subscriptionEndAtForOwner($resort),
             'subscription_billing_mode' => $resort->subscription?->billing_mode ?? 'manual',
             'subscription_renewal_duration_months' => (int) ($resort->subscription?->renewal_duration_months ?? 1),
             'subscription_recurring_cancelled_at' => $resort->subscription?->recurring_cancelled_at?->toIso8601String(),
@@ -183,5 +207,47 @@ class ResortLandingPageController extends Controller
             'url' => $urls[0] ?? null,
             'urls' => $urls,
         ], count($urls) > 1 ? 'Images uploaded' : 'Image uploaded');
+    }
+
+    /**
+     * PATCH /resort-owner/landing-page/video — Business Pro only.
+     */
+    public function updateLandingVideo(Request $request, PlanFeatureResolver $plans)
+    {
+        $resort = $this->resolveResort($request);
+        if (! $resort) {
+            return $this->errorResponse('No resort found for this account.', null, 404);
+        }
+
+        $plans->assertFeature($resort->subscription, 'video_embed');
+
+        $data = $request->validate([
+            'admin_landing_embed_enabled' => ['required', 'boolean'],
+            'admin_landing_youtube_url' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $enabled = $data['admin_landing_embed_enabled'];
+        $rawUrl = $data['admin_landing_youtube_url'] ?? null;
+        $rawUrl = is_string($rawUrl) ? trim($rawUrl) : null;
+        if ($rawUrl === '') {
+            $rawUrl = null;
+        }
+
+        if ($enabled && ! YoutubeVideoId::parse($rawUrl)) {
+            throw ValidationException::withMessages([
+                'admin_landing_youtube_url' => ['Enter a valid YouTube link or video ID when the intro video is enabled.'],
+            ]);
+        }
+
+        $resort->admin_landing_embed_enabled = $enabled;
+        if ($request->exists('admin_landing_youtube_url') || $enabled) {
+            $resort->admin_landing_youtube_url = $rawUrl;
+        }
+        $resort->save();
+
+        return $this->successResponse([
+            'admin_landing_embed_enabled' => (bool) $resort->admin_landing_embed_enabled,
+            'admin_landing_youtube_url' => $resort->admin_landing_youtube_url,
+        ], 'Landing video updated');
     }
 }

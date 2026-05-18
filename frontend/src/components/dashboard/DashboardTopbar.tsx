@@ -15,7 +15,9 @@ import { Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Lo
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { formatOwnerConsoleStatusLabel } from "@/lib/billing/subscriptionStatus";
+import { formatOwnerConsoleStatusLabel, planBadgeLabel } from "@/lib/billing/subscriptionStatus";
+import { isXenditCheckoutUrl } from "@/lib/billing/xenditCheckout";
+import { businessProMonthlyPrice, isBusinessProPlan, normalizePlanId } from "@/lib/subscriptionPlans";
 import { pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { createPortal } from "react-dom";
 
@@ -51,8 +53,6 @@ function formatSubscriptionRemainingLabel(days: number | null): string | null {
 }
 
 type DashboardTopbarProps = { onOpenMenu: () => void };
-type SubscriptionPaymentMethod = "CREDIT_CARD" | "GCASH";
-
 type OwnerSubscriptionInfo = {
   resortId: number | null;
   status: string | null;
@@ -64,35 +64,14 @@ type OwnerSubscriptionInfo = {
   nextDueDate: string | null;
 };
 
-type PlanDuration = 1 | 3 | 6 | 12;
-type PlanOffer = {
-  duration: PlanDuration;
-  /** Charged monthly rate for this prepay tier */
-  monthlyRate: number;
-  /** Shown struck through as “was” price */
-  listMonthlyRate: number;
-  billingType: "Monthly" | "Upfront";
-};
-
-function buildStandardOffers(): PlanOffer[] {
-  if (pricingPilotEnabled()) {
-    const u = pricingPilotUnitPhp();
-    return [
-      { duration: 1, monthlyRate: u, listMonthlyRate: u, billingType: "Monthly" },
-      { duration: 3, monthlyRate: u, listMonthlyRate: u, billingType: "Upfront" },
-      { duration: 6, monthlyRate: u, listMonthlyRate: u, billingType: "Upfront" },
-      { duration: 12, monthlyRate: u, listMonthlyRate: u, billingType: "Upfront" },
-    ];
-  }
-  return [
-    { duration: 1, monthlyRate: 2100, listMonthlyRate: 3000, billingType: "Monthly" },
-    { duration: 3, monthlyRate: 1900, listMonthlyRate: 2700, billingType: "Upfront" },
-    { duration: 6, monthlyRate: 1700, listMonthlyRate: 2500, billingType: "Upfront" },
-    { duration: 12, monthlyRate: 1500, listMonthlyRate: 2300, billingType: "Upfront" },
-  ];
-}
-
-const STANDARD_OFFERS: PlanOffer[] = buildStandardOffers();
+const BUSINESS_PRO_FEATURES = [
+  "Up to 20 room slots",
+  "Revenue & analytics dashboards",
+  "Video on your resort page",
+  "Priority verified listing",
+  "Downloadable reports",
+  "Reward Growth Program eligibility",
+] as const;
 
 export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const pathname = usePathname();
@@ -103,8 +82,6 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const [mounted, setMounted] = useState(false);
   const [subscribingNow, setSubscribingNow] = useState(false);
   const subscribeInFlightRef = useRef(false);
-  const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(1);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<SubscriptionPaymentMethod>("CREDIT_CARD");
   const [subscriptionInfo, setSubscriptionInfo] = useState<OwnerSubscriptionInfo | null>(null);
   const [cancellingRecurring, setCancellingRecurring] = useState(false);
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
@@ -125,32 +102,48 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
   const hasActiveReferralTrial = Boolean(user?.referral_trial?.active);
   const subscriptionStatus = (
     subscriptionInfo?.status ??
-    (user?.role === "resort_owner" && ownerHasWorkspace ? "expired" : "active")
+    (user?.role === "resort_owner" && ownerHasWorkspace ? "active" : "active")
   ).toLowerCase();
-  const isSubscribedOwner =
-    user?.role === "resort_owner" &&
-    (subscriptionStatus === "active" || hasActiveReferralTrial);
-  const showSubscribeCta =
-    user?.role === "resort_owner" && ownerHasWorkspace && subscriptionStatus === "expired";
-  const ownerStatusLabel = formatOwnerConsoleStatusLabel(subscriptionStatus, hasActiveReferralTrial);
-  const subscriptionEndsAt =
-    subscriptionInfo?.endsAt ?? (hasActiveReferralTrial ? (user?.referral_trial?.ends_at ?? null) : null);
+  const ownerPlan = normalizePlanId(subscriptionInfo?.plan);
+  const isBusinessPro = isBusinessProPlan(subscriptionInfo?.plan, subscriptionStatus) || hasActiveReferralTrial;
+  const isSubscribedOwner = user?.role === "resort_owner" && ownerHasWorkspace;
+  const showUpgradeCta =
+    user?.role === "resort_owner" && ownerHasWorkspace && !isBusinessPro;
+  const ownerStatusLabel = formatOwnerConsoleStatusLabel(
+    subscriptionStatus,
+    hasActiveReferralTrial,
+    subscriptionInfo?.plan,
+  );
+  const ownerBadgeLabel = planBadgeLabel(subscriptionInfo?.plan, subscriptionStatus);
+  const isStandardFreeActive =
+    ownerPlan === "standard" && subscriptionStatus === "active" && !hasActiveReferralTrial;
+  const subscriptionEndsAt = isStandardFreeActive
+    ? null
+    : subscriptionInfo?.endsAt ?? (hasActiveReferralTrial ? (user?.referral_trial?.ends_at ?? null) : null);
   const formattedEndDate = subscriptionEndsAt
     ? new Date(subscriptionEndsAt).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
     : "Not available";
   const subscriptionDaysLeft = subscriptionDaysRemaining(subscriptionEndsAt);
   const subscriptionRemainingLabel = formatSubscriptionRemainingLabel(subscriptionDaysLeft);
-  const isPaidSubscriptionActive = subscriptionStatus === "active";
+  const isPaidSubscriptionActive = isBusinessPro && subscriptionStatus === "active";
   const autoRenewalActive =
     subscriptionInfo?.billingMode === "auto_card" && !subscriptionInfo?.recurringCancelledAt;
-  const renewalMonths = subscriptionInfo?.renewalDurationMonths ?? selectedDuration;
-  const selectedOffer = STANDARD_OFFERS.find((o) => o.duration === selectedDuration) ?? STANDARD_OFFERS[0]!;
-  const totalCharge = pricingPilotEnabled()
-    ? pricingPilotUnitPhp()
-    : selectedOffer.monthlyRate * selectedDuration;
+  const renewalMonths = subscriptionInfo?.renewalDurationMonths ?? 1;
+  const totalCharge = pricingPilotEnabled() ? pricingPilotUnitPhp() : businessProMonthlyPrice();
+  const selectedDuration = 1 as const;
+  const selectedOffer = { monthlyRate: totalCharge, listMonthlyRate: totalCharge };
+  const STANDARD_OFFERS = [
+    { duration: 1 as const, monthlyRate: totalCharge, listMonthlyRate: totalCharge, billingType: "Monthly" },
+  ];
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const openUpgrade = () => setShowSubscribeModal(true);
+    window.addEventListener("subscription:open-upgrade", openUpgrade);
+    return () => window.removeEventListener("subscription:open-upgrade", openUpgrade);
   }, []);
 
   useEffect(() => {
@@ -237,19 +230,24 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
     if (subscribeInFlightRef.current) return;
     subscribeInFlightRef.current = true;
     setSubscribingNow(true);
-    const durationForCheckout = selectedDuration;
     setShowSubscribeModal(false);
     try {
       const result = await createSubscriptionInvoice(
         false,
-        selectedPaymentMethod,
+        undefined,
         undefined,
         "monthly",
         undefined,
-        durationForCheckout,
+        1,
         typeof window !== "undefined" ? window.location.origin : undefined,
       );
-      window.location.href = result.invoice_url;
+      const checkoutUrl = result.invoice_url?.trim() ?? "";
+      if (!isXenditCheckoutUrl(checkoutUrl)) {
+        throw new Error(
+          "Payment gateway did not return a Xendit checkout link. Add your server IP to the Xendit API key allowlist, or use a development API key for local testing.",
+        );
+      }
+      window.location.assign(checkoutUrl);
     } catch (err) {
       pushToast({
         title: "Unable to start payment",
@@ -354,7 +352,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
           <>
             {user.role === "resort_owner" ? (
               <>
-                {showSubscribeCta ? (
+                {showUpgradeCta ? (
                   <div className="relative">
                     <button
                       type="button"
@@ -362,8 +360,8 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                       className="group relative inline-flex max-w-[9.5rem] items-center justify-center gap-1 overflow-hidden rounded-xl bg-gradient-to-r from-primaryBlue via-[#2d6de8] to-slateBlue px-3 py-2 font-dash text-[10px] font-bold leading-tight text-white shadow-[0_2px_12px_rgba(37,99,235,0.40)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(37,99,235,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue/50 focus-visible:ring-offset-2 active:translate-y-0 sm:max-w-none sm:px-4 sm:text-dash-xs"
                     >
                       <span className="pointer-events-none absolute inset-0 -translate-x-full skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                      <span className="relative sm:hidden">Subscribe</span>
-                      <span className="relative hidden sm:inline">Subscribe now</span>
+                      <span className="relative sm:hidden">Upgrade</span>
+                      <span className="relative hidden sm:inline">Upgrade to Business Pro</span>
                     </button>
 
                     <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center">
@@ -384,23 +382,23 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                       }
                     }}
                     className={`inline-flex max-w-[10rem] items-center gap-1.5 rounded-xl px-2 py-1.5 font-dash text-[10px] font-bold uppercase leading-tight tracking-wide shadow-soft-sm sm:max-w-none sm:gap-2 sm:px-3 sm:py-2 sm:text-dash-xs ${
-                      isSubscribedOwner
+                      isBusinessPro
                         ? "border border-emerald-300/80 bg-emerald-50 text-emerald-700"
-                        : "border border-amber-300/80 bg-amber-50 text-amber-700"
+                        : "border border-sky-200/80 bg-sky-50 text-sky-900"
                     }`}
                     aria-expanded={isSubscribedOwner ? showSubscriptionDetails : undefined}
                     aria-haspopup={isSubscribedOwner ? "dialog" : undefined}
                   >
                     <Crown size={14} className="shrink-0 max-sm:h-3.5 max-sm:w-3.5" />
-                    {isSubscribedOwner ? (
+                    {isBusinessPro ? (
                       <>
-                        <span className="truncate sm:hidden">Premium</span>
-                        <span className="hidden sm:inline">Status: Premium (active)</span>
+                        <span className="truncate sm:hidden">Pro</span>
+                        <span className="hidden sm:inline">Premium Verified</span>
                       </>
                     ) : (
                       <>
-                        <span className="truncate sm:hidden">{ownerStatusLabel}</span>
-                        <span className="hidden sm:inline">Status: {ownerStatusLabel}</span>
+                        <span className="truncate sm:hidden">Standard</span>
+                        <span className="hidden sm:inline">{ownerBadgeLabel}</span>
                       </>
                     )}
                     {isSubscribedOwner ? (
@@ -415,16 +413,26 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-72 rounded-xl border border-softBorder bg-white p-3 shadow-card">
                       <p className="font-dash text-[11px] font-bold uppercase tracking-wide text-zinc-500">Subscription details</p>
                       <p className="mt-1 text-sm font-semibold text-navy">
-                        Plan: {(subscriptionInfo?.plan ?? "basic").toUpperCase()}
+                        Plan: {ownerPlan === "business_pro" ? "Business Pro" : "Standard (free)"}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-700">Expires: {formattedEndDate}</p>
-                      {subscriptionRemainingLabel ? (
-                        <p className="mt-0.5 text-[11px] font-medium tabular-nums text-zinc-400">
-                          {hasActiveReferralTrial && !isPaidSubscriptionActive
-                            ? `Referral trial · ${subscriptionRemainingLabel}`
-                            : subscriptionRemainingLabel}
+                      {isStandardFreeActive ? (
+                        <p className="mt-1 text-sm text-zinc-600">
+                          Verified listing — no expiration. Upgrade anytime for analytics and up to 20 rooms.
                         </p>
-                      ) : null}
+                      ) : (
+                        <>
+                          {subscriptionEndsAt ? (
+                            <p className="mt-1 text-sm text-zinc-700">Expires: {formattedEndDate}</p>
+                          ) : null}
+                          {subscriptionRemainingLabel ? (
+                            <p className="mt-0.5 text-[11px] font-medium tabular-nums text-zinc-400">
+                              {hasActiveReferralTrial && !isPaidSubscriptionActive
+                                ? `Referral trial · ${subscriptionRemainingLabel}`
+                                : subscriptionRemainingLabel}
+                            </p>
+                          ) : null}
+                        </>
+                      )}
                       {isPaidSubscriptionActive ? (
                         <p className="mt-2 text-[11px] text-zinc-600">
                           {autoRenewalActive
@@ -452,7 +460,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                           {cancellingRecurring ? "Cancelling…" : "Cancel auto-renewal"}
                         </button>
                       ) : null}
-                      {!isPaidSubscriptionActive ? (
+                      {!isPaidSubscriptionActive && !isStandardFreeActive ? (
                         <p className="mt-2 text-[11px] text-zinc-500">
                           {hasActiveReferralTrial
                             ? "Referral trial access. Subscribe before your trial ends to keep your resort active."
@@ -539,7 +547,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Standard subscription details"
+            aria-label="Business Pro upgrade"
           >
             <div className="relative overflow-hidden border-b border-softBorder/70 bg-gradient-to-r from-navy via-primaryBlue to-slateBlue px-4 pb-3 pt-3 text-white sm:px-6 sm:pb-4 sm:pt-4">
               <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
@@ -548,13 +556,13 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                 <div className="min-w-0 flex-1">
                   <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white/90 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[10px]">
                     <Sparkles size={11} className="shrink-0 sm:h-3 sm:w-3" aria-hidden />
-                    Subscription Offer
+                    Business Pro
                   </span>
                   <h2 className="mt-1.5 font-dash text-base font-semibold leading-snug sm:mt-2 sm:text-xl">
-                    Best for direct resort onboarding
+                    Premium Verified Resort
                   </h2>
                   <p className="mt-1 text-xs leading-snug text-white/85 sm:text-sm">
-                    Launch faster with one complete monthly package.
+                    Analytics, priority listing, video, and up to 20 rooms — ₱1,000/month.
                   </p>
                 </div>
                 <button
@@ -572,20 +580,19 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
               <div className="rounded-xl border border-skyBlue/20 bg-gradient-to-b from-skyBlue/5 to-white p-3 sm:rounded-2xl sm:p-5">
                 <p className="inline-flex items-center gap-1.5 font-dash text-sm font-semibold text-navy sm:text-base">
                   <WalletCards size={14} className="shrink-0 text-primaryBlue sm:h-[15px] sm:w-[15px]" />
-                  Standard Subscription
+                  Business Pro
                 </p>
-                <p className="mt-1 inline-flex items-start gap-1.5 text-[11px] leading-snug text-zinc-600 sm:items-center sm:text-sm">
-                  <CalendarDays size={13} className="mt-0.5 shrink-0 text-zinc-500 sm:mt-0 sm:h-[14px] sm:w-[14px]" />
-                  Choose your plan duration (3 rooms included)
+                <p className="mt-1 text-[11px] leading-snug text-zinc-600 sm:text-sm">
+                  Standard (free) includes up to 10 rooms. Upgrade for premium tools below.
                 </p>
-                <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-2.5 lg:grid-cols-4">
+                <div className="hidden">
                   {STANDARD_OFFERS.map((offer) => {
                     const active = selectedDuration === offer.duration;
                     return (
                       <button
                         key={`duration-${offer.duration}`}
                         type="button"
-                        onClick={() => setSelectedDuration(offer.duration)}
+                        onClick={() => undefined}
                         className={`flex min-w-0 flex-col items-stretch gap-1 rounded-lg border px-2.5 py-2 text-left transition sm:rounded-xl sm:px-3 sm:py-2.5 ${
                           active
                             ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/30"
@@ -618,16 +625,13 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   <p className="inline-flex flex-wrap items-end gap-x-2 gap-y-0.5 text-2xl font-black leading-none tracking-tight text-zinc-950 sm:gap-x-2.5 sm:text-4xl">
                     <WalletCards size={18} className="shrink-0 text-primaryBlue sm:mb-1 sm:h-[22px] sm:w-[22px]" />
                     <span className="inline-flex flex-wrap items-end gap-x-1.5 sm:gap-x-2">
-                      <span className="text-lg font-bold tabular-nums text-zinc-400 line-through decoration-zinc-400 decoration-2 sm:text-3xl">
-                        {formatPhpLedger(selectedOffer.listMonthlyRate)}
-                      </span>
                       <span className="tabular-nums">
-                        {formatPhpLedger(selectedOffer.monthlyRate)}
+                        {formatPhpLedger(totalCharge)}
                       </span>
                     </span>
                   </p>
                   <p className="pb-0.5 text-[10px] font-medium lowercase leading-none text-zinc-500 sm:pb-1 sm:text-xs">
-                    / month (promo rate)
+                    / month
                   </p>
                 </div>
                 <p className="mt-1.5 inline-flex flex-wrap items-center gap-1 text-[10px] text-zinc-500 sm:mt-2 sm:gap-1.5 sm:text-xs">
@@ -641,67 +645,17 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   </span>
                 </p>
                 <p className="mt-1 text-[10px] leading-snug text-zinc-500 sm:text-[11px]">
-                  {selectedPaymentMethod === "CREDIT_CARD"
-                    ? `Card (Visa, Mastercard, JCB): charged automatically every ${selectedDuration} month${selectedDuration > 1 ? "s" : ""} after checkout.`
-                    : "GCash and other methods: pay manually each billing period (we email an invoice)."}
+                  You&apos;ll choose your payment method (card, GCash, Maya, and more) on the secure Xendit checkout page.
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <p className="font-dash text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Payment method</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPaymentMethod("CREDIT_CARD")}
-                    className={`rounded-xl border px-3 py-2.5 text-left text-[11px] transition sm:text-xs ${
-                      selectedPaymentMethod === "CREDIT_CARD"
-                        ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/25"
-                        : "border-softBorder bg-white hover:border-primaryBlue/30"
-                    }`}
-                  >
-                    <span className="block font-semibold text-navy">Card</span>
-                    <span className="mt-0.5 block text-zinc-600">Visa, Mastercard, JCB · auto-renewal</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPaymentMethod("GCASH")}
-                    className={`rounded-xl border px-3 py-2.5 text-left text-[11px] transition sm:text-xs ${
-                      selectedPaymentMethod === "GCASH"
-                        ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/25"
-                        : "border-softBorder bg-white hover:border-primaryBlue/30"
-                    }`}
-                  >
-                    <span className="block font-semibold text-navy">GCash / other</span>
-                    <span className="mt-0.5 block text-zinc-600">Manual renewal each period</span>
-                  </button>
-                </div>
-              </div>
-
               <ul className="grid gap-1.5 text-[11px] leading-snug text-zinc-700 sm:gap-2.5 sm:text-sm md:grid-cols-2">
-                <li className="flex items-start gap-1.5 sm:gap-2">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
-                  Booking Management System
-                </li>
-                <li className="flex items-start gap-1.5 sm:gap-2">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
-                  Payment System (Gcash or credit cards)
-                </li>
-                <li className="flex items-start gap-1.5 sm:gap-2">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
-                  5 pictures per room allowed
-                </li>
-                <li className="flex items-start gap-1.5 sm:gap-2">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
-                  Full room description
-                </li>
-                <li className="flex items-start gap-1.5 sm:gap-2">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
-                  Real time room availability
-                </li>
-                <li className="flex items-start gap-1.5 sm:gap-2">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
-                  Tech Support 8am-4pm Mon-Fri
-                </li>
+                {BUSINESS_PRO_FEATURES.map((feature) => (
+                  <li key={feature} className="flex items-start gap-1.5 sm:gap-2">
+                    <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+                    {feature}
+                  </li>
+                ))}
               </ul>
 
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-medium leading-snug text-amber-800 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
@@ -724,7 +678,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   disabled={subscribingNow}
                   className="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-gradient-to-r from-primaryBlue to-slateBlue px-3 py-2 text-xs font-semibold text-white shadow-soft-sm transition-[transform,filter] hover:-translate-y-px hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto sm:px-4 sm:text-sm"
                 >
-                  {subscribingNow ? <Loader2 size={14} className="animate-spin" /> : "Subscribe now"}
+                  {subscribingNow ? <Loader2 size={14} className="animate-spin" /> : "Upgrade — pay now"}
                 </button>
               </div>
             </div>

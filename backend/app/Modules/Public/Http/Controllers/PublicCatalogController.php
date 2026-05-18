@@ -12,6 +12,7 @@ use App\Modules\Reservations\Services\ReservationService;
 use App\Models\Tenant;
 use App\Services\LandingReadinessService;
 use App\Services\PhilippineLocationService;
+use App\Support\SubscriptionPlan;
 use App\Support\YoutubeVideoId;
 use App\Services\RoomOccupancyService;
 use App\Shared\Traits\ApiResponseTrait;
@@ -33,10 +34,13 @@ class PublicCatalogController extends Controller
         $cityCode = request()->string('city_code')->value();
 
         $resorts = Resort::query()
-            ->with(['rooms' => fn ($q) => $q->where('status', 'active')->select('id', 'resort_id')])
+            ->with(['subscription', 'rooms' => fn ($q) => $q->where('status', 'active')->select('id', 'resort_id')])
             ->withCount(['rooms as active_rooms_count' => fn ($q) => $q->where('status', 'active')])
             ->where('is_publicly_listed', true)
-            ->latest()
+            ->leftJoin('subscriptions', 'subscriptions.resort_id', '=', 'resorts.id')
+            ->orderByRaw("CASE WHEN subscriptions.plan = 'business_pro' AND subscriptions.status IN ('active','grace_period') THEN 1 ELSE 0 END DESC")
+            ->orderByDesc('resorts.created_at')
+            ->select('resorts.*')
             ->when($provinceCode, fn ($q) => $q->where('address_province_psgc', $provinceCode))
             ->when($cityCode, fn ($q) => $q->where('address_city_municipality_psgc', $cityCode))
             ->when($search, function ($query) use ($search): void {
@@ -56,20 +60,31 @@ class PublicCatalogController extends Controller
             ->get()
             ->mapWithKeys(fn ($row): array => [(int) $row->resort_id => (float) $row->min_price]);
 
-        $resorts->setCollection($resorts->getCollection()->map(fn (Resort $resort): array => [
-            'id'               => $resort->id,
-            'name'             => $resort->name,
-            'description'      => $resort->description,
-            'address'          => $this->locations->resortDisplayLine($resort),
-            'addressProvincePsgc' => $resort->address_province_psgc,
-            'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
-            'addressBarangayPsgc' => $resort->address_barangay_psgc,
-            'contactNumber'    => $resort->contact_number,
-            'isVip'            => (bool) $resort->is_vip,
-            'activeRoomsCount' => $resort->active_rooms_count,
-            'featuredRoomId'   => $resort->rooms->first()?->id,
-            'priceFrom'        => $minPrices->get($resort->id),
-        ]));
+        $resorts->setCollection($resorts->getCollection()->map(function (Resort $resort) use ($minPrices): array {
+            $plan = SubscriptionPlan::normalize($resort->subscription?->plan);
+            $isPremium = $plan === SubscriptionPlan::BUSINESS_PRO
+                && in_array((string) ($resort->subscription?->status), ['active', 'grace_period'], true);
+
+            return [
+                'id'               => $resort->id,
+                'name'             => $resort->name,
+                'description'      => $resort->description,
+                'address'          => $this->locations->resortDisplayLine($resort),
+                'addressProvincePsgc' => $resort->address_province_psgc,
+                'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
+                'addressBarangayPsgc' => $resort->address_barangay_psgc,
+                'contactNumber'    => $resort->contact_number,
+                'plan'             => $plan,
+                'badgeLabel'       => $isPremium
+                    ? SubscriptionPlan::badgeLabel(SubscriptionPlan::BUSINESS_PRO)
+                    : SubscriptionPlan::badgeLabel(SubscriptionPlan::STANDARD),
+                'isPremiumVerified' => $isPremium,
+                'isVip'            => $isPremium,
+                'activeRoomsCount' => $resort->active_rooms_count,
+                'featuredRoomId'   => $resort->rooms->first()?->id,
+                'priceFrom'        => $minPrices->get($resort->id),
+            ];
+        }));
 
         return $this->successResponse($resorts, 'Public resorts fetched');
     }
@@ -182,8 +197,12 @@ class PublicCatalogController extends Controller
             ->values()
             ->all();
 
+        $plan = SubscriptionPlan::normalize($resort->subscription?->plan);
+        $isPremium = $plan === SubscriptionPlan::BUSINESS_PRO
+            && in_array((string) ($resort->subscription?->status), ['active', 'grace_period'], true);
+
         $embedVideoId = null;
-        if ($resort->admin_landing_embed_enabled) {
+        if ($isPremium && $resort->admin_landing_embed_enabled) {
             $embedVideoId = YoutubeVideoId::parse($resort->admin_landing_youtube_url);
         }
 
@@ -199,7 +218,12 @@ class PublicCatalogController extends Controller
             'addressBarangayPsgc' => $resort->address_barangay_psgc,
             'contactNumber'        => $resort->contact_number,
             'logoUrl'              => $resort->logo_url,
-            'isVip'                => (bool) $resort->is_vip,
+            'plan'                 => $plan,
+            'badgeLabel'           => $isPremium
+                ? SubscriptionPlan::badgeLabel(SubscriptionPlan::BUSINESS_PRO)
+                : SubscriptionPlan::badgeLabel(SubscriptionPlan::STANDARD),
+            'isPremiumVerified'    => $isPremium,
+            'isVip'                => $isPremium,
             'amenities'            => $resortAmenities,
             'cancellationPolicy'   => $resort->cancellation_policy,
             'hero'                 => $payload['hero'],
@@ -362,7 +386,7 @@ class PublicCatalogController extends Controller
             return $this->errorResponse('Resort is not publicly listed.', ['room' => ['not_publicly_available']], 404);
         }
 
-        if (! $resort->subscription || $resort->subscription->status !== 'active') {
+        if (! $resort->subscription || ! in_array($resort->subscription->status, ['active', 'grace_period'], true)) {
             return $this->errorResponse('Resort subscription is not active.', ['room' => ['subscription_inactive']], 403);
         }
 

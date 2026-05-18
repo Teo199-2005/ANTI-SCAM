@@ -109,6 +109,9 @@ export type PublicResortLandingPayload = {
   contactNumber: string | null;
   logoUrl: string | null;
   isVip: boolean;
+  plan?: string;
+  badgeLabel?: string;
+  isPremiumVerified?: boolean;
   /** Resort-level amenities from the owner profile (display chips on the public landing page). */
   amenities?: string[];
   cancellationPolicy?: string | null;
@@ -126,6 +129,16 @@ export type PublicResortLandingPayload = {
 
 export async function getOwnerLandingPage(): Promise<OwnerLandingPageResponse> {
   const { data } = await apiClient.get<ApiEnvelope<OwnerLandingPageResponse>>("/resort-owner/landing-page");
+  return data.data;
+}
+
+export async function updateOwnerLandingVideo(payload: {
+  admin_landing_embed_enabled: boolean;
+  admin_landing_youtube_url?: string | null;
+}): Promise<{ admin_landing_embed_enabled: boolean; admin_landing_youtube_url: string | null }> {
+  const { data } = await apiClient.patch<
+    ApiEnvelope<{ admin_landing_embed_enabled: boolean; admin_landing_youtube_url: string | null }>
+  >("/resort-owner/landing-page/video", payload);
   return data.data;
 }
 

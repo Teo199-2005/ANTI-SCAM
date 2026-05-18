@@ -22,8 +22,11 @@ import {
   RotateCcw,
   TrendingUp,
 } from "lucide-react";
+import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { useEffect, useMemo, useState } from "react";
 import { formatPhp, formatPhpLedger } from "@/lib/formatPhp";
+import Link from "next/link";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -35,6 +38,7 @@ const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 const WEEK_OPTIONS = Array.from({ length: 53 }, (_, i) => i + 1);
 
 export default function ResortRevenuePage() {
+  const [planAllowed, setPlanAllowed] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [payload, setPayload] = useState<ResortRevenueAnalyticsPayload | null>(null);
@@ -50,6 +54,16 @@ export default function ResortRevenuePage() {
     month: "",
     week: "",
   });
+
+  useEffect(() => {
+    void getOwnerLandingPage()
+      .then((landing) => {
+        setPlanAllowed(
+          isBusinessProPlan(landing.subscription_plan, landing.subscription_status),
+        );
+      })
+      .catch(() => setPlanAllowed(false));
+  }, []);
   const [error, setError] = useState<string | null>(null);
 
   const load = async (f: ResortRevenueFilters) => {
@@ -296,6 +310,31 @@ export default function ResortRevenuePage() {
       rgbKey: rgb.violet,
     },
   ];
+
+  if (planAllowed === null) {
+    return <div className="dash-card p-8 text-center text-zinc-600">Loading…</div>;
+  }
+
+  if (!planAllowed) {
+    return (
+      <div className="dash-card max-w-xl space-y-4 p-8">
+        <h1 className="dash-page-title">Revenue &amp; analytics</h1>
+        <p className="text-sm text-zinc-600">
+          Revenue reporting is included with Business Pro (₱1,000/month).
+        </p>
+        <button
+          type="button"
+          className="dash-btn-primary"
+          onClick={() => window.dispatchEvent(new Event("subscription:open-upgrade"))}
+        >
+          Upgrade to Business Pro
+        </button>
+        <Link href="/dashboard/resort" className="block text-sm text-primaryBlue hover:underline">
+          Back to overview
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

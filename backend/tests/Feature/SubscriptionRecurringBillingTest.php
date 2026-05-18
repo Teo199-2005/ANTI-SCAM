@@ -60,19 +60,35 @@ class SubscriptionRecurringBillingTest extends TestCase
         return [$resort, $subscription, $owner];
     }
 
-    public function test_owner_checkout_requires_payment_method(): void
+    public function test_owner_checkout_without_payment_method_uses_xendit_default_methods(): void
     {
         config(['services.xendit.secret_key' => 'xnd_development_test_key']);
 
         [$resort, , $owner] = $this->seedDueSubscription();
         $resort->subscription->update(['status' => 'expired']);
 
+        Http::fake([
+            'https://api.xendit.co/v2/invoices' => Http::response([
+                'id' => 'inv_open_checkout',
+                'invoice_url' => 'https://checkout.xendit.co/open',
+            ], 200),
+        ]);
+
         Sanctum::actingAs($owner);
 
         $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
             'billing_scope' => 'monthly',
             'subscription_duration_months' => 1,
-        ])->assertStatus(422);
+        ])->assertOk();
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), '/v2/invoices')) {
+                return false;
+            }
+            $body = $request->data();
+
+            return ! isset($body['payment_methods']);
+        });
     }
 
     public function test_card_checkout_tags_invoice_plan_with_rec_suffix(): void

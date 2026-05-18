@@ -19,14 +19,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 import { listResorts, ResortItem } from "@/lib/api/resort";
-import { createSubscriptionInvoice } from "@/lib/api/subscription";
-import {
-  SLOT_PREPAY_LABELS,
-  slotPrepayMonthlyRate,
-  slotPrepayTotal,
-  type SlotPrepayDuration,
-} from "@/lib/billing/slotPrepay";
-import { defaultExtraRoomFeeFallbackPhp } from "@/lib/pricingPilot";
+import { isBusinessProPlan, SUBSCRIPTION_PLANS } from "@/lib/subscriptionPlans";
 import { bulkDeleteRooms, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
@@ -104,10 +97,6 @@ export default function ResortRoomsPage() {
   const [createRoomId, setCreateRoomId] = useState<number | null>(null);
   const [createModalTab, setCreateModalTab] = useState<"details" | "images">("details");
   const [createSaving, setCreateSaving] = useState(false);
-  const [payingForRoomSlot, setPayingForRoomSlot] = useState(false);
-  const [roomAddonOpen, setRoomAddonOpen] = useState(false);
-  const [roomAddonQuantity, setRoomAddonQuantity] = useState(1);
-  const [roomAddonDuration, setRoomAddonDuration] = useState<SlotPrepayDuration>(1);
   const [error, setError] = useState<string | null>(null);
   const { pushToast } = useToast();
   const bulk = useBulkSelection(rooms, (r) => r.id);
@@ -220,21 +209,16 @@ export default function ResortRoomsPage() {
     (typeof resort?.rooms_count === "number" ? resort.rooms_count : null) ??
     meta?.total ??
     rooms.length;
-  const includedRooms = resort?.subscription?.included_rooms ?? Infinity;
-  const subIncludedCap = resort?.subscription?.included_rooms;
-  const slotsRemaining =
-    typeof subIncludedCap === "number"
-      ? Math.max(0, subIncludedCap - activeRoomsCount)
-      : null;
-  const extraRoomFee = Number(resort?.subscription?.extra_room_fee ?? defaultExtraRoomFeeFallbackPhp());
-  const slotMonthlyPrepay = slotPrepayMonthlyRate(extraRoomFee, roomAddonDuration);
-  const addonPrepayTotal = slotPrepayTotal(extraRoomFee, roomAddonDuration, roomAddonQuantity);
+  const isBusinessPro = isBusinessProPlan(resort?.subscription?.plan, resort?.subscription?.status);
+  const includedRooms =
+    resort?.subscription?.included_rooms ??
+    (isBusinessPro ? SUBSCRIPTION_PLANS.business_pro.maxRooms : SUBSCRIPTION_PLANS.standard.maxRooms);
+  const slotsRemaining = Math.max(0, includedRooms - activeRoomsCount);
   const atIncludedRoomLimit = resort ? activeRoomsCount >= includedRooms : false;
+  const showUpgradeCta = !isBusinessPro;
 
-  const openRoomAddonModal = () => {
-    setRoomAddonQuantity(1);
-    setRoomAddonDuration(1);
-    setRoomAddonOpen(true);
+  const openUpgradeModal = () => {
+    window.dispatchEvent(new Event("subscription:open-upgrade"));
   };
 
   const onDelete = async (roomId: number) => {
@@ -351,38 +335,6 @@ export default function ResortRoomsPage() {
     }
   };
 
-  const onPayToAddRoom = async () => {
-    if (!resort?.id) {
-      pushToast({ title: "Resort not found", description: "Reload and try again.", tone: "error" });
-      return;
-    }
-    if (roomAddonQuantity < 1) {
-      pushToast({ title: "Invalid quantity", description: "Room quantity must be at least 1.", tone: "warning" });
-      return;
-    }
-    setPayingForRoomSlot(true);
-    try {
-      const result = await createSubscriptionInvoice(
-        false,
-        undefined,
-        undefined,
-        "room_addon",
-        roomAddonQuantity,
-        roomAddonDuration,
-        typeof window !== "undefined" ? window.location.origin : undefined,
-      );
-      setRoomAddonOpen(false);
-      window.location.href = result.invoice_url;
-    } catch (err) {
-      pushToast({
-        title: "Unable to start payment",
-        description: parseApiErrorMessage(err, "Please try again from the topbar Subscribe now button."),
-        tone: "error",
-      });
-    } finally {
-      setPayingForRoomSlot(false);
-    }
-  };
 
   const paginationFooter =
     error !== "no_resort_workspace" && meta && resort ? (
@@ -436,19 +388,18 @@ export default function ResortRoomsPage() {
                   Add
                 </button>
               )}
-              {activeRoomsCount >= includedRooms ? (
+              {atIncludedRoomLimit && showUpgradeCta ? (
                 <div className="flex max-w-md flex-wrap items-center gap-2 text-sm text-zinc-600">
                   <span>
-                    You've reached your plan's active room limit ({includedRooms}). Pay now to continue adding rooms.
+                    You&apos;ve reached your plan&apos;s active room limit ({includedRooms}). Upgrade to Business Pro for up to 20 rooms.
                   </span>
                   <button
                     type="button"
-                    onClick={openRoomAddonModal}
-                    disabled={payingForRoomSlot}
+                    onClick={openUpgradeModal}
                     className="inline-flex items-center gap-2 rounded-lg border border-primaryBlue/20 bg-primaryBlue/10 px-3 py-1.5 text-xs font-semibold text-primaryBlue hover:bg-primaryBlue/15 disabled:opacity-60"
                   >
-                    {payingForRoomSlot ? <Loader2 size={12} className="animate-spin" /> : <PackagePlus size={12} />}
-                    {payingForRoomSlot ? "Opening checkout…" : "Buy extra room slots"}
+                    <Crown size={12} />
+                    Upgrade to Business Pro
                   </button>
                 </div>
               ) : null}
@@ -472,7 +423,7 @@ export default function ResortRoomsPage() {
                 ) : null}{" "}
                 of{" "}
                 <span className="font-medium text-zinc-900">
-                  {typeof subIncludedCap === "number" ? subIncludedCap : "—"}
+                  {includedRooms}
                 </span>{" "}
                 included
                 {slotsRemaining !== null ? (
@@ -483,28 +434,29 @@ export default function ResortRoomsPage() {
                       <span className="font-medium text-emerald-800">
                         {slotsRemaining} slot{slotsRemaining === 1 ? "" : "s"} available
                       </span>
+                    ) : isBusinessPro ? (
+                      <span className="font-medium text-amber-900">
+                        At plan limit ({includedRooms} active rooms max)
+                      </span>
                     ) : (
-                      <span className="font-medium text-amber-900">At included limit — buy slots to add more</span>
+                      <span className="font-medium text-amber-900">At plan limit — upgrade for more rooms</span>
                     )}
                   </>
                 ) : null}
               </p>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
-                <p className="text-xs text-zinc-500">
-                  Extra slots:{" "}
-                  <span className="font-mono font-medium text-zinc-700">{formatPhp(extraRoomFee)}</span>
-                  /mo each
-                </p>
-                <button
-                  type="button"
-                  onClick={openRoomAddonModal}
-                  disabled={payingForRoomSlot || !resort?.subscription}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primaryBlue/25 bg-primaryBlue/10 px-3 py-2 text-xs font-semibold text-primaryBlue shadow-sm transition hover:bg-primaryBlue/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                >
-                  {payingForRoomSlot ? <Loader2 size={14} className="animate-spin" /> : <PackagePlus size={14} />}
-                  {payingForRoomSlot ? "Opening checkout…" : "Buy extra room slots"}
-                </button>
-              </div>
+              {showUpgradeCta ? (
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+                  <button
+                    type="button"
+                    onClick={openUpgradeModal}
+                    disabled={!resort?.subscription}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primaryBlue/25 bg-primaryBlue/10 px-3 py-2 text-xs font-semibold text-primaryBlue shadow-sm transition hover:bg-primaryBlue/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                  >
+                    <Crown size={14} />
+                    Upgrade to Business Pro
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
               {!resort || activeRoomsCount >= includedRooms ? (
@@ -532,19 +484,18 @@ export default function ResortRoomsPage() {
                   Add
                 </button>
               )}
-              {activeRoomsCount >= includedRooms ? (
+              {atIncludedRoomLimit && showUpgradeCta ? (
                 <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600 sm:max-w-xs">
                   <span>
-                    You've reached your plan's active room limit ({includedRooms}). Pay now to continue adding rooms.
+                    You&apos;ve reached your plan&apos;s active room limit ({includedRooms}). Upgrade to Business Pro for up to 20 rooms.
                   </span>
                   <button
                     type="button"
-                    onClick={openRoomAddonModal}
-                    disabled={payingForRoomSlot}
+                    onClick={openUpgradeModal}
                     className="inline-flex items-center gap-2 rounded-lg border border-primaryBlue/20 bg-primaryBlue/10 px-3 py-1.5 text-xs font-semibold text-primaryBlue hover:bg-primaryBlue/15 disabled:opacity-60"
                   >
-                    {payingForRoomSlot ? <Loader2 size={12} className="animate-spin" /> : <PackagePlus size={12} />}
-                    {payingForRoomSlot ? "Opening checkout…" : "Buy extra room slots"}
+                    <Crown size={12} />
+                    Upgrade to Business Pro
                   </button>
                 </div>
               ) : null}
@@ -786,160 +737,6 @@ export default function ResortRoomsPage() {
         }}
       />
 
-      <DashModal
-        open={roomAddonOpen}
-        onClose={() => {
-          if (!payingForRoomSlot) setRoomAddonOpen(false);
-        }}
-        title={
-          <span className="inline-flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primaryBlue/15 to-slateBlue/10 text-primaryBlue">
-              <PackagePlus size={18} strokeWidth={2} />
-            </span>
-            Buy extra room slots
-          </span>
-        }
-        description="Prepay extra slot fees at a discounted rate—same duration options as your main plan."
-        className="max-w-[min(100vw-1rem,36rem)] md:max-w-xl"
-      >
-        <div className="space-y-5">
-          <div className="relative overflow-hidden rounded-2xl border border-primaryBlue/15 bg-gradient-to-br from-primaryBlue/[0.07] via-white to-slate-50 p-5 shadow-[0_12px_40px_-18px_rgba(13,30,66,0.2)]">
-            <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-primaryBlue/10 blur-2xl" />
-            <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-primaryBlue">
-              <Sparkles size={13} className="shrink-0" />
-              Room capacity
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-700">
-              {atIncludedRoomLimit
-                ? "You’re at your included active-room limit. Unlock more slots now—your limit updates as soon as payment is confirmed."
-                : "Raise your included room limit anytime. Longer prepay windows use the same discounted monthly rates as your subscription."}
-            </p>
-            <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-zinc-600">
-              <CalendarDays size={14} className="text-zinc-500" />
-              Prepay period (applies per slot)
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {SLOT_PREPAY_LABELS.map(({ duration, billingType }) => {
-                const active = roomAddonDuration === duration;
-                return (
-                  <button
-                    key={`slot-duration-${duration}`}
-                    type="button"
-                    onClick={() => setRoomAddonDuration(duration)}
-                    disabled={payingForRoomSlot}
-                    className={`rounded-xl border px-2 py-2.5 text-left transition disabled:opacity-60 ${
-                      active
-                        ? "border-primaryBlue bg-primaryBlue/10 ring-1 ring-primaryBlue/30"
-                        : "border-softBorder bg-white hover:border-primaryBlue/35"
-                    }`}
-                  >
-                    <p className="inline-flex items-center gap-1 text-xs font-bold text-navy">
-                      <CalendarDays size={12} className={active ? "text-primaryBlue" : "text-zinc-500"} />
-                      {duration} mo{duration > 1 ? "s" : ""}
-                    </p>
-                    <p className="text-[11px] text-zinc-500">{billingType}</p>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex flex-wrap items-end gap-x-2 gap-y-1">
-              <p className="inline-flex items-end gap-2 text-3xl font-black leading-none tracking-tight text-zinc-950 sm:text-4xl">
-                <WalletCards size={20} className="mb-1 text-primaryBlue" />
-                {formatPhpLedger(slotMonthlyPrepay)}
-              </p>
-              <p className="pb-1 text-xs font-medium lowercase text-zinc-500">/ slot / month (prepay tier)</p>
-            </div>
-            <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-zinc-500">
-              <Crown size={13} className="text-primaryBlue" />
-              Total due now:{" "}
-              <span className="font-semibold text-navy">
-                {formatPhpLedger(addonPrepayTotal)}
-              </span>
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-softBorder bg-white p-4">
-            <label htmlFor="room-addon-qty" className="mb-2 block text-sm font-semibold text-navy">
-              How many slots?
-            </label>
-            <input
-              id="room-addon-qty"
-              type="number"
-              min={1}
-              max={50}
-              value={roomAddonQuantity}
-              onChange={(e) => {
-                const val = Number(e.target.value || 1);
-                setRoomAddonQuantity(Number.isFinite(val) ? Math.max(1, Math.min(50, Math.floor(val))) : 1);
-              }}
-              className="dash-input max-w-[200px]"
-            />
-            <p className="mt-2 text-xs text-zinc-500">
-              List price per slot overage is {formatPhp(extraRoomFee)}/mo; prepay uses the tiered rate above for{" "}
-              {roomAddonDuration} month{roomAddonDuration > 1 ? "s" : ""}.
-            </p>
-          </div>
-
-          <ul className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-2">
-            <li className="inline-flex items-start gap-2">
-              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
-              Slots are added to your plan immediately after payment
-            </li>
-            <li className="inline-flex items-start gap-2">
-              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
-              Same 1 / 3 / 6 / 12‑month prepay discounts as subscribe
-            </li>
-          </ul>
-
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-            VAT and final totals are confirmed on the Xendit checkout page.
-          </div>
-
-          <div className="rounded-xl border border-primaryBlue/15 bg-primaryBlue/5 p-4">
-            <p className="text-sm font-semibold text-navy">Summary</p>
-            <div className="mt-2 space-y-1 text-sm text-zinc-700">
-              <p>
-                Slots: <span className="font-medium text-navy">{roomAddonQuantity}</span>
-              </p>
-              <p>
-                Prepay: <span className="font-medium text-navy">{roomAddonDuration}</span> month
-                {roomAddonDuration > 1 ? "s" : ""}
-              </p>
-              <p>
-                Effective rate: {formatPhpLedger(slotMonthlyPrepay)} ×{" "}
-                {roomAddonQuantity} × {roomAddonDuration}
-              </p>
-              <p className="border-t border-primaryBlue/10 pt-2 font-semibold text-navy">
-                Total: {formatPhpLedger(addonPrepayTotal)}
-              </p>
-            </div>
-          </div>
-
-          <p className="text-[11px] leading-snug text-zinc-500">
-            Room slots are billed per invoice and are not included in card auto-renewal.
-          </p>
-
-          <div className="flex flex-wrap justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setRoomAddonOpen(false)}
-              disabled={payingForRoomSlot}
-              className="rounded-xl border border-softBorder bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void onPayToAddRoom()}
-              disabled={payingForRoomSlot}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primaryBlue to-slateBlue px-5 py-2.5 text-sm font-semibold text-white shadow-soft-sm transition-[transform,filter] hover:-translate-y-px hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {payingForRoomSlot ? <Loader2 size={14} className="animate-spin" /> : <WalletCards size={16} />}
-              {payingForRoomSlot ? "Opening checkout…" : "Pay with Xendit"}
-            </button>
-          </div>
-        </div>
-      </DashModal>
     </div>
   );
 }
