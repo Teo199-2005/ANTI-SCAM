@@ -64,16 +64,45 @@ export function drawPdfReportHeader(
   return y + 30;
 }
 
-export function downloadPdfDocument(doc: jsPDF, fileName: string): void {
-  const pdfBlob = doc.output("blob");
-  const blobUrl = URL.createObjectURL(pdfBlob);
+/**
+ * Download + optional in-tab preview via blob: URL (never file://).
+ * Revoking the blob URL too early breaks downloads in Chrome/Edge.
+ */
+export function downloadPdfDocument(doc: jsPDF, fileName: string, openPreview = true): void {
+  const safeName = fileName.toLowerCase().endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+
+  let blob: Blob;
+  try {
+    blob = doc.output("blob") as Blob;
+  } catch {
+    const buffer = doc.output("arraybuffer") as ArrayBuffer;
+    blob = new Blob([buffer], { type: "application/pdf" });
+  }
+
+  if (blob.size === 0) {
+    throw new Error("PDF export produced an empty file.");
+  }
+
+  if (openPreview) {
+    const previewUrl = URL.createObjectURL(blob);
+    const preview = window.open(previewUrl, "_blank", "noopener,noreferrer");
+    if (preview) {
+      setTimeout(() => URL.revokeObjectURL(previewUrl), 120_000);
+    }
+  }
+
+  const downloadUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = blobUrl;
-  link.download = fileName;
+  link.href = downloadUrl;
+  link.download = safeName;
+  link.rel = "noopener";
+  link.style.display = "none";
   document.body.appendChild(link);
   link.click();
-  link.remove();
-  URL.revokeObjectURL(blobUrl);
+  setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
+  }, 60_000);
 }
 
 export function ensurePdfPageSpace(

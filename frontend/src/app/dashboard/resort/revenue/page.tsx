@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/dashboard";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
 import { laravelPublicUrl } from "@/lib/publicAsset";
+import { downloadPdfDocument } from "@/lib/pdf/analyticsReportPdf";
 import { jsPDF } from "jspdf";
 import {
   BadgeDollarSign,
@@ -260,17 +261,7 @@ export default function ResortRevenuePage() {
 
       const fileDate = new Date().toISOString().slice(0, 10);
       const fileName = `${(payload.resort.name || "resort").replace(/\s+/g, "-").toLowerCase()}-revenue-${fileDate}.pdf`;
-
-      // Use Blob download to avoid file:// navigation issues on some browsers.
-      const pdfBlob = doc.output("blob");
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(blobUrl);
+      downloadPdfDocument(doc, fileName);
     } finally {
       setExportingPdf(false);
     }
