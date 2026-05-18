@@ -27,15 +27,75 @@ final class SubscriptionPlan
   }
 
   /**
+   * @return array<string, array<string, mixed>>
+   */
+  public static function plans(): array
+  {
+    $plans = config('subscription_plans');
+    if (is_array($plans) && isset($plans[self::STANDARD])) {
+      return $plans;
+    }
+
+    $path = config_path('subscription_plans.php');
+    if (is_file($path)) {
+      $loaded = require $path;
+      if (is_array($loaded) && isset($loaded[self::STANDARD])) {
+        return $loaded;
+      }
+    }
+
+    return self::builtinPlans();
+  }
+
+  /**
    * @return array<string, mixed>
    */
   public static function config(string $plan): array
   {
     $plan = self::normalize($plan);
-    /** @var array<string, array<string, mixed>> $plans */
-    $plans = config('subscription_plans', []);
+    $plans = self::plans();
 
     return $plans[$plan] ?? $plans[self::STANDARD];
+  }
+
+  /**
+   * @return array<string, array<string, mixed>>
+   */
+  private static function builtinPlans(): array
+  {
+    return [
+      self::STANDARD => [
+        'label' => 'Verified Resort',
+        'badge_label' => 'Verified Resort',
+        'max_rooms' => 10,
+        'monthly_price_php' => 0,
+        'listing_priority' => 0,
+        'features' => [
+          'pms', 'calendar', 'booking_site', 'notifications', 'guest_dashboard',
+          'reservation_management', 'online_booking', 'payment_methods', 'verified_listing',
+        ],
+      ],
+      self::BUSINESS_PRO => [
+        'label' => 'Premium Verified Resort',
+        'badge_label' => 'Premium Verified Resort',
+        'max_rooms' => 20,
+        'monthly_price_php' => 1000,
+        'listing_priority' => 100,
+        'features' => [
+          'analytics', 'revenue_reports', 'guest_traffic_analytics', 'conversion_reports',
+          'video_embed', 'priority_listing', 'downloadable_reports', 'priority_support',
+          'reward_growth_program', 'business_insights',
+        ],
+      ],
+      self::ENTERPRISE => [
+        'label' => 'Enterprise',
+        'badge_label' => 'Enterprise Resort',
+        'max_rooms' => 50,
+        'monthly_price_php' => 0,
+        'listing_priority' => 200,
+        'features' => [],
+      ],
+    ];
   }
 
   public static function maxRooms(?string $plan): int
