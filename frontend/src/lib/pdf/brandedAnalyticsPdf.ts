@@ -115,7 +115,7 @@ export async function beginBrandedPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const left = 14;
   const right = pageWidth - 14;
-  const logoDataUrl = await loadBrandLogoDataUrl();
+  const logoDataUrl = await loadBrandLogoDataUrlForPdf();
 
   const sess: BrandedPdfSession = {
     doc,

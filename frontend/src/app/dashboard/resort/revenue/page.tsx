@@ -9,9 +9,7 @@ import {
   type ResortRevenueFilters,
 } from "@/lib/api/dashboard";
 import { color, rgb, shadowKpiTint } from "@/lib/design-tokens";
-import { laravelPublicUrl } from "@/lib/publicAsset";
-import { downloadPdfDocument } from "@/lib/pdf/analyticsReportPdf";
-import { jsPDF } from "jspdf";
+import { exportResortRevenuePdf } from "@/lib/pdf/resortRevenuePdf";
 import {
   BadgeDollarSign,
   CalendarCheck2,
@@ -26,8 +24,7 @@ import {
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { useEffect, useMemo, useState } from "react";
-import { formatPhp, formatPhpForPdf } from "@/lib/formatPhp";
-import { loadBrandLogoDataUrlForPdf } from "@/lib/pdf/brandedAnalyticsPdf";
+import { formatPhp } from "@/lib/formatPhp";
 import Link from "next/link";
 
 const MONTHS = [
@@ -121,156 +118,7 @@ export default function ResortRevenuePage() {
     if (!payload) return;
     setExportingPdf(true);
     try {
-      const brandLogo = await loadBrandLogoDataUrlForPdf();
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [210, 297], // explicit A4 size
-      });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const left = 12;
-      const right = pageWidth - 12;
-      let y = 12;
-      const fmtMoney = (value: number) => formatPhpForPdf(value);
-      const drawFooter = (pageNum: number) => {
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.15);
-        doc.line(left, pageHeight - 14, right, pageHeight - 14);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(60, 60, 60);
-        doc.setFontSize(7.5);
-        doc.text("Anti-Scam PH · Revenue Report", left, pageHeight - 11);
-        doc.setFontSize(6.8);
-        const disclaimer = doc.splitTextToSize(
-          "Anti-Scam PH is a product and service operated by The Rising 2 Brothers OPC.",
-          right - left - 22,
-        );
-        doc.text(disclaimer, left, pageHeight - 8, { lineHeightFactor: 1.15 });
-        doc.setFontSize(7.5);
-        doc.text(`Page ${pageNum}`, right, pageHeight - 3.5, { align: "right" });
-      };
-      const drawTableHeader = (top: number) => {
-        doc.setDrawColor(0, 0, 0);
-        doc.setFillColor(245, 245, 245);
-        doc.rect(left, top, right - left, 8, "FD");
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.5);
-        doc.text("Date", left + 2, top + 5.2);
-        doc.text("Reservations", left + 38, top + 5.2);
-        doc.text("Confirmed", left + 72, top + 5.2);
-        doc.text("Fees", left + 98, top + 5.2);
-        doc.text("Gross", left + 144, top + 5.2);
-      };
-      const drawWatermark = () => {
-        doc.saveGraphicsState();
-        doc.setTextColor(180, 180, 180);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(38);
-        doc.text("ANTI-SCAM PH", pageWidth / 2, pageHeight / 2, { angle: 28, align: "center" });
-        doc.restoreGraphicsState();
-      };
-
-      let resortLogoDataUrl: string | null = null;
-      if (payload.resort.logo_url) {
-        try {
-          const logoUrl = laravelPublicUrl(payload.resort.logo_url);
-          const res = await fetch(logoUrl, { mode: "cors" });
-          const blob = await res.blob();
-          resortLogoDataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result));
-            reader.readAsDataURL(blob);
-          });
-        } catch {
-          resortLogoDataUrl = null;
-        }
-      }
-
-      const headerLogo = brandLogo ?? resortLogoDataUrl;
-      const headerH = 32;
-      doc.setFillColor(13, 30, 66);
-      doc.rect(0, y - 2, pageWidth, headerH, "F");
-      doc.setFillColor(204, 27, 46);
-      doc.rect(0, y - 2 + headerH, pageWidth, 1, "F");
-      if (headerLogo) {
-        doc.addImage(headerLogo, "PNG", left, y + 2, 18, 18);
-      }
-      const titleX = headerLogo ? left + 22 : left;
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text("ANTI-SCAM PH", titleX, y + 10);
-      doc.setFontSize(11);
-      doc.text(payload.resort.name || "Resort Revenue Report", titleX, y + 17);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.setTextColor(220, 230, 245);
-      doc.text("Revenue & analytics report", titleX, y + 22);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`Period: ${applied.period.toUpperCase()}`, right - 2, y + 10, { align: "right" });
-      doc.text(`Generated: ${new Date().toLocaleString("en-PH")}`, right - 2, y + 17, { align: "right" });
-      y += headerH + 6;
-
-      drawWatermark();
-
-      // Summary cards (black/white)
-      const cardW = (right - left - 6) / 2;
-      const drawKpi = (x: number, top: number, label: string, value: string) => {
-        doc.setFillColor(255, 255, 255);
-        doc.setDrawColor(0, 0, 0);
-        doc.rect(x, top, cardW, 18, "S");
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.text(label, x + 3, top + 6);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.text(value, x + 3, top + 13);
-      };
-      drawKpi(left, y, "Fees Collected", fmtMoney(totals.totalReservationFees));
-      drawKpi(left + cardW + 6, y, "Gross Bookings", fmtMoney(totals.totalGrossBookings));
-      y += 21;
-      drawKpi(left, y, "Revenue This Month", fmtMoney(totals.revenueThisMonth));
-      drawKpi(left + cardW + 6, y, "Confirmed / Pending", `${totals.totalConfirmed} / ${totals.totalPending}`);
-      y += 24;
-
-      // Table
-      drawTableHeader(y);
-      y += 11;
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.setTextColor(0, 0, 0);
-      let pageNum = 1;
-
-      for (const row of breakdown) {
-        if (y > pageHeight - 18) {
-          drawFooter(pageNum);
-          doc.addPage();
-          pageNum += 1;
-          drawWatermark();
-          y = 16;
-          drawTableHeader(y);
-          y += 11;
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(0, 0, 0);
-        }
-        doc.setDrawColor(0, 0, 0);
-        doc.line(left, y + 0.8, right, y + 0.8);
-        doc.text(row.date, left + 2, y + 4.7);
-        doc.text(String(row.reservations), left + 47, y + 4.7);
-        doc.text(String(row.confirmed), left + 79, y + 4.7);
-        doc.text(fmtMoney(Number(row.feesCollected)), left + 100, y + 4.7);
-        doc.text(fmtMoney(Number(row.grossBookings)), left + 145, y + 4.7);
-        y += 7;
-      }
-      drawFooter(pageNum);
-
-      const fileDate = new Date().toISOString().slice(0, 10);
-      const fileName = `${(payload.resort.name || "resort").replace(/\s+/g, "-").toLowerCase()}-revenue-${fileDate}.pdf`;
-      downloadPdfDocument(doc, fileName);
+      await exportResortRevenuePdf(payload, applied);
     } finally {
       setExportingPdf(false);
     }
