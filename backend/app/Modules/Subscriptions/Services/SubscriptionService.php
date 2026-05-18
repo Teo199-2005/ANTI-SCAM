@@ -123,7 +123,8 @@ class SubscriptionService
     }
     $subscription->billing_cycle_end = null;
     $subscription->next_due_date = null;
-    $subscription->renewal_duration_months = null;
+    // MySQL column is NOT NULL; Standard has no renewal billing — keep default 1.
+    $subscription->renewal_duration_months = 1;
     $subscription->save();
 
     $resort = $subscription->resort;
