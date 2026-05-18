@@ -240,15 +240,15 @@ export function LandingPremiumPage() {
 
       {/* ── Pricing — Standard vs Business Pro ── */}
       <section
-        className="border-t border-zinc-200/70 py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-7 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:pl-6 lg:pr-10"
+        className="border-t border-zinc-200/70 py-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-5 sm:pl-4 sm:pr-6 md:pl-5 md:pr-7 lg:pl-6 lg:pr-10"
         style={{
           backgroundColor: "#ffffff",
           backgroundImage: 'url("/patterns/cloth-alike.png")',
         }}
       >
-        <div className="mx-auto mb-4 h-px w-full max-w-[min(1100px,100%)] bg-gradient-to-r from-transparent via-zinc-300/80 to-transparent sm:mb-4" aria-hidden />
+        <div className="mx-auto mb-3 h-px w-full max-w-[min(1100px,100%)] bg-gradient-to-r from-transparent via-zinc-300/80 to-transparent" aria-hidden />
         <ScrollReveal direction="up" delayMs={30}>
-          <SubscriptionPlansComparison />
+          <SubscriptionPlansComparison compact />
         </ScrollReveal>
       </section>
 
