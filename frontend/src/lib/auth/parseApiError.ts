@@ -203,7 +203,13 @@ export function parseApiErrorMessage(error: unknown, fallback = "Something went 
       return "That file is too large for the server. Try a smaller image, or use a compressed JPEG or WebP.";
     if (error.response?.status === 422) return "Some information looks incorrect. Check the form and try again.";
     if (error.response?.status === 429) return "Too many attempts. Please wait a moment and try again.";
-    if (error.response?.status === 502) return "The service is temporarily unavailable. Please try again in a moment.";
+    if (error.response?.status === 502) {
+      const m = typeof data?.message === "string" ? data.message.trim() : "";
+      if (m !== "" && !isGenericBagMessage(m)) {
+        return m;
+      }
+      return "The service is temporarily unavailable. Please try again in a moment.";
+    }
     if (error.response?.status === 503) {
       const code = typeof data?.code === "string" ? data.code : "";
       if (code === "bff_laravel_not_loopback" && typeof data?.message === "string" && data.message.trim() !== "") {
