@@ -7,6 +7,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -68,5 +69,73 @@ class SubscriptionPlanGatingTest extends TestCase
 
         $this->getJson('/api/v1/dashboard/resort-revenue-analytics')
             ->assertOk();
+    }
+
+    public function test_standard_owner_pay_invoice_persists_billing_cycle_when_subscription_end_is_null(): void
+    {
+        config(['services.xendit.secret_key' => 'xnd_development_test_key']);
+
+        $tenant = Tenant::create([
+            'name' => 'Std Checkout Tenant',
+            'slug' => 'std-checkout',
+            'subdomain' => 'stdcheckout',
+            'status' => 'active',
+        ]);
+
+        $resort = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Std Checkout Resort',
+            'is_publicly_listed' => true,
+        ]);
+
+        Subscription::create([
+            'tenant_id' => $tenant->id,
+            'resort_id' => $resort->id,
+            'plan' => 'standard',
+            'base_price' => 0,
+            'included_rooms' => 10,
+            'extra_room_fee' => 0,
+            'active_room_count' => 2,
+            'total_monthly_fee' => 0,
+            'status' => 'active',
+            'billing_cycle_start' => now()->startOfDay()->toDateString(),
+            'billing_cycle_end' => null,
+            'next_due_date' => null,
+        ]);
+
+        $owner = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'role' => 'resort_owner',
+        ]);
+
+        Http::fake([
+            'https://api.xendit.co/v2/invoices' => Http::response([
+                'id' => 'inv_std_upgrade',
+                'invoice_url' => 'https://checkout.xendit.co/std-upgrade',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $this->postJson('/api/v1/resort-owner/subscriptions/pay-invoice', [
+            'billing_scope' => 'monthly',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.invoice_url', 'https://checkout.xendit.co/std-upgrade');
+
+        $this->assertDatabaseHas('subscription_invoices', [
+            'resort_id' => $resort->id,
+            'status' => 'pending',
+            'xendit_invoice_id' => 'inv_std_upgrade',
+        ]);
+
+        $invoice = \App\Models\SubscriptionInvoice::query()->where('resort_id', $resort->id)->first();
+        $this->assertNotNull($invoice->billing_cycle_start);
+        $this->assertNotNull($invoice->billing_cycle_end);
+        $this->assertSame(now()->startOfDay()->toDateString(), $invoice->billing_cycle_start->toDateString());
+        $this->assertSame(
+            now()->startOfDay()->addMonth()->subDay()->toDateString(),
+            $invoice->billing_cycle_end->toDateString()
+        );
     }
 }

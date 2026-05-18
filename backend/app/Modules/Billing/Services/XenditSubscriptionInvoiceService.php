@@ -14,6 +14,7 @@ use App\Modules\Billing\Support\XenditCheckoutUrl;
 use App\Modules\Billing\Support\XenditGatewayErrorMessage;
 use App\Support\PricingPilot;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -273,6 +274,8 @@ class XenditSubscriptionInvoiceService
             throw new RuntimeException('Xendit did not return a valid checkout URL. Verify API key permissions and IP allowlist.');
         }
 
+        [$cycleStart, $cycleEnd] = $this->resolvePendingInvoiceBillingCycle($subscription, $durationMonths);
+
         $invoice = SubscriptionInvoice::create([
             'tenant_id' => $subscription->tenant_id,
             'subscription_id' => $subscription->id,
@@ -285,8 +288,8 @@ class XenditSubscriptionInvoiceService
             'marketer_id' => $marketerId,
             'status' => 'pending',
             'source' => $invoiceSource,
-            'billing_cycle_start' => $subscription->billing_cycle_start,
-            'billing_cycle_end' => $subscription->billing_cycle_end,
+            'billing_cycle_start' => $cycleStart,
+            'billing_cycle_end' => $cycleEnd,
         ]);
 
         return [
@@ -328,6 +331,8 @@ class XenditSubscriptionInvoiceService
             $paidAt
         );
 
+        [$cycleStart, $cycleEnd] = $this->resolvePendingInvoiceBillingCycle($subscription, 1);
+
         $invoice = SubscriptionInvoice::create([
             'tenant_id' => $subscription->tenant_id,
             'subscription_id' => $subscription->id,
@@ -340,8 +345,8 @@ class XenditSubscriptionInvoiceService
             'marketer_id' => $marketerId,
             'status' => 'paid',
             'paid_at' => $paidAt,
-            'billing_cycle_start' => $subscription->billing_cycle_start,
-            'billing_cycle_end' => $subscription->billing_cycle_end,
+            'billing_cycle_start' => $cycleStart,
+            'billing_cycle_end' => $cycleEnd,
             'acknowledgment_receipt_no' => $ackNo,
         ]);
 
@@ -361,6 +366,25 @@ class XenditSubscriptionInvoiceService
     private function canUseLocalMockPaid(): bool
     {
         return ! app()->isProduction() && (bool) config('services.xendit.allow_mock_paid', false);
+    }
+
+    /**
+     * Dates for a new pending invoice row. Standard (free) subscriptions often have null cycle end;
+     * mirror SubscriptionPaymentConfirmationService so the DB insert never receives null.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function resolvePendingInvoiceBillingCycle(Subscription $subscription, int $durationMonths = 1): array
+    {
+        $durationMonths = max(1, $durationMonths);
+
+        $newStart = $subscription->billing_cycle_end
+            ? Carbon::parse($subscription->billing_cycle_end)->addDay()->startOfDay()
+            : now()->startOfDay();
+
+        $newEnd = $newStart->copy()->addMonthsNoOverflow($durationMonths)->subDay();
+
+        return [$newStart->toDateString(), $newEnd->toDateString()];
     }
 
     /**
