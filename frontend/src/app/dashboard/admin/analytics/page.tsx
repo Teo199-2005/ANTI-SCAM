@@ -6,6 +6,7 @@ import {
   type AdminAnalytics,
   getAdminAnalytics,
 } from "@/lib/api/admin";
+import { exportAdminAnalyticsPdf } from "@/lib/pdf/exportAdminAnalyticsPdf";
 import {
   Activity,
   BarChart3,
@@ -13,7 +14,9 @@ import {
   CalendarDays,
   CheckCircle2,
   DollarSign,
+  Download,
   Filter,
+  Loader2,
   RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
@@ -81,6 +84,7 @@ function StatBadge({
 
 export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError]   = useState<string | null>(null);
   const [data, setData]     = useState<AdminAnalytics | null>(null);
 
@@ -136,14 +140,33 @@ export default function AdminAnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* ── Page header ── */}
-      <div className="dash-page-header">
-        <h1 className="dash-page-title flex items-center gap-2">
-          <BarChart3 size={24} className="text-skyBlue" />
-          Analytics
-        </h1>
-        <p className="dash-page-sub max-w-3xl">
-          Platform-wide monitoring — filter by resort, period, or revenue range. All charts update live when you apply filters.
-        </p>
+      <div className="dash-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="dash-page-title flex items-center gap-2">
+            <BarChart3 size={24} className="text-skyBlue" />
+            Analytics
+          </h1>
+          <p className="dash-page-sub max-w-3xl">
+            Platform-wide monitoring — filter by resort, period, or revenue range. All charts update live when you apply filters.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!data) return;
+            setExportingPdf(true);
+            try {
+              exportAdminAnalyticsPdf(data, applied);
+            } finally {
+              setExportingPdf(false);
+            }
+          }}
+          disabled={loading || exportingPdf || !data}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-softBorder bg-white px-4 py-2.5 text-sm font-semibold text-navy shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          Export PDF
+        </button>
       </div>
 
       {/* ── Filter bar ── */}

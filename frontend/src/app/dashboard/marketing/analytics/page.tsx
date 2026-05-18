@@ -7,7 +7,8 @@ import {
   type MarketingAnalyticsPayload,
   type MarketingMonthlyAnalytics,
 } from "@/lib/api/marketing";
-import { BarChart3, Building2, DollarSign, PieChart, TrendingUp, Users } from "lucide-react";
+import { exportMarketingAnalyticsPdf } from "@/lib/pdf/exportMarketingAnalyticsPdf";
+import { BarChart3, Building2, DollarSign, Download, Loader2, PieChart, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPhpLedger as fmtMoney } from "@/lib/formatPhp";
 
@@ -23,6 +24,7 @@ export default function MarketingAnalyticsPage() {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [data, setData] = useState<MarketingAnalyticsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (y: number) => {
@@ -78,6 +80,23 @@ export default function MarketingAnalyticsPage() {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => {
+                if (!data) return;
+                setExportingPdf(true);
+                try {
+                  exportMarketingAnalyticsPdf(data, year);
+                } finally {
+                  setExportingPdf(false);
+                }
+              }}
+              disabled={loading || exportingPdf || !data}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/95 px-4 py-2 font-dash text-dash-sm font-semibold text-navy shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Export PDF
+            </button>
           </div>
         </div>
       </div>
