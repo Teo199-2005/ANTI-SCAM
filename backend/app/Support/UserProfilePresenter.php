@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Modules\Billing\Support\XenditMode;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
 
@@ -62,6 +63,9 @@ final class UserProfilePresenter
             $a['marketer_bank_details_complete'] = filled($user->marketer_bank_name)
                 && filled($user->marketer_bank_account_name)
                 && filled($user->marketer_bank_account_number);
+
+            $a['billing_xendit_mode'] = XenditMode::current();
+            $a['marketing_payout_automation_enabled'] = (bool) config('services.marketing_payout.enabled');
         }
 
         return $a;

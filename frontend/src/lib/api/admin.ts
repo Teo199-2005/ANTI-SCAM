@@ -506,6 +506,51 @@ export async function getAdminFinanceOverview(): Promise<AdminFinanceOverview> {
   return data.data;
 }
 
+export type AdminCompanyExecutive = {
+  key: string;
+  name: string;
+  role_title: string;
+  role_short: string;
+  bio: string;
+  amount_php_per_booking: number;
+  qualifying_bookings: number;
+  commission_total_php: number;
+};
+
+export type AdminCompanyAnalytics = {
+  year: number;
+  month: number | null;
+  period_label: string;
+  policy_note: string;
+  marketer_booking_rate_php: number;
+  marketer_commissions_enabled: boolean;
+  executive_amount_php_per_booking: number;
+  executive_count: number;
+  executive_team_total_php: number;
+  executives: AdminCompanyExecutive[];
+  qualifying_bookings: { credits_count: number; reversals_count: number; net_count: number };
+  guest_bookings: { paid_count: number; paid_total_php: number };
+  subscription_inflows_paid_php: number;
+  marketer_booking_commissions: {
+    credits_gross_php: number;
+    reversals_gross_php: number;
+    net_credited_php: number;
+  };
+  estimated_platform_retention_from_bookings_php: number;
+  waterfall: Array<{ key: string; label: string; amount_php: number; kind: "inflow" | "outflow" | "summary" }>;
+  monthly_executive_accrual: Array<{ period: string; qualifying_bookings: number; team_total_php: number }>;
+};
+
+export async function getAdminCompanyAnalytics(params?: {
+  year?: number;
+  month?: number;
+}): Promise<AdminCompanyAnalytics> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminCompanyAnalytics>>("/admin/analytics/company", {
+    params,
+  });
+  return data.data;
+}
+
 export async function getAdminBookingCommissionAnalytics(year?: number): Promise<AdminBookingCommissionAnalytics> {
   const { data } = await apiClient.get<ApiEnvelope<AdminBookingCommissionAnalytics>>(
     "/admin/marketing/booking-commissions/analytics",
@@ -573,6 +618,7 @@ export type AdminMarketerMonitorRow = {
   id: number;
   name: string;
   email: string;
+  avatar_url?: string | null;
   referral_code: string | null;
   joined_at: string | null;
   assigned_resorts_count: number;
@@ -668,6 +714,47 @@ export type AdminMarketerDetailClient = {
   referred_user_id: number | null;
 };
 
+export type AdminMarketerProfileDetail = {
+  phone: string | null;
+  avatar_url: string | null;
+  joined_at: string | null;
+  mailing_province_psgc: string | null;
+  mailing_city_municipality_psgc: string | null;
+  mailing_barangay_name: string | null;
+  mailing_location_label: string | null;
+  marketer_mailing_address: string | null;
+  marketer_tin_masked: string | null;
+  marketer_gov_id_type: string | null;
+  marketer_gov_id_label: string | null;
+  marketer_gov_id_number_masked: string | null;
+  marketer_gov_id_has_number: boolean;
+  marketer_gov_id_document_url: string | null;
+  marketer_gov_id_complete: boolean;
+  gcash_masked_number: string | null;
+  gcash_account_holder_name: string | null;
+  gcash_payout_configured: boolean;
+  marketer_bank_name: string | null;
+  marketer_bank_branch: string | null;
+  marketer_bank_account_name: string | null;
+  marketer_bank_account_masked: string | null;
+  billing_xendit_mode: "live" | "test" | "unset";
+  marketing_payout_automation_enabled: boolean;
+};
+
+export type AdminMarketerDetailBookingCommission = {
+  id: number;
+  type: string;
+  amount_php: number;
+  period: string;
+  resort_id: number | null;
+  resort_name: string | null;
+  reservation_id: number | null;
+  reference_no: string | null;
+  reserved_at: string | null;
+  reservation_status: string | null;
+  created_at: string | null;
+};
+
 export type AdminMarketerDetailTransaction = {
   id: number;
   resort_id: number | null;
@@ -701,6 +788,7 @@ export type AdminMarketerDetailPayload = {
     commission_pending_php: number;
     commission_released_gross_php: number;
     commission_total_gross_php: number;
+    profile: AdminMarketerProfileDetail;
   };
   clients: AdminMarketerDetailClient[];
   clients_meta: {
@@ -710,6 +798,11 @@ export type AdminMarketerDetailPayload = {
   };
   transactions: AdminMarketerDetailTransaction[];
   transactions_meta: {
+    total: number;
+    definition: string;
+  };
+  booking_commissions: AdminMarketerDetailBookingCommission[];
+  booking_commissions_meta: {
     total: number;
     definition: string;
   };

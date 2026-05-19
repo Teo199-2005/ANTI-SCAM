@@ -7,6 +7,7 @@ import {
   AUTH_SHELL_CLEAR_NAV_MOBILE_PT,
   isAuthSplitShellPath,
 } from "@/lib/authMarketingNavOverlay";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -23,38 +24,42 @@ export const AUTH_MARKETING_CARD =
   "max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_10px_32px_-22px_rgba(13,30,66,0.14)] " +
   "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-[1] before:h-[3px] before:bg-gradient-to-r before:from-clOcean before:via-clTeal before:to-sky-400 before:content-[''] before:hidden max-lg:before:block";
 
+export type AuthResortHero = {
+  name: string;
+  logoUrl?: string | null;
+  backgroundImageUrl?: string | null;
+};
+
 type AuthSplitShellProps = {
   children: ReactNode;
-  /**
-   * Guest signup/sign-in opened from `/resort/{slug}` (`?resort=` on login/register)
-   * or booker intent (`?intent=client`). Single centered column; parent layout may hide marketing nav.
-   */
+  /** @deprecated Use `resortHero` — keeps split layout with resort photography on the aside. */
   guestResortContext?: boolean;
+  /** Resort landing guest auth — two panels; aside shows resort background when available. */
+  resortHero?: AuthResortHero | null;
+};
+
+type DefaultSplitShellProps = {
+  children: ReactNode;
+  asideImageSrc: string;
+  asideImageAlt: string;
+  /** When true, use a single centered column (generic marketing register). */
+  registerCentered: boolean;
+  /** Resort slug chrome supplies its own sticky navbar — skip marketing fixed-nav padding. */
+  underResortNavbar?: boolean;
 };
 
 /**
- * Single-column layout for resort guest / booker auth (no marketing navbar in parent — light top padding).
+ * Split auth layout (form + hero aside on desktop) — matches platform login/register.
  */
-function ResortGuestCenteredShell({ children }: { children: ReactNode }) {
-  return (
-    <div className="auth-paper-bg relative min-h-0 flex-1">
-      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl sm:px-6 sm:pb-10 sm:pt-8">
-        <div className="flex flex-1 flex-col justify-center">
-          <div className={cn(AUTH_MOBILE_FORM_CHROME, "lg:block")}>{children}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Split auth layout for default marketing login/register (two panels on large screens).
- */
-function DefaultSplitShell({ children }: { children: ReactNode }) {
+function DefaultSplitShell({
+  children,
+  asideImageSrc,
+  asideImageAlt,
+  registerCentered,
+  underResortNavbar = false,
+}: DefaultSplitShellProps) {
   const pathname = usePathname();
-  const clearFixedNav = isAuthSplitShellPath(pathname);
-  /** Register uses a single centered column; login/forgot-password keep the split hero + form panels. */
-  const registerCentered = pathname === "/register" || pathname.startsWith("/register/");
+  const clearFixedNav = isAuthSplitShellPath(pathname) && !underResortNavbar;
 
   return (
     <div className="auth-paper-bg relative min-h-screen">
@@ -73,12 +78,13 @@ function DefaultSplitShell({ children }: { children: ReactNode }) {
           >
             <div className="relative h-[min(38svh,13.5rem)] min-h-[11.5rem] w-full overflow-hidden rounded-2xl sm:h-[min(36svh,15rem)] sm:min-h-[12.5rem]">
               <Image
-                src={BRAND_HERO_SRC}
-                alt="Anti-Scam PH — safe resort bookings"
+                src={asideImageSrc}
+                alt={asideImageAlt}
                 fill
-                className="object-cover object-[center_15%]"
+                className="object-cover object-center"
                 sizes="100vw"
                 priority
+                unoptimized={asideImageSrc.startsWith("http")}
               />
               <div
                 className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1628]/55 via-transparent to-transparent"
@@ -148,14 +154,19 @@ function DefaultSplitShell({ children }: { children: ReactNode }) {
                   : "p-6 md:p-8 lg:py-10 lg:px-8 xl:p-10 xl:px-10",
               )}
             >
-              <div className="relative h-full w-full min-h-0">
+              <div className="relative h-full w-full min-h-0 overflow-hidden rounded-2xl">
                 <Image
-                  src={BRAND_HERO_SRC}
-                  alt="Anti-Scam PH — safe travels, verified resorts"
+                  src={asideImageSrc}
+                  alt={asideImageAlt}
                   fill
                   sizes="50vw"
-                  className="object-contain object-center"
+                  className="object-cover object-center"
                   priority
+                  unoptimized={asideImageSrc.startsWith("http")}
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1628]/40 via-[#0a1628]/10 to-transparent"
+                  aria-hidden
                 />
               </div>
             </div>
@@ -166,10 +177,37 @@ function DefaultSplitShell({ children }: { children: ReactNode }) {
   );
 }
 
-export function AuthSplitShell({ children, guestResortContext = false }: AuthSplitShellProps) {
-  if (guestResortContext) {
-    return <ResortGuestCenteredShell>{children}</ResortGuestCenteredShell>;
+export function AuthSplitShell({ children, guestResortContext = false, resortHero = null }: AuthSplitShellProps) {
+  const pathname = usePathname();
+  const registerCenteredDefault = pathname === "/register" || pathname.startsWith("/register/");
+
+  if (resortHero || guestResortContext) {
+    // guestResortContext: legacy; resort chrome layout should wrap the page when possible.
+    const bg = resortHero?.backgroundImageUrl?.trim();
+    const asideSrc = bg ? laravelPublicUrl(bg) : BRAND_HERO_SRC;
+    const asideAlt = resortHero?.name
+      ? `${resortHero.name} — guest booking on Anti-Scam PH`
+      : "Anti-Scam PH — safe resort bookings";
+    return (
+      <DefaultSplitShell
+        asideImageSrc={asideSrc}
+        asideImageAlt={asideAlt}
+        registerCentered={false}
+        underResortNavbar
+      >
+        {children}
+      </DefaultSplitShell>
+    );
   }
 
-  return <DefaultSplitShell>{children}</DefaultSplitShell>;
+  return (
+    <DefaultSplitShell
+      asideImageSrc={BRAND_HERO_SRC}
+      asideImageAlt="Anti-Scam PH — safe travels, verified resorts"
+      registerCentered={registerCenteredDefault}
+      underResortNavbar={false}
+    >
+      {children}
+    </DefaultSplitShell>
+  );
 }

@@ -5,6 +5,7 @@ import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
 import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
 import { MARKETING_MODAL_PANEL_MAX_H_MD, MARKETING_MODAL_Z_REGISTER } from "@/lib/marketingModalLayout";
 import { cn } from "@/lib/utils";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import { BadgeCheck, Shield, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -87,18 +88,14 @@ export function VerifyResortComingSoonModal({ open, onClose }: Props) {
             team.
           </p>
           <ul className="flex flex-wrap gap-2">
-            {[
-              { icon: Shield, label: "Verified badge" },
-              { icon: BadgeCheck, label: "Legitimacy checks" },
-            ].map(({ icon: Icon, label }) => (
-              <li
-                key={label}
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#0d1f3c]"
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} aria-hidden />
-                {label}
-              </li>
-            ))}
+            <li className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#0d1f3c]">
+              <BusinessProVerifiedBadge size="sm" />
+              Premium verified badge
+            </li>
+            <li className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-[#0d1f3c]">
+              <BadgeCheck className="h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} aria-hidden />
+              Legitimacy checks
+            </li>
           </ul>
         </div>
       </div>

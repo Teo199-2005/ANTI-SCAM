@@ -145,7 +145,7 @@ export default function AboutPage() {
               <div className="flex flex-col justify-center bg-clSeafoam/25 p-6 md:p-8">
                 <div className="mb-3 flex items-center gap-2.5">
                   <div className="inline-flex rounded-xl border border-clOcean/20 bg-white p-2 shadow-sm text-clOcean">
-                    <ShieldCheck className="h-4 w-4" />
+                    <ShieldCheck className="h-4 w-4" aria-hidden />
                   </div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-clOcean">
                     Verification & trust

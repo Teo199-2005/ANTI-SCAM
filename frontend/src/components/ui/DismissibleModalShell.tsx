@@ -1,8 +1,10 @@
 "use client";
 
+import { useHydrated } from "@/hooks/useHydrated";
 import { MARKETING_MODAL_FRAME_CLASS, MARKETING_MODAL_Z } from "@/lib/marketingModalLayout";
 import { cn } from "@/lib/utils";
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   open: boolean;
@@ -53,6 +55,8 @@ export function DismissibleModalShell({
   layout = "marketing",
   frameClassName,
 }: Props) {
+  const hydrated = useHydrated();
+
   useModalEscape(onClose, open && escapeToClose);
 
   useEffect(() => {
@@ -64,9 +68,9 @@ export function DismissibleModalShell({
     };
   }, [open, lockScroll]);
 
-  if (!open) return null;
+  if (!open || !hydrated) return null;
 
-  return (
+  const shell = (
     <div
       role="presentation"
       className={cn(
@@ -97,4 +101,6 @@ export function DismissibleModalShell({
       </div>
     </div>
   );
+
+  return createPortal(shell, document.body);
 }

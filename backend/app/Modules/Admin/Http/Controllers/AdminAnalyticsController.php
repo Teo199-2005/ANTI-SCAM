@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Resort;
+use App\Services\AdminCompanyAnalyticsService;
 use App\Support\QueryDateParts;
 use App\Support\CacheSafe;
 use App\Shared\Traits\ApiResponseTrait;
@@ -14,6 +15,29 @@ use Illuminate\Support\Facades\DB;
 class AdminAnalyticsController extends Controller
 {
     use ApiResponseTrait;
+
+    public function __construct(
+        private readonly AdminCompanyAnalyticsService $companyAnalytics,
+    ) {}
+
+    /** Company P&amp;L: executive booking accruals and platform retention estimate. */
+    public function company(Request $request)
+    {
+        $year = (int) $request->input('year', now()->year);
+        $year = min(max($year, 2020), now()->year + 1);
+        $month = $request->filled('month') ? (int) $request->input('month') : null;
+        if ($month !== null && ($month < 1 || $month > 12)) {
+            $month = null;
+        }
+
+        $cacheKey = 'dashboard:admin_company_analytics:'.$year.':'.($month ?? 'all');
+
+        $payload = CacheSafe::remember($cacheKey, now()->addSeconds(60), function () use ($year, $month) {
+            return $this->companyAnalytics->report($year, $month);
+        });
+
+        return $this->successResponse($payload, 'Company analytics fetched');
+    }
 
     public function index(Request $request)
     {

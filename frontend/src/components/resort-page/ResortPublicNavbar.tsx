@@ -107,7 +107,7 @@ export function ResortPublicNavbar({
 
   const resortParam = listingSlug.trim();
   const returnTo = resortParam ? `/resort/${encodeURIComponent(resortParam)}` : null;
-  const loginHref = buildLoginUrl({ intent: "client", returnTo });
+  const loginHref = buildLoginUrl({ intent: "client", returnTo, resortSlug: resortParam || null });
   const registerHref = buildRegisterUrl({ intent: "client", returnTo, resortSlug: resortParam || null });
   const topHref = sectionHref("#top", landingHrefBase);
   const showAuthCluster = !showDashboardLink;

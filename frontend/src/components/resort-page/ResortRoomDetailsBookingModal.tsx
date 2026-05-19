@@ -17,8 +17,8 @@ import {
   roomImageDisplaySrc,
   type RoomImageAccess,
 } from "@/lib/roomImagePreview";
+import { formatGuestDisplayPhp, resolveGuestReservationFeePhp } from "@/lib/guestRoomPricing";
 import { amenityMeta, extractRoomMeta, formatPhp } from "@/lib/roomPreviewDisplay";
-import { defaultReservationFeeFallbackPhp, pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 import { cn } from "@/lib/utils";
 import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
@@ -104,6 +104,8 @@ export function ResortRoomDetailsBookingModal({
   }, [room, onClose]);
 
   if (!mounted || !room) return null;
+
+  const reservationFeePhp = resolveGuestReservationFeePhp(room.reservationFee);
 
   return (
     <>
@@ -266,7 +268,9 @@ export function ResortRoomDetailsBookingModal({
                 <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 shadow-sm">
                     <p className="text-xs text-zinc-500">Price per night</p>
-                    <p className="font-bold text-emerald-800">{formatPhp(room.basePrice)}</p>
+                    <p className="font-bold text-emerald-800">
+                      {formatGuestDisplayPhp(room.basePrice, reservationFeePhp)}
+                    </p>
                   </div>
                   <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
                     <p className="text-xs text-zinc-500">Maximum guests</p>
@@ -319,13 +323,7 @@ export function ResortRoomDetailsBookingModal({
                   </p>
                 </div>
 
-                <ReservationFeeBreakdownPanel
-                  totalPhp={
-                    pricingPilotEnabled() ? pricingPilotUnitPhp() : defaultReservationFeeFallbackPhp()
-                  }
-                  variant="compact"
-                  className="mb-0"
-                />
+                <ReservationFeeBreakdownPanel totalPhp={reservationFeePhp} variant="compact" className="mb-0" />
               </div>
             </div>
           </div>

@@ -15,6 +15,7 @@ use App\Services\MarketerCommissionPayoutService;
 use App\Services\AdminBookingCommissionAnalyticsService;
 use App\Services\MarketerReferralDetailService;
 use App\Services\MarketingBookingCommissionSettingsService;
+use App\Support\MarketerAdminProfilePresenter;
 use App\Support\ResortLocationQuery;
 use App\Shared\Traits\ApiResponseTrait;
 use Carbon\Carbon;
@@ -165,6 +166,7 @@ class MarketingController extends Controller
                 'id' => $m->id,
                 'name' => $m->name,
                 'email' => $m->email,
+                'avatar_url' => $m->avatar_url,
                 'referral_code' => $m->referral_code,
                 'joined_at' => $m->created_at?->toIso8601String(),
                 'assigned_resorts_count' => (int) $m->assigned_resorts_count,
@@ -262,6 +264,7 @@ class MarketingController extends Controller
                 'email' => $marketer->email,
                 'referral_code' => $marketer->referral_code,
                 'joined_at' => $marketer->created_at?->toIso8601String(),
+                'profile' => MarketerAdminProfilePresenter::toArray($marketer),
                 'assigned_resorts_count' => (int) DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count(),
                 'referral_signup_clients_count' => $referralClientsCount,
                 'qualifying_bookings_count' => $this->bookingStats->qualifyingBookingsCount($marketerId),

@@ -9,3 +9,10 @@ export function siteUrl(): string {
   }
   return "https://anti-scamph.com";
 }
+
+/** Official Anti-Scam PH social profiles (marketing site footer, contact, etc.). */
+export const platformSocialLinks = {
+  instagram: "https://www.instagram.com/antiscamph/",
+  facebook: "https://facebook.com",
+  x: "https://x.com",
+} as const;

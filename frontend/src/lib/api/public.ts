@@ -38,6 +38,7 @@ export type PublicResort = {
   contactNumber: string | null;
   /** Public resort detail (by id or slug) — resort logo path when set. */
   logoUrl?: string | null;
+  isPremiumVerified?: boolean;
   map?: PublicResortMap | null;
   images?: { id: number; url: string; caption?: string | null }[];
   rooms: PublicRoom[];
@@ -121,6 +122,35 @@ export async function listPublicResorts(params?: {
 export async function getPublicResort(id: number | string): Promise<PublicResort> {
   const { data } = await apiClient.get<ApiEnvelope<PublicResort>>(`/public/resorts/${id}`);
   return data.data;
+}
+
+/** Map resort detail payload to catalog list shape (e.g. rooms preview modal). */
+export function publicResortToListItem(
+  resort: PublicResort & {
+    slug?: string | null;
+    backgroundImageUrl?: string | null;
+    badgeLabel?: string;
+    isVip?: boolean;
+  },
+): PublicResortListItem {
+  const activeRooms = (resort.rooms ?? []).filter((r) => r.status === "active");
+  const prices = activeRooms.map((r) => Number(r.basePrice)).filter((p) => p > 0);
+  return {
+    id: resort.id,
+    slug: resort.slug ?? null,
+    name: resort.name,
+    description: resort.description,
+    address: resort.address,
+    contactNumber: resort.contactNumber ?? null,
+    logoUrl: resort.logoUrl ?? null,
+    backgroundImageUrl: resort.backgroundImageUrl ?? null,
+    badgeLabel: resort.badgeLabel,
+    isPremiumVerified: resort.isPremiumVerified,
+    isVip: resort.isVip,
+    activeRoomsCount: activeRooms.length,
+    featuredRoomId: activeRooms[0]?.id ?? null,
+    priceFrom: prices.length > 0 ? Math.min(...prices) : null,
+  };
 }
 
 export async function getPublicResortBySlug(slug: string): Promise<PublicResort> {

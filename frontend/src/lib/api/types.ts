@@ -86,6 +86,9 @@ export type AuthUser = {
   marketer_bank_account_name?: string | null;
   marketer_bank_account_masked?: string | null;
   marketer_bank_details_complete?: boolean;
+  /** live | test | unset — from server XENDIT_SECRET_KEY prefix */
+  billing_xendit_mode?: "live" | "test" | "unset";
+  marketing_payout_automation_enabled?: boolean;
 };
 
 // ── Resort ────────────────────────────────────────────────────────────────────

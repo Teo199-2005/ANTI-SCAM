@@ -61,15 +61,15 @@ const adminGroups: NavGroup[] = [
   {
     label: "Management",
     items: [
-      { href: "/dashboard/admin/resorts",       label: "Resorts",       icon: Building2 },
-      { href: "/dashboard/admin/landing-embed", label: "Landing intro video", icon: Video },
-      { href: "/dashboard/admin/users",          label: "Users",         icon: Users },
-      { href: "/dashboard/admin/clients",        label: "Clients",       icon: UserRound },
+      { href: "/dashboard/admin/users", label: "Users", icon: Users },
       { href: "/dashboard/admin/marketing-monitor", label: "Marketing partners", icon: Activity },
-      { href: "/dashboard/admin/reservations",   label: "Reservations",  icon: CalendarDays },
-      { href: "/dashboard/admin/subscriptions",  label: "Subscriptions", icon: CreditCard },
-      { href: "/dashboard/admin/finance",       label: "Finance & payouts", icon: Landmark },
-      { href: "/dashboard/admin/suspensions",    label: "Suspensions",   icon: AlertTriangle },
+      { href: "/dashboard/admin/resorts", label: "Resorts", icon: Building2 },
+      { href: "/dashboard/admin/clients", label: "Clients", icon: UserRound },
+      { href: "/dashboard/admin/landing-embed", label: "Landing intro video", icon: Video },
+      { href: "/dashboard/admin/reservations", label: "Reservations", icon: CalendarDays },
+      { href: "/dashboard/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+      { href: "/dashboard/admin/finance", label: "Finance & payouts", icon: Landmark },
+      { href: "/dashboard/admin/suspensions", label: "Suspensions", icon: AlertTriangle },
     ],
   },
   {

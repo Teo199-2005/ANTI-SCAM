@@ -7,6 +7,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatPhp } from "@/lib/formatPhp";
+import {
+  formatGuestDisplayPhp,
+  guestBalanceAtResortPhp,
+  resolveGuestReservationFeePhp,
+} from "@/lib/guestRoomPricing";
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -179,7 +184,8 @@ export default function ClientRoomExplorePage() {
   };
 
   const nights = nightsBetween(checkIn, checkOut);
-  const estimatedTotal = room && nights > 0 ? nights * Number(room.basePrice) : 0;
+  const reservationFeePhp = room ? resolveGuestReservationFeePhp(room.reservationFee) : 0;
+  const balanceAtResort = room && nights > 0 ? guestBalanceAtResortPhp(room.basePrice, nights) : 0;
 
   const onCheckAvailability = async () => {
     if (!checkIn || !checkOut) {
@@ -299,8 +305,10 @@ export default function ClientRoomExplorePage() {
               <Users size={16} />
               Up to {room.capacity} guests
             </p>
-            <p className="mt-3 font-dash text-2xl font-bold text-navy">{formatPhp(Number(room.basePrice))}</p>
-            <p className="text-xs text-zinc-500">per night (estimate before fees &amp; taxes)</p>
+            <p className="mt-3 font-dash text-2xl font-bold text-navy">
+              {formatGuestDisplayPhp(room.basePrice, reservationFeePhp)}
+            </p>
+            <p className="text-xs text-zinc-500">per night (includes reservation fee in rate shown)</p>
 
             <div className="mt-5 space-y-3 border-t border-softBorder pt-4">
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -330,7 +338,8 @@ export default function ClientRoomExplorePage() {
               {nights > 0 ? (
                 <p className="text-sm text-zinc-700">
                   <span className="font-semibold">{nights}</span> night{nights === 1 ? "" : "s"} · Est.{" "}
-                  <span className="font-semibold text-navy">{formatPhp(estimatedTotal)}</span>
+                  <span className="font-semibold text-navy">{formatPhp(balanceAtResort)}</span> at resort +{" "}
+                  <span className="font-semibold text-navy">{formatPhp(reservationFeePhp)}</span> online
                 </p>
               ) : null}
 

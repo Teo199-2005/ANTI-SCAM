@@ -75,6 +75,18 @@ class AdminMarketerDetailTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.marketer.id', $marketer->id)
             ->assertJsonPath('data.marketer.referral_code', 'CHARLIE01')
+            ->assertJsonStructure([
+                'data' => [
+                    'marketer' => [
+                        'profile' => [
+                            'phone',
+                            'marketer_gov_id_complete',
+                            'billing_xendit_mode',
+                        ],
+                    ],
+                    'booking_commissions',
+                ],
+            ])
             ->assertJsonPath('data.clients_meta.paid_converting', 1)
             ->assertJsonCount(1, 'data.clients')
             ->assertJsonCount(1, 'data.transactions')

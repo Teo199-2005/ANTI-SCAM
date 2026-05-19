@@ -47,6 +47,8 @@ export type LandingComputedRoom = {
   name: string;
   capacity: number;
   basePrice: number;
+  /** Guest reservation fee (PHP); used for displayed nightly rate. */
+  reservationFee?: number;
   amenities: string[];
   rules: string | null;
   images: LandingRoomImage[];

@@ -4,7 +4,7 @@ import PageContainer from "@/components/layout/PageContainer";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPublicResort } from "@/lib/api/public";
 import { getReservation, ReservationDetail } from "@/lib/api/payment";
-import { formatStayRange } from "@/lib/formatPhp";
+import { formatPhp, formatStayRange } from "@/lib/formatPhp";
 import {
   postPaymentBookingsHref,
   postPaymentBookingsLabel,
@@ -114,6 +114,16 @@ function PaymentSuccessContent() {
                 </p>
               ) : null}
             </div>
+          ) : null}
+
+          {reservation && Number(reservation.totalAmount) > 0 ? (
+            <p className="mt-4 rounded-xl border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-sm text-zinc-700">
+              Remaining balance due at check-in:{" "}
+              <span className="font-bold text-navy tabular-nums">{formatPhp(Number(reservation.totalAmount))}</span>
+              <span className="mt-1 block text-xs text-zinc-600">
+                Reservation fee paid online: {formatPhp(Number(reservation.reservationFee))}
+              </span>
+            </p>
           ) : null}
 
           <p className="mt-5 text-sm text-zinc-500">

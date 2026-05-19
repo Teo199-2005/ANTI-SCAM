@@ -1,10 +1,10 @@
 "use client";
 
 import { ResortCatalogPanelHeader } from "@/components/marketing/ResortCatalogPanelHeader";
-import Button from "@/components/ui/Button";
 import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
 import type { PublicResortListItem } from "@/lib/api/public";
 import { formatPhp } from "@/lib/formatPhp";
+import { guestDisplayPriceFrom } from "@/lib/guestRoomPricing";
 import { MARKETING_MODAL_PANEL_MAX_H_MD, MARKETING_MODAL_Z } from "@/lib/marketingModalLayout";
 import { cn } from "@/lib/utils";
 import { ExternalLink, MapPin, Phone } from "lucide-react";
@@ -15,6 +15,15 @@ type Props = {
   open: boolean;
   onClose: () => void;
 };
+
+const modalPrimaryCtaClass = cn(
+  "flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold",
+  "border-0 bg-gradient-to-r from-clOcean to-clTeal text-white shadow-cl-btn",
+  "transition-[transform,color,background-color,box-shadow] duration-150",
+  "hover:from-clOceanHover hover:to-clOcean hover:shadow-cl-btn",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clOcean/60 focus-visible:ring-offset-2",
+  "active:scale-[0.985]",
+);
 
 export function ResortWebsitePreviewModal({ resort, open, onClose }: Props) {
   if (!open) return null;
@@ -67,9 +76,9 @@ export function ResortWebsitePreviewModal({ resort, open, onClose }: Props) {
           ) : null}
           {resort.priceFrom != null && resort.priceFrom > 0 ? (
             <p className="rounded-lg bg-sky-50 px-3 py-2 text-center text-sm font-semibold text-[#0d1f3c]">
-              Stays from {formatPhp(resort.priceFrom)} / night
+              Stays from {formatPhp(guestDisplayPriceFrom(resort.priceFrom))} / night
               <span className="mt-0.5 block text-[11px] font-normal text-zinc-500">
-                + platform reservation fee at checkout
+                Reservation fee included in rate shown; room balance due at check-in
               </span>
             </p>
           ) : null}
@@ -77,17 +86,19 @@ export function ResortWebsitePreviewModal({ resort, open, onClose }: Props) {
 
         <div className="flex shrink-0 flex-col gap-2 border-t border-zinc-100 bg-zinc-50/80 px-5 py-3">
           {hasDedicatedSite ? (
-            <Link href={websiteHref} target="_blank" rel="noopener noreferrer" onClick={onClose}>
-              <Button type="button" className="w-full justify-center gap-2">
-                <ExternalLink size={16} aria-hidden />
-                Open resort website
-              </Button>
+            <Link
+              href={websiteHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onClose}
+              className={modalPrimaryCtaClass}
+            >
+              <ExternalLink size={16} className="shrink-0 opacity-90" aria-hidden />
+              Open resort website
             </Link>
           ) : (
-            <Link href={websiteHref} onClick={onClose}>
-              <Button type="button" className="w-full justify-center">
-                View resort on Anti-Scam PH
-              </Button>
+            <Link href={websiteHref} onClick={onClose} className={modalPrimaryCtaClass}>
+              View resort on Anti-Scam PH
             </Link>
           )}
           <button

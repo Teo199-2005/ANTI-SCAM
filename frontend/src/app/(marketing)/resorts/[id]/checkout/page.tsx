@@ -9,14 +9,21 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
   ArrowRight,
   BadgeCheck,
+  Eye,
+  EyeOff,
   Loader2,
   Lock,
   LogIn,
   Mail,
+  Phone,
   Shield,
   User,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { AuthOrEmailDivider } from "@/components/auth/AuthOrEmailDivider";
+import { GoogleOAuthContinueLink } from "@/components/auth/GoogleOAuthContinueLink";
+import { useHydrated } from "@/hooks/useHydrated";
+import { buildResortCheckoutHref } from "@/lib/publicBookingLinks";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
@@ -25,13 +32,21 @@ import {
   sanitizeEmailTyping,
   sanitizeIntegerDigitsOnly,
   sanitizePersonName,
+  sanitizePhilippinesMobileInput,
 } from "@/lib/inputRestrictions";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import Link from "next/link";
 import { formatPhp } from "@/lib/formatPhp";
+import { formatGuestDisplayPhp, guestBalanceAtResortPhp, resolveGuestReservationFeePhp } from "@/lib/guestRoomPricing";
 import { defaultReservationFeeFallbackPhp } from "@/lib/pricingPilot";
 
 type Step = "auth" | "confirm" | "paying";
+
+const checkoutFieldClass =
+  "w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-clOcean focus:ring-2 focus:ring-clOcean/25";
+
+const checkoutPrimaryBtnClass =
+  "flex w-full items-center justify-center gap-2 rounded-xl border border-clOcean/25 bg-gradient-to-r from-clOcean to-clTeal px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-clOcean/25 transition hover:from-clOceanHover hover:to-clOcean focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clOcean/50 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60";
 
 export default function CheckoutPage() {
   const { id: resortIdParam } = useParams();
@@ -40,8 +55,18 @@ export default function CheckoutPage() {
   const roomId   = searchParams.get("roomId")   ?? "";
   const checkIn  = searchParams.get("checkIn")  ?? "";
   const checkOut = searchParams.get("checkOut") ?? "";
+  const oauthError = searchParams.get("error");
 
   const { user, loading: authLoading, login, register } = useAuth();
+
+  const checkoutReturnTo = useMemo(() => {
+    const resortNum = Number(resortId);
+    const roomNum = Number(roomId);
+    if (!Number.isFinite(resortNum) || resortNum <= 0 || !Number.isFinite(roomNum) || roomNum <= 0) {
+      return `/resorts/${encodeURIComponent(resortId)}/checkout`;
+    }
+    return buildResortCheckoutHref(resortNum, roomNum, checkIn, checkOut);
+  }, [resortId, roomId, checkIn, checkOut]);
 
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
@@ -53,10 +78,15 @@ export default function CheckoutPage() {
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [acceptCheckoutTerms, setAcceptCheckoutTerms] = useState(false);
+  const hydrated = useHydrated();
 
   // Booking
   const [guestCount, setGuestCount] = useState(1);
@@ -82,9 +112,9 @@ export default function CheckoutPage() {
     : 0;
 
   const reservationFeePhp = room
-    ? Number(room.reservationFee ?? defaultReservationFeeFallbackPhp())
+    ? resolveGuestReservationFeePhp(room.reservationFee)
     : defaultReservationFeeFallbackPhp();
-  const balanceAtResortTotal = room && nights > 0 ? Number(room.basePrice) * nights : 0;
+  const balanceAtResortTotal = room && nights > 0 ? guestBalanceAtResortPhp(room.basePrice, nights) : 0;
 
   useEffect(() => {
     const load = async () => {
@@ -133,15 +163,20 @@ export default function CheckoutPage() {
       setAuthError("Password does not meet minimum security requirements.");
       return;
     }
+    if (authMode === "register" && password !== passwordConfirmation) {
+      setAuthError("Passwords do not match.");
+      return;
+    }
     setAuthPending(true);
     try {
       if (authMode === "register") {
         await register({
           name,
           email,
+          phone: sanitizePhilippinesMobileInput(phone) || undefined,
           role_intent: "client",
           password,
-          password_confirmation: password,
+          password_confirmation: passwordConfirmation,
           accept_terms: true,
         });
       } else {
@@ -250,6 +285,9 @@ export default function CheckoutPage() {
                 <h2 className="font-semibold text-zinc-800">Guest information</h2>
               </div>
 
+              <GoogleOAuthContinueLink returnTo={checkoutReturnTo} className="mb-4" />
+              <AuthOrEmailDivider className="mb-5" />
+
               <div className="mb-5 flex gap-2">
                 {(["register", "login"] as const).map((m) => (
                   <button
@@ -258,6 +296,9 @@ export default function CheckoutPage() {
                     onClick={() => {
                       setAuthMode(m);
                       setAuthError(null);
+                      setPasswordConfirmation("");
+                      setShowPassword(false);
+                      setShowPasswordConfirmation(false);
                     }}
                     className={`flex-1 rounded-full border py-2 text-sm font-semibold transition ${
                       authMode === m
@@ -271,6 +312,14 @@ export default function CheckoutPage() {
               </div>
 
               <form className="space-y-4" onSubmit={onAuth}>
+                {oauthError === "oauth_failed" ? (
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-amber-200/90 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                  >
+                    Google sign-in failed. Please try again or continue with email below.
+                  </p>
+                ) : null}
                 {authError ? (
                   <p className="rounded-xl border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-800">
                     {authError}
@@ -278,12 +327,16 @@ export default function CheckoutPage() {
                 ) : null}
                 {authMode === "register" && (
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-zinc-700">Full name</label>
+                    <label htmlFor="checkout-name" className="mb-1 block text-xs font-semibold text-zinc-700">
+                      Full name
+                    </label>
                     <div className="relative">
                       <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                       <input
-                        className="glass-field pl-9"
+                        id="checkout-name"
+                        className={`${checkoutFieldClass} pl-10`}
                         required
+                        autoComplete="name"
                         placeholder="Maria Santos"
                         value={name}
                         onChange={(e) => setName(sanitizePersonName(e.target.value))}
@@ -291,38 +344,111 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 )}
+                {authMode === "register" ? (
+                  <div>
+                    <label htmlFor="checkout-phone" className="mb-1 block text-xs font-semibold text-zinc-700">
+                      Mobile number
+                    </label>
+                    <div className="relative">
+                      <Phone size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                      <input
+                        id="checkout-phone"
+                        className={`${checkoutFieldClass} pl-10`}
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="09171234567"
+                        value={phone}
+                        onChange={(e) => setPhone(sanitizePhilippinesMobileInput(e.target.value))}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-zinc-500">Optional — for booking updates (09XXXXXXXXX).</p>
+                  </div>
+                ) : null}
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-700">Email</label>
+                  <label htmlFor="checkout-email" className="mb-1 block text-xs font-semibold text-zinc-700">
+                    Email
+                  </label>
                   <div className="relative">
                     <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                     <input
-                      className="glass-field pl-9"
+                      id="checkout-email"
+                      className={`${checkoutFieldClass} pl-10`}
                       type="email"
                       required
+                      autoComplete="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) =>
-                        setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())
-                      }
+                      onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-700">Password</label>
-                  <input
-                    className="glass-field"
-                    type="password"
-                    required
-                    minLength={8}
-                    placeholder={authMode === "register" ? "At least 8 characters" : "••••••••"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    aria-describedby={authMode === "register" ? "checkout-password-meter" : undefined}
-                  />
+                  <label htmlFor="checkout-password" className="mb-1 block text-xs font-semibold text-zinc-700">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" aria-hidden />
+                    <input
+                      id="checkout-password"
+                      className={`${checkoutFieldClass} pl-10 ${hydrated ? "pr-11" : "pr-4"}`}
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={8}
+                      autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                      placeholder={authMode === "register" ? "Min 8 chars, mixed case + number" : "Your password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      aria-describedby={authMode === "register" ? "checkout-password-meter" : undefined}
+                    />
+                    {hydrated ? (
+                      <button
+                        type="button"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-500 outline-none transition hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-clOcean/25"
+                      >
+                        {showPassword ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+                      </button>
+                    ) : null}
+                  </div>
                   {authMode === "register" ? (
                     <PasswordRequirementsMeter className="mt-2" password={password} id="checkout-password-meter" />
                   ) : null}
                 </div>
+                {authMode === "register" ? (
+                  <div>
+                    <label htmlFor="checkout-password-confirm" className="mb-1 block text-xs font-semibold text-zinc-700">
+                      Confirm password
+                    </label>
+                    <div className="relative">
+                      <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" aria-hidden />
+                      <input
+                        id="checkout-password-confirm"
+                        className={`${checkoutFieldClass} pl-10 ${hydrated ? "pr-11" : "pr-4"}`}
+                        type={showPasswordConfirmation ? "text" : "password"}
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        placeholder="Re-enter your password"
+                        value={passwordConfirmation}
+                        onChange={(e) => setPasswordConfirmation(e.target.value)}
+                      />
+                      {hydrated ? (
+                        <button
+                          type="button"
+                          aria-label={showPasswordConfirmation ? "Hide password" : "Show password"}
+                          aria-pressed={showPasswordConfirmation}
+                          onClick={() => setShowPasswordConfirmation((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-500 outline-none transition hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-clOcean/25"
+                        >
+                          {showPasswordConfirmation ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 {authMode === "register" ? (
                   <label className="flex items-start gap-2 rounded-xl border border-white/50 bg-white/20 px-3 py-2.5 text-xs text-zinc-700">
                     <input
@@ -342,16 +468,23 @@ export default function CheckoutPage() {
                 <button
                   type="submit"
                   disabled={authPending || (authMode === "register" && !acceptCheckoutTerms)}
-                  className="cl-btn-primary w-full disabled:opacity-60 disabled:pointer-events-none"
+                  className={checkoutPrimaryBtnClass}
                 >
                   {authPending ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin" /> Please wait…
-                    </span>
+                    <>
+                      <Loader2 size={16} className="animate-spin shrink-0" aria-hidden />
+                      Please wait…
+                    </>
                   ) : authMode === "register" ? (
-                    "Continue as Guest"
+                    <>
+                      Continue as Guest
+                      <ArrowRight size={16} className="shrink-0 opacity-95" aria-hidden />
+                    </>
                   ) : (
-                    "Sign in & Continue"
+                    <>
+                      Sign in & Continue
+                      <ArrowRight size={16} className="shrink-0 opacity-95" aria-hidden />
+                    </>
                   )}
                 </button>
               </form>
@@ -406,7 +539,7 @@ export default function CheckoutPage() {
                     <>
                       {" "}
                       <span className="text-zinc-500">
-                        ({nights} night{nights === 1 ? "" : "s"} · {formatPhp(Number(room.basePrice))} per night).
+                        ({nights} night{nights === 1 ? "" : "s"} · {formatGuestDisplayPhp(room.basePrice, reservationFeePhp)} per night).
                       </span>
                     </>
                   ) : null}
@@ -458,7 +591,10 @@ export default function CheckoutPage() {
                 <div>
                   <p className="font-heading text-lg font-bold text-navy">{room.resort.name}</p>
                   <p className="mt-0.5 text-zinc-600">
-                    {room.name} <span className="text-zinc-400">({room.code})</span>
+                    {room.name}
+                    {room.code?.trim() ? (
+                      <span className="text-zinc-400"> ({room.code.trim()})</span>
+                    ) : null}
                   </p>
                 </div>
                 <div className="space-y-2 rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-3 py-3">
@@ -477,7 +613,9 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between rounded-lg border border-zinc-200/90 bg-white/80 px-3 py-2.5">
                   <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Rate / night</span>
-                  <span className="tabular-nums text-base font-bold text-zinc-900">{formatPhp(Number(room.basePrice))}</span>
+                  <span className="tabular-nums text-base font-bold text-zinc-900">
+                    {formatGuestDisplayPhp(room.basePrice, reservationFeePhp)}
+                  </span>
                 </div>
                 <div className="relative overflow-hidden rounded-xl border-2 border-amber-300/70 bg-gradient-to-br from-amber-50 via-white to-emerald-50/90 p-3.5 shadow-sm">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800/90">Due now (online)</p>

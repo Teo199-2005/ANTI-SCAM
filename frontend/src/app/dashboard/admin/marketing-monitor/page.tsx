@@ -4,6 +4,10 @@ import DashCard from "@/components/dash/DashCard";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DataTable from "@/components/shared/DataTable";
+import {
+  DashTableActionsCell,
+  DashTableActionsHead,
+} from "@/components/shared/DashTableActions";
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import LocationFilterBar, {
@@ -20,7 +24,9 @@ import {
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/tableSortPagination";
+import { cn } from "@/lib/utils";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { TableEntityThumb } from "@/components/shared/TableEntityThumb";
 import { Activity, Eye, Info, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
@@ -54,12 +60,67 @@ function fmtDate(iso: string | null | undefined) {
 
 function IdleBadge({ months, referredCount }: { months: number | null; referredCount: number }) {
   if (referredCount === 0) {
-    return <span className="dash-badge-rose">No conversions yet</span>;
+    return <span className="dash-badge-rose text-[10px]">No clients</span>;
   }
-  if (months === null) return <span className="dash-badge-slate">—</span>;
-  if (months >= 6) return <span className="dash-badge-rose">{months} mo idle</span>;
-  if (months >= 3) return <span className="dash-badge-amber">{months} mo idle</span>;
-  return <span className="dash-badge-emerald">{months} mo idle</span>;
+  if (months === null) return <span className="dash-badge-slate text-[10px]">—</span>;
+  if (months >= 6) return <span className="dash-badge-rose text-[10px]">{months}mo idle</span>;
+  if (months >= 3) return <span className="dash-badge-amber text-[10px]">{months}mo idle</span>;
+  return <span className="dash-badge-emerald text-[10px]">{months}mo idle</span>;
+}
+
+const MONITOR_TABLE_COMPACT = "[&_th]:px-2.5 [&_td]:px-2.5 [&_th]:py-2.5 [&_td]:py-2.5";
+
+function FunnelCounts({ r }: { r: AdminMarketerMonitorRow }) {
+  return (
+    <div className="space-y-0.5 text-[11px] leading-snug tabular-nums">
+      <p title="Resorts assigned to this partner for outreach">
+        <span className="text-zinc-500">Assigned </span>
+        <span className="font-semibold text-navy">{r.assigned_resorts_count}</span>
+      </p>
+      <p title="Referred owner accounts with qualifying payments">
+        <span className="text-zinc-500">Clients </span>
+        <span className="font-semibold text-navy">{r.referred_clients_count}</span>
+      </p>
+      <p title="Referred resorts with qualifying payments">
+        <span className="text-zinc-500">Resorts </span>
+        <span className="font-semibold text-navy">{r.referred_resorts_count}</span>
+      </p>
+    </div>
+  );
+}
+
+function BookingCounts({ r }: { r: AdminMarketerMonitorRow }) {
+  return (
+    <div className="space-y-0.5 text-[11px] leading-snug tabular-nums">
+      <p title="Qualifying guest bookings that earned commission">
+        <span className="text-zinc-500">Credited </span>
+        <span className="font-semibold text-navy">{r.booking_credits_count ?? 0}</span>
+      </p>
+      <p title="Bookings where commission was reversed (e.g. cancellation)">
+        <span className="text-zinc-500">Reversed </span>
+        <span className="font-semibold text-navy">{r.booking_reversals_count ?? 0}</span>
+      </p>
+    </div>
+  );
+}
+
+function CommissionStack({ r }: { r: AdminMarketerMonitorRow }) {
+  return (
+    <div className="space-y-0.5 text-right text-[11px] leading-snug tabular-nums">
+      <p title="Commission earned, not yet paid out">
+        <span className="text-zinc-500">Pending </span>
+        {fmtPhp(r.commission_pending_php)}
+      </p>
+      <p title="Commission already paid to this partner">
+        <span className="text-zinc-500">Released </span>
+        {fmtPhp(r.commission_released_gross_php)}
+      </p>
+      <p className="font-semibold text-navy" title="Pending + released (lifetime gross)">
+        <span className="font-normal text-zinc-500">Total </span>
+        {fmtPhp(r.commission_total_gross_php)}
+      </p>
+    </div>
+  );
 }
 
 export default function AdminMarketingMonitorPage() {
@@ -188,7 +249,7 @@ export default function AdminMarketingMonitorPage() {
       />
     ) : null;
 
-  const colSpan = 11;
+  const colSpan = 7;
 
   return (
     <div className="space-y-6">
@@ -287,78 +348,70 @@ export default function AdminMarketingMonitorPage() {
               {pageRows.map((r) => (
                 <DashMobileTableCard
                   key={r.id}
-                  title={r.name}
+                  title={
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      <TableEntityThumb imageUrl={r.avatar_url} name={r.name} kind="person" size="sm" />
+                      <span className="min-w-0 truncate">{r.name}</span>
+                    </span>
+                  }
                   fields={[
-                    { label: "Email", value: <span className="break-all">{r.email}</span> },
+                    { label: "Email", value: r.email },
+                    ...(r.referral_code ? [{ label: "Code", value: r.referral_code }] : []),
                     {
-                      label: "Referral code",
-                      value: <span className="font-mono text-violet-800">{r.referral_code ?? "—"}</span>,
-                    },
-                    {
-                      label: "Assigned / clients / resorts billed",
-                      fullWidth: true,
+                      label: "Referrals",
                       value: (
-                        <span>
-                          {r.assigned_resorts_count} assigned · <strong>{r.referred_clients_count}</strong> clients ·{" "}
-                          <strong>{r.referred_resorts_count}</strong> resorts
+                        <span className="text-xs tabular-nums">
+                          Assigned {r.assigned_resorts_count} · Clients {r.referred_clients_count} · Resorts{" "}
+                          {r.referred_resorts_count}
                         </span>
                       ),
                     },
                     {
-                      label: "Bookings credited / reversed",
+                      label: "Bookings",
                       value: (
-                        <div className="space-y-1">
-                          <strong>{r.booking_credits_count ?? 0}</strong> credited · {r.booking_reversals_count ?? 0} reversed
-                          {r.current_commission_per_booking_php != null ? (
-                            <div className="text-[11px] font-semibold text-navy tabular-nums">
-                              {fmtPhp(r.current_commission_per_booking_php)} current rate
-                            </div>
-                          ) : null}
-                        </div>
+                        <span className="text-xs tabular-nums">
+                          Credited {r.booking_credits_count ?? 0} · Reversed {r.booking_reversals_count ?? 0}
+                        </span>
                       ),
                     },
                     {
-                      label: "Idle (since new client)",
+                      label: "Idle (new client)",
                       value: (
-                        <div className="space-y-1">
+                        <span className="inline-flex flex-wrap items-center gap-2">
                           <IdleBadge
                             months={r.months_since_last_new_referred_resort}
                             referredCount={r.referred_clients_count}
                           />
-                          <div className="text-[11px] text-zinc-500">
-                            Last new client: {fmtDate(r.last_new_referred_resort_at)}
-                          </div>
-                        </div>
-                      ),
-                    },
-                    {
-                      label: "Last referral payment",
-                      value: fmtDate(r.last_any_referral_payment_at),
-                    },
-                    {
-                      label: "Commission pending / released / total",
-                      fullWidth: true,
-                      value: (
-                        <span>
-                          {fmtPhp(r.commission_pending_php)} / {fmtPhp(r.commission_released_gross_php)} /{" "}
-                          <strong>{fmtPhp(r.commission_total_gross_php)}</strong>
+                          <span className="text-xs text-zinc-500">
+                            Last new:{" "}
+                            {r.last_new_referred_resort_at
+                              ? fmtDate(r.last_new_referred_resort_at).split(",")[0]
+                              : "—"}
+                          </span>
                         </span>
                       ),
                     },
+                    { label: "Last referral payment", value: fmtDate(r.last_any_referral_payment_at) },
                     {
-                      label: "Actions",
+                      label: "Commissions",
                       value: (
-                        <button
-                          type="button"
-                          className="dash-btn-sm inline-flex items-center gap-1.5 border border-zinc-200 bg-white"
-                          onClick={() => setDetailMarketerId(r.id)}
-                        >
-                          <Eye size={13} />
-                          View details
-                        </button>
+                        <span className="text-xs tabular-nums">
+                          Pending {fmtPhp(r.commission_pending_php)} · Released{" "}
+                          {fmtPhp(r.commission_released_gross_php)} · Total {fmtPhp(r.commission_total_gross_php)}
+                        </span>
                       ),
                     },
                   ]}
+                  actions={
+                    <button
+                      type="button"
+                      className="dash-btn-sm inline-flex w-full items-center justify-center gap-1.5 border border-zinc-200 bg-white"
+                      onClick={() => setDetailMarketerId(r.id)}
+                    >
+                      <Eye size={13} aria-hidden />
+                      View details
+                    </button>
+                  }
                 />
               ))}
             </div>
@@ -368,33 +421,27 @@ export default function AdminMarketingMonitorPage() {
 
         <div className="hidden md:block">
           <DataTable
-            minWidthClass="min-w-[1120px]"
-            caption={undefined}
+            minWidthClass="w-full min-w-0"
+            tableClassName={cn("table-fixed", MONITOR_TABLE_COMPACT)}
+            scrollRegionLabel="Marketing partners table"
+            colgroup={
+              <colgroup>
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "8%" }} />
+              </colgroup>
+            }
             footer={paginationFooter ?? undefined}
             headers={
               <>
                 <SortableTh label="Marketer" sortKey="name" activeKey={sortBy} direction={sortDir} onSort={onSort} />
                 <SortableTh
-                  label="Assigned"
-                  sortKey="assigned_resorts_count"
-                  activeKey={sortBy}
-                  direction={sortDir}
-                  onSort={onSort}
-                  align="center"
-                  className="text-center"
-                />
-                <SortableTh
-                  label="Clients"
+                  label="Referrals"
                   sortKey="referred_clients_count"
-                  activeKey={sortBy}
-                  direction={sortDir}
-                  onSort={onSort}
-                  align="center"
-                  className="text-center"
-                />
-                <SortableTh
-                  label="Resorts billed"
-                  sortKey="referred_resorts_count"
                   activeKey={sortBy}
                   direction={sortDir}
                   onSort={onSort}
@@ -411,39 +458,25 @@ export default function AdminMarketingMonitorPage() {
                   className="text-center"
                 />
                 <SortableTh
-                  label="Idle (new client)"
+                  label="Idle"
                   sortKey="months_since_last_new_referred_resort"
                   activeKey={sortBy}
                   direction={sortDir}
                   onSort={onSort}
+                  align="center"
+                  className="text-center"
                 />
                 <SortableTh
-                  label="Last referral payment"
+                  label="Last paid"
                   sortKey="last_any_referral_payment_at"
                   activeKey={sortBy}
                   direction={sortDir}
                   onSort={onSort}
+                  align="center"
+                  className="text-center"
                 />
                 <SortableTh
-                  label="Pending"
-                  sortKey="commission_pending_php"
-                  activeKey={sortBy}
-                  direction={sortDir}
-                  onSort={onSort}
-                  align="right"
-                  className="text-right"
-                />
-                <SortableTh
-                  label="Released"
-                  sortKey="commission_released_gross_php"
-                  activeKey={sortBy}
-                  direction={sortDir}
-                  onSort={onSort}
-                  align="right"
-                  className="text-right"
-                />
-                <SortableTh
-                  label="Total comm."
+                  label="Commissions"
                   sortKey="commission_total_gross_php"
                   activeKey={sortBy}
                   direction={sortDir}
@@ -451,9 +484,7 @@ export default function AdminMarketingMonitorPage() {
                   align="right"
                   className="text-right"
                 />
-                <th className="px-3 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                  Actions
-                </th>
+                <DashTableActionsHead>Actions</DashTableActionsHead>
               </>
             }
           >
@@ -467,43 +498,50 @@ export default function AdminMarketingMonitorPage() {
             >
               {pageRows.map((r) => (
                 <tr key={r.id} className="group">
-                  <td>
-                    <div className="font-semibold text-navy">{r.name}</div>
-                    <div className="text-xs text-zinc-500">{r.email}</div>
-                    {r.referral_code ? (
-                      <div className="mt-0.5 font-mono text-[11px] text-violet-700">Code: {r.referral_code}</div>
-                    ) : null}
+                  <td className="max-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <TableEntityThumb imageUrl={r.avatar_url} name={r.name} kind="person" size="sm" />
+                      <div className="min-w-0 overflow-hidden">
+                        <div className="truncate font-semibold text-navy">{r.name}</div>
+                        <div className="truncate text-[11px] text-zinc-500">{r.email}</div>
+                        {r.referral_code ? (
+                          <div className="truncate font-mono text-[10px] text-violet-700">{r.referral_code}</div>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
-                  <td className="text-center tabular-nums">{r.assigned_resorts_count}</td>
-                  <td className="text-center tabular-nums font-semibold text-navy">{r.referred_clients_count}</td>
-                  <td className="text-center tabular-nums font-medium">{r.referred_resorts_count}</td>
-                  <td className="text-center tabular-nums">
-                    <div className="font-semibold text-navy">{r.booking_credits_count ?? 0}</div>
-                    <div className="text-[11px] text-zinc-500">{r.booking_reversals_count ?? 0} rev.</div>
+                  <td>
+                    <FunnelCounts r={r} />
+                  </td>
+                  <td>
+                    <BookingCounts r={r} />
                   </td>
                   <td>
                     <IdleBadge
                       months={r.months_since_last_new_referred_resort}
                       referredCount={r.referred_clients_count}
                     />
-                    <div className="mt-1 text-[11px] text-zinc-500">
-                      Last new: {fmtDate(r.last_new_referred_resort_at)}
-                    </div>
+                    <p className="mt-1 truncate text-[10px] text-zinc-500" title={fmtDate(r.last_new_referred_resort_at)}>
+                      {r.last_new_referred_resort_at ? fmtDate(r.last_new_referred_resort_at).split(",")[0] : "—"}
+                    </p>
                   </td>
-                  <td className="text-sm text-zinc-700">{fmtDate(r.last_any_referral_payment_at)}</td>
-                  <td className="text-right tabular-nums">{fmtPhp(r.commission_pending_php)}</td>
-                  <td className="text-right tabular-nums">{fmtPhp(r.commission_released_gross_php)}</td>
-                  <td className="text-right tabular-nums font-medium">{fmtPhp(r.commission_total_gross_php)}</td>
-                  <td className="text-right">
+                  <td className="text-center text-[11px] text-zinc-700">
+                    <span className="line-clamp-2">{fmtDate(r.last_any_referral_payment_at)}</span>
+                  </td>
+                  <td>
+                    <CommissionStack r={r} />
+                  </td>
+                  <DashTableActionsCell>
                     <button
                       type="button"
-                      className="dash-btn-sm inline-flex items-center gap-1.5 border border-zinc-200 bg-white"
+                      className="dash-btn-sm inline-flex items-center gap-1 border border-zinc-200 bg-white px-2 py-1 text-[11px]"
                       onClick={() => setDetailMarketerId(r.id)}
+                      aria-label={`View details for ${r.name}`}
                     >
-                      <Eye size={13} />
-                      View details
+                      <Eye size={12} aria-hidden />
+                      View
                     </button>
-                  </td>
+                  </DashTableActionsCell>
                 </tr>
               ))}
             </AsyncStatePanel>

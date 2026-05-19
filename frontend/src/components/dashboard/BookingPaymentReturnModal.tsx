@@ -8,6 +8,7 @@ import {
   postPaymentResortLandingOrDashboardHref,
   postPaymentResortLandingOrDashboardLabel,
 } from "@/lib/postPaymentDashboardLinks";
+import { formatPhp } from "@/lib/formatPhp";
 import { BadgeCheck, CalendarDays, LayoutDashboard, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -174,6 +175,19 @@ export default function BookingPaymentReturnModal({
                 {reservation.checkInDate} → {reservation.checkOutDate}
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {reservation && Number(reservation.totalAmount) > 0 ? (
+          <div className="rounded-xl border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-left">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-amber-900/90">Pay at the resort</p>
+            <p className="mt-1 text-sm text-zinc-700">
+              Remaining balance due at check-in:{" "}
+              <span className="tabular-nums font-bold text-navy">{formatPhp(Number(reservation.totalAmount))}</span>
+            </p>
+            <p className="mt-1 text-[11px] text-zinc-600">
+              Your {formatPhp(Number(reservation.reservationFee))} reservation fee was paid online via Xendit.
+            </p>
           </div>
         ) : null}
 

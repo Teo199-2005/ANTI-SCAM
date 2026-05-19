@@ -1,6 +1,7 @@
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import type { LandingComputedFooter } from "@/lib/api/landingPage";
-import { ExternalLink, Globe, Shield, Users } from "lucide-react";
+import { VerifiedBadge } from "@/components/badges/VerifiedBadge";
+import { ExternalLink, Globe, Users } from "lucide-react";
 import Link from "next/link";
 
 const NAVY = "#0d1f3c";
@@ -9,9 +10,10 @@ const GOLD = "#f5a623";
 type Props = {
   footer: LandingComputedFooter;
   resortName: string;
+  isPremiumVerified?: boolean;
 };
 
-export function ResortLandingFooter({ footer, resortName }: Props) {
+export function ResortLandingFooter({ footer, resortName, isPremiumVerified = false }: Props) {
   return (
     <footer className="border-t border-zinc-200/90 text-zinc-800">
       <section className="border-t-2 border-white/20" style={{ backgroundColor: NAVY }} aria-label="Anti-Scam PH">
@@ -45,8 +47,12 @@ export function ResortLandingFooter({ footer, resortName }: Props) {
               </p>
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/90">
-                  <Shield className="h-3 w-3 text-zinc-200" aria-hidden />
-                  Verified
+                  <VerifiedBadge
+                    premium={isPremiumVerified}
+                    size="xs"
+                    standardIconClassName="h-3 w-3 text-zinc-200"
+                  />
+                  {isPremiumVerified ? "Premium verified" : "Verified"}
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/85">
                   <Users className="h-3 w-3 text-zinc-200" aria-hidden />

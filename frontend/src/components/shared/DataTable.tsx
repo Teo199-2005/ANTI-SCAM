@@ -9,6 +9,10 @@ type DataTableProps = {
   leadingHeader?: ReactNode;
   children: ReactNode;
   minWidthClass?: string;
+  /** Extra classes on `<table>` (e.g. `table-fixed` for fit-to-container layouts). */
+  tableClassName?: string;
+  /** Optional `<colgroup>` for fixed column widths. */
+  colgroup?: ReactNode;
   caption?: string;
   /** Main row + detail/expand row pairs — corrects action-column zebra striping */
   splitBodyRows?: boolean;
@@ -23,6 +27,8 @@ export default function DataTable({
   leadingHeader,
   children,
   minWidthClass = "min-w-[640px]",
+  tableClassName,
+  colgroup,
   caption,
   splitBodyRows = false,
   footer,
@@ -36,11 +42,22 @@ export default function DataTable({
         </div>
       ) : null}
       <div
-        className="dash-table-scroll-region overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]"
+        className={cn(
+          "dash-table-scroll-region overscroll-x-contain [-webkit-overflow-scrolling:touch]",
+          minWidthClass?.includes("min-w-0") ? "overflow-x-hidden" : "overflow-x-auto",
+        )}
         role="region"
         aria-label={scrollRegionLabel}
       >
-        <table className={cn("dash-table", minWidthClass, splitBodyRows && "dash-table--split-pairs")}>
+        <table
+          className={cn(
+            "dash-table",
+            minWidthClass,
+            tableClassName,
+            splitBodyRows && "dash-table--split-pairs",
+          )}
+        >
+          {colgroup}
           <thead>
             <tr>
               {leadingHeader}

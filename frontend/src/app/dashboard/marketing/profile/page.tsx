@@ -5,7 +5,9 @@ import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
-import { getMarketingGovIdOptions, laravelStorageUrl, type MarketingGovIdOption } from "@/lib/api/marketingGovId";
+import GovIdDocumentPreview from "@/components/marketing/GovIdDocumentPreview";
+import { getMarketingGovIdOptions, type MarketingGovIdOption } from "@/lib/api/marketingGovId";
+import { isXenditLiveMode, isXenditTestMode } from "@/lib/billingXendit";
 import { formatRoleLabel } from "@/lib/utils";
 import {
   Camera,
@@ -21,15 +23,34 @@ import {
   User,
   Wallet,
 } from "lucide-react";
+import { INPUT_MAX, sanitizeEmailTyping, sanitizePersonName, sanitizePhilippinesMobileInput, sanitizeTinTyping } from "@/lib/inputRestrictions";
 import {
-  sanitizeEmailTyping,
-  sanitizeGovIdNumberInput,
-  sanitizePersonName,
-  sanitizePhilippinesMobileInput,
-  sanitizeTinTyping,
-} from "@/lib/inputRestrictions";
+  formatGovIdDisplay,
+  formatPhilippinesMobileDisplay,
+  formatTinDisplay,
+  hasFieldErrors,
+  sanitizeBarangayName,
+  sanitizeGovIdNumberForType,
+  validateMarketingGcashForm,
+  validateMarketingGovIdForm,
+  validateMarketingPersonalForm,
+  type MarketingProfileFieldErrors,
+} from "@/lib/marketingProfileInputs";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+
+function FieldInlineError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1 text-[11px] text-rose-600" role="alert">
+      {message}
+    </p>
+  );
+}
+
+function inputClass(hasError: boolean, extra = ""): string {
+  return [extra || "dash-input", hasError ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : ""].filter(Boolean).join(" ");
+}
 
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const AVATAR_ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -50,6 +71,7 @@ export default function MarketingProfilePage() {
   });
   const [tin, setTin] = useState("");
   const [saving, setSaving] = useState(false);
+  const [personalErrors, setPersonalErrors] = useState<MarketingProfileFieldErrors>({});
 
   // Avatar
   const avatarRef = useRef<HTMLInputElement>(null);
@@ -59,6 +81,8 @@ export default function MarketingProfilePage() {
   const [gcashNumber, setGcashNumber] = useState("");
   const [gcashHolder, setGcashHolder] = useState("");
   const [savingGcash, setSavingGcash] = useState(false);
+  const [gcashErrors, setGcashErrors] = useState<MarketingProfileFieldErrors>({});
+  const [govErrors, setGovErrors] = useState<MarketingProfileFieldErrors>({});
 
   const [govOptions, setGovOptions] = useState<MarketingGovIdOption[]>([]);
   const [govIdType, setGovIdType] = useState("");
@@ -67,6 +91,8 @@ export default function MarketingProfilePage() {
   const [uploadingGovDoc, setUploadingGovDoc] = useState(false);
   /** After saving ID type+number, allow upload even if /me hasn’t returned masked yet (avoids stuck “Choose file”). */
   const [govIdSavedForUpload, setGovIdSavedForUpload] = useState(false);
+  const [govDocPreviewUrl, setGovDocPreviewUrl] = useState<string | null>(null);
+  const [govDocPreviewIsPdf, setGovDocPreviewIsPdf] = useState(false);
   const govDocRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -130,6 +156,18 @@ export default function MarketingProfilePage() {
   const govPlaceholder = selectedGovOption?.placeholder ?? user?.marketer_gov_id_placeholder ?? "ID number";
   const govFormatHint = selectedGovOption?.format_hint ?? user?.marketer_gov_id_format_hint ?? "";
 
+  const xenditTestMode = isXenditTestMode(user?.billing_xendit_mode);
+  const xenditLiveMode = isXenditLiveMode(user?.billing_xendit_mode);
+  const payoutAutomationOn = Boolean(user?.marketing_payout_automation_enabled);
+
+  useEffect(() => {
+    return () => {
+      if (govDocPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(govDocPreviewUrl);
+      }
+    };
+  }, [govDocPreviewUrl]);
+
   const payoutDetailsOk = Boolean(user?.gcash_payout_configured);
   const checklistItems = [
     { label: "Full name", ok: Boolean(user?.name?.trim()) },
@@ -143,20 +181,31 @@ export default function MarketingProfilePage() {
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors = validateMarketingPersonalForm({ name, email, phone, mailingLocation, tin });
+    setPersonalErrors(errors);
+    if (hasFieldErrors(errors)) {
+      pushToast({
+        title: "Check your entries",
+        description: Object.values(errors).find(Boolean) ?? "Fix the highlighted fields and try again.",
+        tone: "warning",
+      });
+      return;
+    }
     setSaving(true);
     try {
       await apiClient.patch("/auth/profile", {
-        name,
-        email,
-        phone: phone.trim() || "",
+        name: sanitizePersonName(name),
+        email: sanitizeEmailTyping(email).toLowerCase(),
+        phone: sanitizePhilippinesMobileInput(phone),
         mailing_province_psgc: mailingLocation.provinceCode,
         mailing_city_municipality_psgc: mailingLocation.cityCode,
         mailing_barangay_name: mailingLocation.barangayName?.trim() || "",
         mailing_barangay_psgc: null,
-        marketer_tin: tin.trim() || "",
+        marketer_tin: sanitizeTinTyping(tin) || "",
       });
       await refreshUser();
       setTin("");
+      setPersonalErrors({});
       pushToast({ title: "Profile updated", description: "Your details were saved successfully.", tone: "success" });
     } catch (error: unknown) {
       const axiosErr = error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
@@ -177,12 +226,18 @@ export default function MarketingProfilePage() {
 
   const onSaveGovId = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!govIdType.trim()) {
-      pushToast({ title: "Select ID type", description: "Choose which government-issued ID you are using.", tone: "warning" });
-      return;
-    }
-    if (!govIdNumber.trim()) {
-      pushToast({ title: "ID number required", description: "Enter the number as shown on your ID.", tone: "warning" });
+    const errors = validateMarketingGovIdForm({
+      govIdType,
+      govIdNumber,
+      selectedOption: selectedGovOption,
+    });
+    setGovErrors(errors);
+    if (hasFieldErrors(errors)) {
+      pushToast({
+        title: "Check your ID details",
+        description: Object.values(errors).find(Boolean) ?? "Fix the highlighted fields and try again.",
+        tone: "warning",
+      });
       return;
     }
     setSavingGovId(true);
@@ -193,6 +248,7 @@ export default function MarketingProfilePage() {
       });
       await refreshUser();
       setGovIdNumber("");
+      setGovErrors({});
       setGovIdSavedForUpload(true);
       pushToast({ title: "ID details saved", description: "You can now upload a photo or scan of your ID.", tone: "success" });
     } catch (error: unknown) {
@@ -221,12 +277,20 @@ export default function MarketingProfilePage() {
       e.target.value = "";
       return;
     }
+    if (govDocPreviewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(govDocPreviewUrl);
+    }
+    const blobUrl = URL.createObjectURL(file);
+    setGovDocPreviewUrl(blobUrl);
+    setGovDocPreviewIsPdf(file.type === "application/pdf");
     setUploadingGovDoc(true);
     try {
       const form = new FormData();
       form.append("document", file);
       await apiClient.post("/auth/marketing-gov-id-document", form);
       await refreshUser();
+      setGovDocPreviewUrl(null);
+      setGovDocPreviewIsPdf(false);
       pushToast({ title: "ID uploaded", description: "Your document was stored securely.", tone: "success" });
     } catch (error: unknown) {
       const axiosErr = error as { response?: { data?: { message?: string } } };
@@ -243,29 +307,40 @@ export default function MarketingProfilePage() {
 
   const onSaveGcash = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors = validateMarketingGcashForm({
+      gcashNumber,
+      gcashHolder,
+      hasExistingNumber: Boolean(user?.gcash_masked_number || user?.gcash_payout_configured),
+    });
+    setGcashErrors(errors);
+    if (hasFieldErrors(errors)) {
+      pushToast({
+        title: "Check GCash details",
+        description: Object.values(errors).find(Boolean) ?? "Fix the highlighted fields and try again.",
+        tone: "warning",
+      });
+      return;
+    }
     setSavingGcash(true);
     try {
       const payload: Record<string, string> = {};
-      if (gcashNumber.trim() !== "") {
-        payload.gcash_account_number = gcashNumber.trim();
-        payload.gcash_account_holder_name = gcashHolder.trim();
-      } else if (gcashHolder.trim() !== "") {
-        payload.gcash_account_holder_name = gcashHolder.trim();
-      } else {
-        pushToast({
-          title: "Nothing to save",
-          description: "Enter your GCash number and name, or update the account name only.",
-          tone: "warning",
-        });
-        setSavingGcash(false);
-        return;
+      const num = sanitizePhilippinesMobileInput(gcashNumber);
+      const holder = sanitizePersonName(gcashHolder, INPUT_MAX.gcashHolder);
+      if (num !== "") {
+        payload.gcash_account_number = num;
+        payload.gcash_account_holder_name = holder;
+      } else if (holder !== "") {
+        payload.gcash_account_holder_name = holder;
       }
       await apiClient.patch("/auth/profile", payload);
       await refreshUser();
       setGcashNumber("");
+      setGcashErrors({});
       pushToast({
         title: "Payout details saved",
-        description: "Your GCash information was updated. Use Xendit test mode until you go live.",
+        description: xenditLiveMode
+          ? "Your GCash wallet is on file for live commission payouts."
+          : "Your GCash information was updated.",
         tone: "success",
       });
     } catch (error: unknown) {
@@ -428,13 +503,19 @@ export default function MarketingProfilePage() {
                 <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
                   id="marketing-profile-name"
-                  className="dash-input pl-9"
+                  className={inputClass(Boolean(personalErrors.name), "dash-input pl-9")}
+                  maxLength={INPUT_MAX.personName}
+                  aria-invalid={Boolean(personalErrors.name)}
                   value={name}
-                  onChange={(e) => setName(sanitizePersonName(e.target.value))}
+                  onChange={(e) => {
+                    setName(sanitizePersonName(e.target.value));
+                    if (personalErrors.name) setPersonalErrors((p) => ({ ...p, name: undefined }));
+                  }}
                   autoComplete="name"
                   required
                 />
               </div>
+              <FieldInlineError message={personalErrors.name} />
             </div>
 
             <div>
@@ -443,14 +524,21 @@ export default function MarketingProfilePage() {
                 <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
                   id="marketing-profile-email"
-                  className="dash-input pl-9"
+                  className={inputClass(Boolean(personalErrors.email), "dash-input pl-9")}
                   type="email"
                   inputMode="email"
+                  autoComplete="email"
+                  maxLength={INPUT_MAX.email}
+                  aria-invalid={Boolean(personalErrors.email)}
                   value={email}
-                  onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
+                  onChange={(e) => {
+                    setEmail(sanitizeEmailTyping(e.target.value).toLowerCase());
+                    if (personalErrors.email) setPersonalErrors((p) => ({ ...p, email: undefined }));
+                  }}
                   required
                 />
               </div>
+              <FieldInlineError message={personalErrors.email} />
             </div>
 
             <div>
@@ -459,17 +547,22 @@ export default function MarketingProfilePage() {
                 <Phone size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
                   id="marketing-profile-phone"
-                  className="dash-input pl-9"
+                  className={inputClass(Boolean(personalErrors.phone), "dash-input pl-9")}
                   type="tel"
                   inputMode="numeric"
                   autoComplete="tel"
-                  placeholder="09xxxxxxxxx"
-                  value={phone}
-                  onChange={(e) => setPhone(sanitizePhilippinesMobileInput(e.target.value))}
-                  pattern="[0-9]*"
+                  placeholder="0917 123 4567"
+                  maxLength={13}
+                  aria-invalid={Boolean(personalErrors.phone)}
+                  value={formatPhilippinesMobileDisplay(phone)}
+                  onChange={(e) => {
+                    setPhone(sanitizePhilippinesMobileInput(e.target.value));
+                    if (personalErrors.phone) setPersonalErrors((p) => ({ ...p, phone: undefined }));
+                  }}
                 />
               </div>
-              <p className="mt-1 text-[11px] text-zinc-500">Primary contact number (may differ from your GCash wallet number).</p>
+              <FieldInlineError message={personalErrors.phone} />
+              <p className="mt-1 text-[11px] text-zinc-500">11 digits starting with 09. May differ from your GCash wallet number.</p>
             </div>
 
             <div className="md:col-span-2">
@@ -484,8 +577,15 @@ export default function MarketingProfilePage() {
                   user?.mailing_barangay_psgc && !user?.mailing_barangay_name?.trim(),
                 )}
                 value={mailingLocation}
-                onChange={setMailingLocation}
+                onChange={(loc) => {
+                  setMailingLocation({
+                    ...loc,
+                    barangayName: loc.barangayName ? sanitizeBarangayName(loc.barangayName) : null,
+                  });
+                  if (personalErrors.mailingLocation) setPersonalErrors((p) => ({ ...p, mailingLocation: undefined }));
+                }}
               />
+              <FieldInlineError message={personalErrors.mailingLocation} />
             </div>
 
             <div className="md:col-span-2">
@@ -494,14 +594,19 @@ export default function MarketingProfilePage() {
               </label>
               <input
                 id="marketing-profile-tin"
-                className="dash-input max-w-md font-mono text-sm"
+                className={inputClass(Boolean(personalErrors.tin), "dash-input max-w-md font-mono text-sm")}
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="9–12 digits (BIR TIN)"
-                value={tin}
-                onChange={(e) => setTin(sanitizeTinTyping(e.target.value))}
-                pattern="[0-9]*"
+                placeholder="123-456-789-000"
+                maxLength={15}
+                aria-invalid={Boolean(personalErrors.tin)}
+                value={formatTinDisplay(tin)}
+                onChange={(e) => {
+                  setTin(sanitizeTinTyping(e.target.value));
+                  if (personalErrors.tin) setPersonalErrors((p) => ({ ...p, tin: undefined }));
+                }}
               />
+              <FieldInlineError message={personalErrors.tin} />
               {user?.marketer_tin_masked ? (
                 <p className="mt-1 text-[11px] text-zinc-500">
                   On file: <span className="font-mono">{user.marketer_tin_masked}</span> — enter the full TIN above to replace, or clear the field and save to remove.
@@ -550,9 +655,14 @@ export default function MarketingProfilePage() {
               </label>
               <select
                 id="gov-id-type"
-                className="dash-input"
+                className={inputClass(Boolean(govErrors.govIdType))}
                 value={govIdType}
-                onChange={(e) => setGovIdType(e.target.value)}
+                aria-invalid={Boolean(govErrors.govIdType)}
+                onChange={(e) => {
+                  setGovIdType(e.target.value);
+                  setGovIdNumber("");
+                  setGovErrors({});
+                }}
               >
                 <option value="">Select one…</option>
                 {govOptions.map((o) => (
@@ -561,6 +671,7 @@ export default function MarketingProfilePage() {
                   </option>
                 ))}
               </select>
+              <FieldInlineError message={govErrors.govIdType} />
             </div>
 
             <div className="md:col-span-2">
@@ -569,12 +680,23 @@ export default function MarketingProfilePage() {
               </label>
               <input
                 id="gov-id-number"
-                className="dash-input font-mono text-sm"
+                className={inputClass(Boolean(govErrors.govIdNumber), "dash-input font-mono text-sm")}
                 autoComplete="off"
+                disabled={!govIdType}
+                maxLength={INPUT_MAX.govIdNumber}
+                aria-invalid={Boolean(govErrors.govIdNumber)}
                 placeholder={govPlaceholder}
-                value={govIdNumber}
-                onChange={(e) => setGovIdNumber(sanitizeGovIdNumberInput(e.target.value))}
+                value={
+                  govIdType === "philsys" || govIdType === "postal"
+                    ? formatGovIdDisplay(govIdType, govIdNumber)
+                    : govIdNumber
+                }
+                onChange={(e) => {
+                  setGovIdNumber(sanitizeGovIdNumberForType(govIdType, e.target.value));
+                  if (govErrors.govIdNumber) setGovErrors((p) => ({ ...p, govIdNumber: undefined }));
+                }}
               />
+              <FieldInlineError message={govErrors.govIdNumber} />
               {user?.marketer_gov_id_number_masked ? (
                 <p className="mt-1 text-[11px] text-zinc-500">
                   On file: <span className="font-mono">{user.marketer_gov_id_number_masked}</span> — enter the full number above to replace.
@@ -615,18 +737,14 @@ export default function MarketingProfilePage() {
           <p className="mb-3 text-xs text-zinc-600">
             Save your ID type and number first. PNG, JPG, WEBP, or PDF · max 5 MB. Changing ID type will require a new upload.
           </p>
-          {user?.marketer_gov_id_document_url ? (
-            <p className="mb-2 text-xs text-zinc-600">
-              <a
-                href={laravelStorageUrl(user.marketer_gov_id_document_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-clOcean underline underline-offset-2 hover:text-clOceanHover"
-              >
-                View uploaded file
-              </a>
-            </p>
-          ) : null}
+          {(govDocPreviewUrl || user?.marketer_gov_id_document_url) && (
+            <GovIdDocumentPreview
+              className="mb-4"
+              src={govDocPreviewUrl ?? user?.marketer_gov_id_document_url ?? null}
+              isPdf={govDocPreviewIsPdf}
+              title="ID document preview"
+            />
+          )}
           <button
             type="button"
             disabled={uploadingGovDoc || !canUploadGovIdDocument}
@@ -669,10 +787,19 @@ export default function MarketingProfilePage() {
           Automated commissions are paid to your <strong className="font-semibold text-navy">GCash wallet</strong> on the <strong>10th of each month</strong>{" "}
           (Asia/Manila) when platform automation is on. Add the mobile number and account name that match your GCash registration.
         </p>
-        <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
-          <strong>Test mode:</strong> In Xendit test mode, disbursements are simulated. Fund your test payout balance in the Xendit dashboard
-          before expecting successful transfers.
-        </div>
+        {xenditTestMode ? (
+          <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
+            <strong>Test mode:</strong> The platform is using a Xendit <em>development</em> API key. Disbursements are simulated — fund your
+            test payout balance in the Xendit dashboard before expecting transfers.
+          </div>
+        ) : xenditLiveMode ? (
+          <div className="mb-4 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
+            <strong>Live payouts:</strong> Xendit is configured for production.{" "}
+            {payoutAutomationOn
+              ? "Eligible commissions are sent to your GCash on the 10th of each month (Asia/Manila) when your profile and KYC are complete."
+              : "Automated monthly payouts are not enabled on the server yet — contact platform admin if you expect auto-disbursement."}
+          </div>
+        ) : null}
         {user?.gcash_payout_configured ? (
           <p className="mb-3 text-sm text-zinc-600">
             <span className="font-semibold text-navy">GCash on file:</span> {user.gcash_masked_number ?? "GCash number"} ·{" "}
@@ -690,15 +817,21 @@ export default function MarketingProfilePage() {
               </label>
               <input
                 id="gcash-number"
-                className="dash-input"
+                className={inputClass(Boolean(gcashErrors.gcashNumber))}
+                type="tel"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder={user?.gcash_masked_number ? "Enter full number to replace on file" : "09xxxxxxxxx"}
-                value={gcashNumber}
-                onChange={(e) => setGcashNumber(sanitizePhilippinesMobileInput(e.target.value))}
-                pattern="[0-9]*"
+                placeholder={user?.gcash_masked_number ? "0917 123 4567 (replace on file)" : "0917 123 4567"}
+                maxLength={13}
+                aria-invalid={Boolean(gcashErrors.gcashNumber)}
+                value={formatPhilippinesMobileDisplay(gcashNumber)}
+                onChange={(e) => {
+                  setGcashNumber(sanitizePhilippinesMobileInput(e.target.value));
+                  if (gcashErrors.gcashNumber) setGcashErrors((p) => ({ ...p, gcashNumber: undefined }));
+                }}
               />
-              <p className="mt-1 text-[11px] text-zinc-500">Philippines format 09xxxxxxxxx. Leave blank to only update the name on file.</p>
+              <FieldInlineError message={gcashErrors.gcashNumber} />
+              <p className="mt-1 text-[11px] text-zinc-500">11 digits starting with 09. Leave blank to only update the name on file.</p>
             </div>
             <div>
               <label htmlFor="gcash-holder" className="mb-1.5 block text-xs font-semibold text-zinc-600">
@@ -706,12 +839,18 @@ export default function MarketingProfilePage() {
               </label>
               <input
                 id="gcash-holder"
-                className="dash-input"
+                className={inputClass(Boolean(gcashErrors.gcashHolder))}
                 autoComplete="name"
                 placeholder="Name on GCash"
+                maxLength={INPUT_MAX.gcashHolder}
+                aria-invalid={Boolean(gcashErrors.gcashHolder)}
                 value={gcashHolder}
-                onChange={(e) => setGcashHolder(sanitizePersonName(e.target.value, 120))}
+                onChange={(e) => {
+                  setGcashHolder(sanitizePersonName(e.target.value, INPUT_MAX.gcashHolder));
+                  if (gcashErrors.gcashHolder) setGcashErrors((p) => ({ ...p, gcashHolder: undefined }));
+                }}
               />
+              <FieldInlineError message={gcashErrors.gcashHolder} />
             </div>
             <div className="md:col-span-2">
               <button type="submit" disabled={savingGcash} className="dash-btn-primary disabled:opacity-60">

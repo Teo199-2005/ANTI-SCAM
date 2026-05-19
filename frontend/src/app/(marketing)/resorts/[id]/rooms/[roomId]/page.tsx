@@ -17,6 +17,11 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { formatPhp } from "@/lib/formatPhp";
+import {
+  formatGuestDisplayPhp,
+  guestBalanceAtResortPhp,
+  resolveGuestReservationFeePhp,
+} from "@/lib/guestRoomPricing";
 import { defaultReservationFeeFallbackPhp } from "@/lib/pricingPilot";
 
 function addDays(iso: string, days: number): string {
@@ -109,7 +114,7 @@ function RoomDetailInner() {
 
   const checkoutHref = `/resorts/${resortId}/checkout?roomId=${roomId}&checkIn=${checkIn}&checkOut=${checkOut}&resortId=${resortId}`;
   const checkOutMin = checkIn ? addDays(checkIn, 1) : today;
-  const reservationFeePhp = Number(room.reservationFee ?? defaultReservationFeeFallbackPhp());
+  const reservationFeePhp = resolveGuestReservationFeePhp(room.reservationFee ?? defaultReservationFeeFallbackPhp());
 
   return (
     <PageContainer className="section-padding">
@@ -147,9 +152,13 @@ function RoomDetailInner() {
             </div>
 
             <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Base price</p>
-              <p className="font-heading text-4xl text-zinc-900">{formatPhp(Number(room.basePrice))}</p>
-              <p className="text-xs text-zinc-500">per night (excl. reservation fee)</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Price per night</p>
+              <p className="font-heading text-4xl text-zinc-900">
+                {formatGuestDisplayPhp(room.basePrice, reservationFeePhp)}
+              </p>
+              <p className="text-xs text-zinc-500">
+                Includes {formatPhp(reservationFeePhp)} reservation fee in the rate shown; pay the room balance at check-in.
+              </p>
             </div>
           </div>
 
@@ -263,7 +272,7 @@ function RoomDetailInner() {
                     <span>
                       {formatPhp(Number(room.basePrice))} × {nights} night{nights > 1 ? "s" : ""}
                     </span>
-                    <span>{formatPhp(Number(room.basePrice) * nights)}</span>
+                    <span>{formatPhp(guestBalanceAtResortPhp(room.basePrice, nights))}</span>
                   </div>
                   <div className="flex justify-between text-amber-700">
                     <span>Reservation fee (now)</span>
@@ -273,7 +282,7 @@ function RoomDetailInner() {
                   </div>
                   <div className="flex justify-between border-t border-zinc-200 pt-2 font-semibold text-zinc-900">
                     <span>Balance at resort</span>
-                    <span>{formatPhp(Number(room.basePrice) * nights)}</span>
+                    <span>{formatPhp(guestBalanceAtResortPhp(room.basePrice, nights))}</span>
                   </div>
                 </div>
                 <ReservationFeeBreakdownPanel totalPhp={reservationFeePhp} variant="compact" className="mt-3" />

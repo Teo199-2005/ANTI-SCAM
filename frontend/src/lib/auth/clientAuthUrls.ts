@@ -6,13 +6,34 @@ export function sanitizeReturnTo(raw: string | null | undefined): string | null 
   return v;
 }
 
-export function buildLoginUrl(opts?: { returnTo?: string | null; intent?: "client" | "owner" }): string {
+export function buildLoginUrl(opts?: {
+  returnTo?: string | null;
+  intent?: "client" | "owner";
+  resortSlug?: string | null;
+}): string {
   const params = new URLSearchParams();
   if (opts?.intent === "client") params.set("intent", "client");
   const ret = sanitizeReturnTo(opts?.returnTo ?? null);
   if (ret) params.set("returnTo", ret);
+  if (opts?.resortSlug?.trim()) params.set("resort", opts.resortSlug.trim());
   const q = params.toString();
   return q ? `/login?${q}` : "/login";
+}
+
+/** Client explore with rooms modal open for a resort (post guest signup from resort landing). */
+export function buildClientExploreOpenResortPath(resortId: number): string {
+  return `/dashboard/client/explore?openResort=${encodeURIComponent(String(resortId))}`;
+}
+
+export function resolveGuestPostAuthPath(
+  role: string,
+  opts?: { returnTo?: string | null; resortId?: number | null; fromResortGuest?: boolean },
+): string {
+  const guestRole = role === "client" || role === "user" || role === "guest";
+  if (opts?.fromResortGuest && guestRole && opts.resortId != null && opts.resortId > 0) {
+    return buildClientExploreOpenResortPath(opts.resortId);
+  }
+  return postAuthDashboardPath(role, opts?.returnTo ?? null);
 }
 
 export function buildRegisterUrl(opts?: {

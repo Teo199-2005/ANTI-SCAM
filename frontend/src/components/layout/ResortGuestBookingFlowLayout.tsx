@@ -13,7 +13,8 @@ import { getPublicResort } from "@/lib/api/public";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { ExternalLink, Globe, MapPin, Phone, Shield } from "lucide-react";
+import { VerifiedBadge } from "@/components/badges/VerifiedBadge";
+import { ExternalLink, Globe, MapPin, Phone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -89,7 +90,11 @@ function PublicResortShellFooter({ resort }: Readonly<{ resort: PublicResort }>)
               <BrandWordmark tone="onDark" size="sm" className="min-w-0 leading-tight" />
             </Link>
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/90">
-              <Shield className="h-3.5 w-3.5 text-zinc-200" aria-hidden />
+              <VerifiedBadge
+                premium={Boolean(resort.isPremiumVerified)}
+                size="sm"
+                standardIconClassName="h-3.5 w-3.5 text-zinc-200"
+              />
               Verified booking checkout
             </span>
           </div>
@@ -300,7 +305,11 @@ export function ResortGuestBookingFlowLayout({ children }: Readonly<{ children: 
       />
       <main className="relative z-0 min-w-0 flex-1">{children}</main>
       {landing ? (
-        <ResortLandingFooter footer={landing.footer} resortName={landing.name} />
+        <ResortLandingFooter
+          footer={landing.footer}
+          resortName={landing.name}
+          isPremiumVerified={landing.isPremiumVerified ?? false}
+        />
       ) : slug ? (
         <ResortGuestPublicFooter resortSlug={slug} />
       ) : (

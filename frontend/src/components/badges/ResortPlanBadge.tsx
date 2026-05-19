@@ -1,6 +1,5 @@
-import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
+import { VerifiedBadge } from "@/components/badges/VerifiedBadge";
 import { cn } from "@/lib/utils";
-import { Shield } from "lucide-react";
 
 type Props = {
   badgeLabel?: string | null;
@@ -21,11 +20,7 @@ export function ResortPlanBadge({ badgeLabel, isPremiumVerified, className }: Pr
         className,
       )}
     >
-      {premium ? (
-        <BusinessProVerifiedBadge size="sm" />
-      ) : (
-        <Shield className="h-3 w-3 shrink-0 text-sky-700" aria-hidden />
-      )}
+      <VerifiedBadge premium={premium} size="sm" />
       {badgeLabel}
     </span>
   );

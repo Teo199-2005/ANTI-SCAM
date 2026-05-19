@@ -55,6 +55,7 @@ function toLandingRoom(room: PublicRoom): LandingComputedRoom {
     name: room.name,
     capacity: room.capacity,
     basePrice: room.basePrice,
+    reservationFee: room.reservationFee,
     amenities: room.amenities ?? [],
     rules: room.rules ?? null,
     images: (room.images ?? []).map((img) => ({ id: img.id, url: img.url })),

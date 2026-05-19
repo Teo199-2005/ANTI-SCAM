@@ -6,7 +6,7 @@ import { BedDouble, CalendarRange, ChevronLeft, Loader2, MapPin, Phone, Users } 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { formatPhpPerNight } from "@/lib/formatPhp";
+import { formatGuestDisplayPerNight } from "@/lib/guestRoomPricing";
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T12:00:00");
@@ -194,7 +194,7 @@ export default function ResortExplorePage() {
                 <p className="mt-1 flex items-center gap-1 text-sm text-zinc-600">
                   <Users size={14} /> Up to {room.capacity} guests
                 </p>
-                <p className="mt-2 text-sm font-semibold text-navy">From {formatPhpPerNight(Number(room.basePrice))}</p>
+                <p className="mt-2 text-sm font-semibold text-navy">From {formatGuestDisplayPerNight(room.basePrice, room.reservationFee)}</p>
                 {room.units && room.units > 1 ? (
                   <p className="mt-0.5 text-xs text-zinc-500">{room.units} bookable units (same room type)</p>
                 ) : null}

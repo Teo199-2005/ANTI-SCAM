@@ -1,5 +1,6 @@
 /**
- * Strips near-black background, trims empty transparency, outputs public/verified.png.
+ * Removes outer black background via edge flood-fill (keeps black checkmark on the gold disc).
+ * Trims transparency and writes public/verified.png.
  */
 import sharp from "sharp";
 import { existsSync } from "fs";
@@ -21,19 +22,50 @@ if (!input) {
 
 const output = join(__dirname, "..", "public", "verified.png");
 
+const BLACK_THRESHOLD = 48;
+
+function isNearBlack(r, g, b) {
+  return Math.max(r, g, b) < BLACK_THRESHOLD;
+}
+
 const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 const { width, height } = info;
+const n = width * height;
+const isBackground = new Uint8Array(n);
+const queue = [];
 
-for (let i = 0; i < data.length; i += 4) {
-  const r = data[i];
-  const g = data[i + 1];
-  const b = data[i + 2];
-  const lum = Math.max(r, g, b);
-  if (lum < 36) {
-    data[i + 3] = 0;
-  } else if (lum < 72) {
-    const edge = (lum - 36) / 36;
-    data[i + 3] = Math.min(data[i + 3], Math.round(edge * 255));
+function trySeed(x, y) {
+  if (x < 0 || y < 0 || x >= width || y >= height) return;
+  const i = y * width + x;
+  if (isBackground[i]) return;
+  const o = i * 4;
+  if (!isNearBlack(data[o], data[o + 1], data[o + 2])) return;
+  isBackground[i] = 1;
+  queue.push(i);
+}
+
+for (let x = 0; x < width; x++) {
+  trySeed(x, 0);
+  trySeed(x, height - 1);
+}
+for (let y = 0; y < height; y++) {
+  trySeed(0, y);
+  trySeed(width - 1, y);
+}
+
+while (queue.length > 0) {
+  const i = queue.pop();
+  const x = i % width;
+  const y = (i / width) | 0;
+  if (x > 0) trySeed(x - 1, y);
+  if (x < width - 1) trySeed(x + 1, y);
+  if (y > 0) trySeed(x, y - 1);
+  if (y < height - 1) trySeed(x, y + 1);
+}
+
+for (let i = 0; i < n; i++) {
+  if (isBackground[i]) {
+    data[i * 4 + 3] = 0;
   }
 }
 
@@ -43,4 +75,4 @@ const meta = await sharp(data, { raw: { width, height, channels: 4 } })
   .png({ compressionLevel: 9, adaptiveFiltering: true })
   .toFile(output);
 
-console.log(`Wrote ${output} (${meta.width}x${meta.height})`);
+console.log(`Wrote ${output} (${meta.width}x${meta.height}) — background removed, checkmark preserved`);

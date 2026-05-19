@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useHydrated } from "@/hooks/useHydrated";
 import { useRegisterModal } from "@/contexts/RegisterModalContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
-import { buildLoginUrl, postAuthDashboardPath } from "@/lib/auth/clientAuthUrls";
+import { buildLoginUrl, resolveGuestPostAuthPath } from "@/lib/auth/clientAuthUrls";
 import { publicClient } from "@/lib/api/client";
 import { validateReferralCodePublic } from "@/lib/api/referral";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
@@ -76,7 +76,12 @@ function RegisterPageInner() {
   const needsRolePick = !isOwnerFlow && !isClientFlow;
   const { openRegisterModal } = useRegisterModal();
   const legacyResortBanner = Boolean(resortSlug) && intentRaw !== "client";
-  const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null; id?: number } | null>(null);
+  const [resortBrand, setResortBrand] = useState<{
+    name: string;
+    logoUrl: string | null;
+    id?: number;
+    backgroundImageUrl?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!resortSlug) {
@@ -88,14 +93,15 @@ function RegisterPageInner() {
       try {
         const { data } = await publicClient.get<{
           success: boolean;
-          data?: { name?: string; logoUrl?: string | null };
+          data?: { id?: number; name?: string; logoUrl?: string | null; backgroundImageUrl?: string | null };
         }>(`/public/resorts/slug/${encodeURIComponent(resortSlug)}`);
         if (cancelled) return;
         if (data.success && data.data?.name) {
           setResortBrand({
+            id: data.data.id,
             name: data.data.name,
             logoUrl: data.data.logoUrl ?? null,
-            id: (data.data as { id?: number }).id,
+            backgroundImageUrl: data.data.backgroundImageUrl ?? null,
           });
         } else {
           setResortBrand(null);
@@ -221,7 +227,13 @@ function RegisterPageInner() {
         });
         return;
       }
-      router.push(postAuthDashboardPath(user.role, returnTo));
+      router.push(
+        resolveGuestPostAuthPath(user.role, {
+          returnTo,
+          resortId: resortBrand?.id,
+          fromResortGuest: isGuestFromResort,
+        }),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
@@ -242,7 +254,17 @@ function RegisterPageInner() {
       : null;
 
   return (
-    <AuthSplitShell guestResortContext={isGuestFromResort}>
+    <AuthSplitShell
+      resortHero={
+        isGuestFromResort && resortBrand
+          ? {
+              name: resortBrand.name,
+              logoUrl: resortBrand.logoUrl,
+              backgroundImageUrl: resortBrand.backgroundImageUrl,
+            }
+          : null
+      }
+    >
       {mounted && trialSuccessModal
         ? createPortal(
             <DismissibleModalShell
@@ -635,6 +657,7 @@ function RegisterPageInner() {
             href={buildLoginUrl({
               returnTo: returnTo || (resortSlug ? `/resort/${resortSlug}` : null),
               intent: isClientFlow ? "client" : undefined,
+              resortSlug: resortSlug || null,
             })}
             className="font-semibold text-clOcean hover:text-clOceanHover hover:underline"
           >

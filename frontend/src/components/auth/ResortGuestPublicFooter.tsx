@@ -4,7 +4,7 @@ import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { publicClient } from "@/lib/api/client";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
-import { ExternalLink, Globe, Shield } from "lucide-react";
+import { ExternalLink, Globe, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -81,7 +81,7 @@ export function ResortGuestPublicFooter({ resortSlug }: Props) {
               <BrandWordmark tone="onDark" size="sm" className="min-w-0 leading-tight" />
             </Link>
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/90">
-              <Shield className="h-3.5 w-3.5 text-zinc-200" aria-hidden />
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-zinc-200" aria-hidden />
               Verified listing
             </span>
           </div>

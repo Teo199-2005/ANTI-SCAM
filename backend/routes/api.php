@@ -156,6 +156,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/admin/clients/{client}', [AdminClientController::class, 'show']);
             Route::get('/admin/location-stats', [AdminLocationStatsController::class, 'index']);
             Route::get('/admin/analytics', [AdminAnalyticsController::class, 'index']);
+            Route::get('/admin/analytics/company', [AdminAnalyticsController::class, 'company']);
             Route::get('/admin/subscriptions/overview', [AdminSubscriptionOverviewController::class, 'index']);
             Route::get('/admin/finance/overview', [AdminFinanceController::class, 'overview']);
             Route::get('/admin/finance/payment-ledger', [AdminFinanceController::class, 'paymentLedger']);

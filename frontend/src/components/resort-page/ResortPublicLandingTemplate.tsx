@@ -45,7 +45,8 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         heading={data.hero.heading}
         location={data.address ?? data.map.address}
         contactNumber={data.contactNumber}
-        isVip={data.isPremiumVerified ?? data.isVip}
+        isVip={data.isVip}
+        isPremiumVerified={data.isPremiumVerified ?? false}
         badgeLabel={data.badgeLabel}
         facebookUrl={data.hero.facebookUrl ?? null}
         instagramUrl={data.hero.instagramUrl ?? null}
@@ -69,7 +70,11 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         surface={resortLandingSurfaceFor(sectionChain, "about")}
       />
 
-      <ResortLandingFooter footer={data.footer} resortName={data.name} />
+      <ResortLandingFooter
+        footer={data.footer}
+        resortName={data.name}
+        isPremiumVerified={data.isPremiumVerified ?? false}
+      />
     </main>
   );
 }

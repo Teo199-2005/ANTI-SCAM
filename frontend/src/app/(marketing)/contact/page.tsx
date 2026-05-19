@@ -5,7 +5,8 @@ import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Button from "@/components/ui/Button";
 import OwnerValuePropsStrip from "@/components/home/OwnerValuePropsStrip";
-import { Building2, CheckCircle2, Clock3, Mail, MapPin, MessageSquareMore, PhoneCall } from "lucide-react";
+import { Building2, CheckCircle2, Clock3, Instagram, Mail, MapPin, MessageSquareMore, PhoneCall } from "lucide-react";
+import { platformSocialLinks } from "@/lib/site";
 import { sanitizeEmailTyping, sanitizeLongText, sanitizePersonName } from "@/lib/inputRestrictions";
 import { useState } from "react";
 
@@ -119,6 +120,15 @@ export default function ContactPage() {
           </p>
           <p className="text-sm text-zinc-600">0917-874-4889</p>
           <p className="text-sm text-zinc-600">(02) 8123 4567</p>
+          <a
+            href={platformSocialLinks.instagram}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primaryBlue hover:underline"
+          >
+            <Instagram size={14} aria-hidden />
+            @antiscamph on Instagram
+          </a>
         </Card>
         <Card>
           <div className="glass-pill-icon">

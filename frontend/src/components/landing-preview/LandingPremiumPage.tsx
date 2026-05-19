@@ -12,7 +12,6 @@ import {
   BarChart2,
   Building,
   Calendar,
-  CheckCircle,
   Globe,
   Lock,
   MapPin,
@@ -22,6 +21,7 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 import { SubscriptionPlansComparison } from "@/components/marketing/SubscriptionPlansComparison";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
@@ -159,11 +159,15 @@ export function LandingPremiumPage() {
               {[
                 { icon: Shield, label: "SEC Registered Company" },
                 { icon: MapPin, label: "Philippine-Based Support" },
-                { icon: CheckCircle, label: "Verified Resort Badge System" },
+                { icon: null, label: "Verified Resort Badge System", verifiedBadge: true as const },
                 { icon: Lock, label: "Secure Reservation Processing" },
-              ].map(({ icon: Icon, label }) => (
+              ].map(({ icon: Icon, label, verifiedBadge }) => (
                 <div key={label} className="flex min-w-0 items-start gap-2">
-                  <Icon className="mt-0.5 h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
+                  {verifiedBadge ? (
+                    <BusinessProVerifiedBadge size="lg" className="mt-0.5" />
+                  ) : Icon ? (
+                    <Icon className="mt-0.5 h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
+                  ) : null}
                   <span className="min-w-0 text-[12px] font-semibold leading-snug sm:text-[13px]" style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
                     {label}
                   </span>

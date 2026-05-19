@@ -4,8 +4,8 @@ import { ResortLandingHeroBackground } from "@/components/resort-page/ResortLand
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import type { PublicAdminLandingEmbed } from "@/lib/api/landingPage";
 import { cn } from "@/lib/utils";
-import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
-import { Facebook, Instagram, MapPin, Phone, ShieldCheck } from "lucide-react";
+import { VerifiedBadge } from "@/components/badges/VerifiedBadge";
+import { Facebook, Instagram, MapPin, Phone } from "lucide-react";
 
 /**
  * Public resort hero — full-bleed photo + glass panel.
@@ -50,6 +50,8 @@ type Props = {
   /** Optional hero link (e.g. About / Find us) — no default when omitted. */
   secondaryCta?: { href: string; label: string } | null;
   isVip: boolean;
+  /** Business Pro / premium verified — gold verified.png badge. */
+  isPremiumVerified?: boolean;
   badgeLabel?: string;
   facebookUrl?: string | null;
   instagramUrl?: string | null;
@@ -67,6 +69,7 @@ export function ResortLandingHero({
   contactNumber,
   secondaryCta,
   isVip,
+  isPremiumVerified = false,
   badgeLabel,
   facebookUrl,
   instagramUrl,
@@ -136,18 +139,18 @@ export function ResortLandingHero({
                 <div className="flex w-full max-w-md flex-wrap items-center justify-center gap-2 sm:w-auto sm:max-w-none">
                   <span
                     className={
-                      isVip
+                      isPremiumVerified || isVip
                         ? "inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-500/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-50/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md sm:px-3.5 sm:py-2 sm:text-[11px]"
                         : "inline-flex items-center gap-2 rounded-full border border-white/22 bg-white/12 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md sm:px-3.5 sm:py-2 sm:text-[11px]"
                     }
                     style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
                   >
-                    {isVip ? (
-                      <BusinessProVerifiedBadge size="md" />
-                    ) : (
-                      <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-zinc-300 sm:h-4 sm:w-4" aria-hidden />
-                    )}
-                    {badgeLabel ?? (isVip ? "Premium Verified Resort" : "Verified Resort")}
+                    <VerifiedBadge
+                      premium={isPremiumVerified}
+                      size="md"
+                      standardIconClassName="h-3.5 w-3.5 text-zinc-200 sm:h-4 sm:w-4"
+                    />
+                    {badgeLabel ?? (isPremiumVerified ? "Premium Verified Resort" : "Verified Resort")}
                   </span>
                 </div>
               </div>

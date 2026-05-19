@@ -27,6 +27,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import AdminResortViewModal from "@/components/dashboard/AdminResortViewModal";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { TableEntityThumb } from "@/components/shared/TableEntityThumb";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { BadgeCheck, Building2, Crown, Eye, PenLine, XCircle } from "lucide-react";
 import Link from "next/link";
@@ -311,6 +312,7 @@ export default function AdminResortsPage() {
                       onChange={() => bulk.toggle(resort.id)}
                       ariaLabel={`Select ${resort.name}`}
                     />
+                    <TableEntityThumb imageUrl={resort.logo_url} name={resort.name} kind="resort" />
                     <span>{resort.name}</span>
                   </span>
                 }
@@ -396,7 +398,12 @@ export default function AdminResortsPage() {
                   onChange={() => bulk.toggle(resort.id)}
                   ariaLabel={`Select ${resort.name}`}
                 />
-                <td className="font-semibold text-navy">{resort.name}</td>
+                <td>
+                  <div className="flex items-center gap-3">
+                    <TableEntityThumb imageUrl={resort.logo_url} name={resort.name} kind="resort" />
+                    <span className="font-semibold text-navy">{resort.name}</span>
+                  </div>
+                </td>
                 <td className="text-zinc-600">{resort.address ?? "—"}</td>
                 <td className="text-xs text-zinc-500 whitespace-nowrap">
                   {resort.created_at ? new Date(resort.created_at).toLocaleDateString() : "—"}

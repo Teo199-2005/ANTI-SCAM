@@ -1,6 +1,8 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import { AdminAnalyticsCompanyTab } from "@/components/dashboard/admin/AdminAnalyticsCompanyTab";
+import { AdminAnalyticsMarketingTab } from "@/components/dashboard/admin/AdminAnalyticsMarketingTab";
 import {
   type AnalyticsFilters,
   type AdminAnalytics,
@@ -11,12 +13,14 @@ import {
   Activity,
   BarChart3,
   Building2,
+  Briefcase,
   CalendarDays,
   CheckCircle2,
   DollarSign,
   Download,
   Filter,
   Loader2,
+  Megaphone,
   RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
@@ -35,6 +39,14 @@ const MONTHS = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
+
+type AnalyticsTabId = "operations" | "company" | "marketing";
+
+const ANALYTICS_TABS: { id: AnalyticsTabId; label: string; icon: React.ElementType }[] = [
+  { id: "operations", label: "Operations", icon: BarChart3 },
+  { id: "company", label: "Company", icon: Briefcase },
+  { id: "marketing", label: "Marketing", icon: Megaphone },
+];
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed:       "bg-emerald-500",
@@ -83,6 +95,7 @@ function StatBadge({
 }
 
 export default function AdminAnalyticsPage() {
+  const [tab, setTab] = useState<AnalyticsTabId>("operations");
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError]   = useState<string | null>(null);
@@ -111,7 +124,9 @@ export default function AdminAnalyticsPage() {
     }
   }, []);
 
-  useEffect(() => { void load(applied); }, [applied, load]);
+  useEffect(() => {
+    if (tab === "operations") void load(applied);
+  }, [applied, load, tab]);
 
   const applyFilters = () => setApplied({ ...filters });
   const resetFilters = () => {
@@ -147,9 +162,10 @@ export default function AdminAnalyticsPage() {
             Analytics
           </h1>
           <p className="dash-page-sub max-w-3xl">
-            Platform-wide monitoring — filter by resort, period, or revenue range. All charts update live when you apply filters.
+            Operations KPIs, company retention (executive accruals), and marketing partner commissions.
           </p>
         </div>
+        {tab === "operations" && (
         <button
           type="button"
           onClick={() => {
@@ -167,8 +183,89 @@ export default function AdminAnalyticsPage() {
           {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
           Export PDF
         </button>
+        )}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {ANALYTICS_TABS.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
+                active
+                  ? "bg-navy text-white shadow-soft-sm"
+                  : "bg-softCard text-zinc-600 ring-1 ring-softBorder hover:bg-metalFace",
+              )}
+            >
+              <Icon size={14} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {(tab === "company" || tab === "marketing") && (
+        <DashCard className="p-4">
+          <p className="mb-3 text-xs text-zinc-500">
+            Period for {tab === "company" ? "company" : "marketing"} analytics — change year
+            {tab === "company" ? " or month" : ""} then apply.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Year</label>
+              <select
+                className="dash-input"
+                value={filters.year ?? CURRENT_YEAR}
+                onChange={(e) => setFilters((f) => ({ ...f, year: Number(e.target.value) }))}
+              >
+                {YEAR_OPTIONS.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {tab === "company" && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-500">Month</label>
+                <select
+                  className="dash-input"
+                  value={filters.month ?? ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, month: e.target.value ? Number(e.target.value) : "" }))
+                  }
+                >
+                  <option value="">Full year</option>
+                  {MONTHS.map((name, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button type="button" className="dash-btn-primary" onClick={applyFilters}>
+              Apply period
+            </button>
+          </div>
+        </DashCard>
+      )}
+
+      {tab === "company" && (
+        <AdminAnalyticsCompanyTab year={applied.year ?? CURRENT_YEAR} month={applied.month ?? ""} />
+      )}
+
+      {tab === "marketing" && (
+        <AdminAnalyticsMarketingTab year={applied.year ?? CURRENT_YEAR} />
+      )}
+
+      {tab === "operations" && (
+      <>
       {/* ── Filter bar ── */}
       <DashCard className="p-5">
         <div className="mb-3 flex items-center gap-2">
@@ -574,6 +671,8 @@ export default function AdminAnalyticsPage() {
             </div>
           </DashCard>
         </>
+      )}
+      </>
       )}
     </div>
   );

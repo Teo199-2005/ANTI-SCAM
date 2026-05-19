@@ -2,7 +2,8 @@
 
 import type { PublicRoom } from "@/lib/api/public";
 import { normalizeRoomImages, roomImageDisplaySrc } from "@/lib/roomImagePreview";
-import { amenityMeta, extractRoomMeta, formatPhpPerNight } from "@/lib/roomPreviewDisplay";
+import { formatGuestDisplayPerNight } from "@/lib/guestRoomPricing";
+import { amenityMeta, extractRoomMeta } from "@/lib/roomPreviewDisplay";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 import { cn } from "@/lib/utils";
 import { BedDouble, ImageOff, Users } from "lucide-react";
@@ -62,7 +63,7 @@ export function CatalogRoomPreviewTile({ room, onSelect, className }: Props) {
             {room.capacity} {room.capacity === 1 ? "guest" : "guests"}
           </span>
           <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2 py-px text-[10px] font-semibold text-zinc-800">
-            {formatPhpPerNight(room.basePrice)}
+            {formatGuestDisplayPerNight(room.basePrice, room.reservationFee)}
           </span>
           {bedCount ? (
             <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">

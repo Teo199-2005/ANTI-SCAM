@@ -7,6 +7,7 @@ import { ResortLogoWatermark } from "@/components/marketing/ResortLogoWatermark"
 import Button from "@/components/ui/Button";
 import type { PublicResortListItem } from "@/lib/api/public";
 import { formatPhp } from "@/lib/formatPhp";
+import { guestDisplayPriceFrom } from "@/lib/guestRoomPricing";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
 import { BedDouble, Building2, ExternalLink, MapPin } from "lucide-react";
@@ -177,7 +178,7 @@ export function BrowseResortCard({ resort, onViewRooms, onViewWebsite, className
               style={{ color: NAVY }}
               title="Lowest nightly rate among active rooms (reservation fee added at checkout)"
             >
-              Rooms from {formatPhp(resort.priceFrom)}
+              Rooms from {formatPhp(guestDisplayPriceFrom(resort.priceFrom))}
               <span className="font-medium text-zinc-500">/night</span>
             </p>
           ) : null}

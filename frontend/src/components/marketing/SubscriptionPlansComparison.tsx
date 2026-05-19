@@ -90,7 +90,7 @@ type PlanCardProps = {
   compact?: boolean;
   title: string;
   badge: string;
-  badgeIcon?: typeof Shield;
+  badgeIcon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   badgeLeading?: ReactNode;
   priceLabel: string;
   priceSubtext: string;

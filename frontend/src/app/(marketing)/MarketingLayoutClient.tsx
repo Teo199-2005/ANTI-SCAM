@@ -1,6 +1,5 @@
 "use client";
 
-import { ResortGuestPublicFooter } from "@/components/auth/ResortGuestPublicFooter";
 import AppLoadingScreen from "@/components/layout/AppLoadingScreen";
 import Footer from "@/components/layout/Footer";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
@@ -13,6 +12,7 @@ import {
   MARKETING_OVERLAY_MAIN_TOP_PAD_CLASS,
 } from "@/lib/authMarketingNavOverlay";
 import { ResortGuestBookingFlowLayout } from "@/components/layout/ResortGuestBookingFlowLayout";
+import { ResortGuestSlugChromeLayout } from "@/components/layout/ResortGuestSlugChromeLayout";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
@@ -84,10 +84,7 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
 
   if (isGuestResortAuthPath && resortSlugForGuestAuth) {
     return (
-      <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[#f4f7fb]">
-        <main className="relative z-0 min-w-0 flex-1">{children}</main>
-        <ResortGuestPublicFooter resortSlug={resortSlugForGuestAuth} />
-      </div>
+      <ResortGuestSlugChromeLayout resortSlug={resortSlugForGuestAuth}>{children}</ResortGuestSlugChromeLayout>
     );
   }
 

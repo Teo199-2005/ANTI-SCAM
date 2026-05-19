@@ -4,7 +4,7 @@ import { AuthSplitShell } from "@/components/auth/AuthSplitShell";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
-import { buildRegisterUrl, postAuthDashboardPath } from "@/lib/auth/clientAuthUrls";
+import { buildRegisterUrl, resolveGuestPostAuthPath } from "@/lib/auth/clientAuthUrls";
 import { publicClient } from "@/lib/api/client";
 import { useHydrated } from "@/hooks/useHydrated";
 import { laravelPublicUrl } from "@/lib/publicAsset";
@@ -67,7 +67,12 @@ function LoginPageContent() {
   const returnTo = searchParams.get("returnTo")?.trim() ?? "";
   const isClientContext = searchParams.get("intent") === "client" || Boolean(resortSlug);
   const isGuestFromResort = isClientContext && Boolean(resortSlug);
-  const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null } | null>(null);
+  const [resortBrand, setResortBrand] = useState<{
+    id?: number;
+    name: string;
+    logoUrl: string | null;
+    backgroundImageUrl?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!resortSlug) {
@@ -79,11 +84,16 @@ function LoginPageContent() {
       try {
         const { data } = await publicClient.get<{
           success: boolean;
-          data?: { name?: string; logoUrl?: string | null };
+          data?: { id?: number; name?: string; logoUrl?: string | null; backgroundImageUrl?: string | null };
         }>(`/public/resorts/slug/${encodeURIComponent(resortSlug)}`);
         if (cancelled) return;
         if (data.success && data.data?.name) {
-          setResortBrand({ name: data.data.name, logoUrl: data.data.logoUrl ?? null });
+          setResortBrand({
+            id: data.data.id,
+            name: data.data.name,
+            logoUrl: data.data.logoUrl ?? null,
+            backgroundImageUrl: data.data.backgroundImageUrl ?? null,
+          });
         } else {
           setResortBrand(null);
         }
@@ -105,7 +115,13 @@ function LoginPageContent() {
     setPending(true);
     try {
       const user = await login(email.trim(), password);
-      router.push(postAuthDashboardPath(user.role, returnTo || (resortSlug ? `/resort/${resortSlug}` : null)));
+      router.push(
+        resolveGuestPostAuthPath(user.role, {
+          returnTo: returnTo || (resortSlug ? `/resort/${resortSlug}` : null),
+          resortId: resortBrand?.id,
+          fromResortGuest: isGuestFromResort,
+        }),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
@@ -120,7 +136,13 @@ function LoginPageContent() {
     setPassword(demoPassword);
     try {
       const user = await login(e, demoPassword);
-      router.push(postAuthDashboardPath(user.role, returnTo || (resortSlug ? `/resort/${resortSlug}` : null)));
+      router.push(
+        resolveGuestPostAuthPath(user.role, {
+          returnTo: returnTo || (resortSlug ? `/resort/${resortSlug}` : null),
+          resortId: resortBrand?.id,
+          fromResortGuest: isGuestFromResort,
+        }),
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed.";
       setError(msg);
@@ -130,7 +152,17 @@ function LoginPageContent() {
 
   return (
     <>
-    <AuthSplitShell guestResortContext={isGuestFromResort}>
+    <AuthSplitShell
+      resortHero={
+        isGuestFromResort && resortBrand
+          ? {
+              name: resortBrand.name,
+              logoUrl: resortBrand.logoUrl,
+              backgroundImageUrl: resortBrand.backgroundImageUrl,
+            }
+          : null
+      }
+    >
       <div className={loginCardClass}>
         {isGuestFromResort ? (
           <p className="mb-4 text-center">
@@ -281,7 +313,11 @@ function LoginPageContent() {
         <p className="mt-7 text-center text-sm text-zinc-600">
           No account yet?{" "}
           <Link
-            href={resortSlug ? `/register?resort=${encodeURIComponent(resortSlug)}` : "/register"}
+            href={buildRegisterUrl({
+              intent: isClientContext ? "client" : undefined,
+              returnTo: returnTo || (resortSlug ? `/resort/${resortSlug}` : null),
+              resortSlug: resortSlug || null,
+            })}
             className="font-semibold text-clOcean hover:text-clOceanHover hover:underline"
           >
             Create one

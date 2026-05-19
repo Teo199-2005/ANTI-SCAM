@@ -178,6 +178,7 @@ class PublicCatalogController extends Controller
             'tenantId'      => $tenant->id,
             'name'          => $resort->name,
             'logoUrl'       => $resort->logo_url,
+            'backgroundImageUrl' => $resort->background_image_url,
             'description'   => $resort->description,
             'address'       => $this->locations->resortDisplayLine($resort),
             'addressProvincePsgc' => $resort->address_province_psgc,
