@@ -61,7 +61,7 @@ export default function MarketingAnalyticsPage() {
             <p className="font-dash text-dash-xs font-medium text-white/70">Insights</p>
             <h1 className="mt-1 font-dash text-dash-3xl font-bold text-white md:text-dash-4xl">Marketing analytics</h1>
             <p className="mt-1 max-w-xl font-dash text-dash-sm text-white/80">
-              Referral-driven subscription payments and commission accruals for your assigned resorts.
+              Paid online guest bookings and commission accruals for your assigned resorts.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -119,15 +119,15 @@ export default function MarketingAnalyticsPage() {
           />
           <StatCard
             compact
-            label="Referral checkouts"
-            value={data ? String(data.totals.referral_subscription_count_ytd) : "–"}
+            label="Booking credits (YTD)"
+            value={data ? String(data.totals.booking_credits_ytd) : "–"}
             icon={Users}
             iconTone="navy"
           />
           <StatCard
             compact
-            label="Referral volume (YTD)"
-            value={data ? fmtMoney(data.totals.referral_subscription_volume_ytd) : "–"}
+            label="Reversed bookings (YTD)"
+            value={data ? String(data.totals.booking_reversals_ytd) : "–"}
             icon={TrendingUp}
             iconTone="violet"
           />
@@ -143,7 +143,7 @@ export default function MarketingAnalyticsPage() {
             <div>
               <h2 className="font-dash text-base font-semibold text-navy">Monthly activity</h2>
               <p className="text-xs text-zinc-400">
-                Stacked commissions (pending · released) and referral-backed subscription payments per month.
+                Stacked commissions (pending · released) and qualifying booking credits per month.
               </p>
             </div>
           </div>
@@ -187,7 +187,7 @@ export default function MarketingAnalyticsPage() {
                       )}
                     </div>
                     <span className="text-[10px] font-semibold text-zinc-500">{monthLabel(m.period)}</span>
-                    <span className="text-[9px] text-zinc-400">{m.referral_payment_count} ref.</span>
+                    <span className="text-[9px] text-zinc-400">{m.booking_credits_count} bk.</span>
                   </div>
                 );
               })}

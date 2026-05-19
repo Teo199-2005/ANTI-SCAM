@@ -22,7 +22,7 @@ export async function exportMarketingAnalyticsPdf(
 
   let sess = await beginBrandedPdf(reportLabel, {
     title: "Marketing Analytics",
-    subtitle: "Referral commissions & subscription volume",
+    subtitle: "Booking commissions & qualifying guest bookings",
     metaLines: [`Year ${year}`, `Generated: ${new Date().toLocaleString("en-PH")}`],
   });
 
@@ -30,19 +30,19 @@ export async function exportMarketingAnalyticsPdf(
   sess = drawBrandedKpiRow(sess, [
     { label: "Pending commission", value: formatPhpForPdf(t.commission_pending_ytd) },
     { label: "Released commission", value: formatPhpForPdf(t.commission_released_ytd) },
-    { label: "Referral checkouts", value: String(t.referral_subscription_count_ytd) },
-    { label: "Referral volume", value: formatPhpForPdf(t.referral_subscription_volume_ytd) },
+    { label: "Booking credits", value: String(t.booking_credits_ytd) },
+    { label: "Reversed bookings", value: String(t.booking_reversals_ytd) },
   ]);
 
   const monthlyRows = (data.monthly ?? []).map((m) => [
     monthLabel(m.period),
     formatPhpForPdf(m.commission_pending),
     formatPhpForPdf(m.commission_released),
-    String(m.referral_payment_count),
+    String(m.booking_credits_count),
   ]);
   if (monthlyRows.length > 0) {
     sess = drawBrandedSection(sess, "Monthly activity");
-    sess = drawBrandedTable(sess, ["Month", "Pending", "Released", "Referrals"], monthlyRows);
+    sess = drawBrandedTable(sess, ["Month", "Pending", "Released", "Bookings"], monthlyRows);
   }
 
   const resortRows = (data.by_resort ?? []).map((r) => [

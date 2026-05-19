@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosError } from "axios";
 
 /** Laravel / framework messages that add no value for end users when combined with field errors. */
 const GENERIC_BAG_MESSAGES = new Set([
@@ -128,18 +128,18 @@ export function flattenLaravelApiErrors(errors: unknown): string[] {
   return dedupeLines(lines);
 }
 
-function requestUrlPath(error: axios.AxiosError): string {
+function requestUrlPath(error: AxiosError): string {
   const base = (error.config?.baseURL ?? "").replace(/\/+$/, "");
   const url = error.config?.url ?? "";
   return `${base}/${url}`.replace(/([^:]\/)\/+/g, "$1").toLowerCase();
 }
 
-function isAuthApiRequest(error: axios.AxiosError): boolean {
+function isAuthApiRequest(error: AxiosError): boolean {
   const path = requestUrlPath(error);
   return path.includes("/api/auth") || /\/(login|register|logout|me)(\?|$|\/)/.test(path);
 }
 
-function isUploadRequest(error: axios.AxiosError): boolean {
+function isUploadRequest(error: AxiosError): boolean {
   const path = requestUrlPath(error);
   const data = error.config?.data;
   if (typeof FormData !== "undefined" && data instanceof FormData) return true;
