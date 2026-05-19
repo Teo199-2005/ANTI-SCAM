@@ -21,8 +21,8 @@ use Throwable;
 /**
  * Batches pending {@link Commission} rows for GCash disbursement via Xendit.
  *
- * Gross per row is whatever was credited (including tier-based subscription-referral amounts from
- * {@see \App\Services\SubscriptionReferralCommissionService}); this service only sums gross, applies
+ * Gross per row is whatever was credited (booking referral amounts from
+ * {@see \App\Services\BookingReferralCommissionService}); this service only sums gross, applies
  * withholding, allocates net to line items, and submits the batch. It does not recalculate tiers.
  *
  * Hardening notes:

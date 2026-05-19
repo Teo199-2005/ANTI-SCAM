@@ -89,7 +89,8 @@ function ReceiptContent() {
   if (loading) return <div className="dash-card p-10 text-center text-zinc-500">Loading receipt…</div>;
   if (error || !reservation) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-10 text-center text-rose-800">{error}</div>;
 
-  const balance = Number(reservation.total_amount) - Number(reservation.reservation_fee);
+  const balanceAtResort = Number(reservation.total_amount);
+  const tripTotal = balanceAtResort + Number(reservation.reservation_fee);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -169,17 +170,17 @@ function ReceiptContent() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-zinc-600">Remaining balance (pay at resort)</span>
-            <span className="font-bold text-orange-600">{formatPhp(balance)}</span>
+            <span className="font-bold text-orange-600">{formatPhp(balanceAtResort)}</span>
           </div>
           <div className="flex justify-between border-t border-emerald-200 pt-2 text-base font-bold">
-            <span className="text-navy">Total booking amount</span>
-            <span className="text-navy">{formatPhp(Number(reservation.total_amount))}</span>
+            <span className="text-navy">Total trip cost</span>
+            <span className="text-navy">{formatPhp(tripTotal)}</span>
           </div>
         </div>
 
         <p className="mt-4 text-center text-xs text-zinc-400">
           The {formatPhp(Number(reservation.reservation_fee))} reservation fee is non-refundable. The remaining balance of{" "}
-          {formatPhp(balance)} is payable directly at the resort upon check-in.
+          {formatPhp(balanceAtResort)} is payable directly at the resort upon check-in.
         </p>
       </DashCard>
     </div>

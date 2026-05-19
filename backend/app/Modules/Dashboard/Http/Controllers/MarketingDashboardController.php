@@ -7,11 +7,11 @@ use App\Models\Commission;
 use App\Models\CommissionRelease;
 use App\Models\ReferralSignupAttribution;
 use App\Models\Resort;
-use App\Models\SubscriptionInvoice;
+use App\Models\MarketerBookingCommissionEvent;
 use App\Models\User;
 use App\Support\ResortLocationQuery;
+use App\Services\MarketerBookingCommissionStatsService;
 use App\Services\MarketerCommissionPayoutService;
-use App\Services\MarketerTierService;
 use App\Services\ReferralSignupTrialService;
 use App\Services\PhilippineLocationService;
 use App\Shared\Traits\ApiResponseTrait;
@@ -25,7 +25,7 @@ class MarketingDashboardController extends Controller
 
     public function __construct(
         private readonly MarketerCommissionPayoutService $marketerPayouts,
-        private readonly MarketerTierService $marketerTiers,
+        private readonly MarketerBookingCommissionStatsService $bookingStats,
         private readonly ReferralSignupTrialService $referralSignupTrial,
     ) {}
 
@@ -47,19 +47,22 @@ class MarketingDashboardController extends Controller
 
         $resortCount = DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count();
 
-        $convertingClientsCount = $this->marketerTiers->countConvertingClients($marketerId);
-        $convertingResortsWithReferralCount = $this->marketerTiers->countDistinctReferredResorts($marketerId);
-        $marketerTier = $this->marketerTiers->resolveTier($convertingClientsCount);
-        $tierLadder = $this->marketerTiers->tierLadder();
-        $tierPolicy = $this->marketerTiers->tierPolicySummary();
+        $currentPeriod = $this->bookingStats->currentMonthPeriod();
+        $qualifyingBookingsLifetime = $this->bookingStats->qualifyingBookingsCount($marketerId);
+        $qualifyingBookingsMtd = $this->bookingStats->qualifyingBookingsCount($marketerId, $currentPeriod, $currentPeriod);
+        $reversedBookingsMtd = $this->bookingStats->reversedBookingsCount($marketerId, $currentPeriod, $currentPeriod);
+        $commissionPerBooking = $this->bookingStats->commissionPerBookingPhp();
+        $bookingPolicy = $this->bookingStats->bookingCommissionPolicySummary();
 
         $user = $request->user();
         $frontend = $this->publicRegistrationBaseUrl($request);
         $code = $user->referral_code;
-        $shareRegister = $code !== null && $code !== '' ? "{$frontend}/register?ref=".rawurlencode((string) $code) : null;
+        $shareRegister = $code !== null && $code !== ''
+            ? "{$frontend}/register?intent=owner&ref=".rawurlencode((string) $code)
+            : null;
         $referralSignupClientsCount = $this->referralSignupTrial->countSignupClients($marketerId);
-        $subscribeHint = $code !== null && $code !== ''
-            ? "Share your registration link — resort owners who sign up with code {$code} receive 1 month of platform access free. Paid subscriptions after the trial count toward your commission tier."
+        $referralHint = $code !== null && $code !== ''
+            ? "Share your registration link — resort owners who sign up with code {$code} receive 1 month of platform access free. You earn ₱{$commissionPerBooking} per paid online guest booking at each resort you refer."
             : null;
 
         $wh = $this->marketerPayouts->withholdingRate();
@@ -72,31 +75,16 @@ class MarketingDashboardController extends Controller
             'releasedCommissionsGross' => (float) $releasedCommissionsGross,
             'payoutWithholdingRate' => $wh,
             'assignedResorts' => $resortCount,
-            'convertingClientsCount' => $convertingClientsCount,
             'referralSignupClientsCount' => $referralSignupClientsCount,
-            'convertingResortsWithReferralCount' => $convertingResortsWithReferralCount,
-            'marketerTier' => $marketerTier === null ? null : [
-                'tierKey' => $marketerTier['tier_key'],
-                'label' => $marketerTier['label'],
-                'perPaymentPhp' => $marketerTier['per_payment_php'],
-                'minClients' => $marketerTier['min_clients'],
-                'maxClients' => $marketerTier['max_clients'],
-                'nextTierAt' => $marketerTier['next_tier_at'],
-                'clientsToNextTier' => $marketerTier['clients_to_next_tier'],
-            ],
-            'tierLadder' => array_map(static fn (array $b): array => [
-                'tierKey' => $b['tier_key'],
-                'label' => $b['label'],
-                'minClients' => $b['min_clients'],
-                'maxClients' => $b['max_clients'],
-                'perPaymentPhp' => $b['per_payment_php'],
-                'clientRangeLabel' => $b['client_range_label'],
-            ], $tierLadder),
-            'tierPolicy' => $tierPolicy,
+            'qualifyingBookingsCount' => $qualifyingBookingsLifetime,
+            'qualifyingBookingsMtd' => $qualifyingBookingsMtd,
+            'reversedBookingsMtd' => $reversedBookingsMtd,
+            'commissionPerBookingPhp' => $commissionPerBooking,
+            'bookingCommissionPolicy' => $bookingPolicy,
             'referral_code' => $code,
             'referral_share_register_url' => $shareRegister,
-            'referral_subscribe_hint' => $subscribeHint,
-            'commission_payout_schedule' => 'Pending subscription-referral commissions are paid automatically via GCash (Xendit) on the 10th of each month (Asia/Manila), for earnings through the previous calendar month, when automation is enabled and payout details are complete. A platform withholding (taxes and fees) is deducted before each disbursement; see payoutWithholdingRate.',
+            'referral_subscribe_hint' => $referralHint,
+            'commission_payout_schedule' => 'Pending booking commissions are paid automatically via GCash (Xendit) on the 10th of each month (Asia/Manila), for earnings through the previous calendar month, when automation is enabled and payout details are complete. A platform withholding (taxes and fees) is deducted before each disbursement; see payoutWithholdingRate.',
         ], 'Marketing stats');
     }
 
@@ -253,10 +241,24 @@ class MarketingDashboardController extends Controller
                     'trial_total' => $trialTotal,
                     'trial_active_total' => $trialActiveTotal,
                 ],
-                'tier_policy' => $this->marketerTiers->tierPolicySummary(),
+                'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
             ],
             'Marketing clients',
         );
+    }
+
+    public function bookings(Request $request)
+    {
+        $marketerId = $request->user()->id;
+        $perPage = min(50, max(5, (int) $request->integer('perPage', 15)));
+
+        $events = MarketerBookingCommissionEvent::query()
+            ->with(['resort:id,name', 'reservation:id,reference_no,check_in_date,check_out_date,status'])
+            ->where('marketer_id', $marketerId)
+            ->latest('id')
+            ->paginate($perPage);
+
+        return $this->successResponse($events, 'Booking commission events fetched');
     }
 
     /**
@@ -384,8 +386,8 @@ class MarketingDashboardController extends Controller
                 'period' => $p,
                 'commission_pending' => 0.0,
                 'commission_released' => 0.0,
-                'referral_payment_count' => 0,
-                'referral_payment_volume' => 0.0,
+                'booking_credits_count' => 0,
+                'booking_reversals_count' => 0,
             ];
         }
 
@@ -407,20 +409,25 @@ class MarketingDashboardController extends Controller
             }
         }
 
-        $referralInvoices = SubscriptionInvoice::withoutGlobalScopes()
-            ->where('marketer_id', $marketerId)
-            ->where('status', 'paid')
-            ->whereNotNull('paid_at')
-            ->whereYear('paid_at', $year)
-            ->get(['paid_at', 'amount']);
-
-        foreach ($referralInvoices as $inv) {
-            $p = $inv->paid_at->format('Y-m');
-            if (! isset($monthBuckets[$p])) {
-                continue;
+        $bookingCreditsByPeriod = $this->bookingStats->bookingCreditsByPeriod($marketerId, $periodStart, $periodEnd);
+        foreach ($bookingCreditsByPeriod as $p => $count) {
+            if (isset($monthBuckets[$p])) {
+                $monthBuckets[$p]['booking_credits_count'] = $count;
             }
-            $monthBuckets[$p]['referral_payment_count']++;
-            $monthBuckets[$p]['referral_payment_volume'] += (float) $inv->amount;
+        }
+
+        $reversalsByPeriod = MarketerBookingCommissionEvent::query()
+            ->select('period', DB::raw('COUNT(*) as c'))
+            ->where('marketer_id', $marketerId)
+            ->where('type', MarketerBookingCommissionEvent::TYPE_REVERSAL)
+            ->whereBetween('period', [$periodStart, $periodEnd])
+            ->groupBy('period')
+            ->pluck('c', 'period');
+
+        foreach ($reversalsByPeriod as $p => $count) {
+            if (isset($monthBuckets[$p])) {
+                $monthBuckets[$p]['booking_reversals_count'] = (int) $count;
+            }
         }
 
         $byResort = $commissionsYtd->groupBy('resort_id')->map(function ($group) {
@@ -429,17 +436,20 @@ class MarketingDashboardController extends Controller
             return [
                 'resort_id' => (int) $first->resort_id,
                 'resort_name' => $first->resort?->name ?? 'Resort',
+                'booking_count' => (int) $group->sum('booking_count'),
                 'commission_total' => round((float) $group->sum('commission_amount'), 2),
                 'commission_pending' => round((float) $group->where('status', 'pending')->sum('commission_amount'), 2),
                 'commission_released' => round((float) $group->where('status', 'released')->sum('commission_amount'), 2),
             ];
         })->values()->all();
 
+        $bookingCreditsYtd = $this->bookingStats->qualifyingBookingsCount($marketerId, $periodStart, $periodEnd);
+
         $totals = [
             'commission_pending_ytd' => round((float) $commissionsYtd->where('status', 'pending')->sum('commission_amount'), 2),
             'commission_released_ytd' => round((float) $commissionsYtd->where('status', 'released')->sum('commission_amount'), 2),
-            'referral_subscription_count_ytd' => $referralInvoices->count(),
-            'referral_subscription_volume_ytd' => round((float) $referralInvoices->sum('amount'), 2),
+            'booking_credits_ytd' => $bookingCreditsYtd,
+            'booking_reversals_ytd' => $this->bookingStats->reversedBookingsCount($marketerId, $periodStart, $periodEnd),
         ];
 
         return $this->successResponse([

@@ -7,8 +7,8 @@ const REF_VAT = 53.57;
 const REF_PROCESSING = 15;
 
 export const RESERVATION_FEE_COPY = {
-  collectedOnline: "The Reservation Fee is collected online to secure the booking.",
-  balanceAtResort: "Remaining resort charges shall be paid directly to the resort upon check-in.",
+  collectedOnline: "Due now (secures your slot) — reservation fee paid online.",
+  balanceAtResort: "Due at check-in — room balance paid directly to the resort.",
   vatInclusiveTag: "VAT inclusive",
   breakdownSummary:
     "The Reservation Fee secures your booking and includes applicable taxes and payment processing charges. Remaining resort charges shall be paid directly to the resort upon check-in.",

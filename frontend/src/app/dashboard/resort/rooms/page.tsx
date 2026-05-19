@@ -19,6 +19,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 import { listResorts, ResortItem } from "@/lib/api/resort";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import { isBusinessProPlan, SUBSCRIPTION_PLANS } from "@/lib/subscriptionPlans";
 import { bulkDeleteRooms, bulkDeleteToastDescription } from "@/lib/api/bulkDelete";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -29,7 +30,6 @@ import {
   BedDouble,
   CalendarDays,
   CheckCircle2,
-  Crown,
   Loader2,
   PackagePlus,
   Pencil,
@@ -398,7 +398,7 @@ export default function ResortRoomsPage() {
                     onClick={openUpgradeModal}
                     className="inline-flex items-center gap-2 rounded-lg border border-primaryBlue/20 bg-primaryBlue/10 px-3 py-1.5 text-xs font-semibold text-primaryBlue hover:bg-primaryBlue/15 disabled:opacity-60"
                   >
-                    <Crown size={12} />
+                    <BusinessProVerifiedBadge size="xs" />
                     Upgrade to Business Pro
                   </button>
                 </div>
@@ -452,7 +452,7 @@ export default function ResortRoomsPage() {
                     disabled={!resort?.subscription}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primaryBlue/25 bg-primaryBlue/10 px-3 py-2 text-xs font-semibold text-primaryBlue shadow-sm transition hover:bg-primaryBlue/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
-                    <Crown size={14} />
+                    <BusinessProVerifiedBadge size="xs" />
                     Upgrade to Business Pro
                   </button>
                 </div>
@@ -494,7 +494,7 @@ export default function ResortRoomsPage() {
                     onClick={openUpgradeModal}
                     className="inline-flex items-center gap-2 rounded-lg border border-primaryBlue/20 bg-primaryBlue/10 px-3 py-1.5 text-xs font-semibold text-primaryBlue hover:bg-primaryBlue/15 disabled:opacity-60"
                   >
-                    <Crown size={12} />
+                    <BusinessProVerifiedBadge size="xs" />
                     Upgrade to Business Pro
                   </button>
                 </div>

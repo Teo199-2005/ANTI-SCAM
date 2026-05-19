@@ -10,13 +10,14 @@ class Commission extends Model
 {
     protected $fillable = [
         'marketer_id', 'resort_id', 'period',
-        'gross_bookings', 'commission_rate', 'marketer_tier', 'unit_commission_php', 'commission_amount', 'status', 'payout_batch_id',
+        'gross_bookings', 'booking_count', 'commission_rate', 'marketer_tier', 'unit_commission_php', 'commission_amount', 'status', 'payout_batch_id',
     ];
 
     protected function casts(): array
     {
         return [
             'gross_bookings' => 'decimal:2',
+            'booking_count' => 'integer',
             'commission_rate' => 'float',
             'unit_commission_php' => 'decimal:2',
             'commission_amount' => 'decimal:2',

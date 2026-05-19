@@ -7,7 +7,15 @@ import {
 } from "@/lib/api/public";
 import { formatStayRange } from "@/lib/formatPhp";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
-import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
+import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
+import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
+import {
+  MARKETING_MODAL_CENTER_FRAME_CLASS,
+  MARKETING_MODAL_PANEL_MAX_H_MD,
+  MARKETING_MODAL_Z_NESTED_DEEP,
+} from "@/lib/marketingModalLayout";
+import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -182,15 +190,6 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
     setMonthYm(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}`);
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   if (!mounted || !open) return null;
 
   const weekLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -201,13 +200,19 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
   const inSelectedRange = (iso: string) => Boolean(checkIn && checkOut && iso >= checkIn && iso < checkOut);
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[240] flex items-center justify-center bg-zinc-950/75 p-3 md:p-6"
-      onClick={onClose}
-      role="presentation"
+    <DismissibleModalShell
+      open={open}
+      onClose={onClose}
+      zIndexClass={MARKETING_MODAL_Z_NESTED_DEEP}
+      layout="bare"
+      frameClassName={MARKETING_MODAL_CENTER_FRAME_CLASS}
+      backdropClassName="bg-zinc-950/75"
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/40 bg-white p-5 shadow-2xl md:p-6"
+        className={cn(
+          "pointer-events-auto relative flex w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-white/40 bg-white p-5 shadow-2xl md:p-6",
+          MARKETING_MODAL_PANEL_MAX_H_MD,
+        )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -220,14 +225,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
             </h2>
             <p className="mt-1 text-sm text-zinc-500">{roomName}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-            aria-label="Close"
-          >
-            <X size={16} />
-          </button>
+          <ModalCloseButton onClose={onClose} />
         </div>
 
         <p className="mb-3 text-xs leading-relaxed text-zinc-600">
@@ -373,7 +371,7 @@ export function ResortRoomAvailabilityModal({ open, onClose, roomId, roomName, c
           </div>
         </div>
       </div>
-    </div>,
+    </DismissibleModalShell>,
     document.body,
   );
 }

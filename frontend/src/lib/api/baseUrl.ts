@@ -11,6 +11,10 @@ export function getLaravelWebOrigin(): string {
   return laravelApiV1BaseUrl().replace(/\/api\/v1$/i, "");
 }
 
-export function googleOAuthRedirectUrl(): string {
-  return `${getLaravelWebOrigin()}/auth/google/redirect`;
+export function googleOAuthRedirectUrl(returnTo?: string | null): string {
+  const base = `${getLaravelWebOrigin()}/auth/google/redirect`;
+  if (!returnTo?.trim() || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
+    return base;
+  }
+  return `${base}?returnTo=${encodeURIComponent(returnTo)}`;
 }

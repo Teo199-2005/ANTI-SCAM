@@ -128,6 +128,24 @@ export function flattenLaravelApiErrors(errors: unknown): string[] {
   return dedupeLines(lines);
 }
 
+function requestUrlPath(error: axios.AxiosError): string {
+  const base = (error.config?.baseURL ?? "").replace(/\/+$/, "");
+  const url = error.config?.url ?? "";
+  return `${base}/${url}`.replace(/([^:]\/)\/+/g, "$1").toLowerCase();
+}
+
+function isAuthApiRequest(error: axios.AxiosError): boolean {
+  const path = requestUrlPath(error);
+  return path.includes("/api/auth") || /\/(login|register|logout|me)(\?|$|\/)/.test(path);
+}
+
+function isUploadRequest(error: axios.AxiosError): boolean {
+  const path = requestUrlPath(error);
+  const data = error.config?.data;
+  if (typeof FormData !== "undefined" && data instanceof FormData) return true;
+  return path.includes("/upload") || path.includes("/images");
+}
+
 function joinValidationLines(lines: string[]): string {
   if (lines.length === 0) return "";
   if (lines.length === 1) return lines[0];
@@ -140,7 +158,19 @@ function joinValidationLines(lines: string[]): string {
 export function parseApiErrorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (axios.isAxiosError(error)) {
     if (error.code === "ECONNABORTED") {
-      return "Upload timed out. The server may be misconfigured — on the VPS set LARAVEL_API_BASE_URL=http://127.0.0.1:8080/api/v1 and run php artisan media:verify.";
+      if (isAuthApiRequest(error)) {
+        return "Sign-in timed out. Start the Laravel API (cd backend && php artisan serve), set LARAVEL_API_BASE_URL=http://127.0.0.1:8000/api/v1 in frontend/.env.local, then restart the Next.js dev server.";
+      }
+      if (isUploadRequest(error)) {
+        return "Upload timed out. On a VPS set LARAVEL_API_BASE_URL=http://127.0.0.1:8080/api/v1 and run php artisan media:verify.";
+      }
+      return "The request timed out. Check that the API is running and LARAVEL_API_BASE_URL in frontend/.env.local points to it.";
+    }
+
+    if (!error.response && (error.code === "ERR_NETWORK" || error.message.toLowerCase().includes("network"))) {
+      if (isAuthApiRequest(error)) {
+        return "Could not reach the sign-in service. Start Laravel (php artisan serve), confirm frontend/.env.local has LARAVEL_API_BASE_URL=http://127.0.0.1:8000/api/v1, then restart Next.js.";
+      }
     }
 
     const data = error.response?.data as Record<string, unknown> | undefined;

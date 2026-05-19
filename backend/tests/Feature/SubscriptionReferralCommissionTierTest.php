@@ -8,18 +8,20 @@ use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Modules\Billing\Services\SubscriptionPaymentConfirmationService;
 use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Legacy subscription commission service is deprecated; platform uses booking commissions.
+ */
 class SubscriptionReferralCommissionTierTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_credits_silver_commission_after_paid_invoice(): void
+    public function test_subscription_payment_confirmation_does_not_create_commission(): void
     {
-        config(['marketing_tiers.emergency_flat_per_payment_php' => null]);
-
         $tenant = Tenant::create([
             'name' => 'Tier Tenant',
             'slug' => 'tier-tenant',
@@ -36,16 +38,15 @@ class SubscriptionReferralCommissionTierTest extends TestCase
         $subscription = Subscription::query()->create([
             'tenant_id' => $tenant->id,
             'resort_id' => $resort->id,
-            'plan' => 'basic',
-            'base_price' => 2000,
-            'included_rooms' => 3,
-            'extra_room_fee' => 300,
+            'plan' => 'business_pro',
+            'base_price' => 1000,
+            'included_rooms' => 10,
+            'extra_room_fee' => 0,
             'active_room_count' => 2,
-            'total_monthly_fee' => 2600,
+            'total_monthly_fee' => 1000,
             'billing_cycle_start' => now()->startOfMonth()->toDateString(),
             'billing_cycle_end' => now()->endOfMonth()->toDateString(),
-            'next_due_date' => now()->addMonth()->startOfMonth()->toDateString(),
-            'grace_until' => null,
+            'next_due_date' => now()->addMonth()->toDateString(),
             'status' => 'active',
         ]);
 
@@ -59,53 +60,38 @@ class SubscriptionReferralCommissionTierTest extends TestCase
             'subscription_id' => $subscription->id,
             'resort_id' => $resort->id,
             'xendit_invoice_id' => 'inv_tier_1',
-            'xendit_invoice_url' => null,
-            'amount' => 2000,
-            'plan' => 'basic_m1',
+            'amount' => 1000,
+            'plan' => 'business_pro_m1',
             'referral_code' => 'TIERCODE1',
             'marketer_id' => $marketer->id,
             'status' => 'paid',
-            'billing_cycle_start' => now()->startOfMonth()->toDateString(),
-            'billing_cycle_end' => now()->endOfMonth()->toDateString(),
+            'billing_cycle_start' => now()->startOfMonth(),
+            'billing_cycle_end' => now()->endOfMonth(),
             'paid_at' => now(),
         ]);
 
-        $invoice->refresh();
+        app(SubscriptionPaymentConfirmationService::class)->applyBaseSubscriptionPayment($invoice->refresh());
 
-        app(SubscriptionReferralCommissionService::class)->creditFromPaidMonthlyInvoice($invoice);
-
-        $period = $invoice->billing_cycle_start->format('Y-m');
-
-        $this->assertDatabaseHas('commissions', [
-            'marketer_id' => $marketer->id,
-            'resort_id' => $resort->id,
-            'period' => $period,
-            'commission_amount' => 150,
-            'marketer_tier' => 'silver',
-            'unit_commission_php' => 150,
-            'status' => 'pending',
-        ]);
+        $this->assertSame(0, Commission::query()->where('marketer_id', $marketer->id)->count());
     }
 
-    public function test_skips_credit_when_no_converting_resorts_resolved(): void
+    public function test_legacy_subscription_commission_service_still_runs_when_called_directly(): void
     {
         config(['marketing_tiers.emergency_flat_per_payment_php' => null]);
 
-        $marketer = User::factory()->create(['role' => 'marketing']);
-
-        // Invoice marked paid but not persisted in a way count sees it — use unpaid to simulate
-        // edge: marketer_id set, plan ok, but status not paid so count stays 0
         $tenant = Tenant::create([
-            'name' => 'T2',
-            'slug' => 't2',
-            'subdomain' => 't2',
+            'name' => 'Legacy',
+            'slug' => 'legacy',
+            'subdomain' => 'legacy',
             'status' => 'active',
         ]);
+
         $resort = Resort::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id,
-            'name' => 'R2',
+            'name' => 'R',
             'is_publicly_listed' => true,
         ]);
+
         $subscription = Subscription::query()->create([
             'tenant_id' => $tenant->id,
             'resort_id' => $resort->id,
@@ -117,26 +103,31 @@ class SubscriptionReferralCommissionTierTest extends TestCase
             'total_monthly_fee' => 2600,
             'billing_cycle_start' => now()->startOfMonth()->toDateString(),
             'billing_cycle_end' => now()->endOfMonth()->toDateString(),
-            'next_due_date' => now()->addMonth()->startOfMonth()->toDateString(),
-            'grace_until' => null,
+            'next_due_date' => now()->addMonth()->toDateString(),
             'status' => 'active',
         ]);
 
-        $invoice = new SubscriptionInvoice([
+        $marketer = User::factory()->create(['role' => 'marketing', 'referral_code' => 'LEG']);
+
+        $invoice = SubscriptionInvoice::query()->create([
             'tenant_id' => $tenant->id,
             'subscription_id' => $subscription->id,
             'resort_id' => $resort->id,
-            'amount' => 1000,
+            'xendit_invoice_id' => 'inv_legacy',
+            'amount' => 2000,
             'plan' => 'basic_m1',
             'marketer_id' => $marketer->id,
-            'status' => 'pending',
+            'status' => 'paid',
+            'paid_at' => now(),
             'billing_cycle_start' => now()->startOfMonth(),
             'billing_cycle_end' => now()->endOfMonth(),
         ]);
-        $invoice->save();
 
-        app(SubscriptionReferralCommissionService::class)->creditFromPaidMonthlyInvoice($invoice);
+        app(SubscriptionReferralCommissionService::class)->creditFromPaidMonthlyInvoice($invoice->refresh());
 
-        $this->assertSame(0, Commission::query()->where('marketer_id', $marketer->id)->count());
+        $this->assertDatabaseHas('commissions', [
+            'marketer_id' => $marketer->id,
+            'commission_amount' => 150,
+        ]);
     }
 }

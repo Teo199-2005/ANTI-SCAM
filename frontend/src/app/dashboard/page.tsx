@@ -32,7 +32,7 @@ export default function DashboardPage() {
     }
 
     if (user.role === "guest") {
-      router.replace("/dashboard/guest");
+      router.replace("/dashboard/client");
       return;
     }
 

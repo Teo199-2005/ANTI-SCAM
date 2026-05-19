@@ -3,7 +3,7 @@
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { PrivacyDocumentContent } from "@/components/legal/PrivacyDocumentContent";
 import { fetchTermsPayload, type TermsPayload, type TermsSection } from "@/lib/legal/termsApi";
-import { X } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
 import {
   createContext,
   useCallback,
@@ -123,14 +123,7 @@ function ModalFrame({
                 <div className="mt-0.5 max-w-prose text-[11px] leading-snug text-zinc-500 sm:text-xs">{subtitle}</div>
               ) : null}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="shrink-0 rounded-xl border border-zinc-200 bg-white p-2 text-zinc-600 shadow-sm transition hover:bg-zinc-100 hover:text-zinc-900"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
+            <ModalCloseButton onClose={onClose} className="shrink-0" />
           </div>
         </div>
         <div

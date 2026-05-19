@@ -1,5 +1,6 @@
-import { Shield, Star } from "lucide-react";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import { cn } from "@/lib/utils";
+import { Shield } from "lucide-react";
 
 type Props = {
   badgeLabel?: string | null;
@@ -21,7 +22,7 @@ export function ResortPlanBadge({ badgeLabel, isPremiumVerified, className }: Pr
       )}
     >
       {premium ? (
-        <Star className="h-3 w-3 shrink-0 text-amber-600" aria-hidden />
+        <BusinessProVerifiedBadge size="sm" />
       ) : (
         <Shield className="h-3 w-3 shrink-0 text-sky-700" aria-hidden />
       )}

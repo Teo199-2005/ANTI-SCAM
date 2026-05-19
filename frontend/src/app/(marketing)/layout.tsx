@@ -2,6 +2,7 @@
 
 import MarketingLayoutClient from "@/app/(marketing)/MarketingLayoutClient";
 import AppLoadingScreen from "@/components/layout/AppLoadingScreen";
+import { RegisterModalProvider } from "@/contexts/RegisterModalContext";
 import { Suspense, type ReactNode } from "react";
 
 export default function MarketingLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -11,7 +12,9 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
         <AppLoadingScreen variant="marketing" message="Loading…" submessage="Checking your session." />
       }
     >
-      <MarketingLayoutClient>{children}</MarketingLayoutClient>
+      <RegisterModalProvider>
+        <MarketingLayoutClient>{children}</MarketingLayoutClient>
+      </RegisterModalProvider>
     </Suspense>
   );
 }

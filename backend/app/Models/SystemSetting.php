@@ -14,6 +14,7 @@ class SystemSetting extends Model
         return match ($this->type) {
             'boolean' => filter_var($this->value, FILTER_VALIDATE_BOOLEAN),
             'integer' => (int) $this->value,
+            'decimal' => round((float) $this->value, 2),
             'json'    => json_decode($this->value, true),
             default   => $this->value,
         };

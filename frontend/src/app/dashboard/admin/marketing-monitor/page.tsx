@@ -6,7 +6,6 @@ import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/share
 import DataTable from "@/components/shared/DataTable";
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
-import MarketerTierBadge, { marketerTierSortRank } from "@/components/dashboard/MarketerTierBadge";
 import LocationFilterBar, {
   emptyLocationFilter,
   locationFilterToParams,
@@ -104,21 +103,14 @@ export default function AdminMarketingMonitorPage() {
     void load(query);
   };
 
-  const tierCounts = useMemo(() => {
-    let silver = 0;
-    let gold = 0;
-    let platinum = 0;
-    let other = 0;
-    let none = 0;
+  const bookingTotals = useMemo(() => {
+    let credits = 0;
+    let reversals = 0;
     for (const r of rows) {
-      const k = r.marketer_tier_key;
-      if (k === "silver") silver++;
-      else if (k === "gold") gold++;
-      else if (k === "platinum") platinum++;
-      else if (k === "emergency_flat") other++;
-      else none++;
+      credits += r.booking_credits_count ?? 0;
+      reversals += r.booking_reversals_count ?? 0;
     }
-    return { silver, gold, platinum, other, none };
+    return { credits, reversals };
   }, [rows]);
 
   const sortedRows = useMemo(() => {
@@ -157,14 +149,10 @@ export default function AdminMarketingMonitorPage() {
           return compareNullable(a.commission_released_gross_php, b.commission_released_gross_php, sortDir);
         case "commission_total_gross_php":
           return compareNullable(a.commission_total_gross_php, b.commission_total_gross_php, sortDir);
-        case "marketer_tier_key":
-          return compareNullable(marketerTierSortRank(a.marketer_tier_key), marketerTierSortRank(b.marketer_tier_key), sortDir);
-        case "per_payment_php":
-          return compareNullable(
-            a.per_payment_php ?? -1,
-            b.per_payment_php ?? -1,
-            sortDir,
-          );
+        case "booking_credits_count":
+          return compareNullable(a.booking_credits_count ?? 0, b.booking_credits_count ?? 0, sortDir);
+        case "booking_reversals_count":
+          return compareNullable(a.booking_reversals_count ?? 0, b.booking_reversals_count ?? 0, sortDir);
         default:
           return 0;
       }
@@ -210,9 +198,8 @@ export default function AdminMarketingMonitorPage() {
           Marketing monitor
         </h1>
         <p className="dash-page-sub">
-          Referral conversions, partner tier (by converting clients — one owner org per client), idle time since the last
-          new client, and commission balances. Tiers set the PHP credited per qualifying paid subscription invoice. Sorted
-          with the longest idle periods first.
+          Referral signup funnel, booking commissions (paid online guest bookings), idle time since the last new client,
+          and commission balances. Sorted with the longest idle periods first.
         </p>
 
         <form onSubmit={onSearch} className="dash-filter-bar">
@@ -244,17 +231,17 @@ export default function AdminMarketingMonitorPage() {
 
       {rows.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50/95 via-white to-fuchsia-50/80 px-4 py-3 text-xs text-violet-950 shadow-sm">
-          <span className="font-bold uppercase tracking-wide text-violet-900/80">Tier snapshot</span>
-          <MarketerTierBadge tierKey="platinum" label={`Platinum ${tierCounts.platinum}`} size="sm" />
-          <MarketerTierBadge tierKey="gold" label={`Gold ${tierCounts.gold}`} size="sm" />
-          <MarketerTierBadge tierKey="silver" label={`Silver ${tierCounts.silver}`} size="sm" />
-          {tierCounts.other > 0 ? (
-            <MarketerTierBadge tierKey="emergency_flat" label={`Flat rate ${tierCounts.other}`} size="sm" />
-          ) : null}
-          {tierCounts.none > 0 ? (
-            <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
-              No tier {tierCounts.none}
+          <span className="font-bold uppercase tracking-wide text-violet-900/80">Booking commissions</span>
+          <span className="inline-flex rounded-full border border-violet-200 bg-white px-2.5 py-0.5 font-semibold tabular-nums">
+            {bookingTotals.credits} credited
+          </span>
+          {bookingTotals.reversals > 0 ? (
+            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 font-semibold tabular-nums text-amber-900">
+              {bookingTotals.reversals} reversed
             </span>
+          ) : null}
+          {meta?.commission_per_booking_php != null ? (
+            <span className="text-violet-800">{fmtPhp(meta.commission_per_booking_php)} per qualifying booking</span>
           ) : null}
         </div>
       ) : null}
@@ -272,22 +259,10 @@ export default function AdminMarketingMonitorPage() {
         </div>
       ) : null}
 
-      {meta?.tier_ladder && meta.tier_ladder.length > 0 ? (
+      {meta?.booking_commission_policy ? (
         <div className="rounded-2xl border border-softBorder bg-white px-4 py-3 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Commission tier ladder</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {meta.tier_ladder.map((t) => (
-              <div
-                key={t.tier_key}
-                className="inline-flex items-center gap-2 rounded-xl border border-softBorder bg-softCard/80 px-3 py-2 text-xs"
-              >
-                <MarketerTierBadge tierKey={t.tier_key} label={t.label} size="sm" />
-                <span className="tabular-nums text-zinc-600">{t.client_range_label} resorts</span>
-                <span className="font-semibold tabular-nums text-navy">{fmtPhp(t.per_payment_php)}</span>
-              </div>
-            ))}
-          </div>
-          {meta.tier_policy ? <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">{meta.tier_policy}</p> : null}
+          <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Booking commission policy</p>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-600">{meta.booking_commission_policy}</p>
         </div>
       ) : null}
 
@@ -330,13 +305,13 @@ export default function AdminMarketingMonitorPage() {
                       ),
                     },
                     {
-                      label: "Tier / per paid credit",
+                      label: "Bookings credited / reversed",
                       value: (
                         <div className="space-y-1">
-                          <MarketerTierBadge tierKey={r.marketer_tier_key} label={r.marketer_tier_label} size="sm" />
-                          {r.per_payment_php != null ? (
+                          <strong>{r.booking_credits_count ?? 0}</strong> credited · {r.booking_reversals_count ?? 0} reversed
+                          {r.current_commission_per_booking_php != null ? (
                             <div className="text-[11px] font-semibold text-navy tabular-nums">
-                              {fmtPhp(r.per_payment_php)} / credit
+                              {fmtPhp(r.current_commission_per_booking_php)} current rate
                             </div>
                           ) : null}
                         </div>
@@ -427,11 +402,13 @@ export default function AdminMarketingMonitorPage() {
                   className="text-center"
                 />
                 <SortableTh
-                  label="Tier"
-                  sortKey="marketer_tier_key"
+                  label="Bookings"
+                  sortKey="booking_credits_count"
                   activeKey={sortBy}
                   direction={sortDir}
                   onSort={onSort}
+                  align="center"
+                  className="text-center"
                 />
                 <SortableTh
                   label="Idle (new client)"
@@ -500,20 +477,9 @@ export default function AdminMarketingMonitorPage() {
                   <td className="text-center tabular-nums">{r.assigned_resorts_count}</td>
                   <td className="text-center tabular-nums font-semibold text-navy">{r.referred_clients_count}</td>
                   <td className="text-center tabular-nums font-medium">{r.referred_resorts_count}</td>
-                  <td>
-                    <div className="space-y-1">
-                      <MarketerTierBadge tierKey={r.marketer_tier_key} label={r.marketer_tier_label} size="sm" />
-                      {r.per_payment_php != null ? (
-                        <div className="text-[11px] font-medium tabular-nums text-navy">
-                          {fmtPhp(r.per_payment_php)} / credit
-                        </div>
-                      ) : null}
-                      {r.clients_to_next_tier != null && r.next_tier_at != null && r.clients_to_next_tier > 0 ? (
-                        <div className="text-[10px] text-zinc-500">
-                          +{r.clients_to_next_tier} to tier threshold {r.next_tier_at}
-                        </div>
-                      ) : null}
-                    </div>
+                  <td className="text-center tabular-nums">
+                    <div className="font-semibold text-navy">{r.booking_credits_count ?? 0}</div>
+                    <div className="text-[11px] text-zinc-500">{r.booking_reversals_count ?? 0} rev.</div>
                   </td>
                   <td>
                     <IdleBadge

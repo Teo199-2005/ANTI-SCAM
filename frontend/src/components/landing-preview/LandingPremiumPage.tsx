@@ -18,13 +18,14 @@ import {
   MapPin,
   MessageSquare,
   Phone,
-  Play,
+  Compass,
   Shield,
   Users,
 } from "lucide-react";
 import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 import { SubscriptionPlansComparison } from "@/components/marketing/SubscriptionPlansComparison";
 import { MarketingPremiumNavbar } from "@/components/layout/MarketingPremiumNavbar";
+import { useRegisterModal } from "@/contexts/RegisterModalContext";
 import ScrollReveal from "@/components/shared/ScrollReveal";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +57,8 @@ const registerGoldButtonStyle = {
 } as const;
 
 export function LandingPremiumPage() {
+  const { openRegisterModal } = useRegisterModal();
+
   return (
     <div className="min-w-0 origin-top overflow-x-hidden bg-white font-body text-[#111] antialiased max-lg:[zoom:1] lg:[zoom:1.05]">
       {/* ── Hero + glass nav over image (nav does not stack above hero) ── */}
@@ -123,20 +126,21 @@ export function LandingPremiumPage() {
             </p>
 
             <div className="mt-5 flex max-w-lg flex-col gap-3 lg:mt-4 lg:max-w-none lg:flex-row lg:flex-nowrap lg:items-center lg:gap-2.5">
-              <Link
-                href="/register"
+              <button
+                type="button"
                 className={cn(
                   REGISTER_GOLD_SHINE_REGISTER_BTN,
                   "inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[14px] font-extrabold lg:min-h-0 lg:w-auto lg:flex-none lg:rounded-lg lg:px-6 lg:py-3 lg:text-base"
                 )}
                 style={registerGoldButtonStyle}
+                onClick={() => openRegisterModal()}
               >
                 <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
                 <Building className="relative z-10 h-[1.125rem] w-[1.125rem] shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)] sm:h-5 sm:w-5" aria-hidden />
                 <span className="relative z-10">Register Your Resort →</span>
-              </Link>
+              </button>
               <Link
-                href="#product-demo"
+                href="/resorts"
                 className="relative isolate inline-flex min-h-[48px] w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-slate-500/85 bg-gradient-to-b from-white to-slate-100 px-4 py-3 text-[14px] font-extrabold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(15,23,42,0.07),0_4px_12px_rgba(15,23,42,0.06)] transition hover:brightness-[1.03] active:brightness-[0.99] lg:min-h-0 lg:w-auto lg:shrink-0 lg:rounded-lg lg:gap-2 lg:px-6 lg:py-3 lg:text-base"
                 style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
               >
@@ -145,9 +149,9 @@ export function LandingPremiumPage() {
                   aria-hidden
                 />
                 <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-800 bg-gradient-to-br from-white to-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:h-7 sm:w-7">
-                  <Play className="h-3 w-3 fill-slate-800 text-slate-800 sm:h-3.5 sm:w-3.5" aria-hidden />
+                  <Compass className="h-3.5 w-3.5 text-slate-800 sm:h-4 sm:w-4" aria-hidden />
                 </span>
-                <span className="relative z-10">See Demo</span>
+                <span className="relative z-10">Browse Resorts</span>
               </Link>
             </div>
 

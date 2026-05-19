@@ -86,25 +86,6 @@ class LandingReadinessService
             }
         }
 
-        // Google Maps embed URL (no API key needed for basic search / coordinate embed)
-        $mapEmbedUrl = null;
-        $mapSearchUrl = null;
-        $lat = $resort->map_latitude;
-        $lng = $resort->map_longitude;
-        if ($lat !== null && $lng !== null && $lat !== '' && $lng !== '') {
-            $latS = (string) $lat;
-            $lngS = (string) $lng;
-            $mapEmbedUrl = "https://maps.google.com/maps?q={$latS},{$lngS}&ll={$latS},{$lngS}&z=17&output=embed";
-            $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$latS},{$lngS}";
-        } else {
-            $mapQuery = $this->locations->resortMapQueryString($resort);
-            if ($mapQuery !== null) {
-                $encoded = rawurlencode($mapQuery);
-                $mapEmbedUrl = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
-                $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$encoded}";
-            }
-        }
-
         return [
             'hero' => [
                 'heading' => $resort->name,
@@ -144,11 +125,40 @@ class LandingReadinessService
                 'resortContact' => $resort->contact_number,
                 'address' => $this->locations->resortDisplayLine($resort),
             ],
-            'map' => [
-                'address' => $this->locations->resortDisplayLine($resort),
-                'embedUrl' => $mapEmbedUrl,
-                'searchUrl' => $mapSearchUrl,
-            ],
+            'map' => $this->mapPayloadForResort($resort),
+        ];
+    }
+
+    /**
+     * Google Maps embed + search URLs for a resort (coordinates or address query).
+     *
+     * @return array{address: ?string, embedUrl: ?string, searchUrl: ?string}
+     */
+    public function mapPayloadForResort(Resort $resort): array
+    {
+        $address = $this->locations->resortDisplayLine($resort);
+        $mapEmbedUrl = null;
+        $mapSearchUrl = null;
+        $lat = $resort->map_latitude;
+        $lng = $resort->map_longitude;
+        if ($lat !== null && $lng !== null && $lat !== '' && $lng !== '') {
+            $latS = (string) $lat;
+            $lngS = (string) $lng;
+            $mapEmbedUrl = "https://maps.google.com/maps?q={$latS},{$lngS}&ll={$latS},{$lngS}&z=17&output=embed";
+            $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$latS},{$lngS}";
+        } else {
+            $mapQuery = $this->locations->resortMapQueryString($resort);
+            if ($mapQuery !== null) {
+                $encoded = rawurlencode($mapQuery);
+                $mapEmbedUrl = "https://maps.google.com/maps?q={$encoded}&output=embed&z=15";
+                $mapSearchUrl = "https://www.google.com/maps/search/?api=1&query={$encoded}";
+            }
+        }
+
+        return [
+            'address' => $address,
+            'embedUrl' => $mapEmbedUrl,
+            'searchUrl' => $mapSearchUrl,
         ];
     }
 

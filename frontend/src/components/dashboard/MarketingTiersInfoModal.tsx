@@ -1,22 +1,24 @@
 "use client";
 
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
-import type { MarketerTierInfo, TierLadderEntry } from "@/lib/api/marketing";
 import { formatPhp } from "@/lib/formatPhp";
-import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import { cn } from "@/lib/utils";
-import { ShieldCheck, X } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
+import { BedDouble, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 type MarketingTiersInfoModalProps = {
   open: boolean;
   onClose: () => void;
-  tierLadder: TierLadderEntry[];
-  tierPolicy: string;
-  marketerTier: MarketerTierInfo | null;
-  convertingClientsCount: number;
-  convertingResortsWithReferralCount?: number;
+  bookingCommissionPolicy: string;
+  commissionPerBookingPhp: number;
+  qualifyingBookingsCount: number;
+  qualifyingBookingsMtd: number;
+  pendingCommissionsGross?: number;
+  pendingPayoutNetEstimate?: number;
+  payoutWithholdingRate?: number;
+  commissionPayoutSchedule?: string | null;
   loading?: boolean;
   title?: string;
 };
@@ -24,13 +26,16 @@ type MarketingTiersInfoModalProps = {
 export default function MarketingTiersInfoModal({
   open,
   onClose,
-  tierLadder,
-  tierPolicy,
-  marketerTier,
-  convertingClientsCount,
-  convertingResortsWithReferralCount = 0,
+  bookingCommissionPolicy,
+  commissionPerBookingPhp,
+  qualifyingBookingsCount,
+  qualifyingBookingsMtd,
+  pendingCommissionsGross = 0,
+  pendingPayoutNetEstimate = 0,
+  payoutWithholdingRate = 0.1,
+  commissionPayoutSchedule,
   loading,
-  title = "Partner tier program",
+  title = "Booking commission program",
 }: MarketingTiersInfoModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -45,123 +50,91 @@ export default function MarketingTiersInfoModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-navy/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      className="fixed inset-0 z-[80] flex items-end justify-center p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
       role="presentation"
-      onClick={onClose}
     >
+      <button
+        type="button"
+        className="absolute inset-0 bg-navy/40"
+        aria-label="Close"
+        onClick={onClose}
+      />
       <div
-        className={cn(
-          "max-h-[min(92dvh,720px)] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/20 bg-white shadow-[0_24px_80px_rgba(13,30,66,0.35)] sm:rounded-2xl",
-        )}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="tiers-modal-title"
-        onClick={(e) => e.stopPropagation()}
+        aria-labelledby="booking-commission-modal-title"
+        className={cn(
+          "relative z-10 flex max-h-[min(92vh,720px)] w-full flex-col overflow-hidden rounded-t-2xl border border-softBorder bg-white shadow-2xl",
+          "sm:max-w-lg sm:rounded-2xl",
+        )}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-softBorder bg-gradient-to-r from-navy/95 via-primaryBlue to-slateBlue px-4 py-3 text-white sm:px-5 sm:py-4">
-          <div className="min-w-0">
-            <p className="inline-flex flex-wrap items-center gap-1.5 text-white/85">
-              <ShieldCheck size={14} className="shrink-0" aria-hidden />
-              <BrandWordmark tone="onDark" size="2xs" className="leading-none" />
-            </p>
-            <h2 id="tiers-modal-title" className="mt-1 font-dash text-lg font-bold leading-snug sm:text-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-softBorder bg-gradient-to-r from-violet-50/90 to-white px-4 py-4 sm:px-5">
+          <div>
+            <BrandWordmark className="h-5 w-auto opacity-90" />
+            <h2
+              id="booking-commission-modal-title"
+              className="mt-2 font-dash text-base font-bold text-navy sm:text-lg"
+            >
               {title}
             </h2>
-            <p className="mt-1 text-xs text-white/85">
-              Transparent, count-based rates for subscription referral commissions.
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Earn on paid online guest bookings at your assigned resorts.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
+          <ModalCloseButton onClose={onClose} tone="dark" className="shrink-0" />
         </div>
 
-        <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+        <div className="space-y-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
           {loading ? (
-            <p className="text-sm text-zinc-600">Loading tier details…</p>
+            <p className="text-sm text-zinc-600">Loading commission details…</p>
           ) : (
             <>
               <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/80 to-white p-4">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-violet-900/80">Your status</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-violet-900/80">Your earnings</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <MarketerTierBadge
-                    tierKey={marketerTier?.tierKey}
-                    label={marketerTier?.label}
-                    size="md"
-                  />
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-900">
+                    <BedDouble size={14} aria-hidden />
+                    {formatPhp(commissionPerBookingPhp)} / booking
+                  </span>
                   <span className="text-sm text-zinc-700">
-                    <strong className="tabular-nums text-navy">{convertingClientsCount}</strong> converting{" "}
-                    {convertingClientsCount === 1 ? "client" : "clients"}
-                    {convertingResortsWithReferralCount > convertingClientsCount ? (
-                      <span className="text-zinc-500">
-                        {" "}
-                        ({convertingResortsWithReferralCount} resort{convertingResortsWithReferralCount === 1 ? "" : "s"} billed)
-                      </span>
-                    ) : null}
+                    <strong className="tabular-nums text-navy">{qualifyingBookingsCount}</strong> lifetime ·{" "}
+                    <strong className="tabular-nums text-navy">{qualifyingBookingsMtd}</strong> this month
                   </span>
                 </div>
-                {marketerTier ? (
-                  <p className="mt-2 text-sm text-zinc-700">
-                    Current commission credit per qualifying paid subscription:{" "}
-                    <strong className="text-navy">{formatPhp(marketerTier.perPaymentPhp)}</strong>
-                    {marketerTier.clientsToNextTier != null && marketerTier.nextTierAt != null ? (
-                      <span className="block pt-1 text-xs text-zinc-600">
-                        {marketerTier.clientsToNextTier > 0 ? (
-                          <>
-                            Add <strong>{marketerTier.clientsToNextTier}</strong> more converting{" "}
-                            {marketerTier.clientsToNextTier === 1 ? "client" : "clients"} to reach the next tier (at{" "}
-                            {marketerTier.nextTierAt}).
-                          </>
-                        ) : (
-                          <>You are at the threshold for the next tier.</>
-                        )}
-                      </span>
-                    ) : null}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-sm text-zinc-700">
-                    Earn your first tier when at least one resort-owner organization you referred has a paid qualifying
-                    platform subscription invoice. Renewals and extra resorts under the same owner still count as one
-                    client. Room add-on-only payments do not count.
-                  </p>
-                )}
+                <p className="mt-2 text-sm text-zinc-700">
+                  Pending gross <strong className="text-navy">{formatPhp(pendingCommissionsGross)}</strong>
+                  {pendingPayoutNetEstimate > 0 ? (
+                    <>
+                      {" "}
+                      · Est. payout <strong className="text-navy">{formatPhp(pendingPayoutNetEstimate)}</strong> (
+                      {Math.round(payoutWithholdingRate * 100)}% withholding)
+                    </>
+                  ) : null}
+                </p>
               </div>
 
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Tier ladder</p>
-                <div className="mt-2 overflow-hidden rounded-xl border border-softBorder">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-softCard text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                      <tr>
-                        <th className="px-3 py-2">Tier</th>
-                        <th className="px-3 py-2">Converting clients</th>
-                        <th className="px-3 py-2 text-right">Per paid credit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-softBorder bg-white">
-                      {tierLadder.map((row) => (
-                        <tr key={row.tierKey} className="text-zinc-800">
-                          <td className="px-3 py-2.5">
-                            <MarketerTierBadge tierKey={row.tierKey} label={row.label} size="sm" />
-                          </td>
-                          <td className="px-3 py-2.5 font-medium tabular-nums text-zinc-700">{row.clientRangeLabel}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-navy">{formatPhp(row.perPaymentPhp)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-3 text-xs leading-relaxed text-emerald-950">
+                <p className="flex items-center gap-1.5 font-bold uppercase tracking-wide text-emerald-900/90">
+                  <ShieldCheck size={14} aria-hidden />
+                  Qualifying booking
+                </p>
+                <ul className="mt-2 list-inside list-disc space-y-1">
+                  <li>Online guest booking at a resort assigned to you</li>
+                  <li>Status confirmed and payment marked paid (Xendit)</li>
+                  <li>Manual or unpaid bookings do not earn commission</li>
+                </ul>
               </div>
 
-              {tierPolicy ? (
+              {bookingCommissionPolicy ? (
                 <div className="rounded-xl border border-sky-100 bg-sky-50/90 px-3 py-3 text-xs leading-relaxed text-sky-950">
-                  {tierPolicy}
+                  {bookingCommissionPolicy}
                 </div>
+              ) : null}
+
+              {commissionPayoutSchedule ? (
+                <p className="text-xs text-zinc-600">
+                  <strong className="text-zinc-800">Payout schedule:</strong> {commissionPayoutSchedule}
+                </p>
               ) : null}
             </>
           )}

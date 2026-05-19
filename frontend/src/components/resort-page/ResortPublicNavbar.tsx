@@ -21,6 +21,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { buildLoginUrl, buildRegisterUrl } from "@/lib/auth/clientAuthUrls";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
 
@@ -105,7 +106,9 @@ export function ResortPublicNavbar({
   }, [listingSlug]);
 
   const resortParam = listingSlug.trim();
-  const q = resortParam ? `?resort=${encodeURIComponent(resortParam)}` : "";
+  const returnTo = resortParam ? `/resort/${encodeURIComponent(resortParam)}` : null;
+  const loginHref = buildLoginUrl({ intent: "client", returnTo });
+  const registerHref = buildRegisterUrl({ intent: "client", returnTo, resortSlug: resortParam || null });
   const topHref = sectionHref("#top", landingHrefBase);
   const showAuthCluster = !showDashboardLink;
 
@@ -156,7 +159,7 @@ export function ResortPublicNavbar({
             {showAuthCluster ? (
               <>
                 <Link
-                  href={`/login${q}`}
+                  href={loginHref}
                   className="hidden items-center gap-1.5 rounded-full border border-zinc-300/90 bg-white px-3.5 py-2 text-sm font-bold text-navy shadow-sm transition hover:bg-zinc-50 sm:inline-flex"
                   style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
                 >
@@ -164,7 +167,7 @@ export function ResortPublicNavbar({
                   Log in
                 </Link>
                 <Link
-                  href={`/register${q}`}
+                  href={registerHref}
                   className={cn(REGISTER_GOLD_SHINE_REGISTER_BTN, "hidden rounded-full px-3.5 py-2 text-sm font-bold sm:inline-flex")}
                   style={registerGoldButtonStyle}
                 >
@@ -211,7 +214,7 @@ export function ResortPublicNavbar({
             {showAuthCluster ? (
               <>
                 <Link
-                  href={`/login${q}`}
+                  href={loginHref}
                   className="mt-1 flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 text-sm font-bold text-navy"
                   onClick={() => setOpen(false)}
                 >
@@ -219,7 +222,7 @@ export function ResortPublicNavbar({
                   Log in
                 </Link>
                 <Link
-                  href={`/register${q}`}
+                  href={registerHref}
                   className="relative mt-1 flex min-h-[44px] items-center justify-center gap-2 overflow-hidden rounded-xl py-2.5 text-sm font-bold text-white"
                   style={registerGoldButtonStyle}
                   onClick={() => setOpen(false)}

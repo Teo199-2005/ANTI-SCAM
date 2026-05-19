@@ -7,9 +7,10 @@ use App\Models\User;
 use App\Models\XenditWebhookEvent;
 use App\Support\XenditInvoiceWebhookStatus;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\BookingReferralCommissionService;
 use App\Services\DigitalAcknowledgmentReceiptService;
-use App\Services\RoomStayGuard;
 use App\Services\EmailNotificationService;
+use App\Services\RoomStayGuard;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,6 +22,7 @@ class XenditWebhookService
         private readonly AuditLogService $audits,
         private readonly EmailNotificationService $emails,
         private readonly DigitalAcknowledgmentReceiptService $digitalReceipts,
+        private readonly BookingReferralCommissionService $bookingCommissions,
     ) {}
 
     public function verifySignature(string $signature): void
@@ -76,6 +78,7 @@ class XenditWebhookService
             if (XenditInvoiceWebhookStatus::isPaid($payload)) {
                 if ($reservation->xendit_payment_status === 'paid' && $reservation->status === 'confirmed') {
                     $alreadyPaid = $reservation->load(['client', 'resort', 'room']);
+                    $this->bookingCommissions->creditFromPaidReservation($alreadyPaid);
                     DB::afterCommit(function () use ($alreadyPaid): void {
                         $this->emails->sendReservationPaymentNotificationsIfMissing($alreadyPaid);
                     });
@@ -124,6 +127,7 @@ class XenditWebhookService
                 RoomStayGuard::expireDuplicatePendingForStay($reservation);
 
                 $reservationForNotifications = $reservation->load(['client', 'resort', 'room']);
+                $this->bookingCommissions->creditFromPaidReservation($reservationForNotifications);
                 DB::afterCommit(function () use ($reservationForNotifications): void {
                     $this->emails->sendReservationPaymentNotifications($reservationForNotifications);
                 });
@@ -168,8 +172,8 @@ class XenditWebhookService
 
         $existing = User::withoutGlobalScopes()->where('email', $email)->first();
         if ($existing) {
-            if ($existing->role === 'guest' && ! $existing->home_resort_id) {
-                $existing->forceFill(['home_resort_id' => $reservation->resort_id])->save();
+            if (in_array($existing->role, ['guest'], true)) {
+                $existing->forceFill(['role' => 'client', 'home_resort_id' => null])->save();
             }
 
             return $existing;
@@ -181,13 +185,12 @@ class XenditWebhookService
             'name' => $name,
             'email' => $email,
             'password' => bcrypt(Str::random(24)),
-            'role' => 'guest',
-            'home_resort_id' => $reservation->resort_id,
+            'role' => 'client',
             'email_verified_at' => now(),
         ]);
 
         $this->audits->log(
-            'guest_account_auto_created',
+            'client_account_auto_created',
             'user',
             $user->id,
             null,

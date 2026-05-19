@@ -22,6 +22,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { useEffect, useMemo, useState } from "react";
 import { formatPhp } from "@/lib/formatPhp";
@@ -172,9 +173,10 @@ export default function ResortRevenuePage() {
         </p>
         <button
           type="button"
-          className="dash-btn-primary"
+          className="dash-btn-primary inline-flex items-center justify-center gap-2"
           onClick={() => window.dispatchEvent(new Event("subscription:open-upgrade"))}
         >
+          <BusinessProVerifiedBadge size="sm" />
           Upgrade to Business Pro
         </button>
         <Link href="/dashboard/resort" className="block text-sm text-primaryBlue hover:underline">

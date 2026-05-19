@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\MarketerBookingCommissionEvent;
 use App\Models\ReferralSignupAttribution;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
@@ -168,5 +169,43 @@ class MarketerReferralDetailService
         }
 
         return $transactions;
+    }
+
+    /**
+     * Booking commission credits and reversals for a marketer (newest first).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function bookingCommissionsForMarketer(int $marketerId, int $limit = 100): array
+    {
+        $rows = MarketerBookingCommissionEvent::query()
+            ->with([
+                'resort:id,name',
+                'reservation:id,reference_no,reserved_at,status',
+            ])
+            ->where('marketer_id', $marketerId)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        $out = [];
+        foreach ($rows as $event) {
+            $reservation = $event->reservation;
+            $out[] = [
+                'id' => $event->id,
+                'type' => $event->type,
+                'amount_php' => round((float) $event->amount, 2),
+                'period' => $event->period,
+                'resort_id' => $event->resort_id,
+                'resort_name' => $event->resort?->name,
+                'reservation_id' => $event->reservation_id,
+                'reference_no' => $reservation?->reference_no,
+                'reserved_at' => $reservation?->reserved_at?->toIso8601String(),
+                'reservation_status' => $reservation?->status,
+                'created_at' => $event->created_at?->toIso8601String(),
+            ];
+        }
+
+        return $out;
     }
 }

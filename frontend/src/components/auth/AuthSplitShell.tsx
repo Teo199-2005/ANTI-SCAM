@@ -8,7 +8,6 @@ import {
   isAuthSplitShellPath,
 } from "@/lib/authMarketingNavOverlay";
 import { cn } from "@/lib/utils";
-import Logo from "@/components/layout/Logo";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -27,26 +26,19 @@ export const AUTH_MARKETING_CARD =
 type AuthSplitShellProps = {
   children: ReactNode;
   /**
-   * Guest signup/sign-in opened from `/resort/{slug}` (`?resort=` on login/register).
-   * Single centered column + platform header; parent layout hides marketing nav/footer.
+   * Guest signup/sign-in opened from `/resort/{slug}` (`?resort=` on login/register)
+   * or booker intent (`?intent=client`). Single centered column; parent layout may hide marketing nav.
    */
   guestResortContext?: boolean;
 };
 
 /**
- * Single-column layout for resort guest auth (no marketing navbar in parent — light top padding).
+ * Single-column layout for resort guest / booker auth (no marketing navbar in parent — light top padding).
  */
 function ResortGuestCenteredShell({ children }: { children: ReactNode }) {
   return (
     <div className="auth-paper-bg relative min-h-0 flex-1">
       <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl sm:px-6 sm:pb-10 sm:pt-8">
-        <header className="mb-6 flex flex-col items-center gap-1.5 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Logo size="sm" className="border-zinc-200/90 bg-white shadow-sm ring-1 ring-zinc-100" />
-            <BrandWordmark tone="onLight" size="sm" className="leading-tight" />
-          </div>
-        </header>
-
         <div className="flex flex-1 flex-col justify-center">
           <div className={cn(AUTH_MOBILE_FORM_CHROME, "lg:block")}>{children}</div>
         </div>
@@ -61,6 +53,7 @@ function ResortGuestCenteredShell({ children }: { children: ReactNode }) {
 function DefaultSplitShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const clearFixedNav = isAuthSplitShellPath(pathname);
+  /** Register uses a single centered column; login/forgot-password keep the split hero + form panels. */
   const registerCentered = pathname === "/register" || pathname.startsWith("/register/");
 
   return (
@@ -106,11 +99,13 @@ function DefaultSplitShell({ children }: { children: ReactNode }) {
         <div
           className={cn(
             "relative z-10 flex w-full min-w-0 flex-1 flex-col",
-            registerCentered ? "lg:mx-auto lg:w-full lg:max-w-4xl lg:flex-none lg:shrink-0 lg:justify-center" : "lg:w-1/2 lg:flex-none lg:shrink-0",
+            registerCentered
+              ? "lg:mx-auto lg:w-full lg:max-w-4xl lg:flex-none lg:shrink-0 lg:justify-start"
+              : "lg:w-1/2 lg:flex-none lg:shrink-0",
             clearFixedNav &&
               (registerCentered
                 ? cn(
-                    "max-lg:pt-[max(0.75rem,calc(env(safe-area-inset-top)+4.1rem))] sm:max-lg:pt-[max(1rem,calc(env(safe-area-inset-top)+4.25rem))]",
+                    "max-lg:pt-[max(1.25rem,calc(env(safe-area-inset-top)+4.35rem))] sm:max-lg:pt-[max(1.5rem,calc(env(safe-area-inset-top)+4.5rem))]",
                     AUTH_SHELL_CLEAR_NAV_DESKTOP_FORM_PT,
                   )
                 : AUTH_SHELL_CLEAR_NAV_DESKTOP_FORM_PT),
@@ -130,7 +125,8 @@ function DefaultSplitShell({ children }: { children: ReactNode }) {
           <div
             className={cn(
               "auth-paper-bg relative flex flex-1 flex-col justify-center px-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-2 max-lg:-mt-2 max-lg:rounded-t-[1.75rem] max-lg:shadow-[0_-16px_48px_-20px_rgba(13,30,66,0.22)] sm:max-lg:-mt-3 sm:px-5 sm:max-lg:pt-3 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-8 lg:py-10 lg:shadow-none xl:px-10",
-              registerCentered && "max-lg:mt-0 max-lg:rounded-none max-lg:shadow-none lg:min-h-0 lg:py-8 xl:py-10",
+              registerCentered &&
+                "max-lg:mt-0 max-lg:rounded-none max-lg:shadow-none lg:min-h-0 lg:justify-start lg:pt-6 lg:pb-12 xl:pt-8 xl:pb-14",
             )}
           >
             <div className={cn("mx-auto w-full max-w-md pb-1 lg:max-w-lg", registerCentered && "lg:max-w-2xl")}>

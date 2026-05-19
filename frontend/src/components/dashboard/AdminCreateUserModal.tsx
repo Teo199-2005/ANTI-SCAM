@@ -77,6 +77,7 @@ export default function AdminCreateUserModal({ open, onClose, onCreated }: Admin
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
+        password_confirmation: passwordConfirmation,
         role,
       });
       pushToast({ title: "User created", description: `${name.trim()} can sign in with this email.`, tone: "success" });

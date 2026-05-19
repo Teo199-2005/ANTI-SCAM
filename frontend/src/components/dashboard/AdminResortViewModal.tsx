@@ -1,5 +1,6 @@
 "use client";
 
+import { SubscriptionPlanLabel } from "@/components/badges/SubscriptionPlanLabel";
 import DashModal from "@/components/dash/DashModal";
 import { getResort, type ResortItem } from "@/lib/api/resort";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
@@ -174,9 +175,11 @@ export default function AdminResortViewModal({ resortId, open, onClose }: AdminR
               <h3 className="mb-1 font-dash text-xs font-bold uppercase tracking-wide text-zinc-500">Subscription</h3>
               <div className="rounded-xl border border-softBorder bg-softCard/60 px-4">
                 <DetailRow label="Plan">
-                  <span className="capitalize">{resort.subscription.plan}</span>
-                  {" · "}
-                  {formatSubscriptionStatusLabel(resort.subscription.status)}
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <SubscriptionPlanLabel plan={resort.subscription.plan} />
+                    <span className="text-zinc-500">·</span>
+                    <span>{formatSubscriptionStatusLabel(resort.subscription.status)}</span>
+                  </span>
                 </DetailRow>
                 <DetailRow label="Monthly fee">{formatPhp(resort.subscription.total_monthly_fee)}</DetailRow>
                 <DetailRow label="Included rooms">{resort.subscription.included_rooms}</DetailRow>

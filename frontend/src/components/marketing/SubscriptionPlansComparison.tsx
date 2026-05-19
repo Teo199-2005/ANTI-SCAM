@@ -1,13 +1,16 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { Check, Shield, Star, X } from "lucide-react";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
+import { GoldBorderRibbon } from "@/components/marketing/GoldBorderRibbon";
+import { Check, Shield, X } from "lucide-react";
 import { formatPhp } from "@/lib/formatPhp";
+import { PREMIUM_MARKETING_BORDER_CLASS } from "@/lib/marketingGoldRibbon";
 import { businessProMonthlyPrice, SUBSCRIPTION_PLANS } from "@/lib/subscriptionPlans";
 import { cn } from "@/lib/utils";
 
 const NAVY = "#0d1f3c";
-const GOLD = "#f5a623";
 
 const STANDARD_FEATURES = [
   "Resort verification process",
@@ -62,19 +65,19 @@ export function SubscriptionPlansComparison({ className, compact }: Props) {
           highlight={false}
           features={STANDARD_FEATURES}
           limitations={STANDARD_LIMITATIONS}
-          ctaHref="/register"
+          ctaHref="/register?intent=owner"
           ctaLabel="Get verified — free"
         />
         <PlanCard
           compact={compact}
           title="Business Pro"
           badge={SUBSCRIPTION_PLANS.business_pro.badgeLabel}
-          badgeIcon={Star}
+          badgeLeading={<BusinessProVerifiedBadge size="xs" />}
           priceLabel={proPrice}
           priceSubtext="Per month · billed via Xendit"
           highlight
           features={PRO_FEATURES}
-          ctaHref="/register"
+          ctaHref="/register?intent=owner"
           ctaLabel="Register & upgrade"
           ribbon="Recommended"
         />
@@ -87,7 +90,8 @@ type PlanCardProps = {
   compact?: boolean;
   title: string;
   badge: string;
-  badgeIcon: typeof Shield;
+  badgeIcon?: typeof Shield;
+  badgeLeading?: ReactNode;
   priceLabel: string;
   priceSubtext: string;
   highlight: boolean;
@@ -103,6 +107,7 @@ function PlanCard({
   title,
   badge,
   badgeIcon: BadgeIcon,
+  badgeLeading,
   priceLabel,
   priceSubtext,
   highlight,
@@ -117,18 +122,11 @@ function PlanCard({
       className={cn(
         "relative flex h-full flex-col rounded-xl border-2",
         compact ? "p-3" : "p-3.5 sm:p-4",
-        highlight ? "border-amber-300/80 shadow-[0_12px_40px_-8px_rgba(13,31,60,0.25)]" : "border-slate-300 bg-white shadow-sm",
+        highlight ? PREMIUM_MARKETING_BORDER_CLASS : "border-slate-300 bg-white shadow-sm",
       )}
       style={highlight ? { backgroundColor: NAVY } : undefined}
     >
-      {ribbon ? (
-        <span
-          className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 rounded-full px-2.5 py-px text-[9px] font-extrabold uppercase tracking-wider text-white"
-          style={{ background: `linear-gradient(165deg, #ffd47a 0%, ${GOLD} 50%, #c9840f 100%)` }}
-        >
-          {ribbon}
-        </span>
-      ) : null}
+      {ribbon ? <GoldBorderRibbon label={ribbon} /> : null}
       <div className="flex flex-wrap items-center gap-1.5">
         <p
           className={cn(
@@ -145,7 +143,7 @@ function PlanCard({
             highlight ? "bg-amber-500/20 text-amber-100 ring-1 ring-amber-300/30" : "bg-sky-50 text-sky-900 ring-1 ring-sky-200",
           )}
         >
-          <BadgeIcon className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" aria-hidden />
+          {badgeLeading ?? (BadgeIcon ? <BadgeIcon className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" aria-hidden /> : null)}
           {badge}
         </span>
       </div>

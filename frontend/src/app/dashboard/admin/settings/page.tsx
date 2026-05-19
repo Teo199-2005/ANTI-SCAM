@@ -3,18 +3,33 @@
 import DashCard from "@/components/dash/DashCard";
 import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { useToast } from "@/components/shared/ToastProvider";
-import { getSystemSettings, sendAdminMailTest, updateSystemSettings, SystemSetting } from "@/lib/api/admin";
+import { getSystemSettings, sendAdminMailTest, updateSystemSettings, type SystemSetting } from "@/lib/api/admin";
 import {
   sanitizeEmailTyping,
   sanitizeIntegerDigitsOnly,
   sanitizeLongText,
 } from "@/lib/inputRestrictions";
-import { Loader2, Mail, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Info, Loader2, Mail, Settings } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+const MARKETING_KEYS = new Set([
+  "marketing_booking_commission_php",
+  "marketing_booking_commission_enabled",
+]);
+
+function sortSettings(rows: SystemSetting[]): SystemSetting[] {
+  return [...rows].sort((a, b) => {
+    const aM = MARKETING_KEYS.has(a.key) ? 0 : 1;
+    const bM = MARKETING_KEYS.has(b.key) ? 0 : 1;
+    if (aM !== bM) return aM - bM;
+    return a.key.localeCompare(b.key);
+  });
+}
 
 export default function SystemSettingsPage() {
   const { pushToast } = useToast();
   const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [policyNote, setPolicyNote] = useState<string | null>(null);
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -22,10 +37,13 @@ export default function SystemSettingsPage() {
   const [mailTestTo, setMailTestTo] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const sorted = useMemo(() => sortSettings(settings), [settings]);
+
   useEffect(() => {
     void getSystemSettings()
-      .then((rows) => {
-        setSettings(rows);
+      .then((payload) => {
+        setSettings(payload.settings);
+        setPolicyNote(payload.marketing_commission_policy_note ?? null);
         setError(null);
       })
       .catch(() => {
@@ -46,10 +64,15 @@ export default function SystemSettingsPage() {
         pushToast({ title: "Nothing to save", description: "Change a value before saving.", tone: "info" });
         return;
       }
-      await updateSystemSettings(payload);
-      setSettings((prev) => prev.map((s) => edited[s.key] !== undefined ? { ...s, value: edited[s.key] } : s));
+      const note = await updateSystemSettings(payload);
+      setSettings((prev) => prev.map((s) => (edited[s.key] !== undefined ? { ...s, value: edited[s.key] } : s)));
       setEdited({});
-      pushToast({ title: "Settings saved", description: "Platform configuration was updated.", tone: "success" });
+      if (note) setPolicyNote(note);
+      pushToast({
+        title: "Settings saved",
+        description: "Booking commission rate changes apply to new credits only.",
+        tone: "success",
+      });
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       pushToast({
@@ -94,19 +117,31 @@ export default function SystemSettingsPage() {
         <h1 className="dash-page-title flex items-center gap-2">
           <Settings size={22} className="text-skyBlue" /> System Settings
         </h1>
-        <p className="dash-page-sub">Platform-wide configuration rules. Changes take effect immediately.</p>
+        <p className="dash-page-sub">Platform-wide configuration. Marketer booking commission changes affect new credits only.</p>
       </div>
+
+      {policyNote ? (
+        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
+          <Info className="mt-0.5 shrink-0" size={18} />
+          <p>{policyNote}</p>
+        </div>
+      ) : null}
 
       <DashCard className="overflow-hidden p-0">
         {error ? <p className="px-6 py-4 text-sm text-rose-700">{error}</p> : null}
         {loading ? (
-          <div className="space-y-3 p-6">{[1,2,3,4,5].map(i=><div key={i} className="h-14 animate-pulse rounded-xl bg-softGray"/>)}</div>
+          <div className="space-y-3 p-6">{[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-softGray" />)}</div>
         ) : (
           <div className="divide-y divide-softBorder">
-            {settings.map((s) => (
+            {sorted.map((s) => (
               <div key={s.key} className="flex flex-wrap items-center gap-4 px-6 py-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-navy">{s.key.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase())}</p>
+                  <p className="font-semibold text-navy">
+                    {s.key.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                    {MARKETING_KEYS.has(s.key) ? (
+                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-violet-700">Booking commission</span>
+                    ) : null}
+                  </p>
                   {s.description ? <p className="text-xs text-zinc-400">{s.description}</p> : null}
                 </div>
                 <div className="w-48">
@@ -119,6 +154,16 @@ export default function SystemSettingsPage() {
                       <option value="true">Enabled</option>
                       <option value="false">Disabled</option>
                     </select>
+                  ) : s.type === "decimal" ? (
+                    <input
+                      className="dash-input"
+                      type="number"
+                      min={1}
+                      max={5000}
+                      step={0.01}
+                      value={edited[s.key] ?? s.value}
+                      onChange={(e) => handleChange(s.key, e.target.value)}
+                    />
                   ) : (
                     <input
                       className="dash-input"
@@ -146,7 +191,14 @@ export default function SystemSettingsPage() {
             onClick={handleSave}
             disabled={saving || Object.keys(edited).length === 0}
           >
-            {saving ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Saving…</span> : "Save settings"}
+            {saving ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" />
+                Saving…
+              </span>
+            ) : (
+              "Save settings"
+            )}
           </button>
         </div>
       </DashCard>
@@ -177,9 +229,7 @@ export default function SystemSettingsPage() {
             type="email"
             placeholder="you@example.com"
             value={mailTestTo}
-            onChange={(e) =>
-              setMailTestTo(sanitizeEmailTyping(e.target.value).toLowerCase())
-            }
+            onChange={(e) => setMailTestTo(sanitizeEmailTyping(e.target.value).toLowerCase())}
           />
           <button
             type="button"

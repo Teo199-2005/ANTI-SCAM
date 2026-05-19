@@ -5,6 +5,7 @@ namespace App\Modules\Auth\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
@@ -12,10 +13,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class GoogleAuthController extends Controller
 {
-    public function redirect(): RedirectResponse|Response
+    public function redirect(Request $request): RedirectResponse|Response
     {
         if (! config('services.google.client_id')) {
             abort(503, 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.');
+        }
+
+        $returnTo = trim((string) $request->query('returnTo', ''));
+        if ($returnTo !== '' && str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//')) {
+            $request->session()->put('google_auth_return_to', $returnTo);
         }
 
         return Socialite::driver('google')->redirect();
@@ -49,18 +55,25 @@ class GoogleAuthController extends Controller
                 'email' => $email,
                 'google_id' => $googleUser->getId(),
                 'password' => Hash::make(Str::random(48)),
-                'role' => 'user',
+                'role' => 'client',
                 'email_verified_at' => now(),
             ]);
+        } elseif (in_array($user->role, ['guest', 'user'], true)) {
+            $user->forceFill(['role' => 'client', 'home_resort_id' => null])->save();
         }
 
         $token = $user->createToken('spa-token')->plainTextToken;
 
-        // Redirect to the Next.js BFF callback route which sets an httpOnly cookie.
-        // The token is passed as a query param and immediately stored server-side — never
-        // returned to JavaScript or the browser history.
+        $returnTo = (string) request()->session()->pull('google_auth_return_to', '');
+        if ($returnTo === '' || ! str_starts_with($returnTo, '/') || str_starts_with($returnTo, '//')) {
+            $returnTo = in_array($user->role, ['client', 'user', 'guest'], true)
+                ? '/dashboard/client'
+                : '/dashboard';
+        }
+
         $frontend = rtrim((string) config('app.frontend_url'), '/');
-        $url = $frontend.'/api/auth/google-callback?token='.rawurlencode($token);
+        $url = $frontend.'/api/auth/google-callback?token='.rawurlencode($token)
+            .'&redirect='.rawurlencode($returnTo);
 
         return redirect()->away($url);
     }

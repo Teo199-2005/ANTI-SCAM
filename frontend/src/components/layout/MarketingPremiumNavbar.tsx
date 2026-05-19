@@ -4,7 +4,7 @@
  * Marketing site navigation (home, about, blogs, contact, auth).
  * - Desktop / tablet: inline `md:flex` link row — layout owned by `desktopLinkClass()` + shell classes below.
  * - Mobile-only: hamburger + collapsible glass panel (`md:hidden`, larger tap targets, safe-area padding).
- * - Below `md`, the gold “Register Your Resort” control is hidden from the top bar (layout: wordmark + optional Log in + menu); register stays available from page CTAs and `/register`.
+ * - Below `md`, Register appears in the top action row (beside the menu toggle) and again in the mobile drawer.
  */
 
 import Link from "next/link";
@@ -18,6 +18,7 @@ import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { cn } from "@/lib/utils";
 import { ResortGrowthRewardsProgramModal } from "@/components/layout/ResortGrowthRewardsProgramModal";
 import { VerifyResortComingSoonModal } from "@/components/layout/VerifyResortComingSoonModal";
+import { useRegisterModal } from "@/contexts/RegisterModalContext";
 
 const GOLD = "#f5a623";
 const WORDMARK_NAVY = "#0B1F3A";
@@ -59,6 +60,7 @@ export function MarketingPremiumNavbar({ mode }: Props) {
   const { user, loading } = useAuth();
   const [mobileNav, setMobileNav] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
+  const { openRegisterModal } = useRegisterModal();
   const [programOpen, setProgramOpen] = useState(false);
   const [rewardsEligible, setRewardsEligible] = useState(true);
 
@@ -305,18 +307,36 @@ export function MarketingPremiumNavbar({ mode }: Props) {
                 <Users className="h-4 w-4 shrink-0" aria-hidden />
                 Log in
               </Link>
+              <button
+                type="button"
+                className={cn(
+                  REGISTER_GOLD_SHINE_REGISTER_BTN,
+                  "gap-1.5 rounded-full px-3 py-2 text-xs font-bold md:hidden",
+                )}
+                style={registerGoldButtonStyle}
+                onClick={() => {
+                  setMobileNav(false);
+                  openRegisterModal();
+                }}
+              >
+                <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+                <Building className="relative z-10 h-3.5 w-3.5 shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)]" aria-hidden />
+                <span className="relative z-10">Register</span>
+              </button>
               <span className="hidden md:contents">
-                <Link
-                  href="/register"
+                <button
+                  type="button"
                   className={cn(REGISTER_GOLD_SHINE_REGISTER_BTN, "gap-2 rounded-full px-4 py-2 text-sm font-bold sm:px-5")}
                   style={registerGoldButtonStyle}
-                  onClick={() => setMobileNav(false)}
+                  onClick={() => {
+                    setMobileNav(false);
+                    openRegisterModal();
+                  }}
                 >
                   <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
                   <Building className="relative z-10 h-4 w-4 shrink-0 drop-shadow-[0_1px_0_rgba(0,0,0,0.15)]" aria-hidden />
-                  <span className="relative z-10 max-[380px]:sr-only">Register Your Resort</span>
-                  <span className="relative z-10 hidden max-[380px]:inline">Register</span>
-                </Link>
+                  Register
+                </button>
               </span>
             </>
           )}
@@ -400,20 +420,38 @@ export function MarketingPremiumNavbar({ mode }: Props) {
               Dashboard
             </Link>
           ) : (
-            <Link
-              href="/login"
-              onClick={() => setMobileNav(false)}
-              className={cn(
-                "mt-1 flex items-center justify-center gap-2 rounded-xl border-2 py-2.5 text-sm font-bold backdrop-blur-md sm:hidden",
-                mode === "hero" || mode === "auth-overlay"
-                  ? "border-white/85 bg-white/60 text-[#0d1f3c]"
-                  : "border-zinc-200 bg-white text-[#0d1f3c] shadow-sm",
-              )}
-              style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-            >
-              <Users className="h-4 w-4" aria-hidden />
-              Log in
-            </Link>
+            <>
+              <button
+                type="button"
+                className={cn(
+                  REGISTER_GOLD_SHINE_REGISTER_BTN,
+                  "mt-1 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold md:hidden",
+                )}
+                style={registerGoldButtonStyle}
+                onClick={() => {
+                  setMobileNav(false);
+                  openRegisterModal();
+                }}
+              >
+                <span className={REGISTER_GOLD_GLOSS_LAYER} aria-hidden />
+                <Building className="relative z-10 h-4 w-4 shrink-0" aria-hidden />
+                <span className="relative z-10">Register Your Resort</span>
+              </button>
+              <Link
+                href="/login"
+                onClick={() => setMobileNav(false)}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-xl border-2 py-2.5 text-sm font-bold backdrop-blur-md md:hidden",
+                  mode === "hero" || mode === "auth-overlay"
+                    ? "border-white/85 bg-white/60 text-[#0d1f3c]"
+                    : "border-zinc-200 bg-white text-[#0d1f3c] shadow-sm",
+                )}
+                style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+              >
+                <Users className="h-4 w-4" aria-hidden />
+                Log in
+              </Link>
+            </>
           )}
         </nav>
       ) : null}

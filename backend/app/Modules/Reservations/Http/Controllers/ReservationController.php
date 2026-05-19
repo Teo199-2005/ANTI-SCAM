@@ -33,20 +33,6 @@ class ReservationController extends Controller
     {
         $this->authorize('create', Reservation::class);
 
-        $user = $request->user();
-        if ($user->role === 'guest') {
-            if (! $user->home_resort_id) {
-                throw ValidationException::withMessages([
-                    'resort_id' => ['Guest account is not linked to a resort.'],
-                ]);
-            }
-            if ((int) $user->home_resort_id !== (int) $request->input('resort_id')) {
-                throw ValidationException::withMessages([
-                    'resort_id' => ['You can only book your home resort.'],
-                ]);
-            }
-        }
-
         try {
             $reservation = $this->service->createFromLock([
                 ...$request->validated(),

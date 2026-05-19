@@ -9,6 +9,7 @@ use App\Modules\Admin\Http\Controllers\AdminOnboardController;
 use App\Modules\Admin\Http\Controllers\AdminResortLandingEmbedController;
 use App\Http\Controllers\BulkDeleteController;
 use App\Modules\Admin\Http\Controllers\AdminLocationStatsController;
+use App\Modules\Admin\Http\Controllers\AdminClientController;
 use App\Modules\Admin\Http\Controllers\AdminStatsController;
 use App\Modules\Admin\Http\Controllers\AdminSubscriptionOverviewController;
 use App\Modules\Admin\Http\Controllers\MarketingController;
@@ -143,6 +144,7 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('role:marketing')->group(function (): void {
             Route::get('/dashboard/marketing/analytics', [MarketingDashboardController::class, 'analytics']);
             Route::get('/dashboard/marketing/clients', [MarketingDashboardController::class, 'clients']);
+            Route::get('/dashboard/marketing/bookings', [MarketingDashboardController::class, 'bookings']);
         });
 
         // Admin-only routes
@@ -150,6 +152,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/users/bulk-delete', [BulkDeleteController::class, 'users']);
             Route::post('/admin/resorts/bulk-delete', [BulkDeleteController::class, 'resorts']);
             Route::get('/admin/stats', [AdminStatsController::class, 'stats']);
+            Route::get('/admin/clients', [AdminClientController::class, 'index']);
+            Route::get('/admin/clients/{client}', [AdminClientController::class, 'show']);
             Route::get('/admin/location-stats', [AdminLocationStatsController::class, 'index']);
             Route::get('/admin/analytics', [AdminAnalyticsController::class, 'index']);
             Route::get('/admin/subscriptions/overview', [AdminSubscriptionOverviewController::class, 'index']);
@@ -185,6 +189,7 @@ Route::prefix('v1')->group(function (): void {
             // Marketing management
             Route::get('/admin/marketers', [MarketingController::class, 'marketers']);
             Route::get('/admin/marketers/monitoring', [MarketingController::class, 'marketersMonitoring']);
+            Route::get('/admin/marketing/booking-commissions/analytics', [MarketingController::class, 'bookingCommissionAnalytics']);
             Route::get('/admin/marketers/{marketer}/detail', [MarketingController::class, 'marketerDetail']);
             Route::post('/admin/marketers/assign', [MarketingController::class, 'assign']);
             Route::post('/admin/marketers/unassign', [MarketingController::class, 'unassign']);
@@ -198,16 +203,12 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/reservations/{reservation}/notes/{note}', [StaffNoteController::class, 'destroy']);
 
         Route::middleware('role:resort_owner,admin_staff,admin')->group(function (): void {
-            Route::post('/resort/guests/bulk-delete', [BulkDeleteController::class, 'resortGuests']);
             Route::get('/resort/guests/{guestKey}/reservations', [ResortGuestController::class, 'reservationsForGuest']);
             Route::get('/resort/guests/{guestKey}', [ResortGuestController::class, 'show']);
-            Route::patch('/resort/guests/{guestKey}', [ResortGuestController::class, 'update']);
-            Route::delete('/resort/guests/{guestKey}', [ResortGuestController::class, 'destroy']);
-            Route::post('/resort/guests', [ResortGuestController::class, 'store']);
             Route::get('/resort/guests', [ResortGuestController::class, 'index']);
         });
 
-        Route::middleware('role:guest')->prefix('guest')->group(function (): void {
+        Route::middleware('role:client,user')->prefix('guest')->group(function (): void {
             Route::post('/favorites/bulk-delete', [BulkDeleteController::class, 'guestFavorites']);
             Route::get('/resort', [GuestPortalController::class, 'resort']);
             Route::get('/rooms', [GuestPortalController::class, 'rooms']);

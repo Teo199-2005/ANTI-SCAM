@@ -4,7 +4,8 @@ import { ResortLandingHeroBackground } from "@/components/resort-page/ResortLand
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import type { PublicAdminLandingEmbed } from "@/lib/api/landingPage";
 import { cn } from "@/lib/utils";
-import { Facebook, Instagram, MapPin, Phone, ShieldCheck, Star } from "lucide-react";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
+import { Facebook, Instagram, MapPin, Phone, ShieldCheck } from "lucide-react";
 
 /**
  * Public resort hero — full-bleed photo + glass panel.
@@ -142,7 +143,7 @@ export function ResortLandingHero({
                     style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
                   >
                     {isVip ? (
-                      <Star className="h-3.5 w-3.5 shrink-0 text-amber-200/90 sm:h-4 sm:w-4" aria-hidden />
+                      <BusinessProVerifiedBadge size="md" />
                     ) : (
                       <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-zinc-300 sm:h-4 sm:w-4" aria-hidden />
                     )}

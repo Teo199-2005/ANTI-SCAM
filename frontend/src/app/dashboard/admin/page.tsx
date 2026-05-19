@@ -3,6 +3,7 @@
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
 import AdminLocationStatsChart from "@/components/dashboard/AdminLocationStatsChart";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import StatCard from "@/components/dashboard/StatCard";
 import LocationFilterBar, {
   emptyLocationFilter,
@@ -23,7 +24,6 @@ import {
   Globe2,
   RefreshCw,
   ShieldCheck,
-  Star,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -149,7 +149,13 @@ export default function AdminOverviewPage() {
 
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-5">
         <StatCard compact label="Standard resorts" value={stats.standardResorts ?? 0} icon={ShieldCheck} iconTone="sky" />
-        <StatCard compact label="Business Pro" value={stats.businessProResorts ?? 0} icon={Star} iconTone="amber" />
+        <StatCard
+          compact
+          label="Business Pro"
+          value={stats.businessProResorts ?? 0}
+          iconNode={<BusinessProVerifiedBadge size="xl" />}
+          iconTone="amber"
+        />
         <StatCard compact label="Sub revenue (month)" value={formatPhp(stats.subscriptionRevenueMonth ?? 0)} icon={CreditCard} iconTone="emerald" />
         <StatCard compact label="Expiring (7d)" value={stats.expiringSubscriptions ?? 0} icon={Clock3} iconTone="amber" />
         <StatCard compact label="Failed payments" value={stats.failedPayments ?? 0} icon={AlertTriangle} iconTone="rose" />

@@ -11,6 +11,7 @@ use App\Models\SystemSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\PhilippineLocationService;
+use App\Support\Tenancy\TenantContext;
 use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,44 @@ use Tests\TestCase;
 class PublicReservationFeeAndResortLifecycleTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_public_resort_detail_by_id_is_not_scoped_to_unrelated_tenant_context(): void
+    {
+        $tenantA = Tenant::create([
+            'name' => 'Tenant A',
+            'slug' => 'tenant-a',
+            'subdomain' => 'tenant-a',
+            'status' => 'active',
+        ]);
+        $resortA = Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenantA->id,
+            'name' => 'Catalog Resort A',
+            'is_publicly_listed' => true,
+        ]);
+
+        $tenantB = Tenant::create([
+            'name' => 'Tenant B',
+            'slug' => 'tenant-b',
+            'subdomain' => 'tenant-b',
+            'status' => 'active',
+        ]);
+        Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenantB->id,
+            'name' => 'Catalog Resort B',
+            'is_publicly_listed' => true,
+        ]);
+
+        TenantContext::setTenantId($tenantB->id);
+
+        try {
+            $this->getJson("/api/v1/public/resorts/{$resortA->id}")
+                ->assertOk()
+                ->assertJsonPath('data.name', 'Catalog Resort A')
+                ->assertJsonStructure(['data' => ['map' => ['address', 'embedUrl', 'searchUrl']]]);
+        } finally {
+            TenantContext::clear();
+        }
+    }
 
     public function test_public_room_payload_includes_reservation_fee_from_system_setting(): void
     {

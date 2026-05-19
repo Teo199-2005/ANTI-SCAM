@@ -108,6 +108,7 @@ export const rgb = {
   sky500: "43, 92, 230",
   violet: "124, 58, 237",
   accent: "245, 184, 0",
+  slate: "100, 116, 139",
 } as const;
 
 export type DataSeriesKey = "s1" | "s2" | "s3" | "s4" | "s5" | "s6";
@@ -121,7 +122,16 @@ export const dataSeriesRgb: Record<DataSeriesKey, string> = {
   s6: rgb.violet,
 };
 
-export type KpiIconTone = "blue" | "sky" | "emerald" | "rose" | "amber" | "orange" | "violet" | "navy";
+export type KpiIconTone =
+  | "blue"
+  | "sky"
+  | "emerald"
+  | "rose"
+  | "amber"
+  | "orange"
+  | "violet"
+  | "navy"
+  | "slate";
 
 type KpiToneDef = {
   accent: string;
@@ -138,6 +148,7 @@ export const kpiTone: Record<KpiIconTone, KpiToneDef> = {
   orange: { accent: color.brand.accentHover, rgb: rgb.accent },
   violet: { accent: color.data.s6, rgb: rgb.violet },
   navy: { accent: color.brand.navy, rgb: rgb.navy },
+  slate: { accent: color.text.muted, rgb: rgb.slate },
 };
 
 /**

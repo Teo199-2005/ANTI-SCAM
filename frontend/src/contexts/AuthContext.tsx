@@ -35,8 +35,8 @@ type AuthContextValue = {
     email: string;
     phone?: string;
     business_name?: string;
-    role_intent?: "resort_owner" | "client" | "guest";
-    resort_subdomain?: string;
+    role_intent?: "resort_owner" | "client";
+    signup_source_resort_id?: number;
     referral_code?: string;
     password: string;
     password_confirmation: string;

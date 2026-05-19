@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import { useToast } from "@/components/shared/ToastProvider";
+import { buildOwnerReferralRegisterUrl } from "@/lib/auth/clientAuthUrls";
 import { getMarketingStats } from "@/lib/api/marketing";
 import { Building2, ClipboardCopy, Link2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -21,7 +22,9 @@ export default function MarketingReferralsPage() {
         setReferralCode(s.referral_code);
         // Always tie the copied link to the site the marketer is actually using (avoids stale FRONTEND_URL / localhost).
         if (s.referral_code) {
-          setRegisterUrl(`${window.location.origin.replace(/\/$/, "")}/register?ref=${encodeURIComponent(s.referral_code)}`);
+          setRegisterUrl(buildOwnerReferralRegisterUrl(window.location.origin, s.referral_code));
+        } else if (s.referral_share_register_url) {
+          setRegisterUrl(s.referral_share_register_url);
         } else {
           setRegisterUrl(null);
         }
@@ -88,8 +91,10 @@ export default function MarketingReferralsPage() {
       <DashCard className="p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="font-dash text-base font-semibold text-navy">Guest registration link</h2>
-            <p className="mt-1 text-xs text-zinc-500">Prefills discovery traffic with your marketer context.</p>
+            <h2 className="font-dash text-base font-semibold text-navy">Resort owner registration link</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Opens owner signup with your referral code applied (1-month trial when eligible).
+            </p>
           </div>
           <button
             type="button"
@@ -109,13 +114,14 @@ export default function MarketingReferralsPage() {
             <Building2 size={18} className="text-sky-700" />
           </div>
           <div>
-            <h2 className="font-dash text-base font-semibold text-navy">Subscription referrals</h2>
+            <h2 className="font-dash text-base font-semibold text-navy">Booking commissions</h2>
             <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-              {hint ??
-                "Assigned resort owners enter your code in the Subscribe modal before Xendit checkout. Successful monthly subscription payments credit your pending commissions for that resort."}
+              You earn a flat commission for each qualifying paid online guest booking at resorts assigned to you. Manual or unpaid
+              bookings do not count. Cancellations before payout may reverse pending credits.
             </p>
             <p className="mt-3 text-xs text-zinc-500">
-              Admin links marketers to resorts. Codes only validate when the owner&apos;s property matches an assignment.
+              {hint ??
+                "Referral codes still help onboard resort owners (signup trial). Earnings come from guest bookings, not owner subscriptions."}
             </p>
           </div>
         </div>

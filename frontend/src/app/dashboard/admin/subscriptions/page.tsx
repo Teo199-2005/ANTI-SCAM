@@ -1,5 +1,7 @@
 "use client";
 
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
+import { SubscriptionPlanLabel } from "@/components/badges/SubscriptionPlanLabel";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
@@ -210,7 +212,16 @@ export default function AdminSubscriptionsPage() {
                     : "rounded-full border border-softBorder bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
                 }
               >
-                {plan === "all" ? "All plans" : plan === "standard" ? "Standard" : "Business Pro"}
+                {plan === "all" ? (
+                  "All plans"
+                ) : plan === "standard" ? (
+                  "Standard"
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <BusinessProVerifiedBadge size="xs" />
+                    Business Pro
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -242,7 +253,10 @@ export default function AdminSubscriptionsPage() {
                   key={resort.id}
                   title={resort.name}
                   fields={[
-                    { label: "Plan", value: <span className="capitalize">{sub?.plan ?? "—"}</span> },
+                    {
+                      label: "Plan",
+                      value: sub?.plan ? <SubscriptionPlanLabel plan={sub.plan} /> : "—",
+                    },
                     { label: "Active rooms", value: String(sub?.active_room_count ?? 0) },
                     {
                       label: "Monthly fee",
@@ -322,7 +336,9 @@ export default function AdminSubscriptionsPage() {
               return (
                 <tr key={resort.id} className="group">
                   <td className="font-semibold text-navy">{resort.name}</td>
-                  <td className="capitalize text-zinc-700">{sub?.plan ?? "—"}</td>
+                  <td className="text-zinc-700">
+                    {sub?.plan ? <SubscriptionPlanLabel plan={sub.plan} /> : "—"}
+                  </td>
                   <td className="text-zinc-600">{sub?.active_room_count ?? 0}</td>
                   <td className="text-zinc-700">
                     {sub ? formatPhp(Number(sub.total_monthly_fee)) : "—"}

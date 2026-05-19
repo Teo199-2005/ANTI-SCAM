@@ -12,6 +12,7 @@ import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import BulkActionBar from "@/components/shared/BulkActionBar";
 import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { SubscriptionPlanLabel } from "@/components/badges/SubscriptionPlanLabel";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import DataTable from "@/components/shared/DataTable";
 import {
@@ -31,6 +32,7 @@ import { BadgeCheck, Building2, Crown, Eye, PenLine, XCircle } from "lucide-reac
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
+import { cn } from "@/lib/utils";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 
 const SORT_FIRST: Record<string, SortDir> = {
@@ -210,8 +212,10 @@ export default function AdminResortsPage() {
 
   const subscriptionCell = (resort: ResortItem) =>
     resort.subscription ? (
-      <span className={subBadge(resort.subscription.status)}>
-        {formatSubscriptionStatusLabel(resort.subscription.status)} · {resort.subscription.plan}
+      <span className={cn(subBadge(resort.subscription.status), "inline-flex flex-wrap items-center gap-1.5")}>
+        <span>{formatSubscriptionStatusLabel(resort.subscription.status)}</span>
+        <span className="text-zinc-400">·</span>
+        <SubscriptionPlanLabel plan={resort.subscription.plan} />
       </span>
     ) : (
       <span className="text-zinc-600">—</span>

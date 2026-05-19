@@ -8,7 +8,6 @@ use App\Support\XenditInvoiceWebhookStatus;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\DigitalAcknowledgmentReceiptService;
 use App\Services\EmailNotificationService;
-use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -18,7 +17,6 @@ class XenditSubscriptionWebhookService
         private readonly XenditWebhookService $signatureVerifier,
         private readonly AuditLogService $audits,
         private readonly EmailNotificationService $emails,
-        private readonly SubscriptionReferralCommissionService $referralCommissions,
         private readonly DigitalAcknowledgmentReceiptService $digitalReceipts,
         private readonly SubscriptionPaymentConfirmationService $paymentConfirmation,
         private readonly XenditRecurringSubscriptionService $recurring,

@@ -6,8 +6,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import { getAssignedResorts, getCommissions, getMarketingStats, getReleaseHistory, AssignedResort, Commission, CommissionRelease, MarketingStats } from "@/lib/api/marketing";
 import { useAuth } from "@/contexts/AuthContext";
 import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
-import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
-import { BadgeCheck, Building2, Clock, DollarSign, Link2, TrendingUp, Users } from "lucide-react";
+import { BadgeCheck, BedDouble, Building2, Clock, DollarSign, Link2, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatPhp } from "@/lib/formatPhp";
@@ -61,18 +60,16 @@ export default function MarketingDashboardPage() {
           Track assigned resorts and commissions. KPIs below mirror this summary.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <MarketerTierBadge
-            tierKey={stats?.marketerTier?.tierKey}
-            label={stats?.marketerTier?.label}
-            size="md"
-            variant="onDark"
-          />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-white/10 px-3 py-1.5 font-dash text-[11px] font-semibold text-white backdrop-blur-sm">
+            <BedDouble size={14} aria-hidden />
+            {stats ? `${formatPhp(stats.commissionPerBookingPhp)} per paid online booking` : "₱10 per paid online booking"}
+          </span>
           <button
             type="button"
             onClick={() => setTiersModalOpen(true)}
             className="inline-flex items-center rounded-full border border-white/35 bg-white/10 px-3 py-1.5 font-dash text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
           >
-            How tiers work
+            Commission policy
           </button>
         </div>
       </div>
@@ -80,37 +77,39 @@ export default function MarketingDashboardPage() {
       <MarketingTiersInfoModal
         open={tiersModalOpen}
         onClose={() => setTiersModalOpen(false)}
-        tierLadder={stats?.tierLadder ?? []}
-        tierPolicy={stats?.tierPolicy ?? ""}
-        marketerTier={stats?.marketerTier ?? null}
-        convertingClientsCount={stats?.convertingClientsCount ?? 0}
-        convertingResortsWithReferralCount={stats?.convertingResortsWithReferralCount ?? 0}
+        bookingCommissionPolicy={stats?.bookingCommissionPolicy ?? ""}
+        commissionPerBookingPhp={stats?.commissionPerBookingPhp ?? 10}
+        qualifyingBookingsCount={stats?.qualifyingBookingsCount ?? 0}
+        qualifyingBookingsMtd={stats?.qualifyingBookingsMtd ?? 0}
+        pendingCommissionsGross={stats?.pendingCommissions ?? 0}
+        pendingPayoutNetEstimate={stats?.pendingPayoutNetEstimate ?? 0}
+        payoutWithholdingRate={stats?.payoutWithholdingRate ?? 0.1}
+        commissionPayoutSchedule={stats?.commission_payout_schedule ?? null}
         loading={loading && !stats}
       />
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-6">
         <StatCard compact label="Assigned resorts"  value={stats?.assignedResorts ?? "–"}                                       icon={Building2}  iconTone="navy" />
         <StatCard
           compact
-          label="Converting clients"
-          value={stats ? stats.convertingClientsCount : "–"}
+          label="Qualifying bookings"
+          value={stats ? stats.qualifyingBookingsMtd : "–"}
           subtitle={
             stats
-              ? [
-                  stats.convertingResortsWithReferralCount > stats.convertingClientsCount
-                    ? `${stats.convertingResortsWithReferralCount} resorts billed; same owner still counts as one client for your tier.`
-                    : null,
-                  stats.marketerTier
-                    ? `${stats.marketerTier.label} · ${formatPhp(stats.marketerTier.perPaymentPhp)} per paid credit`
-                    : "No tier until your first paid referral subscription",
-                ]
-                  .filter(Boolean)
-                  .join(" ")
+              ? `${stats.qualifyingBookingsCount} lifetime · ${formatPhp(stats.commissionPerBookingPhp)} each`
               : undefined
           }
-          icon={Users}
+          icon={BedDouble}
           iconTone="navy"
+        />
+        <StatCard
+          compact
+          label="Referral signups"
+          value={stats ? stats.referralSignupClientsCount : "–"}
+          subtitle="Resort owners who joined via your referral code"
+          icon={Users}
+          iconTone="slate"
         />
         <StatCard compact label="Total commissions" value={stats ? formatPhp(stats.totalCommissions) : "–"}    icon={TrendingUp}  iconTone="emerald" />
         <StatCard
@@ -150,7 +149,7 @@ export default function MarketingDashboardPage() {
               {loading ? "…" : stats?.referral_code ?? "Generating…"}
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              Owners on your assigned resorts apply this in Subscribe checkout for discounted billing and your commission.
+              Share with resort owners for signup trial. You earn {stats ? formatPhp(stats.commissionPerBookingPhp) : "₱10"} per paid online guest booking at assigned resorts.
             </p>
           </div>
         </div>
@@ -239,13 +238,8 @@ export default function MarketingDashboardPage() {
                     { label: "Gross bookings", value: formatPhp(c.grossBookings) },
                     { label: "Rate", value: `${(Number(c.commissionRate) * 100).toFixed(1)}%` },
                     {
-                      label: "Tier (last credit)",
-                      value:
-                        c.marketerTier != null && String(c.marketerTier).length > 0 ? (
-                          <MarketerTierBadge tierKey={c.marketerTier} size="sm" />
-                        ) : (
-                          "—"
-                        ),
+                      label: "Per booking",
+                      value: c.unitCommissionPhp != null ? formatPhp(c.unitCommissionPhp) : formatPhp(10),
                     },
                     {
                       label: "Unit / total",
@@ -270,7 +264,7 @@ export default function MarketingDashboardPage() {
                     <th>Resort</th>
                     <th>Gross Bookings</th>
                     <th>Rate</th>
-                    <th>Tier</th>
+                    <th>Per booking</th>
                     <th>Commission</th>
                     <th>Status</th>
                   </tr>
@@ -282,12 +276,8 @@ export default function MarketingDashboardPage() {
                       <td className="font-semibold text-navy">{c.resort?.name ?? "–"}</td>
                       <td>{formatPhp(c.grossBookings)}</td>
                       <td>{(Number(c.commissionRate) * 100).toFixed(1)}%</td>
-                      <td>
-                        {c.marketerTier ? (
-                          <MarketerTierBadge tierKey={c.marketerTier} size="sm" />
-                        ) : (
-                          <span className="text-xs text-zinc-400">—</span>
-                        )}
+                      <td className="text-sm text-zinc-700">
+                        {c.unitCommissionPhp != null ? formatPhp(c.unitCommissionPhp) : formatPhp(10)}
                       </td>
                       <td className="font-semibold text-emerald-700">
                         {formatPhp(c.commissionAmount)}

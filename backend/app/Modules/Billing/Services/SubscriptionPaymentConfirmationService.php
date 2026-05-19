@@ -7,7 +7,6 @@ use App\Modules\Audit\Services\AuditLogService;
 use App\Modules\Billing\Support\SubscriptionInvoicePlanTag;
 use App\Modules\Subscriptions\Services\SubscriptionService;
 use App\Services\EmailNotificationService;
-use App\Services\SubscriptionReferralCommissionService;
 use Illuminate\Support\Facades\DB;
 
 class SubscriptionPaymentConfirmationService
@@ -15,7 +14,6 @@ class SubscriptionPaymentConfirmationService
   public function __construct(
     private readonly AuditLogService $audits,
     private readonly EmailNotificationService $emails,
-    private readonly SubscriptionReferralCommissionService $referralCommissions,
     private readonly SubscriptionService $subscriptions,
   ) {}
 
@@ -73,8 +71,6 @@ class SubscriptionPaymentConfirmationService
         'plan',
       ])
     );
-
-    $this->referralCommissions->creditFromPaidMonthlyInvoice($invoice);
 
     $subscriptionForNotifications = $subscription->loadMissing('resort');
     $paidInvoice = $invoice->refresh();

@@ -6,8 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Modules\Reservations\Http\Resources\ReservationResource;
-use App\Modules\Resorts\Http\Requests\StoreResortGuestRequest;
-use App\Modules\Resorts\Http\Requests\UpdateResortGuestRequest;
 use App\Modules\Resorts\Services\ResortGuestService;
 use App\Support\ResortGuestKey;
 use App\Support\Tenancy\TenantContext;
@@ -71,27 +69,17 @@ class ResortGuestController extends Controller
             ->orderByDesc('reservationCount')
             ->paginate($perPage);
 
-        $resortIds = DB::table('resorts')
-            ->where('tenant_id', $tenantId)
-            ->pluck('id');
-
-        $guestAccountsByEmail = [];
-        if ($resortIds->isNotEmpty()) {
-            $guestAccountsByEmail = User::query()
-                ->whereIn('role', ['guest', 'client', 'user'])
-                ->where(function ($q) use ($resortIds, $tenantId): void {
-                    $q->whereIn('home_resort_id', $resortIds)
-                        ->orWhereExists(function ($sub) use ($tenantId): void {
-                            $sub->selectRaw('1')
-                                ->from('reservations')
-                                ->whereColumn('reservations.client_id', 'users.id')
-                                ->where('reservations.tenant_id', $tenantId);
-                        });
-                })
-                ->get(['id', 'email', 'role'])
-                ->mapWithKeys(fn (User $u) => [mb_strtolower((string) $u->email) => $u->id])
-                ->all();
-        }
+        $guestAccountsByEmail = User::query()
+            ->whereIn('role', ['client', 'user'])
+            ->whereExists(function ($sub) use ($tenantId): void {
+                $sub->selectRaw('1')
+                    ->from('reservations')
+                    ->whereColumn('reservations.client_id', 'users.id')
+                    ->where('reservations.tenant_id', $tenantId);
+            })
+            ->get(['id', 'email', 'role'])
+            ->mapWithKeys(fn (User $u) => [mb_strtolower((string) $u->email) => $u->id])
+            ->all();
 
         $existingKeys = [];
         $guests->getCollection()->transform(function ($row) use (&$existingKeys, $guestAccountsByEmail): array {
@@ -101,7 +89,7 @@ class ResortGuestController extends Controller
             $accountUserId = $emailKey !== '' ? ($guestAccountsByEmail[$emailKey] ?? null) : null;
             if ($accountUserId === null && ! empty($row->client_id)) {
                 $linked = User::query()->find((int) $row->client_id);
-                if ($linked && in_array($linked->role, ['guest', 'client', 'user'], true)) {
+                if ($linked && in_array($linked->role, ['client', 'user'], true)) {
                     $accountUserId = $linked->id;
                 }
             }
@@ -124,20 +112,6 @@ class ResortGuestController extends Controller
             ];
         });
 
-        $accountOnly = $this->guests->accountOnlyGuests($tenantId, $existingKeys);
-        if ($accountOnly !== []) {
-            $merged = $guests->getCollection()->concat(collect($accountOnly));
-            if ($search !== '') {
-                $s = mb_strtolower($search);
-                $merged = $merged->filter(function (array $g) use ($s): bool {
-                    return str_contains(mb_strtolower($g['name']), $s)
-                        || str_contains(mb_strtolower((string) ($g['email'] ?? '')), $s)
-                        || str_contains((string) ($g['phone'] ?? ''), $s);
-                });
-            }
-            $guests->setCollection($merged->values());
-        }
-
         return $this->successResponse($guests, 'Resort guests fetched');
     }
 
@@ -152,43 +126,6 @@ class ResortGuestController extends Controller
             $this->guests->show($tenantId, $guestKey),
             'Guest details fetched',
         );
-    }
-
-    public function store(StoreResortGuestRequest $request)
-    {
-        $tenantId = $this->resolveTenantId($request);
-        if (! $tenantId) {
-            return $this->errorResponse('No tenant context', null, 422);
-        }
-
-        $guest = $this->guests->store($tenantId, $request->validated());
-
-        return $this->successResponse($guest, 'Guest account created', 201);
-    }
-
-    public function update(UpdateResortGuestRequest $request, string $guestKey)
-    {
-        $tenantId = $this->resolveTenantId($request);
-        if (! $tenantId) {
-            return $this->errorResponse('No tenant context', null, 422);
-        }
-
-        return $this->successResponse(
-            $this->guests->update($tenantId, $guestKey, $request->validated()),
-            'Guest updated',
-        );
-    }
-
-    public function destroy(Request $request, string $guestKey)
-    {
-        $tenantId = $this->resolveTenantId($request);
-        if (! $tenantId) {
-            return $this->errorResponse('No tenant context', null, 422);
-        }
-
-        $result = $this->guests->destroy($tenantId, $guestKey);
-
-        return $this->successResponse($result, 'Guest removed');
     }
 
     public function reservationsForGuest(Request $request, string $guestKey)

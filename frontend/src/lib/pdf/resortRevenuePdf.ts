@@ -347,14 +347,14 @@ export async function exportResortRevenuePdf(
     sess,
     [
       {
-        label: "Fees collected",
+        label: "Fees collected (platform)",
         value: formatPhpForPdf(summary.totalReservationFees),
-        hint: "Reservation fees paid to date",
+        hint: "Online reservation fees (e.g. ₱500 slot fee)",
       },
       {
-        label: "Gross bookings",
+        label: "Gross room value (at resort)",
         value: formatPhpForPdf(summary.totalGrossBookings),
-        hint: "Total booking value",
+        hint: "Room balances due at check-in",
       },
       {
         label: "Revenue this month",

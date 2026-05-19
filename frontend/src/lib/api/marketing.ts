@@ -4,21 +4,22 @@ import type { ApiEnvelope } from "@/lib/api/types";
 export type MarketingAnalyticsTotals = {
   commission_pending_ytd: number;
   commission_released_ytd: number;
-  referral_subscription_count_ytd: number;
-  referral_subscription_volume_ytd: number;
+  booking_credits_ytd: number;
+  booking_reversals_ytd: number;
 };
 
 export type MarketingMonthlyAnalytics = {
   period: string;
   commission_pending: number;
   commission_released: number;
-  referral_payment_count: number;
-  referral_payment_volume: number;
+  booking_credits_count: number;
+  booking_reversals_count: number;
 };
 
 export type MarketingResortAnalyticsRow = {
   resort_id: number;
   resort_name: string;
+  booking_count: number;
   commission_total: number;
   commission_pending: number;
   commission_released: number;
@@ -60,17 +61,20 @@ export type MarketingStats = {
   releasedCommissionsGross: number;
   payoutWithholdingRate: number;
   assignedResorts: number;
-  /** Distinct resort-owner orgs (tenants) with qualifying referral subscription payments — drives tier. */
-  convertingClientsCount: number;
-  /** Distinct resorts that have had at least one such payment (can exceed clients when one owner has multiple resorts). */
-  convertingResortsWithReferralCount: number;
-  marketerTier: MarketerTierInfo | null;
-  tierLadder: TierLadderEntry[];
-  tierPolicy: string;
+  referralSignupClientsCount: number;
+  qualifyingBookingsCount: number;
+  qualifyingBookingsMtd: number;
+  reversedBookingsMtd: number;
+  commissionPerBookingPhp: number;
+  bookingCommissionPolicy: string;
   referral_code: string | null;
   referral_share_register_url: string | null;
   referral_subscribe_hint: string | null;
   commission_payout_schedule?: string | null;
+  /** @deprecated Subscription tier ladder — booking commissions use flat rate */
+  marketerTier?: MarketerTierInfo | null;
+  tierLadder?: TierLadderEntry[];
+  tierPolicy?: string;
 };
 
 export type AssignedResort = {
@@ -152,10 +156,12 @@ function mapStats(raw: Record<string, unknown>): MarketingStats {
     releasedCommissionsGross: Number(raw.releasedCommissionsGross ?? raw.released_commissions_gross ?? 0),
     payoutWithholdingRate: Number(raw.payoutWithholdingRate ?? raw.payout_withholding_rate ?? 0),
     assignedResorts: Number(raw.assignedResorts ?? raw.assigned_resorts ?? 0),
-    convertingClientsCount: Number(raw.convertingClientsCount ?? raw.converting_clients_count ?? 0),
-    convertingResortsWithReferralCount: Number(
-      raw.convertingResortsWithReferralCount ?? raw.converting_resorts_with_referral_count ?? 0,
-    ),
+    referralSignupClientsCount: Number(raw.referralSignupClientsCount ?? raw.referral_signup_clients_count ?? 0),
+    qualifyingBookingsCount: Number(raw.qualifyingBookingsCount ?? raw.qualifying_bookings_count ?? 0),
+    qualifyingBookingsMtd: Number(raw.qualifyingBookingsMtd ?? raw.qualifying_bookings_mtd ?? 0),
+    reversedBookingsMtd: Number(raw.reversedBookingsMtd ?? raw.reversed_bookings_mtd ?? 0),
+    commissionPerBookingPhp: Number(raw.commissionPerBookingPhp ?? raw.commission_per_booking_php ?? 10),
+    bookingCommissionPolicy: String(raw.bookingCommissionPolicy ?? raw.booking_commission_policy ?? ""),
     marketerTier: mapMarketerTier(raw.marketerTier ?? raw.marketer_tier),
     tierLadder: mapTierLadder(raw.tierLadder ?? raw.tier_ladder),
     tierPolicy: String(raw.tierPolicy ?? raw.tier_policy ?? ""),
@@ -263,6 +269,7 @@ export type MarketingClientsPayload = {
     trial_active_total: number;
   };
   tier_policy: string;
+  booking_commission_policy?: string;
 };
 
 function mapMarketingClientRow(o: Record<string, unknown>): MarketingClientRow {
@@ -319,6 +326,7 @@ export async function getMarketingClients(params?: {
       trial_total: Number(metaRaw?.trial_total ?? 0),
       trial_active_total: Number(metaRaw?.trial_active_total ?? 0),
     },
-    tier_policy: String(raw.tier_policy ?? ""),
+    tier_policy: String(raw.tier_policy ?? raw.booking_commission_policy ?? ""),
+    booking_commission_policy: String(raw.booking_commission_policy ?? raw.tier_policy ?? ""),
   };
 }

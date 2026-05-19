@@ -1,175 +1,234 @@
 "use client";
 
-import { BrandWordmark } from "@/components/branding/BrandWordmark";
-import OwnerValuePropsStrip from "@/components/home/OwnerValuePropsStrip";
-import PageContainer from "@/components/layout/PageContainer";
-import { listPublicResorts, PublicResortListItem } from "@/lib/api/public";
+import { BrowseResortCard } from "@/components/marketing/BrowseResortCard";
+import { ResortBrowseFiltersBar } from "@/components/marketing/ResortBrowseFiltersBar";
+import { ResortRoomsPreviewModal } from "@/components/marketing/ResortRoomsPreviewModal";
+import { ResortWebsitePreviewModal } from "@/components/marketing/ResortWebsitePreviewModal";
+import {
+  emptyLocationFilter,
+  type LocationFilterValue,
+} from "@/components/locations/LocationFilterBar";
+import TablePaginationBar from "@/components/shared/TablePaginationBar";
+import { listPublicResorts, type PublicResortListItem } from "@/lib/api/public";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
-import { ResortPlanBadge } from "@/components/badges/ResortPlanBadge";
-import { BedDouble, MapPin, PhoneCall, Search } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
+const PER_PAGE_DEFAULT = 25;
+const NAVY = "#0d1f3c";
+const GOLD = "#f5a623";
+
+/** Full-width catalog shell with comfortable side gutters. */
+const LANDING_SHELL =
+  "mx-auto w-full max-w-[min(100%,1920px)] ps-[max(0.875rem,env(safe-area-inset-left))] pe-[max(0.875rem,env(safe-area-inset-right))] sm:ps-6 sm:pe-6 lg:ps-10 lg:pe-10 xl:ps-12 xl:pe-12";
+
+/** Mobile: single-column list cards. Desktop: up to 5 columns. */
+const RESORT_GRID_CLASS =
+  "grid grid-cols-1 gap-x-3 gap-y-4 pt-1 max-sm:gap-x-2.5 max-sm:gap-y-3.5 sm:grid-cols-3 sm:gap-x-3.5 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-4 xl:gap-x-4";
+
+type PlanFilter = "" | "business_pro" | "standard";
 
 export default function BrowseResortsPage() {
   const [resorts, setResorts] = useState<PublicResortListItem[]>([]);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const load = async (s: string) => {
+  const [query, setQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter());
+  const [planFilter, setPlanFilter] = useState<PlanFilter>("");
+  const [vipOnly, setVipOnly] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, per_page: PER_PAGE_DEFAULT });
+
+  const [roomsModalResort, setRoomsModalResort] = useState<PublicResortListItem | null>(null);
+  const [websiteModalResort, setWebsiteModalResort] = useState<PublicResortListItem | null>(null);
+
+  const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await listPublicResorts({ search: s, perPage: 24 });
-      setResorts(res.data ?? []);
+      const payload = await listPublicResorts({
+        search: appliedSearch || undefined,
+        page,
+        perPage,
+        plan: planFilter,
+        vip_only: vipOnly,
+        province_psgc: locationFilter.provincePsgc,
+        city_municipality_psgc: locationFilter.cityPsgc,
+      });
+      const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      setResorts(rows);
+      if (payload && !Array.isArray(payload) && payload.meta) {
+        setMeta({
+          current_page: payload.meta.current_page ?? page,
+          last_page: payload.meta.last_page ?? 1,
+          total: payload.meta.total ?? rows.length,
+          per_page: payload.meta.per_page ?? perPage,
+        });
+      } else {
+        setMeta({
+          current_page: 1,
+          last_page: 1,
+          total: rows.length,
+          per_page: perPage,
+        });
+      }
     } catch {
       setResorts([]);
+      setError("Could not load resorts. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [appliedSearch, locationFilter, page, perPage, planFilter, vipOnly]);
 
   useEffect(() => {
-    void load("");
-  }, []);
+    void load();
+  }, [load]);
 
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    void load(query);
-    setSearch(query);
+  const applyFilters = () => {
+    setAppliedSearch(query.trim());
+    setPage(1);
   };
 
+  const clearFilters = () => {
+    setQuery("");
+    setAppliedSearch("");
+    setLocationFilter(emptyLocationFilter());
+    setPlanFilter("");
+    setVipOnly(false);
+    setPage(1);
+  };
+
+  const resultLabel = loading
+    ? "Loading resorts…"
+    : `${meta.total} verified resort${meta.total === 1 ? "" : "s"}`;
+
   return (
-    <PageContainer className="section-padding">
-      <div className="soft-panel mb-8 p-8 text-center">
-        <h1 className="font-heading text-4xl text-zinc-900 md:text-5xl">Browse Resorts</h1>
-        <p className="mx-auto mt-3 max-w-xl text-zinc-600">
-          Discover premium staycation experiences across the Philippines.
-        </p>
-        <form onSubmit={onSearch} className="mx-auto mt-6 flex max-w-md gap-2">
-          <div className="relative flex-1">
-            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input
-              className="glass-field pl-9"
-              placeholder="Search by name or location…"
-              value={query}
-              onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value))}
-            />
-          </div>
-          <button type="submit" className="cl-btn-primary">
-            Search
-          </button>
-        </form>
-        {search ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            Showing results for &quot;{search}&quot; —{" "}
-            <button
-              className="underline hover:text-zinc-800"
-              onClick={() => {
-                setQuery("");
-                setSearch("");
-                void load("");
-              }}
-            >
-              clear
-            </button>
+    <div className="min-w-0 bg-white font-body text-[#111] antialiased">
+      <div className="sticky top-[3.5rem] z-30 border-b border-zinc-100/80 bg-white/85 backdrop-blur-xl sm:top-[4rem]">
+        <div className={`${LANDING_SHELL} py-2.5 sm:py-4`}>
+          <ResortBrowseFiltersBar
+            query={query}
+            onQueryChange={(v) => setQuery(sanitizeSearchQuery(v))}
+            onSubmit={applyFilters}
+            location={locationFilter}
+            onLocationChange={(v) => {
+              setLocationFilter(v);
+              setPage(1);
+            }}
+            planFilter={planFilter}
+            onPlanFilterChange={(v) => {
+              setPlanFilter(v);
+              setPage(1);
+            }}
+            vipOnly={vipOnly}
+            onVipOnlyChange={(v) => {
+              setVipOnly(v);
+              setPage(1);
+            }}
+            onClear={clearFilters}
+            resultLabel={resultLabel}
+          />
+        </div>
+      </div>
+
+      <div className={`${LANDING_SHELL} pb-[max(4rem,env(safe-area-inset-bottom))] pt-3 sm:pb-16 sm:pt-6`}>
+        <header className="mb-4 sm:hidden">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-clOcean">Anti-Scam PH</p>
+          <h1 className="font-heading text-xl font-bold leading-tight" style={{ color: NAVY }}>
+            Browse verified resorts
+          </h1>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+            Compare listings, view rooms, and book with scam-aware protections nationwide.
           </p>
+        </header>
+        {error ? (
+          <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 px-6 py-10 text-center text-rose-800">
+            <p className="font-medium">{error}</p>
+            <button
+              type="button"
+              className="mt-4 inline-flex rounded-full px-6 py-2.5 text-sm font-bold text-white shadow-sm"
+              style={{ background: `linear-gradient(165deg, #ffd47a 0%, ${GOLD} 45%, #c9840f 100%)` }}
+              onClick={() => void load()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        {!error && loading ? (
+          <div className={RESORT_GRID_CLASS}>
+            {Array.from({ length: Math.min(perPage, 6) }).map((_, i) => (
+              <div
+                key={i}
+                className="min-h-[8.75rem] animate-pulse overflow-hidden rounded-2xl border-2 border-zinc-200 bg-zinc-100 shadow-sm max-sm:flex max-sm:flex-row"
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {!error && !loading && resorts.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-6 py-16 text-center">
+            <Sparkles className="mx-auto h-10 w-10 text-zinc-300" aria-hidden />
+            <p className="mt-3 font-heading text-lg font-semibold" style={{ color: NAVY }}>
+              No resorts match your filters
+            </p>
+            <p className="mt-1 text-sm text-zinc-500">Try clearing filters or searching a broader area.</p>
+            <button
+              type="button"
+              className="mt-6 inline-flex rounded-full px-6 py-2.5 text-sm font-bold text-white shadow-sm"
+              style={{ background: `linear-gradient(165deg, #ffd47a 0%, ${GOLD} 45%, #c9840f 100%)` }}
+              onClick={clearFilters}
+            >
+              Show all resorts
+            </button>
+          </div>
+        ) : null}
+
+        {!error && !loading && resorts.length > 0 ? (
+          <>
+            <div className={RESORT_GRID_CLASS}>
+              {resorts.map((resort) => (
+                <BrowseResortCard
+                  key={resort.id}
+                  resort={resort}
+                  compact
+                  onViewRooms={() => setRoomsModalResort(resort)}
+                  onViewWebsite={() => setWebsiteModalResort(resort)}
+                />
+              ))}
+            </div>
+
+            <TablePaginationBar
+              className="mt-6 rounded-2xl border border-zinc-100 bg-zinc-50/80 px-2 py-3 shadow-none max-sm:mt-5 sm:mt-8 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
+              page={meta.current_page}
+              lastPage={meta.last_page}
+              total={meta.total}
+              perPage={meta.per_page}
+              perPageOptions={[25, 50, 75, 100]}
+              onPageChange={setPage}
+              onPerPageChange={(n) => {
+                setPerPage(n);
+                setPage(1);
+              }}
+            />
+          </>
         ) : null}
       </div>
 
-      {loading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="soft-panel p-6">
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div className="h-7 w-3/5 animate-pulse rounded-lg bg-zinc-200" />
-                <div className="h-6 w-16 animate-pulse rounded-full bg-zinc-200" />
-              </div>
-              <div className="mt-2 h-4 w-full animate-pulse rounded bg-zinc-200" />
-              <div className="mt-1.5 h-4 w-4/5 animate-pulse rounded bg-zinc-200" />
-              <div className="mt-4 space-y-1.5">
-                <div className="h-4 w-3/5 animate-pulse rounded bg-zinc-200" />
-                <div className="h-4 w-2/5 animate-pulse rounded bg-zinc-200" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : resorts.length === 0 ? (
-        <div className="soft-panel p-10 text-center text-zinc-600">
-          No resorts found.{" "}
-          {search ? (
-            <button className="underline" onClick={() => { setQuery(""); setSearch(""); void load(""); }}>
-              Clear search
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {resorts.map((resort) => (
-            <Link
-              key={resort.id}
-              href={`/resorts/${resort.id}`}
-              className="soft-panel block p-6 transition hover:shadow-float"
-            >
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="font-heading text-2xl text-zinc-900">{resort.name}</h2>
-                  {resort.badgeLabel ? (
-                    <ResortPlanBadge
-                      badgeLabel={resort.badgeLabel}
-                      isPremiumVerified={resort.isPremiumVerified}
-                      className="mt-2"
-                    />
-                  ) : null}
-                </div>
-                <span className="glass-tag shrink-0">
-                  <BedDouble size={11} className="inline mr-1" />
-                  {resort.activeRoomsCount} rooms
-                </span>
-              </div>
-              {resort.description ? (
-                <p className="line-clamp-2 text-sm text-zinc-600">{resort.description}</p>
-              ) : null}
-              <div className="mt-4 space-y-1.5 text-sm text-zinc-600">
-                {resort.address ? (
-                  <p className="inline-flex items-center gap-1.5">
-                    <MapPin size={13} />
-                    {resort.address}
-                  </p>
-                ) : null}
-                {resort.contactNumber ? (
-                  <p className="inline-flex items-center gap-1.5">
-                    <PhoneCall size={13} />
-                    {resort.contactNumber}
-                  </p>
-                ) : null}
-              </div>
-              <div className="mt-5">
-                <span className="inline-flex items-center rounded-full bg-gradient-to-r from-clOcean to-clTeal px-4 py-1.5 text-xs font-semibold text-white shadow-cl-btn">
-                  View Rooms →
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-12 rounded-2xl border border-clOceanDeep/20 bg-gradient-to-br from-clOceanDeep via-clOcean/95 to-clTeal/75 p-8 text-center shadow-cl-card backdrop-blur-xl md:p-10">
-        <h2 className="font-heading text-2xl font-bold text-white md:text-3xl">Are you a resort owner?</h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-white/80 md:text-base">
-          List on{" "}
-          <BrandWordmark tone="onDark" size="sm" className="inline" />: simplify management, look legit to guests, end
-          double bookings, and cut repetitive inquiries.
-        </p>
-        <div className="mt-6">
-          <OwnerValuePropsStrip variant="dark" />
-        </div>
-        <Link
-          href="/register"
-          className="mt-8 inline-flex items-center justify-center rounded-full border border-white/30 bg-white px-8 py-3 text-sm font-bold text-clOcean shadow-lg transition hover:bg-clSand active:scale-[0.985]"
-        >
-          List your resort — get started free →
-        </Link>
-      </div>
-    </PageContainer>
+      {roomsModalResort ? (
+        <ResortRoomsPreviewModal resort={roomsModalResort} open onClose={() => setRoomsModalResort(null)} />
+      ) : null}
+      {websiteModalResort ? (
+        <ResortWebsitePreviewModal
+          resort={websiteModalResort}
+          open
+          onClose={() => setWebsiteModalResort(null)}
+        />
+      ) : null}
+    </div>
   );
 }

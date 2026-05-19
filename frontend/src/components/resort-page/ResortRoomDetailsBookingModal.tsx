@@ -20,7 +20,15 @@ import {
 import { amenityMeta, extractRoomMeta, formatPhp } from "@/lib/roomPreviewDisplay";
 import { defaultReservationFeeFallbackPhp, pricingPilotEnabled, pricingPilotUnitPhp } from "@/lib/pricingPilot";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
-import { CalendarDays, ImageOff, Loader2, Users, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
+import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
+import {
+  MARKETING_MODAL_CENTER_FRAME_CLASS,
+  MARKETING_MODAL_PANEL_MAX_H,
+  MARKETING_MODAL_Z_NESTED,
+} from "@/lib/marketingModalLayout";
+import { CalendarDays, ImageOff, Loader2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +39,8 @@ type Props = {
   onClose: () => void;
   /** `public` = resort landing; `session` = guest dashboard (authenticated BFF). */
   imageAccess?: RoomImageAccess;
+  /** Portal overlay z-index (raise when stacking above catalog modals). */
+  overlayZIndexClass?: string;
 };
 
 /**
@@ -41,6 +51,7 @@ export function ResortRoomDetailsBookingModal({
   resortId,
   onClose,
   imageAccess = "public",
+  overlayZIndexClass = MARKETING_MODAL_Z_NESTED,
 }: Props) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -86,10 +97,8 @@ export function ResortRoomDetailsBookingModal({
       onClose();
     };
     window.addEventListener("keydown", onEscape);
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onEscape);
-      document.body.style.overflow = "";
       setAvailabilityOpen(false);
     };
   }, [room, onClose]);
@@ -99,15 +108,22 @@ export function ResortRoomDetailsBookingModal({
   return (
     <>
       {createPortal(
-        <div
-          className="fixed inset-0 z-[220] flex items-center justify-center bg-zinc-950/72 p-3 md:p-6"
-          onClick={onClose}
+        <DismissibleModalShell
+          open
+          onClose={onClose}
+          zIndexClass={overlayZIndexClass}
+          layout="bare"
+          frameClassName={MARKETING_MODAL_CENTER_FRAME_CLASS}
+          backdropClassName="bg-zinc-950/72"
         >
           <div
-            className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl"
+            className={cn(
+              "pointer-events-auto relative flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl",
+              MARKETING_MODAL_PANEL_MAX_H,
+            )}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="grid max-h-[92vh] grid-cols-1 overflow-y-auto lg:grid-cols-2">
+            <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-2">
               <div className="flex min-h-0 flex-col border-b border-zinc-200 bg-zinc-100 lg:border-b-0 lg:border-r">
                 <div className="relative flex h-56 w-full shrink-0 items-center justify-center overflow-hidden bg-zinc-100 sm:h-64 lg:h-72">
                   {gallery[activeImage] ? (
@@ -244,14 +260,7 @@ export function ResortRoomDetailsBookingModal({
                     <h3 className="font-heading text-2xl font-bold text-navy">{room.name}</h3>
                     <p className="mt-1 text-sm text-zinc-500">Room details</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                    aria-label="Close room details"
-                  >
-                    <X size={16} />
-                  </button>
+                  <ModalCloseButton onClose={onClose} aria-label="Close room details" />
                 </div>
 
                 <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
@@ -320,7 +329,7 @@ export function ResortRoomDetailsBookingModal({
               </div>
             </div>
           </div>
-        </div>,
+        </DismissibleModalShell>,
         document.body,
       )}
       {room && availabilityOpen ? (

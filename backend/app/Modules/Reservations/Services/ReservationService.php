@@ -9,6 +9,7 @@ use App\Models\Room;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\BookingReferralCommissionService;
 use App\Services\RoomStayGuard;
 use App\Support\PricingPilot;
 use DateTimeInterface;
@@ -19,7 +20,10 @@ use RuntimeException;
 
 class ReservationService
 {
-    public function __construct(private readonly AuditLogService $audits) {}
+    public function __construct(
+        private readonly AuditLogService $audits,
+        private readonly BookingReferralCommissionService $bookingCommissions,
+    ) {}
 
     /** Fixed guest reservation fee (PHP), from `system_settings` or config fallback. */
     public static function reservationFeeAmount(): float
@@ -406,6 +410,8 @@ class ReservationService
             ['reason' => $reason]
         );
 
+        $this->maybeReverseBookingCommission($reservation, (string) ($oldValues['status'] ?? ''));
+
         return $reservation->refresh();
     }
 
@@ -437,6 +443,8 @@ class ReservationService
             $reservation->only(['status', 'refund_status']),
             ['reason' => $reason ?? 'Guest removed from directory']
         );
+
+        $this->maybeReverseBookingCommission($reservation, (string) ($oldValues['status'] ?? ''));
 
         return $reservation->refresh();
     }
@@ -475,6 +483,8 @@ class ReservationService
             $reservation->only(['status', 'refund_status']),
             ['reason' => $reason]
         );
+
+        $this->maybeReverseBookingCommission($reservation, (string) ($oldValues['status'] ?? ''));
 
         return $reservation->refresh();
     }
@@ -543,6 +553,19 @@ class ReservationService
             ['reason' => $reason]
         );
 
+        if ($status === 'cancelled') {
+            $this->maybeReverseBookingCommission($reservation, (string) ($oldValues['status'] ?? ''));
+        }
+
         return $reservation->refresh();
+    }
+
+    private function maybeReverseBookingCommission(Reservation $reservation, string $previousStatus): void
+    {
+        if ($previousStatus !== 'confirmed') {
+            return;
+        }
+
+        $this->bookingCommissions->reverseFromCancelledReservation($reservation->refresh());
     }
 }

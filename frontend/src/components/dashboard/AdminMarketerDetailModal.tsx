@@ -1,7 +1,6 @@
 "use client";
 
 import DashModal from "@/components/dash/DashModal";
-import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import {
   getAdminMarketerDetail,
   type AdminMarketerDetailClient,
@@ -189,17 +188,21 @@ export default function AdminMarketerDetailModal({ marketerId, open, onClose }: 
           <div className="space-y-6 pt-4">
             <div className="grid gap-3 rounded-xl border border-softBorder bg-softGray/20 p-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Tier</p>
-                <div className="mt-1">
-                  <MarketerTierBadge tierKey={m.marketer_tier_key} label={m.marketer_tier_label} size="sm" />
-                </div>
-                {m.per_payment_php != null ? (
-                  <p className="mt-1 text-xs tabular-nums text-navy">{fmtPhp(m.per_payment_php)} / credit</p>
-                ) : null}
+                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Booking credits</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-navy">{m.qualifying_bookings_count ?? 0}</p>
+                <p className="text-xs text-zinc-600">
+                  {fmtPhp(m.booking_credits_gross_php ?? 0)} gross · {m.booking_reversals_count ?? 0} reversed
+                </p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Converting clients</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-navy">{m.converting_clients_count}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Current rate (new)</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-violet-800">
+                  {fmtPhp(m.current_commission_per_booking_php ?? 10)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Referral clients</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-navy">{m.referral_signup_clients_count ?? 0}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Assigned resorts</p>

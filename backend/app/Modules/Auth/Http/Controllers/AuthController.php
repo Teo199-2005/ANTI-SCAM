@@ -48,43 +48,20 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'max:190', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
             'business_name' => ['nullable', 'string', 'max:190'],
-            'role_intent' => ['nullable', 'in:resort_owner,client,guest'],
-            'resort_subdomain' => [
-                Rule::requiredIf(fn () => ($request->input('role_intent') ?? 'resort_owner') === 'guest'),
-                'nullable',
-                'string',
-                'max:120',
-            ],
+            'role_intent' => ['nullable', 'in:resort_owner,client'],
+            'signup_source_resort_id' => ['nullable', 'integer', 'exists:resorts,id'],
             'accept_terms' => ['required', 'accepted'],
             'password' => PlatformPasswordRules::requiredWithConfirmation(),
             'referral_code' => ['nullable', 'string', 'max:32'],
         ]);
 
-        $roleIntent = $validated['role_intent'] ?? 'resort_owner';
-
-        $homeResortId = null;
-        if ($roleIntent === 'guest') {
-            $slug = mb_strtolower(trim((string) ($validated['resort_subdomain'] ?? '')));
-            $tenant = Tenant::withoutGlobalScopes()
-                ->where('subdomain', $slug)
-                ->where('status', 'active')
-                ->first();
-            if (! $tenant) {
-                throw ValidationException::withMessages([
-                    'resort_subdomain' => ['This resort link is invalid or inactive.'],
-                ]);
-            }
-            $resort = Resort::withoutGlobalScopes()
-                ->where('tenant_id', $tenant->id)
-                ->where('is_publicly_listed', true)
-                ->first();
-            if (! $resort) {
-                throw ValidationException::withMessages([
-                    'resort_subdomain' => ['This resort is not accepting public bookings yet.'],
-                ]);
-            }
-            $homeResortId = $resort->id;
+        if ($request->input('role_intent') === 'guest' || $request->filled('resort_subdomain')) {
+            throw ValidationException::withMessages([
+                'role_intent' => ['Guest accounts are no longer created. Register as a client to book any resort.'],
+            ]);
         }
+
+        $roleIntent = $validated['role_intent'] ?? 'resort_owner';
 
         $payload = [
             'name' => $validated['name'],
@@ -95,9 +72,6 @@ class AuthController extends Controller
             'terms_accepted_at' => now(),
             'terms_version' => PlatformTerms::version(),
         ];
-        if ($roleIntent === 'guest') {
-            $payload['home_resort_id'] = $homeResortId;
-        }
 
         $user = User::create($payload);
 

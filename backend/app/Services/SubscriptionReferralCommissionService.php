@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Commission;
 use App\Models\SubscriptionInvoice;
 
+/**
+ * @deprecated Replaced by {@see BookingReferralCommissionService} (flat PHP per paid online booking).
+ */
 class SubscriptionReferralCommissionService
 {
     public function __construct(

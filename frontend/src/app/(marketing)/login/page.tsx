@@ -1,10 +1,10 @@
 "use client";
 
-import { AuthPageBrandTagline } from "@/components/branding/AuthPageBrandTagline";
 import { AuthSplitShell } from "@/components/auth/AuthSplitShell";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
+import { buildRegisterUrl, postAuthDashboardPath } from "@/lib/auth/clientAuthUrls";
 import { publicClient } from "@/lib/api/client";
 import { useHydrated } from "@/hooks/useHydrated";
 import { laravelPublicUrl } from "@/lib/publicAsset";
@@ -64,7 +64,9 @@ function LoginPageContent() {
   const oauthError = searchParams.get("error");
 
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
-  const isGuestFromResort = Boolean(resortSlug);
+  const returnTo = searchParams.get("returnTo")?.trim() ?? "";
+  const isClientContext = searchParams.get("intent") === "client" || Boolean(resortSlug);
+  const isGuestFromResort = isClientContext && Boolean(resortSlug);
   const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null } | null>(null);
 
   useEffect(() => {
@@ -103,7 +105,7 @@ function LoginPageContent() {
     setPending(true);
     try {
       const user = await login(email.trim(), password);
-      router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
+      router.push(postAuthDashboardPath(user.role, returnTo || (resortSlug ? `/resort/${resortSlug}` : null)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
@@ -118,7 +120,7 @@ function LoginPageContent() {
     setPassword(demoPassword);
     try {
       const user = await login(e, demoPassword);
-      router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
+      router.push(postAuthDashboardPath(user.role, returnTo || (resortSlug ? `/resort/${resortSlug}` : null)));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed.";
       setError(msg);
@@ -172,7 +174,7 @@ function LoginPageContent() {
 
         <div className="max-lg:mb-5 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-3 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
         <a
-          href={googleOAuthRedirectUrl()}
+          href={googleOAuthRedirectUrl(returnTo || (resortSlug ? `/resort/${resortSlug}` : null))}
           className="mb-3 flex w-full min-h-[2.875rem] items-center justify-center gap-2.5 rounded-xl border border-zinc-200/90 bg-white py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 max-lg:mb-3 max-lg:shadow-md max-lg:shadow-clOcean/10 max-lg:active:scale-[0.99] lg:mb-5 lg:shadow-sm"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
@@ -286,7 +288,6 @@ function LoginPageContent() {
           </Link>
         </p>
 
-        {!isGuestFromResort ? <AuthPageBrandTagline /> : null}
       </div>
     </AuthSplitShell>
     {!isGuestFromResort ? <DemoQuickLogin variant="floating" onLoginAs={onDemoLogin} /> : null}

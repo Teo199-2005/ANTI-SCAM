@@ -6,7 +6,9 @@ import PasswordRequirementsMeter from "@/components/auth/PasswordRequirementsMet
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHydrated } from "@/hooks/useHydrated";
+import { useRegisterModal } from "@/contexts/RegisterModalContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
+import { buildLoginUrl, postAuthDashboardPath } from "@/lib/auth/clientAuthUrls";
 import { publicClient } from "@/lib/api/client";
 import { validateReferralCodePublic } from "@/lib/api/referral";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
@@ -19,6 +21,8 @@ import {
 } from "@/lib/inputRestrictions";
 import { getPasswordPolicyChecks, passwordPolicyMet } from "@/lib/passwordStrength";
 import { laravelPublicUrl } from "@/lib/publicAsset";
+import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
+import { MARKETING_MODAL_CENTER_FRAME_CLASS, MARKETING_MODAL_Z_REGISTER } from "@/lib/marketingModalLayout";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
@@ -58,9 +62,21 @@ function RegisterPageInner() {
   } | null>(null);
   const [mounted, setMounted] = useState(false);
 
+  const refFromQuery = searchParams.get("ref") ?? searchParams.get("referral") ?? "";
+  const hasReferralRef = Boolean(sanitizeReferralCodeInput(refFromQuery));
+
+  const intentRaw = searchParams.get("intent")?.trim() ?? "";
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
-  const isGuestFromResort = Boolean(resortSlug);
-  const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null } | null>(null);
+  const returnTo = searchParams.get("returnTo")?.trim() ?? "";
+  /** Marketer referral codes apply to resort-owner signup only. */
+  const isOwnerFlow = intentRaw === "owner" || hasReferralRef;
+  const isClientFlow = !hasReferralRef && (intentRaw === "client" || Boolean(resortSlug));
+  /** Resort slug signup hides marketing nav — use the compact guest shell only then. */
+  const isGuestFromResort = isClientFlow && Boolean(resortSlug);
+  const needsRolePick = !isOwnerFlow && !isClientFlow;
+  const { openRegisterModal } = useRegisterModal();
+  const legacyResortBanner = Boolean(resortSlug) && intentRaw !== "client";
+  const [resortBrand, setResortBrand] = useState<{ name: string; logoUrl: string | null; id?: number } | null>(null);
 
   useEffect(() => {
     if (!resortSlug) {
@@ -79,6 +95,7 @@ function RegisterPageInner() {
           setResortBrand({
             name: data.data.name,
             logoUrl: data.data.logoUrl ?? null,
+            id: (data.data as { id?: number }).id,
           });
         } else {
           setResortBrand(null);
@@ -96,10 +113,21 @@ function RegisterPageInner() {
     setMounted(true);
   }, []);
 
-  const refFromQuery = searchParams.get("ref") ?? searchParams.get("referral") ?? "";
+  useEffect(() => {
+    if (!needsRolePick) return;
+    openRegisterModal({ onClose: () => router.push("/") });
+  }, [needsRolePick, openRegisterModal, router]);
+
+  /** Legacy shared links used `/register?ref=` without `intent=owner` — normalize the URL. */
+  useEffect(() => {
+    if (!hasReferralRef || intentRaw === "owner") return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("intent", "owner");
+    router.replace(`/register?${params.toString()}`);
+  }, [hasReferralRef, intentRaw, router, searchParams]);
 
   useEffect(() => {
-    if (isGuestFromResort) return;
+    if (!isOwnerFlow) return;
     const normalized = sanitizeReferralCodeInput(refFromQuery);
     if (!normalized) return;
     let cancelled = false;
@@ -126,7 +154,7 @@ function RegisterPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [refFromQuery, isGuestFromResort]);
+  }, [refFromQuery, isOwnerFlow]);
 
   const clearAppliedReferral = () => {
     setAppliedReferral(null);
@@ -177,15 +205,15 @@ function RegisterPageInner() {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
-        business_name: isGuestFromResort ? undefined : businessName.trim() || undefined,
-        role_intent: isGuestFromResort ? "guest" : "resort_owner",
-        resort_subdomain: isGuestFromResort ? resortSlug : undefined,
-        referral_code: !isGuestFromResort && appliedReferral ? appliedReferral.code : undefined,
+        business_name: isOwnerFlow ? businessName.trim() || undefined : undefined,
+        role_intent: isOwnerFlow ? "resort_owner" : "client",
+        signup_source_resort_id: isClientFlow && resortBrand?.id ? resortBrand.id : undefined,
+        referral_code: isOwnerFlow && appliedReferral ? appliedReferral.code : undefined,
         password,
         password_confirmation: passwordConfirmation,
         accept_terms: true,
       });
-      if (!isGuestFromResort && referralTrial?.active) {
+      if (isOwnerFlow && referralTrial?.active) {
         setTrialSuccessModal({
           marketerName: referralTrial.marketer_name ?? appliedReferral?.marketerName ?? "your partner",
           code: referralTrial.code ?? appliedReferral?.code ?? "",
@@ -193,7 +221,7 @@ function RegisterPageInner() {
         });
         return;
       }
-      router.push(user.role === "guest" ? "/dashboard/guest" : "/dashboard");
+      router.push(postAuthDashboardPath(user.role, returnTo));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
@@ -202,7 +230,7 @@ function RegisterPageInner() {
   };
 
   const resortLogoAbs =
-    isGuestFromResort && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
+    isClientFlow && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
 
   const trialEndLabel =
     trialSuccessModal?.endsAt != null
@@ -217,13 +245,21 @@ function RegisterPageInner() {
     <AuthSplitShell guestResortContext={isGuestFromResort}>
       {mounted && trialSuccessModal
         ? createPortal(
-            <div
-              className="fixed inset-0 z-[410] flex items-center justify-center bg-zinc-900/50 p-4 backdrop-blur-[2px]"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="register-trial-success-title"
+            <DismissibleModalShell
+              open
+              onClose={() => setTrialSuccessModal(null)}
+              zIndexClass={MARKETING_MODAL_Z_REGISTER}
+              layout="bare"
+              frameClassName={MARKETING_MODAL_CENTER_FRAME_CLASS}
+              backdropClassName="bg-zinc-900/50 backdrop-blur-[2px]"
             >
-              <div className="w-full max-w-md rounded-2xl border border-emerald-200/80 bg-white p-6 text-center shadow-2xl shadow-zinc-900/20">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="register-trial-success-title"
+                className="pointer-events-auto w-full max-w-md rounded-2xl border border-emerald-200/80 bg-white p-6 text-center shadow-2xl shadow-zinc-900/20"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                   <Gift className="h-7 w-7" aria-hidden />
                 </div>
@@ -243,20 +279,29 @@ function RegisterPageInner() {
                   Go to dashboard
                 </button>
               </div>
-            </div>,
+            </DismissibleModalShell>,
             document.body,
           )
         : null}
-      {mounted && referralVerifyModalOpen && !isGuestFromResort
+      {mounted && referralVerifyModalOpen && isOwnerFlow
         ? createPortal(
-            <div
-              className="fixed inset-0 z-[400] flex items-center justify-center bg-zinc-900/45 p-4 backdrop-blur-[2px]"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="register-referral-verify-title"
-              aria-busy="true"
+            <DismissibleModalShell
+              open
+              onClose={() => {}}
+              zIndexClass={MARKETING_MODAL_Z_REGISTER}
+              layout="bare"
+              frameClassName={MARKETING_MODAL_CENTER_FRAME_CLASS}
+              backdropClassName="bg-zinc-900/45 backdrop-blur-[2px]"
+              dismissOnBackdrop={false}
+              escapeToClose={false}
             >
-              <div className="w-full max-w-sm rounded-2xl border border-white/20 bg-white px-6 py-8 text-center shadow-2xl shadow-zinc-900/25">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="register-referral-verify-title"
+                aria-busy="true"
+                className="pointer-events-auto w-full max-w-sm rounded-2xl border border-white/20 bg-white px-6 py-8 text-center shadow-2xl shadow-zinc-900/25"
+              >
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-clOcean/10">
                   <Loader2 className="h-8 w-8 animate-spin text-clOcean" aria-hidden />
                 </div>
@@ -265,13 +310,19 @@ function RegisterPageInner() {
                 </p>
                 <p className="mt-1.5 text-sm text-zinc-600">Please wait while we check this code…</p>
               </div>
-            </div>,
+            </DismissibleModalShell>,
             document.body,
           )
         : null}
 
+      {!needsRolePick ? (
       <div className={cn(AUTH_MARKETING_CARD, "!p-4 sm:!p-5")}>
-        {isGuestFromResort ? (
+        {legacyResortBanner ? (
+          <p className="mb-3 rounded-lg border border-sky-200/80 bg-sky-50 px-3 py-2 text-center text-xs text-sky-950">
+            One account books any verified resort. Register below as a client to continue.
+          </p>
+        ) : null}
+        {isClientFlow && resortSlug ? (
           <p className="mb-3 text-center">
             <Link
               href={`/resort/${encodeURIComponent(resortSlug)}`}
@@ -301,19 +352,25 @@ function RegisterPageInner() {
           )}
           <div className="min-w-0 flex-1 pt-0.5">
             <h1 className="font-heading text-xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-[1.35rem]">
-              {isGuestFromResort ? "Join as a guest" : "Create your account"}
+              {isOwnerFlow
+                ? "List your resort"
+                : isClientFlow
+                  ? resortBrand?.name
+                    ? `Book ${resortBrand.name}`
+                    : "Create your booker account"
+                  : "Create your account"}
             </h1>
-            {!isGuestFromResort ? (
-              <p className="mt-0.5 text-xs leading-snug text-zinc-600 sm:text-sm sm:leading-snug">
-                Book resorts and track reservations in one place.
-              </p>
-            ) : null}
+            <p className="mt-0.5 text-xs leading-snug text-zinc-600 sm:text-sm sm:leading-snug">
+              {isOwnerFlow
+                ? "Free verification, listing, and owner tools on Anti-Scam PH."
+                : "One account for every verified resort — explore and book anywhere."}
+            </p>
           </div>
         </div>
 
         <div className="max-lg:mb-3 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-2.5 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
         <a
-          href={googleOAuthRedirectUrl()}
+          href={googleOAuthRedirectUrl(returnTo || (resortSlug ? `/resort/${resortSlug}` : undefined))}
           className="mb-2 flex w-full min-h-[2.5rem] items-center justify-center gap-2 rounded-lg border border-zinc-200/90 bg-white py-2.5 text-sm font-semibold text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 max-lg:shadow-sm max-lg:active:scale-[0.99] lg:mb-2.5"
         >
               <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
@@ -357,7 +414,7 @@ function RegisterPageInner() {
             />
           </div>
 
-          <div className={`grid gap-2.5 sm:gap-2 ${isGuestFromResort ? "" : "sm:grid-cols-2"}`}>
+          <div className={`grid gap-2.5 sm:gap-2 ${isOwnerFlow ? "sm:grid-cols-2" : ""}`}>
             <div>
               <label htmlFor="register-phone" className="mb-1 block text-[11px] font-semibold text-zinc-700">
                 Contact number
@@ -367,7 +424,7 @@ function RegisterPageInner() {
                 suppressHydrationWarning
                 className={authInput}
                 autoComplete="tel"
-                required={!isGuestFromResort}
+                required={isOwnerFlow}
                 value={phone}
                 onChange={(e) => setPhone(sanitizePhilippinesMobileInput(e.target.value))}
                 inputMode="numeric"
@@ -375,7 +432,7 @@ function RegisterPageInner() {
                 placeholder="09XXXXXXXXX"
               />
             </div>
-            {isGuestFromResort ? null : (
+            {isOwnerFlow ? (
             <div>
               <label htmlFor="register-business" className="mb-1 block text-[11px] font-semibold text-zinc-700">
                 Resort name
@@ -389,7 +446,7 @@ function RegisterPageInner() {
                 placeholder="e.g. Sunset Cove Resort"
               />
             </div>
-            )}
+            ) : null}
           </div>
 
           <div>
@@ -494,7 +551,7 @@ function RegisterPageInner() {
             />
           </div>
 
-          {!isGuestFromResort ? (
+          {isOwnerFlow ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <label htmlFor="register-referral" className="text-[11px] font-semibold text-zinc-700">
@@ -575,15 +632,19 @@ function RegisterPageInner() {
         <p className="mt-2.5 text-center text-xs text-zinc-600 sm:text-sm">
           Already have an account?{" "}
           <Link
-            href={resortSlug ? `/login?resort=${encodeURIComponent(resortSlug)}` : "/login"}
+            href={buildLoginUrl({
+              returnTo: returnTo || (resortSlug ? `/resort/${resortSlug}` : null),
+              intent: isClientFlow ? "client" : undefined,
+            })}
             className="font-semibold text-clOcean hover:text-clOceanHover hover:underline"
           >
             Sign in
           </Link>
         </p>
 
-        {!isGuestFromResort ? <AuthPageBrandTagline className="mt-3 border-t-0 pt-2 md:mt-2 md:pt-2" /> : null}
+        {isOwnerFlow ? <AuthPageBrandTagline className="mt-3 border-t-0 pt-2 md:mt-2 md:pt-2" /> : null}
       </div>
+      ) : null}
     </AuthSplitShell>
   );
 }

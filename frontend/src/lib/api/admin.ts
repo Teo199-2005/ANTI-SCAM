@@ -219,13 +219,30 @@ export type AnalyticsFilters = {
   max_revenue?: number | "";
 };
 
-export async function getSystemSettings(): Promise<SystemSetting[]> {
-  const { data } = await apiClient.get<ApiEnvelope<SystemSetting[]>>("/admin/settings");
-  return data.data;
+export type SystemSettingsPayload = {
+  settings: SystemSetting[];
+  marketing_commission_policy_note?: string;
+};
+
+export async function getSystemSettings(): Promise<SystemSettingsPayload> {
+  const { data } = await apiClient.get<
+    ApiEnvelope<SystemSetting[] | { settings: SystemSetting[]; marketing_commission_policy_note?: string }>
+  >("/admin/settings");
+  const raw = data.data;
+  if (Array.isArray(raw)) {
+    return { settings: raw };
+  }
+  return {
+    settings: raw.settings ?? [],
+    marketing_commission_policy_note: raw.marketing_commission_policy_note,
+  };
 }
 
-export async function updateSystemSettings(settings: { key: string; value: string }[]): Promise<void> {
-  await apiClient.put("/admin/settings", { settings });
+export async function updateSystemSettings(settings: { key: string; value: string }[]): Promise<string | undefined> {
+  const { data } = await apiClient.put<
+    ApiEnvelope<{ marketing_commission_policy_note?: string } | null>
+  >("/admin/settings", { settings });
+  return data.data?.marketing_commission_policy_note ?? data.message;
 }
 
 export async function sendAdminMailTest(toEmail: string): Promise<{ email_log_id: number }> {
@@ -332,6 +349,26 @@ function normalizeArray<T>(value: unknown): T[] {
 
 // ── Admin finance (payment ledger, commissions, withholding) ───────────────────
 
+export type AdminBookingCommissionOverview = {
+  current_rate_php: number;
+  enabled: boolean;
+  ytd: {
+    credits_count: number;
+    credits_gross_php: number;
+    reversals_count: number;
+    reversals_gross_php: number;
+    net_credited_php: number;
+    marketers_active: number;
+  };
+  ledger: {
+    booking_pending_gross_php: number;
+    booking_released_gross_php: number;
+    legacy_pending_gross_php: number;
+    legacy_released_gross_php: number;
+  };
+  policy_note: string;
+};
+
 export type AdminFinanceOverview = {
   withholding_rate: number;
   withholding_percent_label: string;
@@ -344,6 +381,7 @@ export type AdminFinanceOverview = {
   payout_batches_succeeded_gross: number;
   payout_batches_succeeded_net: number;
   withheld_on_succeeded_batches: number;
+  booking_commissions?: AdminBookingCommissionOverview;
   counts: {
     subscription_invoices_paid: number;
     subscription_invoices_unpaid: number;
@@ -382,10 +420,10 @@ export type FinanceCommissionRow = {
   resort_id: number;
   period: string;
   commission_amount: string;
-  /** Tier key stored on last credit to this row (subscription-referral); optional for legacy rows */
   marketer_tier?: string | null;
-  /** PHP per credit increment when tier was applied; optional for legacy rows */
   unit_commission_php?: string | number | null;
+  commission_source?: "booking_commission" | "subscription_legacy" | string;
+  booking_count?: number | null;
   status: string;
   payout_batch_id: number | null;
   marketer?: { id: number; name: string; email: string };
@@ -468,6 +506,14 @@ export async function getAdminFinanceOverview(): Promise<AdminFinanceOverview> {
   return data.data;
 }
 
+export async function getAdminBookingCommissionAnalytics(year?: number): Promise<AdminBookingCommissionAnalytics> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminBookingCommissionAnalytics>>(
+    "/admin/marketing/booking-commissions/analytics",
+    { params: year != null ? { year } : {} },
+  );
+  return data.data;
+}
+
 export async function getAdminPaymentLedger(params?: {
   page?: number;
   per_page?: number;
@@ -541,11 +587,46 @@ export type AdminMarketerMonitorRow = {
   commission_pending_php: number;
   commission_released_gross_php: number;
   commission_total_gross_php: number;
-  marketer_tier_key: string | null;
-  marketer_tier_label: string | null;
-  per_payment_php: number | null;
-  next_tier_at: number | null;
-  clients_to_next_tier: number | null;
+  booking_credits_count: number;
+  booking_reversals_count: number;
+  booking_credits_gross_php: number;
+  current_commission_per_booking_php: number;
+};
+
+export type AdminBookingCommissionAnalytics = {
+  year: number;
+  current_rate_php: number;
+  commissions_enabled: boolean;
+  policy_note: string;
+  totals: {
+    credits_count: number;
+    credits_gross_php: number;
+    reversals_count: number;
+    reversals_gross_php: number;
+    net_credited_php: number;
+    marketers_active: number;
+  };
+  monthly: Array<{
+    period: string;
+    credits_count: number;
+    credits_gross_php: number;
+    reversals_count: number;
+    reversals_gross_php: number;
+    net_credited_php: number;
+  }>;
+  top_marketers: Array<{
+    marketer_id: number;
+    marketer_name: string;
+    marketer_email: string;
+    credits_count: number;
+    credits_gross_php: number;
+  }>;
+  commission_ledger: {
+    booking_pending_gross_php: number;
+    booking_released_gross_php: number;
+    legacy_pending_gross_php: number;
+    legacy_released_gross_php: number;
+  };
 };
 
 export type AdminTierLadderRow = {
@@ -562,6 +643,8 @@ export type AdminMarketerMonitoringPayload = {
   meta: {
     generated_at: string;
     new_client_definition: string;
+    booking_commission_policy?: string;
+    commission_per_booking_php?: number;
     tier_ladder?: AdminTierLadderRow[];
     tier_policy?: string;
   };
@@ -610,10 +693,11 @@ export type AdminMarketerDetailPayload = {
     referral_code: string | null;
     joined_at: string | null;
     assigned_resorts_count: number;
-    converting_clients_count: number;
-    marketer_tier_key: string | null;
-    marketer_tier_label: string | null;
-    per_payment_php: number | null;
+    referral_signup_clients_count: number;
+    qualifying_bookings_count: number;
+    booking_reversals_count: number;
+    booking_credits_gross_php: number;
+    current_commission_per_booking_php: number;
     commission_pending_php: number;
     commission_released_gross_php: number;
     commission_total_gross_php: number;
@@ -656,6 +740,10 @@ export async function getAdminMarketersMonitoring(
     meta: {
       generated_at: typeof meta.generated_at === "string" ? meta.generated_at : "",
       new_client_definition: typeof meta.new_client_definition === "string" ? meta.new_client_definition : "",
+      booking_commission_policy:
+        typeof meta.booking_commission_policy === "string" ? meta.booking_commission_policy : undefined,
+      commission_per_booking_php:
+        typeof meta.commission_per_booking_php === "number" ? meta.commission_per_booking_php : undefined,
       tier_ladder: Array.isArray(meta.tier_ladder) ? (meta.tier_ladder as AdminTierLadderRow[]) : undefined,
       tier_policy: typeof meta.tier_policy === "string" ? meta.tier_policy : undefined,
     },

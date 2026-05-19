@@ -22,6 +22,12 @@ export type PublicRoom = {
   status: string;
 };
 
+export type PublicResortMap = {
+  address: string | null;
+  embedUrl: string | null;
+  searchUrl: string | null;
+};
+
 export type PublicResort = {
   id: number;
   slug?: string;
@@ -32,16 +38,20 @@ export type PublicResort = {
   contactNumber: string | null;
   /** Public resort detail (by id or slug) — resort logo path when set. */
   logoUrl?: string | null;
+  map?: PublicResortMap | null;
   images?: { id: number; url: string; caption?: string | null }[];
   rooms: PublicRoom[];
 };
 
 export type PublicResortListItem = {
   id: number;
+  slug?: string | null;
   name: string;
   description: string | null;
   address: string | null;
   contactNumber: string | null;
+  logoUrl?: string | null;
+  backgroundImageUrl?: string | null;
   plan?: string;
   badgeLabel?: string;
   isPremiumVerified?: boolean;
@@ -88,16 +98,20 @@ export async function listPublicResorts(params?: {
   page?: number;
   province_psgc?: string | null;
   city_municipality_psgc?: string | null;
+  plan?: "standard" | "business_pro" | "";
+  vip_only?: boolean;
 }) {
   const { data } = await apiClient.get<ApiEnvelope<PaginatedResponse<PublicResortListItem>>>(
     "/public/resorts",
     {
       params: {
-        ...params,
+        search: params?.search || undefined,
+        perPage: params?.perPage,
+        page: params?.page,
+        plan: params?.plan || undefined,
+        vip_only: params?.vip_only ? 1 : undefined,
         province_code: params?.province_psgc ?? undefined,
         city_code: params?.city_municipality_psgc ?? undefined,
-        province_psgc: undefined,
-        city_municipality_psgc: undefined,
       },
     },
   );

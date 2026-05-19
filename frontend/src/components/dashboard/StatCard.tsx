@@ -1,14 +1,16 @@
 import { kpiTone, rgb, type KpiIconTone } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 import { LucideIcon, TrendingDown, TrendingUp } from "lucide-react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export type IconTone = KpiIconTone;
 
 type StatCardProps = {
   label: string;
   value: string | number;
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  /** Custom icon (e.g. Business Pro verified badge image). Takes precedence over `icon`. */
+  iconNode?: ReactNode;
   iconTone?: IconTone;
   trend?: "up" | "down";
   trendValue?: string;
@@ -31,6 +33,7 @@ export default function StatCard({
   label,
   value,
   icon: Icon,
+  iconNode,
   iconTone = "blue",
   trend,
   trendValue,
@@ -38,7 +41,7 @@ export default function StatCard({
   compact = false,
   dense = false,
 }: StatCardProps) {
-  const tone = kpiTone[iconTone];
+  const tone = kpiTone[iconTone] ?? kpiTone.blue;
   const resting = shadowForRgb(tone.rgb);
   const hover = shadowHoverForRgb(tone.rgb);
 
@@ -80,14 +83,16 @@ export default function StatCard({
           )}
           style={{ background: tone.accent }}
         >
-          <Icon
-            className={cn(
-              "text-white",
-              dense ? "h-3.5 w-3.5 md:h-4 md:w-4" : compact ? "h-4 w-4 md:h-[18px] md:w-[18px]" : "h-[18px] w-[18px]",
-            )}
-            strokeWidth={2}
-            aria-hidden
-          />
+          {iconNode ?? (Icon ? (
+            <Icon
+              className={cn(
+                "text-white",
+                dense ? "h-3.5 w-3.5 md:h-4 md:w-4" : compact ? "h-4 w-4 md:h-[18px] md:w-[18px]" : "h-[18px] w-[18px]",
+              )}
+              strokeWidth={2}
+              aria-hidden
+            />
+          ) : null)}
         </div>
 
         {trend === "up" ? (

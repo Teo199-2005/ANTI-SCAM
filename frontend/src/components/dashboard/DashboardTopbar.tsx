@@ -10,8 +10,8 @@ import { formatRoleLabel } from "@/lib/utils";
 import { formatPhpLedger } from "@/lib/formatPhp";
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import MarketingTiersInfoModal from "@/components/dashboard/MarketingTiersInfoModal";
-import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
-import { Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Crown, Loader2, LogOut, Menu, Sparkles, WalletCards, X } from "lucide-react";
+import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
+import { Award, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Loader2, LogOut, Menu, Shield, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -389,7 +389,11 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                     aria-expanded={isSubscribedOwner ? showSubscriptionDetails : undefined}
                     aria-haspopup={isSubscribedOwner ? "dialog" : undefined}
                   >
-                    <Crown size={14} className="shrink-0 max-sm:h-3.5 max-sm:w-3.5" />
+                    {isBusinessPro ? (
+                      <BusinessProVerifiedBadge size="sm" />
+                    ) : (
+                      <Shield size={14} className="shrink-0 max-sm:h-3.5 max-sm:w-3.5" aria-hidden />
+                    )}
                     {isBusinessPro ? (
                       <>
                         <span className="truncate sm:hidden">Pro</span>
@@ -412,8 +416,16 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   {isSubscribedOwner && showSubscriptionDetails ? (
                     <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-72 rounded-xl border border-softBorder bg-white p-3 shadow-card">
                       <p className="font-dash text-[11px] font-bold uppercase tracking-wide text-zinc-500">Subscription details</p>
-                      <p className="mt-1 text-sm font-semibold text-navy">
-                        Plan: {ownerPlan === "business_pro" ? "Business Pro" : "Standard (free)"}
+                      <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-navy">
+                        <span>Plan:</span>
+                        {ownerPlan === "business_pro" ? (
+                          <span className="inline-flex items-center gap-1">
+                            <BusinessProVerifiedBadge size="xs" />
+                            Business Pro
+                          </span>
+                        ) : (
+                          <span>Standard (free)</span>
+                        )}
                       </p>
                       {isStandardFreeActive ? (
                         <p className="mt-1 text-sm text-zinc-600">
@@ -481,24 +493,25 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-xl border border-violet-200/90 bg-gradient-to-b from-violet-50 to-white px-2.5 py-2 font-dash text-[10px] font-bold uppercase tracking-wide text-violet-950 shadow-soft-sm transition hover:border-violet-300 hover:shadow-card sm:max-w-none sm:gap-2 sm:px-3 sm:text-dash-xs"
                 >
                   <Award size={15} className="shrink-0 text-violet-600" aria-hidden />
-                  <span className="hidden min-[400px]:inline">Tiers</span>
-                  <MarketerTierBadge
-                    tierKey={marketingStats?.marketerTier?.tierKey}
-                    label={marketingStats?.marketerTier?.label}
-                    size="sm"
-                    showGem={false}
-                    className="hidden sm:inline-flex"
-                  />
+                  <span className="hidden min-[400px]:inline">Commissions</span>
+                  <span className="hidden tabular-nums text-violet-800 sm:inline">
+                    {marketingStats
+                      ? `${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(marketingStats.commissionPerBookingPhp)}/bk`
+                      : "₱10/bk"}
+                  </span>
                 </button>
                 {mounted ? (
                   <MarketingTiersInfoModal
                     open={marketingTierModalOpen}
                     onClose={() => setMarketingTierModalOpen(false)}
-                    tierLadder={marketingStats?.tierLadder ?? []}
-                    tierPolicy={marketingStats?.tierPolicy ?? ""}
-                    marketerTier={marketingStats?.marketerTier ?? null}
-                    convertingClientsCount={marketingStats?.convertingClientsCount ?? 0}
-                    convertingResortsWithReferralCount={marketingStats?.convertingResortsWithReferralCount ?? 0}
+                    bookingCommissionPolicy={marketingStats?.bookingCommissionPolicy ?? ""}
+                    commissionPerBookingPhp={marketingStats?.commissionPerBookingPhp ?? 10}
+                    qualifyingBookingsCount={marketingStats?.qualifyingBookingsCount ?? 0}
+                    qualifyingBookingsMtd={marketingStats?.qualifyingBookingsMtd ?? 0}
+                    pendingCommissionsGross={marketingStats?.pendingCommissions ?? 0}
+                    pendingPayoutNetEstimate={marketingStats?.pendingPayoutNetEstimate ?? 0}
+                    payoutWithholdingRate={marketingStats?.payoutWithholdingRate ?? 0.1}
+                    commissionPayoutSchedule={marketingStats?.commission_payout_schedule ?? null}
                     loading={marketingStatsLoading}
                   />
                 ) : null}
@@ -555,7 +568,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
               <div className="relative z-10 flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white/90 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[10px]">
-                    <Sparkles size={11} className="shrink-0 sm:h-3 sm:w-3" aria-hidden />
+                    <BusinessProVerifiedBadge size="xs" />
                     Business Pro
                   </span>
                   <h2 className="mt-1.5 font-dash text-base font-semibold leading-snug sm:mt-2 sm:text-xl">
@@ -635,7 +648,7 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   </p>
                 </div>
                 <p className="mt-1.5 inline-flex flex-wrap items-center gap-1 text-[10px] text-zinc-500 sm:mt-2 sm:gap-1.5 sm:text-xs">
-                  <Crown size={12} className="shrink-0 text-primaryBlue sm:h-[13px] sm:w-[13px]" />
+                  <BusinessProVerifiedBadge size="xs" />
                   <span>
                     Total due now:{" "}
                     <span className="font-semibold text-navy">

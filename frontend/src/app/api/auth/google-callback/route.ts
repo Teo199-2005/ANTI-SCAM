@@ -16,7 +16,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=oauth_failed", req.url));
   }
 
-  const res = NextResponse.redirect(new URL("/dashboard", req.url));
+  const rawRedirect = req.nextUrl.searchParams.get("redirect")?.trim() ?? "";
+  const safeRedirect =
+    rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/dashboard";
+  const res = NextResponse.redirect(new URL(safeRedirect, req.url));
 
   res.cookies.set("rs_session", token, rsSessionCookieOptions(req));
 

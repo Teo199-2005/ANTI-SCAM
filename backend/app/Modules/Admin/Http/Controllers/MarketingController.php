@@ -5,13 +5,16 @@ namespace App\Modules\Admin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\CommissionRelease;
+use App\Models\MarketerBookingCommissionEvent;
 use App\Models\MarketerPayoutBatch;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
+use App\Services\MarketerBookingCommissionStatsService;
 use App\Services\MarketerCommissionPayoutService;
+use App\Services\AdminBookingCommissionAnalyticsService;
 use App\Services\MarketerReferralDetailService;
-use App\Services\MarketerTierService;
+use App\Services\MarketingBookingCommissionSettingsService;
 use App\Support\ResortLocationQuery;
 use App\Shared\Traits\ApiResponseTrait;
 use Carbon\Carbon;
@@ -24,7 +27,9 @@ class MarketingController extends Controller
 
     public function __construct(
         private readonly AuditLogService $audits,
-        private readonly MarketerTierService $marketerTiers,
+        private readonly MarketerBookingCommissionStatsService $bookingStats,
+        private readonly MarketingBookingCommissionSettingsService $bookingSettings,
+        private readonly AdminBookingCommissionAnalyticsService $bookingAnalytics,
         private readonly MarketerCommissionPayoutService $marketerPayouts,
         private readonly MarketerReferralDetailService $marketerReferralDetail,
     ) {}
@@ -126,6 +131,12 @@ class MarketingController extends Controller
             ->get()
             ->keyBy('marketer_id');
 
+        $bookingGrossByMarketer = MarketerBookingCommissionEvent::query()
+            ->where('type', MarketerBookingCommissionEvent::TYPE_CREDIT)
+            ->groupBy('marketer_id')
+            ->selectRaw('marketer_id, COALESCE(SUM(amount), 0) as gross')
+            ->pluck('gross', 'marketer_id');
+
         $now = Carbon::now();
 
         $rows = [];
@@ -137,7 +148,8 @@ class MarketingController extends Controller
 
             $referredClientsCount = $ref ? (int) $ref->referred_clients_count : 0;
             $referredResortsCount = $resortRef ? (int) $resortRef->referred_resorts_count : 0;
-            $tierResolved = $this->marketerTiers->resolveTier($referredClientsCount);
+            $bookingCredits = $this->bookingStats->qualifyingBookingsCount((int) $m->id);
+            $bookingReversals = $this->bookingStats->reversedBookingsCount((int) $m->id);
             $lastNewRaw = $ref?->last_new_referred_resort_at ?? null;
             $lastNewAt = $lastNewRaw ? Carbon::parse($lastNewRaw) : null;
 
@@ -167,11 +179,10 @@ class MarketingController extends Controller
                 'commission_pending_php' => $com ? round((float) $com->pending_commission, 2) : 0.0,
                 'commission_released_gross_php' => $com ? round((float) $com->released_commission_gross, 2) : 0.0,
                 'commission_total_gross_php' => $com ? round((float) $com->total_commission_gross, 2) : 0.0,
-                'marketer_tier_key' => $tierResolved['tier_key'] ?? null,
-                'marketer_tier_label' => $tierResolved['label'] ?? null,
-                'per_payment_php' => $tierResolved['per_payment_php'] ?? null,
-                'next_tier_at' => $tierResolved['next_tier_at'] ?? null,
-                'clients_to_next_tier' => $tierResolved['clients_to_next_tier'] ?? null,
+                'booking_credits_count' => $bookingCredits,
+                'booking_reversals_count' => $bookingReversals,
+                'booking_credits_gross_php' => round((float) ($bookingGrossByMarketer->get($m->id) ?? 0), 2),
+                'current_commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
                 '_sort_idle' => $sortIdle,
             ];
         }
@@ -189,11 +200,25 @@ class MarketingController extends Controller
             'rows' => $rows,
             'meta' => [
                 'generated_at' => $now->toIso8601String(),
-                'new_client_definition' => 'Converting client = distinct resort-owner organization (tenant) with at least one paid qualifying subscription invoice attributed to the marketer. Multiple resorts or renewals under the same tenant still count as one client for tiers. Distinct resorts with referral payments is shown separately.',
-                'tier_ladder' => $this->marketerTiers->tierLadder(),
-                'tier_policy' => $this->marketerTiers->tierPolicySummary(),
+                'new_client_definition' => 'Signup funnel: distinct resort-owner organizations with referral attribution (paid subscription or trial). Booking commissions: paid online guest bookings at assigned resorts (flat rate per credit).',
+                'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
+                'commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
+                'commissions_enabled' => $this->bookingSettings->isEnabled(),
+                'settings_policy_note' => $this->bookingSettings->policyNote(),
             ],
         ], 'Marketing monitoring snapshot');
+    }
+
+    /** Admin analytics for booking commissions (amounts from frozen event rows). */
+    public function bookingCommissionAnalytics(Request $request)
+    {
+        $year = $request->integer('year');
+        $year = $year > 2000 && $year < 2100 ? $year : (int) Carbon::now()->year;
+
+        return $this->successResponse(
+            $this->bookingAnalytics->report($year),
+            'Booking commission analytics',
+        );
     }
 
     /** Admin: clients and subscription transactions for one marketing partner. */
@@ -204,8 +229,6 @@ class MarketingController extends Controller
         }
 
         $marketerId = (int) $marketer->id;
-        $convertingClientsCount = $this->marketerTiers->countConvertingClients($marketerId);
-        $tierResolved = $this->marketerTiers->resolveTier($convertingClientsCount);
 
         $commissionStats = Commission::query()
             ->selectRaw(
@@ -218,6 +241,7 @@ class MarketingController extends Controller
 
         $clients = $this->marketerReferralDetail->clientsForMarketer($marketerId);
         $transactions = $this->marketerReferralDetail->subscriptionTransactionsForMarketer($marketerId);
+        $bookingCommissions = $this->marketerReferralDetail->bookingCommissionsForMarketer($marketerId);
 
         $paidClients = 0;
         $trialClients = 0;
@@ -229,6 +253,8 @@ class MarketingController extends Controller
             }
         }
 
+        $referralClientsCount = $paidClients + $trialClients;
+
         return $this->successResponse([
             'marketer' => [
                 'id' => $marketer->id,
@@ -237,10 +263,14 @@ class MarketingController extends Controller
                 'referral_code' => $marketer->referral_code,
                 'joined_at' => $marketer->created_at?->toIso8601String(),
                 'assigned_resorts_count' => (int) DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count(),
-                'converting_clients_count' => $convertingClientsCount,
-                'marketer_tier_key' => $tierResolved['tier_key'] ?? null,
-                'marketer_tier_label' => $tierResolved['label'] ?? null,
-                'per_payment_php' => $tierResolved['per_payment_php'] ?? null,
+                'referral_signup_clients_count' => $referralClientsCount,
+                'qualifying_bookings_count' => $this->bookingStats->qualifyingBookingsCount($marketerId),
+                'booking_reversals_count' => $this->bookingStats->reversedBookingsCount($marketerId),
+                'booking_credits_gross_php' => round((float) MarketerBookingCommissionEvent::query()
+                    ->where('marketer_id', $marketerId)
+                    ->where('type', MarketerBookingCommissionEvent::TYPE_CREDIT)
+                    ->sum('amount'), 2),
+                'current_commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
                 'commission_pending_php' => $commissionStats ? round((float) $commissionStats->pending_commission, 2) : 0.0,
                 'commission_released_gross_php' => $commissionStats ? round((float) $commissionStats->released_commission_gross, 2) : 0.0,
                 'commission_total_gross_php' => $commissionStats ? round((float) $commissionStats->total_commission_gross, 2) : 0.0,
@@ -254,7 +284,12 @@ class MarketingController extends Controller
             'transactions' => $transactions,
             'transactions_meta' => [
                 'total' => count($transactions),
-                'definition' => 'All subscription invoices attributed to this marketer (paid and pending), newest first. Room add-ons are labeled.',
+                'definition' => 'Legacy subscription invoices attributed to this marketer (paid and pending), newest first. New earnings are booking commissions.',
+            ],
+            'booking_commissions' => $bookingCommissions,
+            'booking_commissions_meta' => [
+                'total' => count($bookingCommissions),
+                'definition' => 'Credits and reversals for paid online guest bookings at assigned resorts.',
             ],
         ], 'Marketing partner detail');
     }

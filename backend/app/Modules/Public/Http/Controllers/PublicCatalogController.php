@@ -28,13 +28,19 @@ class PublicCatalogController extends Controller
 
     public function resorts()
     {
-        $perPage = (int) request()->integer('perPage', 12);
+        $perPage = min(100, max(6, (int) request()->integer('perPage', 25)));
         $search = request()->string('search')->value();
         $provinceCode = request()->string('province_code')->value();
         $cityCode = request()->string('city_code')->value();
+        $planFilter = request()->string('plan')->value();
+        $vipOnly = request()->boolean('vip_only');
 
         $resorts = Resort::query()
-            ->with(['subscription', 'rooms' => fn ($q) => $q->where('status', 'active')->select('id', 'resort_id')])
+            ->with([
+                'subscription',
+                'tenant:id,subdomain',
+                'rooms' => fn ($q) => $q->where('status', 'active')->select('id', 'resort_id'),
+            ])
             ->withCount(['rooms as active_rooms_count' => fn ($q) => $q->where('status', 'active')])
             ->where('is_publicly_listed', true)
             ->leftJoin('subscriptions', 'subscriptions.resort_id', '=', 'resorts.id')
@@ -47,6 +53,22 @@ class PublicCatalogController extends Controller
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
                         ->orWhere('address_label', 'like', "%{$search}%");
+                });
+            })
+            ->when($vipOnly, fn ($q) => $q->where('resorts.is_vip', true))
+            ->when($planFilter === SubscriptionPlan::BUSINESS_PRO, function ($q): void {
+                $q->whereHas('subscription', function ($sub): void {
+                    $sub->where('plan', SubscriptionPlan::BUSINESS_PRO)
+                        ->whereIn('status', ['active', 'grace_period']);
+                });
+            })
+            ->when($planFilter === SubscriptionPlan::STANDARD, function ($q): void {
+                $q->where(function ($inner): void {
+                    $inner->whereDoesntHave('subscription')
+                        ->orWhereHas('subscription', function ($sub): void {
+                            $sub->where('plan', '!=', SubscriptionPlan::BUSINESS_PRO)
+                                ->orWhereNotIn('status', ['active', 'grace_period']);
+                        });
                 });
             })
             ->paginate($perPage);
@@ -65,8 +87,13 @@ class PublicCatalogController extends Controller
             $isPremium = $plan === SubscriptionPlan::BUSINESS_PRO
                 && in_array((string) ($resort->subscription?->status), ['active', 'grace_period'], true);
 
+            $slug = $resort->tenant?->subdomain;
+            $slug = is_string($slug) ? trim($slug) : '';
+            $slug = $slug !== '' ? $slug : null;
+
             return [
                 'id'               => $resort->id,
+                'slug'             => $slug,
                 'name'             => $resort->name,
                 'description'      => $resort->description,
                 'address'          => $this->locations->resortDisplayLine($resort),
@@ -74,12 +101,14 @@ class PublicCatalogController extends Controller
                 'addressCityMunicipalityPsgc' => $resort->address_city_municipality_psgc,
                 'addressBarangayPsgc' => $resort->address_barangay_psgc,
                 'contactNumber'    => $resort->contact_number,
+                'logoUrl'          => $resort->logo_url,
+                'backgroundImageUrl' => $resort->background_image_url,
                 'plan'             => $plan,
                 'badgeLabel'       => $isPremium
                     ? SubscriptionPlan::badgeLabel(SubscriptionPlan::BUSINESS_PRO)
                     : SubscriptionPlan::badgeLabel(SubscriptionPlan::STANDARD),
                 'isPremiumVerified' => $isPremium,
-                'isVip'            => $isPremium,
+                'isVip'            => (bool) $resort->is_vip,
                 'activeRoomsCount' => $resort->active_rooms_count,
                 'featuredRoomId'   => $resort->rooms->first()?->id,
                 'priceFrom'        => $minPrices->get($resort->id),
@@ -89,8 +118,10 @@ class PublicCatalogController extends Controller
         return $this->successResponse($resorts, 'Public resorts fetched');
     }
 
-    public function resort(Resort $resort)
+    public function resort(int $resort)
     {
+        $resort = Resort::withoutGlobalScopes()->findOrFail($resort);
+
         if (! $resort->is_publicly_listed) {
             abort(404, 'Resort is not publicly listed.');
         }
@@ -114,6 +145,7 @@ class PublicCatalogController extends Controller
             'contactNumber' => $resort->contact_number,
             'logoUrl'       => $resort->logo_url,
             'isVip'         => (bool) $resort->is_vip,
+            'map'           => $this->readiness->mapPayloadForResort($resort),
             'rooms'         => $rooms,
         ], 'Resort detail fetched');
     }
@@ -153,6 +185,7 @@ class PublicCatalogController extends Controller
             'addressBarangayPsgc' => $resort->address_barangay_psgc,
             'contactNumber' => $resort->contact_number,
             'isVip'         => (bool) $resort->is_vip,
+            'map'           => $this->readiness->mapPayloadForResort($resort),
             'rooms'         => $rooms,
         ], 'Resort detail by slug fetched');
     }
@@ -360,17 +393,29 @@ class PublicCatalogController extends Controller
         return Room::withoutGlobalScopes()
             ->where('resort_id', $resort->id)
             ->where('status', 'active')
+            ->with('images')
             ->get()
-            ->map(fn (Room $room): array => [
-                'id'        => $room->id,
-                'name'      => $room->name,
-                'code'      => $room->code,
-                'capacity'  => $room->capacity,
-                'units'     => max(1, (int) ($room->units ?? 1)),
-                'basePrice' => $room->base_price,
-                'amenities' => $room->amenities ?? [],
-                'status'    => $room->status,
-            ]);
+            ->map(function (Room $room): array {
+                $images = $room->images
+                    ->sortBy(fn ($img): array => [($img->is_primary ? 0 : 1), (int) $img->sort_order])
+                    ->map(fn ($img) => $img->toPublicArray())
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id'        => $room->id,
+                    'name'      => $room->name,
+                    'code'      => $room->code,
+                    'capacity'  => $room->capacity,
+                    'units'     => max(1, (int) ($room->units ?? 1)),
+                    'basePrice' => $room->base_price,
+                    'amenities' => $room->amenities ?? [],
+                    'rules'     => $room->rules,
+                    'images'    => $images,
+                    'status'    => $room->status,
+                ];
+            });
     }
 
     private function validateRoomPublicBookable(Room $room): ?\Illuminate\Http\JsonResponse

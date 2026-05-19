@@ -3,13 +3,14 @@
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
-import MarketerTierBadge from "@/components/dashboard/MarketerTierBadge";
 import {
+  getAdminBookingCommissionAnalytics,
   getAdminCommissionReleases,
   getAdminFinanceCommissions,
   getAdminFinanceOverview,
   getAdminPaymentLedger,
   getAdminWithholdingBatches,
+  type AdminBookingCommissionAnalytics,
   type AdminFinanceOverview,
   type FinanceCommissionRow,
   type FinanceLedgerRow,
@@ -30,12 +31,13 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
 
-type TabId = "overview" | "ledger" | "commissions" | "withholding" | "releases";
+type TabId = "overview" | "booking_commissions" | "ledger" | "commissions" | "withholding" | "releases";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: PieChart },
+  { id: "booking_commissions", label: "Booking commissions", icon: Banknote },
   { id: "ledger", label: "Payment ledger", icon: Receipt },
-  { id: "commissions", label: "Commissions", icon: Banknote },
+  { id: "commissions", label: "Commission ledger", icon: Banknote },
   { id: "withholding", label: "Withholding & payouts", icon: Landmark },
   { id: "releases", label: "Release log", icon: BookOpen },
 ];
@@ -94,6 +96,9 @@ export default function AdminFinancePage() {
   const [relRows, setRelRows] = useState<CommissionReleaseRow[]>([]);
   const [relMeta, setRelMeta] = useState({ last_page: 1, total: 0 });
 
+  const [bookingYear, setBookingYear] = useState(new Date().getFullYear());
+  const [bookingAnalytics, setBookingAnalytics] = useState<AdminBookingCommissionAnalytics | null>(null);
+
   const perPage = 15;
 
   const loadOverview = useCallback(async () => {
@@ -139,6 +144,11 @@ export default function AdminFinancePage() {
     setRelMeta({ last_page: p.last_page, total: p.total });
   }, [relPage]);
 
+  const loadBookingAnalytics = useCallback(async () => {
+    const a = await getAdminBookingCommissionAnalytics(bookingYear);
+    setBookingAnalytics(a);
+  }, [bookingYear]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -146,6 +156,7 @@ export default function AdminFinancePage() {
       setError(null);
       try {
         if (tab === "overview") await loadOverview();
+        else if (tab === "booking_commissions") await loadBookingAnalytics();
         else if (tab === "ledger") await loadLedger();
         else if (tab === "commissions") await loadCommissions();
         else if (tab === "withholding") await loadBatches();
@@ -159,10 +170,17 @@ export default function AdminFinancePage() {
     return () => {
       cancelled = true;
     };
-  }, [tab, loadOverview, loadLedger, loadCommissions, loadBatches, loadReleases]);
+  }, [tab, loadOverview, loadBookingAnalytics, loadLedger, loadCommissions, loadBatches, loadReleases]);
+
+  useEffect(() => {
+    if (tab === "booking_commissions") {
+      void loadBookingAnalytics();
+    }
+  }, [bookingYear, tab, loadBookingAnalytics]);
 
   const refresh = () => {
     if (tab === "overview") void loadOverview();
+    else if (tab === "booking_commissions") void loadBookingAnalytics();
     else if (tab === "ledger") void loadLedger();
     else if (tab === "commissions") void loadCommissions();
     else if (tab === "withholding") void loadBatches();
@@ -262,12 +280,39 @@ export default function AdminFinancePage() {
               <DashCard className="border-l-4 border-l-clOcean p-4 text-sm text-zinc-700">
                 <p className="font-semibold text-navy">Configured marketer payout withholding</p>
                 <p className="mt-1">
-                  Platform rate: <strong>{overview.withholding_percent_label}</strong> of gross subscription-referral
-                  commissions is withheld (taxes &amp; fees) before GCash disbursement. Succeeded batches below show realized
-                  gross vs net paid. Gross per row is credited when subscription invoices pay (tier-based rates); payouts only
-                  sum those booked amounts and apply withholding — they do not recompute tiers.
+                  Platform rate: <strong>{overview.withholding_percent_label}</strong> of gross marketer commissions is withheld
+                  before GCash disbursement. Payout batches sum frozen commission row amounts — they never recalculate historical
+                  credits when you change the rate in System Settings.
                 </p>
               </DashCard>
+              {overview.booking_commissions ? (
+                <DashCard className="border-l-4 border-l-violet-500 p-4">
+                  <p className="text-sm font-semibold text-navy">Booking commissions (YTD)</p>
+                  <p className="mt-1 text-xs text-zinc-600">{overview.booking_commissions.policy_note}</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-zinc-500">Current rate (new credits)</p>
+                      <p className="text-lg font-bold text-violet-800">{fmtPhp(overview.booking_commissions.current_rate_php)}</p>
+                      <p className="text-[10px] text-zinc-500">{overview.booking_commissions.enabled ? "Enabled" : "Disabled"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-zinc-500">Credits (events)</p>
+                      <p className="text-lg font-bold text-navy">{overview.booking_commissions.ytd.credits_count}</p>
+                      <p className="text-[10px] text-zinc-500">{fmtPhp(overview.booking_commissions.ytd.credits_gross_php)} gross</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-zinc-500">Reversals</p>
+                      <p className="text-lg font-bold text-amber-800">{overview.booking_commissions.ytd.reversals_count}</p>
+                      <p className="text-[10px] text-zinc-500">{fmtPhp(overview.booking_commissions.ytd.reversals_gross_php)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-zinc-500">Net credited (YTD)</p>
+                      <p className="text-lg font-bold text-emerald-700">{fmtPhp(overview.booking_commissions.ytd.net_credited_php)}</p>
+                      <p className="text-[10px] text-zinc-500">Pending booking {fmtPhp(overview.booking_commissions.ledger.booking_pending_gross_php)}</p>
+                    </div>
+                  </div>
+                </DashCard>
+              ) : null}
               <div className="rounded-2xl border border-softBorderStrong/70 bg-softGray/20 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-3">
                 <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
                 <DashCard className="border-softBorderStrong/75 p-4 shadow-sm sm:p-5">
@@ -313,6 +358,43 @@ export default function AdminFinancePage() {
                   <p className="mt-1 text-[10px] text-zinc-500 sm:text-xs">All statuses (see Withholding tab)</p>
                 </DashCard>
                 </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === "booking_commissions" && (
+        <div className="space-y-4">
+          <label className="text-xs font-semibold text-zinc-600">
+            Year{" "}
+            <select
+              className={financeSelectCls}
+              value={bookingYear}
+              onChange={(e) => setBookingYear(Number(e.target.value))}
+            >
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          {loading || !bookingAnalytics ? (
+            <div className="h-40 animate-pulse rounded-2xl bg-softGray" />
+          ) : (
+            <>
+              <DashCard className="p-4 text-sm text-zinc-700">{bookingAnalytics.policy_note}</DashCard>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <DashCard className="p-4">
+                  <p className="text-[10px] font-bold uppercase text-zinc-500">Credits</p>
+                  <p className="text-2xl font-bold text-navy">{bookingAnalytics.totals.credits_count}</p>
+                  <p className="text-xs">{fmtPhp(bookingAnalytics.totals.credits_gross_php)}</p>
+                </DashCard>
+                <DashCard className="p-4">
+                  <p className="text-[10px] font-bold uppercase text-zinc-500">Net credited</p>
+                  <p className="text-2xl font-bold text-emerald-700">{fmtPhp(bookingAnalytics.totals.net_credited_php)}</p>
+                </DashCard>
               </div>
             </>
           )}
@@ -464,8 +546,10 @@ export default function AdminFinancePage() {
                       {
                         label: "Tier (last credit)",
                         value:
-                          c.marketer_tier != null && String(c.marketer_tier).length > 0 ? (
-                            <MarketerTierBadge tierKey={c.marketer_tier} size="sm" />
+                          c.commission_source === "booking_commission" ? (
+                            <span className="dash-badge-violet text-[10px]">Booking</span>
+                          ) : c.commission_source === "subscription_legacy" ? (
+                            <span className="dash-badge-slate text-[10px]">Legacy sub</span>
                           ) : (
                             "—"
                           ),
@@ -516,8 +600,10 @@ export default function AdminFinancePage() {
                         <td className="text-sm">{c.resort?.name ?? c.resort_id}</td>
                         <td className="font-mono text-xs">{c.period}</td>
                         <td>
-                          {c.marketer_tier ? (
-                            <MarketerTierBadge tierKey={c.marketer_tier} size="sm" />
+                          {c.commission_source === "booking_commission" ? (
+                            <span className="dash-badge-violet text-[10px]">Booking</span>
+                          ) : c.commission_source === "subscription_legacy" ? (
+                            <span className="dash-badge-slate text-[10px]">Legacy</span>
                           ) : (
                             <span className="text-xs text-zinc-400">—</span>
                           )}

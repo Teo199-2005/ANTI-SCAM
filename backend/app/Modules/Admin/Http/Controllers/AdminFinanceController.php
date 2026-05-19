@@ -8,7 +8,9 @@ use App\Models\CommissionRelease;
 use App\Models\MarketerPayoutBatch;
 use App\Models\Reservation;
 use App\Models\SubscriptionInvoice;
+use App\Services\AdminBookingCommissionAnalyticsService;
 use App\Services\MarketerCommissionPayoutService;
+use App\Services\MarketingBookingCommissionSettingsService;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,8 @@ class AdminFinanceController extends Controller
 
     public function __construct(
         private readonly MarketerCommissionPayoutService $payoutService,
+        private readonly AdminBookingCommissionAnalyticsService $bookingAnalytics,
+        private readonly MarketingBookingCommissionSettingsService $bookingSettings,
     ) {}
 
     /** Platform-wide money snapshot for admin monitoring. */
@@ -63,6 +67,9 @@ class AdminFinanceController extends Controller
 
         $withheldOnSucceededBatches = round(max(0, $grossFromSucceededBatches - $netFromBatches), 2);
 
+        $bookingYear = (int) now()->year;
+        $bookingReport = $this->bookingAnalytics->report($bookingYear);
+
         return $this->successResponse([
             'withholding_rate' => $whRate,
             'withholding_percent_label' => $whPct.'%',
@@ -75,6 +82,13 @@ class AdminFinanceController extends Controller
             'payout_batches_succeeded_gross' => round($grossFromSucceededBatches, 2),
             'payout_batches_succeeded_net' => round($netFromBatches, 2),
             'withheld_on_succeeded_batches' => $withheldOnSucceededBatches,
+            'booking_commissions' => [
+                'current_rate_php' => $this->bookingSettings->amountPhpForNewCredits(),
+                'enabled' => $this->bookingSettings->isEnabled(),
+                'ytd' => $bookingReport['totals'],
+                'ledger' => $bookingReport['commission_ledger'],
+                'policy_note' => $this->bookingSettings->policyNote(),
+            ],
             'counts' => [
                 'subscription_invoices_paid' => SubscriptionInvoice::withoutGlobalScopes()->where('status', 'paid')->count(),
                 'subscription_invoices_unpaid' => SubscriptionInvoice::withoutGlobalScopes()->whereIn('status', ['pending', 'failed', 'expired'])->count(),
@@ -193,6 +207,16 @@ class AdminFinanceController extends Controller
         }
 
         $page = $q->orderByDesc('id')->paginate($perPage);
+
+        $page->getCollection()->transform(function (Commission $commission) {
+            $tier = (string) ($commission->marketer_tier ?? '');
+            $commission->setAttribute(
+                'commission_source',
+                $tier === 'booking_flat' ? 'booking_commission' : 'subscription_legacy',
+            );
+
+            return $commission;
+        });
 
         $summary = [
             'pending_count' => Commission::query()->where('status', 'pending')->count(),

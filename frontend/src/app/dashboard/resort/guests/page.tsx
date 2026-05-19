@@ -13,6 +13,7 @@ import {
 import { useToast } from "@/components/shared/ToastProvider";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import Button from "@/components/ui/Button";
+import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
 import { apiClient } from "@/lib/api/client";
 import { bulkDeleteResortGuests, bulkDeleteToastDescriptionGeneric } from "@/lib/api/bulkDelete";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
@@ -188,9 +189,7 @@ function ModalPanel({
           <h2 className="font-dash text-lg font-semibold text-navy">{title}</h2>
           {subtitle ? <p className="text-xs text-zinc-500">{subtitle}</p> : null}
         </div>
-        <button type="button" className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="Close" onClick={onClose}>
-          <X size={18} />
-        </button>
+        <ModalCloseButton onClose={onClose} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
     </div>
@@ -442,19 +441,10 @@ export default function ResortGuestsPage() {
           <h1 className="dash-page-title flex items-center gap-2">
             <Users size={24} className="text-skyBlue" /> Guest Directory
           </h1>
-          <p className="dash-page-sub">Manage guests, create login accounts, and view booking history.</p>
+          <p className="dash-page-sub">
+            View-only directory of guests who booked your resort (from reservations).
+          </p>
         </div>
-        <button
-          type="button"
-          className="dash-btn-primary inline-flex shrink-0 items-center gap-2"
-          onClick={() => {
-            setCreateForm(blankCreate);
-            setCreateOpen(true);
-          }}
-        >
-          <Plus size={16} aria-hidden />
-          Add guest
-        </button>
       </div>
 
       <div className="dash-filter-bar">
@@ -473,14 +463,6 @@ export default function ResortGuestsPage() {
         )}
       </div>
 
-      <BulkActionBar
-        count={bulk.selectedCount}
-        onClear={bulk.clear}
-        onDelete={() => setConfirmBulkDelete(true)}
-        deleting={bulkDeleting}
-        deleteLabel="Remove selected guests"
-      />
-
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-800">{error}</div>
       ) : (
@@ -491,8 +473,7 @@ export default function ResortGuestsPage() {
           deletingKey={deletingKey}
           bulk={bulk}
           onDetail={(g) => void openDetail(g)}
-          onEdit={openEdit}
-          onDelete={(g) => setConfirmSingleDelete(g)}
+          readOnly
         />
       )}
 
@@ -595,37 +576,7 @@ export default function ResortGuestsPage() {
               detail={detail}
               historyRows={historyRows}
               historyLoading={historyLoading}
-              deletingKey={deletingKey}
-              onEdit={() => {
-                setDetailOpen(false);
-                openEdit({
-                  guestKey: detail.guestKey,
-                  name: detail.name,
-                  email: detail.email,
-                  phone: detail.phone,
-                  id: detail.id,
-                  reservationCount: detail.reservationCount,
-                  totalSpent: detail.totalSpent,
-                  lastCheckIn: detail.lastCheckIn,
-                  lastCheckOut: detail.lastCheckOut,
-                  firstBooking: detail.firstBooking,
-                  hasLoginAccount: detail.hasLoginAccount,
-                });
-              }}
-              onDelete={() =>
-                setConfirmSingleDelete({
-                  guestKey: detail.guestKey,
-                  name: detail.name,
-                  email: detail.email,
-                  phone: detail.phone,
-                  id: detail.id,
-                  reservationCount: detail.reservationCount,
-                  totalSpent: detail.totalSpent,
-                  lastCheckIn: detail.lastCheckIn,
-                  lastCheckOut: detail.lastCheckOut,
-                  firstBooking: detail.firstBooking,
-                })
-              }
+              readOnly
             />
           ) : null}
         </Modal>
@@ -749,16 +700,12 @@ function GuestDetailView({
   detail,
   historyRows,
   historyLoading,
-  deletingKey,
-  onEdit,
-  onDelete,
+  readOnly = false,
 }: {
   detail: GuestDetail;
   historyRows: ReservationRow[];
   historyLoading: boolean;
-  deletingKey: string | null;
-  onEdit: () => void;
-  onDelete: () => void;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-5">
@@ -791,7 +738,7 @@ function GuestDetailView({
                 <UserCheck size={14} /> Active
               </span>
             ) : (
-              <span className="text-zinc-500">None — create via Add guest or set password on edit</span>
+              <span className="text-zinc-500">Guest booked without a platform login</span>
             )}
           </dd>
         </div>
@@ -833,20 +780,6 @@ function GuestDetailView({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
-        <button type="button" className="dash-btn-secondary inline-flex items-center gap-1" onClick={onEdit}>
-          <Pencil size={14} /> Edit
-        </button>
-        <button
-          type="button"
-          className="dash-btn-secondary inline-flex items-center gap-1 text-rose-700 hover:bg-rose-50"
-          disabled={deletingKey === detail.guestKey}
-          onClick={onDelete}
-        >
-          {deletingKey === detail.guestKey ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-          Remove guest
-        </button>
-      </div>
     </div>
   );
 }
@@ -860,6 +793,7 @@ function GuestList({
   onDetail,
   onEdit,
   onDelete,
+  readOnly = false,
 }: {
   loading: boolean;
   filtered: Guest[];
@@ -867,8 +801,9 @@ function GuestList({
   deletingKey: string | null;
   bulk: ReturnType<typeof useBulkSelection<Guest>>;
   onDetail: (g: Guest) => void;
-  onEdit: (g: Guest) => void;
-  onDelete: (g: Guest) => void;
+  onEdit?: (g: Guest) => void;
+  onDelete?: (g: Guest) => void;
+  readOnly?: boolean;
 }) {
   if (loading) {
     return (
@@ -905,11 +840,13 @@ function GuestList({
             key={g.guestKey}
             title={
               <span className="flex items-center gap-2">
-                <BulkSelectMobile
-                  checked={bulk.isSelected(g.guestKey)}
-                  onChange={() => bulk.toggle(g.guestKey)}
-                  ariaLabel={`Select ${g.name}`}
-                />
+                {!readOnly ? (
+                  <BulkSelectMobile
+                    checked={bulk.isSelected(g.guestKey)}
+                    onChange={() => bulk.toggle(g.guestKey)}
+                    ariaLabel={`Select ${g.name}`}
+                  />
+                ) : null}
                 {g.name}
                 {g.hasLoginAccount ? <UserCheck size={14} className="text-emerald-600" aria-label="Has login" /> : null}
               </span>
@@ -942,6 +879,7 @@ function GuestList({
                 <Button type="button" variant="outline" className="w-full justify-center gap-2 text-xs" onClick={() => onDetail(g)}>
                   <Eye size={14} /> Details
                 </Button>
+                {!readOnly && onEdit && onDelete ? (
                 <div className="grid grid-cols-2 gap-2">
                   <Button type="button" variant="outline" className="justify-center gap-1 text-xs" onClick={() => onEdit(g)}>
                     <Pencil size={14} /> Edit
@@ -956,6 +894,7 @@ function GuestList({
                     <Trash2 size={14} /> Remove
                   </Button>
                 </div>
+                ) : null}
               </div>
             }
           />
@@ -965,12 +904,14 @@ function GuestList({
         <table className="dash-table">
           <thead>
             <tr>
+              {!readOnly ? (
               <BulkSelectTh
                 checked={bulk.isAllSelected}
                 indeterminate={bulk.isSomeSelected}
                 onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
                 disabled={filtered.length === 0}
               />
+              ) : null}
               <th>Name</th>
               <th>Email</th>
               <th>Phone</th>
@@ -984,11 +925,13 @@ function GuestList({
           <tbody>
             {filtered.map((g) => (
               <tr key={g.guestKey}>
+                {!readOnly ? (
                 <BulkSelectTd
                   checked={bulk.isSelected(g.guestKey)}
                   onChange={() => bulk.toggle(g.guestKey)}
                   ariaLabel={`Select ${g.name}`}
                 />
+                ) : null}
                 <td className="font-semibold text-navy">
                   <span className="inline-flex items-center gap-1.5">
                     {g.name}
@@ -1020,9 +963,12 @@ function GuestList({
                     <button type="button" className="dash-btn-sm" onClick={() => onDetail(g)} title="View details">
                       <Eye size={14} />
                     </button>
+                    {!readOnly && onEdit ? (
                     <button type="button" className="dash-btn-sm" onClick={() => onEdit(g)} title="Edit">
                       <Pencil size={14} />
                     </button>
+                    ) : null}
+                    {!readOnly && onDelete ? (
                     <button
                       type="button"
                       className="dash-btn-sm text-rose-700"
@@ -1032,6 +978,7 @@ function GuestList({
                     >
                       {deletingKey === g.guestKey ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                     </button>
+                    ) : null}
                   </DashTableActionsInner>
                 </DashTableActionsCell>
               </tr>
