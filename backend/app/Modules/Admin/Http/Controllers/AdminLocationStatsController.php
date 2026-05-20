@@ -419,18 +419,18 @@ class AdminLocationStatsController extends Controller
                 ->where('address_label', '!=', '');
 
             if ($mode === 'province_city_null') {
-                $label = (clone $base)->whereNull('address_city_municipality_psgc')->orderBy('id')->value('address_label');
-                if (is_string($label) && trim($label) !== '') {
-                    return trim($label);
+                $res = (clone $base)->whereNull('address_city_municipality_psgc')->orderBy('id')->first(['address_label', 'address_street_line']);
+                if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
+                    return $this->stripStreetPrefixFromAddressLabel(trim($res->address_label), $res->address_street_line);
                 }
 
                 continue;
             }
 
             if ($mode === 'province_any') {
-                $label = (clone $base)->orderBy('id')->value('address_label');
-                if (is_string($label) && trim($label) !== '') {
-                    return trim($label);
+                $res = (clone $base)->orderBy('id')->first(['address_label', 'address_street_line']);
+                if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
+                    return $this->stripStreetPrefixFromAddressLabel(trim($res->address_label), $res->address_street_line);
                 }
 
                 continue;
@@ -441,14 +441,39 @@ class AdminLocationStatsController extends Controller
             }
 
             foreach ($this->psgcCodeCandidates($cityPsgc) as $cityTry) {
-                $label = (clone $base)->where('address_city_municipality_psgc', $cityTry)->orderBy('id')->value('address_label');
-                if (is_string($label) && trim($label) !== '') {
-                    return trim($label);
+                $res = (clone $base)->where('address_city_municipality_psgc', $cityTry)->orderBy('id')->first(['address_label', 'address_street_line']);
+                if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
+                    return $this->stripStreetPrefixFromAddressLabel(trim($res->address_label), $res->address_street_line);
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * {@see PhilippineLocationService::prefixResortStreetLine} stores "Street, Barangay, City, Province".
+     * Admin location stats should show city + province only, so drop the leading street when it matches
+     * {@see Resort::$address_street_line}.
+     */
+    private function stripStreetPrefixFromAddressLabel(string $addressLabel, mixed $streetRaw): string
+    {
+        $street = is_string($streetRaw) ? trim($streetRaw) : '';
+        if ($street === '') {
+            return $addressLabel;
+        }
+
+        $len = strlen($street);
+        if ($len > 0 && strncasecmp($addressLabel, $street, $len) === 0) {
+            $rest = trim(substr($addressLabel, $len));
+            if (str_starts_with($rest, ',')) {
+                $rest = trim(substr($rest, 1));
+            }
+
+            return $rest !== '' ? $rest : $addressLabel;
+        }
+
+        return $addressLabel;
     }
 
     /**
