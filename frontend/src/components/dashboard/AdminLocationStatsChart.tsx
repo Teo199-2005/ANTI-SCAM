@@ -21,36 +21,36 @@ export default function AdminLocationStatsChart({ rows, limit = 5 }: AdminLocati
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-xs text-zinc-500">
+    <div className="space-y-5">
+      <p className="text-sm text-zinc-500">
         Top {Math.min(limit, topRows.length)} location{topRows.length === 1 ? "" : "s"} by resort count
       </p>
 
-      <ul className="space-y-3.5" aria-label={`Top ${limit} resort locations`}>
+      <ul className="space-y-4 md:space-y-5" aria-label={`Top ${limit} resort locations`}>
         {topRows.map((row, index) => (
           <li key={`${row.location_label}-${index}`}>
-            <div className="mb-1.5 flex items-baseline justify-between gap-3">
-              <div className="flex min-w-0 flex-1 items-baseline gap-2">
+            <div className="mb-2 flex items-baseline justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
                 <span
-                  className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-md bg-zinc-100 px-1.5 text-[11px] font-bold tabular-nums text-zinc-600"
+                  className="inline-flex h-6 min-w-[1.5rem] shrink-0 items-center justify-center rounded-md bg-zinc-100 px-1.5 text-xs font-bold tabular-nums text-zinc-600"
                   aria-label={`Rank ${index + 1}`}
                 >
                   {index + 1}
                 </span>
                 <span
-                  className="min-w-0 truncate font-dash text-sm font-semibold text-navy"
+                  className="min-w-0 truncate font-dash text-base font-semibold text-navy md:text-[1.05rem]"
                   title={row.location_label}
                 >
                   {row.location_label}
                 </span>
               </div>
-              <span className="shrink-0 text-xs font-semibold tabular-nums text-navy">
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-navy">
                 {row.resort_count} {row.resort_count === 1 ? "resort" : "resorts"}
               </span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-softGray">
+            <div className="h-4 overflow-hidden rounded-full bg-softGray">
               <div
-                className="h-3 rounded-full bg-emerald-500 transition-[width] duration-300"
+                className="h-4 rounded-full bg-emerald-500 transition-[width] duration-300"
                 style={{ width: `${barWidth(row.resort_count, maxResorts)}%` }}
               />
             </div>

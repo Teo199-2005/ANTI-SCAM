@@ -10,6 +10,7 @@ use App\Models\Resort;
 use App\Models\User;
 use App\Services\PhilippineLocationService;
 use App\Support\CacheSafe;
+use App\Support\PsgcCode;
 use App\Support\ResortLocationQuery;
 use App\Shared\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
@@ -102,7 +103,7 @@ class AdminLocationStatsController extends Controller
             return false;
         }
 
-        return $this->psgcCodesOverlap($code, $this->hintProvincePsgc);
+        return PsgcCode::same($code, $this->hintProvincePsgc);
     }
 
     private function matchesHintCity(string $code): bool
@@ -111,20 +112,7 @@ class AdminLocationStatsController extends Controller
             return false;
         }
 
-        return $this->psgcCodesOverlap($code, $this->hintCityPsgc);
-    }
-
-    private function psgcCodesOverlap(string $a, string $b): bool
-    {
-        $as = $this->psgcCodeCandidates($a);
-        $bs = $this->psgcCodeCandidates($b);
-        foreach ($as as $x) {
-            if (in_array($x, $bs, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return PsgcCode::same($code, $this->hintCityPsgc);
     }
 
     /**
@@ -305,19 +293,35 @@ class AdminLocationStatsController extends Controller
      */
     private function locationLabelFromRow(array $row): string
     {
-        $cityName = isset($row['city_name']) ? trim((string) $row['city_name']) : '';
+        $cityName = isset($row['city_name']) ? $this->sanitizeLocationLabelPart((string) $row['city_name']) : '';
         if ($cityName !== '') {
-            $provinceName = isset($row['province_name']) ? trim((string) $row['province_name']) : '';
+            $provinceName = isset($row['province_name']) ? $this->sanitizeLocationLabelPart((string) $row['province_name']) : '';
+            if ($provinceName !== '' && strcasecmp($cityName, $provinceName) === 0) {
+                return $cityName;
+            }
 
             return $provinceName !== '' ? "{$cityName}, {$provinceName}" : $cityName;
         }
 
-        $provinceName = isset($row['province_name']) ? trim((string) $row['province_name']) : '';
+        $provinceName = isset($row['province_name']) ? $this->sanitizeLocationLabelPart((string) $row['province_name']) : '';
         if ($provinceName !== '') {
             return $provinceName;
         }
 
         return 'Unknown location';
+    }
+
+    /**
+     * Strip leading/trailing punctuation and odd spaces (e.g. ". District 1" from partial CSV/map labels).
+     */
+    private function sanitizeLocationLabelPart(string $value): string
+    {
+        $s = trim($value);
+        $s = preg_replace('/^[\s\p{Z}\p{P}]+/u', '', $s) ?? '';
+        $s = preg_replace('/[\s\p{Z}\p{P}]+$/u', '', $s) ?? '';
+        $s = preg_replace('/\s+/u', ' ', $s) ?? '';
+
+        return trim($s);
     }
 
     /**
@@ -393,33 +397,6 @@ class AdminLocationStatsController extends Controller
         ];
     }
 
-    /**
-     * @return list<string>
-     */
-    private function psgcCodeCandidates(string $raw): array
-    {
-        $trimmed = trim($raw);
-        if ($trimmed === '') {
-            return [];
-        }
-
-        $digits = preg_replace('/\D+/', '', $trimmed) ?? '';
-        $out = [$trimmed];
-        if ($digits !== '' && $digits !== $trimmed) {
-            $out[] = $digits;
-        }
-        if ($digits !== '') {
-            if (strlen($digits) < 10) {
-                $padded = str_pad($digits, 10, '0', STR_PAD_LEFT);
-                if (! in_array($padded, $out, true)) {
-                    $out[] = $padded;
-                }
-            }
-        }
-
-        return array_values(array_unique(array_filter($out, static fn (string $v): bool => $v !== '')));
-    }
-
     private function looksLikeRawPsgcDigits(string $value): bool
     {
         $digits = preg_replace('/\D+/', '', $value) ?? '';
@@ -447,7 +424,7 @@ class AdminLocationStatsController extends Controller
             return $this->provinceNameCache[$cacheKey];
         }
 
-        foreach ($this->psgcCodeCandidates($code) as $try) {
+        foreach (PsgcCode::candidates($code) as $try) {
             $name = PsgcProvince::query()->where('code', $try)->value('name');
             if ($name !== null && trim((string) $name) !== '') {
                 return $this->provinceNameCache[$cacheKey] = (string) $name;
@@ -492,7 +469,7 @@ class AdminLocationStatsController extends Controller
             'address_barangay_psgc',
         ];
 
-        foreach ($this->psgcCodeCandidates($provincePsgc) as $provTry) {
+        foreach (PsgcCode::candidates($provincePsgc) as $provTry) {
             $base = Resort::withoutGlobalScopes()->where('address_province_psgc', $provTry);
 
             if ($mode === 'province_city_null') {
@@ -501,7 +478,7 @@ class AdminLocationStatsController extends Controller
                 if ($cityPsgc === null || $cityPsgc === '') {
                     return null;
                 }
-                $cityCandidates = $this->psgcCodeCandidates($cityPsgc);
+                $cityCandidates = PsgcCode::candidates($cityPsgc);
                 if ($cityCandidates === []) {
                     return null;
                 }
@@ -564,7 +541,7 @@ class AdminLocationStatsController extends Controller
             return $this->cityProvinceDisplayCache[$key];
         }
 
-        foreach ($this->psgcCodeCandidates($locCode) as $try) {
+        foreach (PsgcCode::candidates($locCode) as $try) {
             $city = PsgcCityMunicipality::query()->where('code', $try)->first();
             if ($city !== null) {
                 $pname = $this->resolveProvinceDisplayName((string) $city->province_code);
@@ -576,10 +553,16 @@ class AdminLocationStatsController extends Controller
             }
         }
 
-        foreach ($this->psgcCodeCandidates($locCode) as $try) {
+        foreach (PsgcCode::candidates($locCode) as $try) {
             $br = PsgcBarangay::query()->where('code', $try)->first();
             if ($br !== null) {
-                $city = PsgcCityMunicipality::query()->where('code', $br->city_municipality_code)->first();
+                $city = null;
+                foreach (PsgcCode::candidates((string) $br->city_municipality_code) as $cityTry) {
+                    $city = PsgcCityMunicipality::query()->where('code', $cityTry)->first();
+                    if ($city !== null) {
+                        break;
+                    }
+                }
                 if ($city !== null) {
                     $pname = $this->resolveProvinceDisplayName((string) $city->province_code);
 
@@ -635,9 +618,20 @@ class AdminLocationStatsController extends Controller
     /**
      * @return array{city: string, province: string}
      */
+    private function trimDisplayFragment(string $segment): string
+    {
+        return $this->sanitizeLocationLabelPart($segment);
+    }
+
+    /**
+     * @return array{city: string, province: string}
+     */
     private function parseCityProvinceFromAddressLabel(string $addressLabel, string $streetLine, string $barangayName): array
     {
-        $parts = array_values(array_filter(array_map('trim', explode(',', $addressLabel)), static fn (string $p): bool => $p !== ''));
+        $parts = array_values(array_filter(array_map(
+            fn (string $p): string => $this->trimDisplayFragment($p),
+            explode(',', $addressLabel),
+        ), static fn (string $p): bool => $p !== ''));
         $street = trim($streetLine);
         $barangay = trim($barangayName);
         $parts = $this->collapseMatchingLeadingSegments($parts, $street, $barangay);

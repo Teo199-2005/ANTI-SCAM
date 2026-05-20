@@ -7,6 +7,7 @@ use App\Models\PsgcCityMunicipality;
 use App\Models\PsgcProvince;
 use App\Models\Resort;
 use App\Models\User;
+use App\Support\PsgcCode;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -21,8 +22,21 @@ class PhilippineLocationService
 
     public function citiesForProvince(string $provinceCode): Collection
     {
+        $prov = $this->findProvinceRow($provinceCode);
+        if ($prov !== null) {
+            return PsgcCityMunicipality::query()
+                ->where('province_code', $prov->code)
+                ->orderBy('name')
+                ->get(['code', 'province_code', 'name']);
+        }
+
+        $candidates = PsgcCode::candidates($provinceCode);
+        if ($candidates === []) {
+            return collect();
+        }
+
         return PsgcCityMunicipality::query()
-            ->where('province_code', $provinceCode)
+            ->whereIn('province_code', $candidates)
             ->orderBy('name')
             ->get(['code', 'province_code', 'name']);
     }
@@ -32,8 +46,13 @@ class PhilippineLocationService
      */
     public function barangaysForCity(string $cityCode, int $perPage = 300): LengthAwarePaginator
     {
+        $candidates = PsgcCode::candidates($cityCode);
+        if ($candidates === []) {
+            return PsgcBarangay::query()->whereRaw('1 = 0')->paginate($perPage, ['code', 'city_municipality_code', 'name']);
+        }
+
         return PsgcBarangay::query()
-            ->where('city_municipality_code', $cityCode)
+            ->whereIn('city_municipality_code', $candidates)
             ->orderBy('name')
             ->paginate($perPage, ['code', 'city_municipality_code', 'name']);
     }
@@ -76,13 +95,13 @@ class PhilippineLocationService
             return $this->looksLikePsgcCode($provinceCode) && $this->looksLikePsgcCode($cityCode);
         }
 
-        $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
+        $city = $this->findCityRow($cityCode);
         if ($city === null) {
             // Partial PSGC seeds (for demos/tests) should not block real picker codes.
             return $this->looksLikePsgcCode($provinceCode) && $this->looksLikePsgcCode($cityCode);
         }
 
-        return $city->province_code === $provinceCode;
+        return PsgcCode::same($city->province_code, $provinceCode);
     }
 
     private function looksLikePsgcCode(string $code): bool
@@ -96,14 +115,62 @@ class PhilippineLocationService
             return false;
         }
 
-        $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
-        if ($city === null || $city->province_code !== $provinceCode) {
+        $city = $this->findCityRow($cityCode);
+        if ($city === null || ! PsgcCode::same($city->province_code, $provinceCode)) {
             return false;
         }
 
-        $br = PsgcBarangay::query()->where('code', $barangayCode)->first();
+        $br = $this->findBarangayRow($barangayCode);
 
-        return $br !== null && $br->city_municipality_code === $cityCode;
+        return $br !== null && PsgcCode::same($br->city_municipality_code, $city->code);
+    }
+
+    private function findProvinceRow(?string $provinceCode): ?PsgcProvince
+    {
+        if (! filled($provinceCode)) {
+            return null;
+        }
+
+        foreach (PsgcCode::candidates($provinceCode) as $try) {
+            $p = PsgcProvince::query()->where('code', $try)->first();
+            if ($p !== null) {
+                return $p;
+            }
+        }
+
+        return null;
+    }
+
+    private function findCityRow(?string $cityCode): ?PsgcCityMunicipality
+    {
+        if (! filled($cityCode)) {
+            return null;
+        }
+
+        foreach (PsgcCode::candidates($cityCode) as $try) {
+            $c = PsgcCityMunicipality::query()->where('code', $try)->first();
+            if ($c !== null) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    private function findBarangayRow(?string $barangayCode): ?PsgcBarangay
+    {
+        if (! filled($barangayCode)) {
+            return null;
+        }
+
+        foreach (PsgcCode::candidates($barangayCode) as $try) {
+            $b = PsgcBarangay::query()->where('code', $try)->first();
+            if ($b !== null) {
+                return $b;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -122,14 +189,14 @@ class PhilippineLocationService
             return null;
         }
 
-        $city = PsgcCityMunicipality::query()->where('code', $cityCode)->first();
-        $prov = PsgcProvince::query()->where('code', $provinceCode)->first();
-        if ($city !== null && $prov !== null && $city->province_code === $provinceCode) {
+        $city = $this->findCityRow($cityCode);
+        $prov = $this->findProvinceRow($provinceCode);
+        if ($city !== null && $prov !== null && PsgcCode::same($city->province_code, $provinceCode)) {
             if (filled($barangayName)) {
                 return trim((string) $barangayName).', '.$city->name.', '.$prov->name;
             }
 
-            $br = PsgcBarangay::query()->where('code', $barangayPsgc)->first();
+            $br = $this->findBarangayRow((string) $barangayPsgc);
             if ($br === null) {
                 return null;
             }

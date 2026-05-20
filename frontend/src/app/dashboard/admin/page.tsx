@@ -12,7 +12,7 @@ import LocationFilterBar, {
 } from "@/components/locations/LocationFilterBar";
 import { getAdminLocationStats, getAdminStats, type AdminLocationStats, AdminStats } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
-import { color, kpiTone } from "@/lib/design-tokens";
+import { color } from "@/lib/design-tokens";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -24,7 +24,6 @@ import {
   Globe2,
   RefreshCw,
   ShieldCheck,
-  TrendingUp,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -161,45 +160,9 @@ export default function AdminOverviewPage() {
         <StatCard compact label="Failed payments" value={stats.failedPayments ?? 0} icon={AlertTriangle} iconTone="rose" />
       </div>
 
-      <DashCard className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="inline-flex rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
-              <Globe2 size={16} className="text-clOcean" />
-            </div>
-            <div>
-              <h2 className="font-dash text-base font-semibold text-navy">Top resort locations</h2>
-              <p className="text-xs text-zinc-500">Top 5 by resort count · filter by province / city</p>
-            </div>
-          </div>
-          <div className="dash-filter-bar dash-filter-bar--flat">
-            <LocationFilterBar label="Resort location" value={locationFilter} onChange={setLocationFilter} />
-          </div>
-        </div>
-        {locationStatsLoading ? (
-          <p className="px-6 py-8 text-sm text-zinc-500">Loading location breakdown…</p>
-        ) : locationStats ? (
-          <div className="px-6 py-5 space-y-4">
-            <div className="flex flex-wrap gap-4 text-sm">
-              <p>
-                <span className="text-zinc-500">Resorts in filter:</span>{" "}
-                <span className="font-semibold text-navy">{locationStats.filtered_totals.resort_count}</span>
-              </p>
-              <p>
-                <span className="text-zinc-500">Resort owners in filter:</span>{" "}
-                <span className="font-semibold text-navy">{locationStats.filtered_totals.owner_count}</span>
-              </p>
-            </div>
-            <AdminLocationStatsChart rows={locationStats.top_resorts ?? []} limit={5} />
-          </div>
-        ) : (
-          <p className="px-6 py-8 text-sm text-zinc-500">Location stats unavailable.</p>
-        )}
-      </DashCard>
-
-      {/* ── Minimal KPI split: ratios left, growth right ─────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DashCard className="overflow-hidden p-0">
+      {/* ── KPI split: booking/resort ratios left, top locations right ─────────── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+        <DashCard className="flex h-full min-h-0 flex-col overflow-hidden p-0">
           <div className="grid grid-cols-1 divide-y divide-softBorder">
             {[
               {
@@ -259,40 +222,44 @@ export default function AdminOverviewPage() {
           </div>
         </DashCard>
 
-        <DashCard className="overflow-hidden p-0">
-          <div className="grid grid-cols-1 divide-y divide-softBorder">
-          {/* Revenue panel */}
-          <div
-            className="relative overflow-hidden p-4 motion-safe:animate-dash-fade-in md:p-5"
-          >
-            <div className="relative flex items-center gap-2">
-              <div className="inline-flex shrink-0 rounded-lg p-1.5" style={{ background: color.brand.accentHover }}>
-                <TrendingUp className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+        <DashCard className="flex h-full min-h-[20rem] flex-col overflow-hidden p-0 lg:min-h-0">
+          <div className="shrink-0 border-b border-softBorder px-4 py-4 md:px-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex items-start gap-2.5">
+                <div className="inline-flex shrink-0 rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
+                  <Globe2 size={16} className="text-clOcean" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-dash text-base font-semibold text-navy">Top resort locations</h2>
+                  <p className="text-xs text-zinc-500">Top 5 by resort count · filter by province / city</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="font-dash text-xs font-semibold leading-tight text-zinc-700">Revenue this month</p>
-                <p className="mt-0.5 font-dash text-[10px] text-zinc-500">From confirmed reservations</p>
-              </div>
-            </div>
-            <p className="relative mt-2 break-words font-dash text-2xl font-bold leading-tight text-navy md:text-3xl">{formatPhp(stats.revenueThisMonth)}</p>
-          </div>
-
-          {/* New users panel */}
-          <div
-            className="relative overflow-hidden p-4 motion-safe:animate-dash-fade-in md:p-5"
-          >
-            <div className="relative flex items-center gap-2">
-              <div className="inline-flex shrink-0 rounded-lg p-1.5" style={{ background: kpiTone.blue.accent }}>
-                <Users className="h-3.5 w-3.5 text-white" strokeWidth={2} />
-              </div>
-              <div className="min-w-0">
-                <p className="font-dash text-xs font-semibold leading-tight text-zinc-700">New users (7 days)</p>
-                <p className="mt-0.5 font-dash text-[10px] text-zinc-500">Registered in the last 7 days</p>
+              <div className="dash-filter-bar dash-filter-bar--flat min-w-0 shrink-0 xl:max-w-[min(100%,28rem)]">
+                <LocationFilterBar label="Resort location" value={locationFilter} onChange={setLocationFilter} />
               </div>
             </div>
-            <p className="relative mt-2 font-dash text-2xl font-bold tabular-nums text-navy md:text-3xl">{stats.newUsersThisWeek}</p>
           </div>
-        </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
+            {locationStatsLoading ? (
+              <p className="text-sm text-zinc-500">Loading location breakdown…</p>
+            ) : locationStats ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <p>
+                    <span className="text-zinc-500">Resorts in filter:</span>{" "}
+                    <span className="font-semibold text-navy">{locationStats.filtered_totals.resort_count}</span>
+                  </p>
+                  <p>
+                    <span className="text-zinc-500">Resort owners in filter:</span>{" "}
+                    <span className="font-semibold text-navy">{locationStats.filtered_totals.owner_count}</span>
+                  </p>
+                </div>
+                <AdminLocationStatsChart rows={locationStats.top_resorts ?? []} limit={5} />
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500">Location stats unavailable.</p>
+            )}
+          </div>
         </DashCard>
       </div>
 
