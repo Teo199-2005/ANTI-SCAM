@@ -337,9 +337,18 @@ class AdminLocationStatsController extends Controller
         }
 
         $mode = $provinceBucketWithoutCity ? 'province_city_null' : 'province_any';
-        $hint = $this->representativeResortAddressLabel($code, null, $mode);
-        if ($hint !== null) {
-            $parsed = $this->parseCityProvinceFromAddressLabel($hint);
+        $res = $this->firstRepresentativeResort($code, null, $mode);
+        if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
+            $suffix = $this->normalizeLabelSuffixForLocationStats(
+                trim($res->address_label),
+                $res->address_street_line,
+                $res->address_barangay_name,
+            );
+            $parsed = $this->parseCityProvinceFromAddressLabel(
+                $suffix,
+                is_string($res->address_street_line) ? trim($res->address_street_line) : '',
+                is_string($res->address_barangay_name) ? trim($res->address_barangay_name) : '',
+            );
             $label = $parsed['province'] !== ''
                 ? $parsed['province']
                 : ($parsed['city'] !== '' ? $parsed['city'] : null);
@@ -349,6 +358,85 @@ class AdminLocationStatsController extends Controller
         }
 
         return $this->provinceNameCache[$cacheKey] = $this->humanizeUnmappedCode($code);
+    }
+
+    /**
+     * @param  'both'|'province_city_null'|'province_any'  $mode
+     */
+    private function firstRepresentativeResort(string $provincePsgc, ?string $cityPsgc, string $mode): ?Resort
+    {
+        $columns = ['id', 'address_label', 'address_street_line', 'address_barangay_name'];
+
+        foreach ($this->psgcCodeCandidates($provincePsgc) as $provTry) {
+            $base = Resort::withoutGlobalScopes()
+                ->where('address_province_psgc', $provTry)
+                ->whereNotNull('address_label')
+                ->where('address_label', '!=', '');
+
+            if ($mode === 'province_city_null') {
+                $res = (clone $base)->whereNull('address_city_municipality_psgc')->orderBy('id')->first($columns);
+                if ($res !== null) {
+                    return $res;
+                }
+
+                continue;
+            }
+
+            if ($mode === 'province_any') {
+                $res = (clone $base)->orderBy('id')->first($columns);
+                if ($res !== null) {
+                    return $res;
+                }
+
+                continue;
+            }
+
+            if ($cityPsgc === null || $cityPsgc === '') {
+                return null;
+            }
+
+            foreach ($this->psgcCodeCandidates($cityPsgc) as $cityTry) {
+                $res = (clone $base)->where('address_city_municipality_psgc', $cityTry)->orderBy('id')->first($columns);
+                if ($res !== null) {
+                    return $res;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeLabelSuffixForLocationStats(string $addressLabel, mixed $streetRaw, mixed $barangayRaw): string
+    {
+        $s = trim($addressLabel);
+        $street = is_string($streetRaw) ? trim($streetRaw) : '';
+        $barangay = is_string($barangayRaw) ? trim($barangayRaw) : '';
+        $s = $this->stripKnownPrefixFromLabel($s, $street);
+        $s = $this->stripKnownPrefixFromLabel($s, $barangay);
+
+        return $s;
+    }
+
+    /**
+     * Remove a leading "Segment," when it matches street or barangay text saved on the resort profile.
+     */
+    private function stripKnownPrefixFromLabel(string $label, string $prefix): string
+    {
+        if ($prefix === '' || $label === '') {
+            return $label;
+        }
+
+        $len = strlen($prefix);
+        if ($len > 0 && strncasecmp($label, $prefix, $len) === 0) {
+            $rest = trim(substr($label, $len));
+            if (str_starts_with($rest, ',')) {
+                $rest = trim(substr($rest, 1));
+            }
+
+            return $rest !== '' ? $rest : $label;
+        }
+
+        return $label;
     }
 
     /**
@@ -388,13 +476,26 @@ class AdminLocationStatsController extends Controller
             }
         }
 
-        $hint = $this->representativeResortAddressLabel($provinceFromResort, $locCode, 'both');
-        if ($hint !== null) {
-            $parsed = $this->parseCityProvinceFromAddressLabel($hint);
+        $res = $this->firstRepresentativeResort($provinceFromResort, $locCode, 'both');
+        if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
+            $suffix = $this->normalizeLabelSuffixForLocationStats(
+                trim($res->address_label),
+                $res->address_street_line,
+                $res->address_barangay_name,
+            );
+            $parsed = $this->parseCityProvinceFromAddressLabel(
+                $suffix,
+                is_string($res->address_street_line) ? trim($res->address_street_line) : '',
+                is_string($res->address_barangay_name) ? trim($res->address_barangay_name) : '',
+            );
             if ($parsed['city'] !== '' || $parsed['province'] !== '') {
+                $provName = $parsed['province'] !== ''
+                    ? $parsed['province']
+                    : $this->resolveProvinceDisplayName($provinceFromResort);
+
                 return $this->cityProvinceDisplayCache[$key] = [
                     'city_name' => $parsed['city'],
-                    'province_name' => $parsed['province'] !== '' ? $parsed['province'] : $parsed['city'],
+                    'province_name' => $provName,
                 ];
             }
         }
@@ -408,88 +509,74 @@ class AdminLocationStatsController extends Controller
     }
 
     /**
-     * @param  'both'|'province_city_null'|'province_any'  $mode
-     */
-    private function representativeResortAddressLabel(string $provincePsgc, ?string $cityPsgc, string $mode): ?string
-    {
-        foreach ($this->psgcCodeCandidates($provincePsgc) as $provTry) {
-            $base = Resort::withoutGlobalScopes()
-                ->where('address_province_psgc', $provTry)
-                ->whereNotNull('address_label')
-                ->where('address_label', '!=', '');
-
-            if ($mode === 'province_city_null') {
-                $res = (clone $base)->whereNull('address_city_municipality_psgc')->orderBy('id')->first(['address_label', 'address_street_line']);
-                if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
-                    return $this->stripStreetPrefixFromAddressLabel(trim($res->address_label), $res->address_street_line);
-                }
-
-                continue;
-            }
-
-            if ($mode === 'province_any') {
-                $res = (clone $base)->orderBy('id')->first(['address_label', 'address_street_line']);
-                if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
-                    return $this->stripStreetPrefixFromAddressLabel(trim($res->address_label), $res->address_street_line);
-                }
-
-                continue;
-            }
-
-            if ($cityPsgc === null || $cityPsgc === '') {
-                return null;
-            }
-
-            foreach ($this->psgcCodeCandidates($cityPsgc) as $cityTry) {
-                $res = (clone $base)->where('address_city_municipality_psgc', $cityTry)->orderBy('id')->first(['address_label', 'address_street_line']);
-                if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
-                    return $this->stripStreetPrefixFromAddressLabel(trim($res->address_label), $res->address_street_line);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * {@see PhilippineLocationService::prefixResortStreetLine} stores "Street, Barangay, City, Province".
-     * Admin location stats should show city + province only, so drop the leading street when it matches
-     * {@see Resort::$address_street_line}.
-     */
-    private function stripStreetPrefixFromAddressLabel(string $addressLabel, mixed $streetRaw): string
-    {
-        $street = is_string($streetRaw) ? trim($streetRaw) : '';
-        if ($street === '') {
-            return $addressLabel;
-        }
-
-        $len = strlen($street);
-        if ($len > 0 && strncasecmp($addressLabel, $street, $len) === 0) {
-            $rest = trim(substr($addressLabel, $len));
-            if (str_starts_with($rest, ',')) {
-                $rest = trim(substr($rest, 1));
-            }
-
-            return $rest !== '' ? $rest : $addressLabel;
-        }
-
-        return $addressLabel;
-    }
-
-    /**
      * @return array{city: string, province: string}
      */
-    private function parseCityProvinceFromAddressLabel(string $addressLabel): array
+    private function parseCityProvinceFromAddressLabel(string $addressLabel, string $streetLine, string $barangayName): array
     {
         $parts = array_values(array_filter(array_map('trim', explode(',', $addressLabel)), static fn (string $p): bool => $p !== ''));
+        $street = trim($streetLine);
+        $barangay = trim($barangayName);
+        $parts = $this->collapseMatchingLeadingSegments($parts, $street, $barangay);
+
+        $guard = 0;
+        while (count($parts) > 2 && $this->segmentLooksLikeDetailedStreetSegment($parts[0]) && $guard++ < 8) {
+            array_shift($parts);
+            $parts = array_values($parts);
+        }
+
         $n = count($parts);
         if ($n === 0) {
             return ['city' => '', 'province' => ''];
         }
         if ($n === 1) {
-            return ['city' => '', 'province' => $parts[0]];
+            return ['city' => '', 'province' => ''];
+        }
+        if ($n === 2) {
+            if ($this->segmentLooksLikeDetailedStreetSegment($parts[0])) {
+                return ['city' => $parts[1], 'province' => ''];
+            }
+
+            return ['city' => $parts[0], 'province' => $parts[1]];
         }
 
         return ['city' => $parts[$n - 2], 'province' => $parts[$n - 1]];
+    }
+
+    /**
+     * @param  list<string>  $parts
+     * @return list<string>
+     */
+    private function collapseMatchingLeadingSegments(array $parts, string $street, string $barangay): array
+    {
+        $parts = array_values($parts);
+        for ($i = 0; $i < 6 && count($parts) >= 1; $i++) {
+            $first = $parts[0] ?? '';
+            if ($first === '') {
+                break;
+            }
+            if ($street !== '' && strcasecmp($first, $street) === 0) {
+                array_shift($parts);
+                $parts = array_values($parts);
+
+                continue;
+            }
+            if ($barangay !== '' && strcasecmp($first, $barangay) === 0) {
+                array_shift($parts);
+                $parts = array_values($parts);
+
+                continue;
+            }
+            break;
+        }
+
+        return array_values($parts);
+    }
+
+    private function segmentLooksLikeDetailedStreetSegment(string $segment): bool
+    {
+        return (bool) preg_match(
+            '/\b(street|st\.|road|rd\.|avenue|ave|boulevard|blvd|highway|hwy|blk|block|lot|phase|district|subdivision|subd\.|purok|sitio|bldg|building|unit|floor|house|#\d)\b/i',
+            $s,
+        );
     }
 }

@@ -149,6 +149,39 @@ class AdminLocationStatsTest extends TestCase
             ->assertJsonFragment(['location_label' => 'Baybay, Leyte']);
     }
 
+    public function test_location_stats_strips_barangay_prefix_when_it_matches_profile_barangay(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $tenant = Tenant::create([
+            'name' => 'Barangay prefix tenant',
+            'slug' => 'brgy-prefix-tenant',
+            'subdomain' => 'brgy-prefix-tenant',
+            'status' => 'active',
+        ]);
+
+        User::factory()->create([
+            'role' => 'resort_owner',
+            'tenant_id' => $tenant->id,
+        ]);
+
+        Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Barangay prefix resort',
+            'is_publicly_listed' => true,
+            'address_street_line' => null,
+            'address_barangay_name' => 'Mabini street',
+            'address_province_psgc' => '7777777777',
+            'address_city_municipality_psgc' => '7777777776',
+            'address_label' => 'Mabini street, City of Cauayan, Isabela',
+        ]);
+
+        $this->getJson('/api/v1/admin/location-stats')
+            ->assertSuccessful()
+            ->assertJsonFragment(['location_label' => 'City of Cauayan, Isabela']);
+    }
+
     public function test_location_stats_strips_street_prefix_from_address_label_for_display(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
