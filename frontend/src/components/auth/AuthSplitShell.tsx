@@ -46,7 +46,12 @@ type DefaultSplitShellProps = {
   registerCentered: boolean;
   /** Resort slug chrome supplies its own sticky navbar — skip marketing fixed-nav padding. */
   underResortNavbar?: boolean;
+  /** `contain` shows the full artwork (login.png is portrait); `cover` fills the frame and crops. */
+  asideImageFit?: "contain" | "cover";
 };
+
+const asideImageFitClass = (fit: "contain" | "cover") =>
+  fit === "contain" ? "object-contain object-center" : "object-cover object-center";
 
 /**
  * Split auth layout (form + hero aside on desktop) — matches platform login/register.
@@ -57,9 +62,11 @@ function DefaultSplitShell({
   asideImageAlt,
   registerCentered,
   underResortNavbar = false,
+  asideImageFit = "contain",
 }: DefaultSplitShellProps) {
   const pathname = usePathname();
   const clearFixedNav = isAuthSplitShellPath(pathname) && !underResortNavbar;
+  const asideImgClass = asideImageFitClass(asideImageFit);
 
   return (
     <div className="auth-paper-bg relative min-h-screen">
@@ -76,12 +83,12 @@ function DefaultSplitShell({
               clearFixedNav ? AUTH_SHELL_CLEAR_NAV_MOBILE_PT : "pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-4",
             )}
           >
-            <div className="relative h-[min(38svh,13.5rem)] min-h-[11.5rem] w-full overflow-hidden rounded-2xl sm:h-[min(36svh,15rem)] sm:min-h-[12.5rem]">
+            <div className="relative h-[min(40svh,15rem)] min-h-[12rem] w-full overflow-hidden rounded-2xl bg-[#0a1628] sm:h-[min(38svh,16rem)] sm:min-h-[13rem]">
               <Image
                 src={asideImageSrc}
                 alt={asideImageAlt}
                 fill
-                className="object-cover object-center"
+                className={asideImgClass}
                 sizes="100vw"
                 priority
                 unoptimized={asideImageSrc.startsWith("http")}
@@ -154,13 +161,13 @@ function DefaultSplitShell({
                   : "p-6 md:p-8 lg:py-10 lg:px-8 xl:p-10 xl:px-10",
               )}
             >
-              <div className="relative h-full w-full min-h-0 overflow-hidden rounded-2xl">
+              <div className="relative h-full w-full min-h-0 overflow-hidden rounded-2xl bg-[#0a1628]">
                 <Image
                   src={asideImageSrc}
                   alt={asideImageAlt}
                   fill
                   sizes="50vw"
-                  className="object-cover object-center"
+                  className={asideImgClass}
                   priority
                   unoptimized={asideImageSrc.startsWith("http")}
                 />
@@ -194,6 +201,7 @@ export function AuthSplitShell({ children, guestResortContext = false, resortHer
         asideImageAlt={asideAlt}
         registerCentered={false}
         underResortNavbar
+        asideImageFit="cover"
       >
         {children}
       </DefaultSplitShell>
@@ -206,6 +214,7 @@ export function AuthSplitShell({ children, guestResortContext = false, resortHer
       asideImageAlt="Anti-Scam PH — safe travels, verified resorts"
       registerCentered={registerCenteredDefault}
       underResortNavbar={false}
+      asideImageFit="contain"
     >
       {children}
     </DefaultSplitShell>
