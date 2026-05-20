@@ -99,6 +99,14 @@ class BookingPaymentReconciliationService
         }
 
         $status = strtoupper((string) ($payload['status'] ?? ''));
+
+        if (in_array($status, ['EXPIRED', 'FAILED'], true)) {
+            $payload['event'] = 'invoice.expired';
+            $this->webhooks->handleInvoicePaid($payload);
+
+            return false;
+        }
+
         if ($status !== 'PAID') {
             return false;
         }

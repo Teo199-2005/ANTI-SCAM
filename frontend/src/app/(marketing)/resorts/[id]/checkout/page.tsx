@@ -3,7 +3,12 @@
 import PageContainer from "@/components/layout/PageContainer";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
-import { createPaymentInvoice, paymentCheckoutReturnBase } from "@/lib/api/payment";
+import {
+  createPaymentInvoice,
+  paymentCheckoutReturnBase,
+  rememberPendingCheckoutReservation,
+  releasePendingCheckoutIfAny,
+} from "@/lib/api/payment";
 import { getPublicResort, getPublicRoom, RoomDetail } from "@/lib/api/public";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import {
@@ -94,6 +99,10 @@ export default function CheckoutPage() {
   const [booking, setBooking] = useState(false);
   const redirecting = useRef(false);
   const bookingInFlight = useRef(false);
+
+  useEffect(() => {
+    void releasePendingCheckoutIfAny();
+  }, []);
 
   useEffect(() => {
     const n = Number(resortId);
@@ -251,6 +260,7 @@ export default function CheckoutPage() {
       if (!invoice.invoice_url) {
         throw new Error("No checkout URL returned from payment service.");
       }
+      rememberPendingCheckoutReservation(reservationId);
       window.location.href = invoice.invoice_url;
     } catch (err: unknown) {
       setBookingError(parseApiErrorMessage(err, "Booking failed. Please try again."));

@@ -193,6 +193,25 @@ class ReservationController extends Controller
         return $this->successResponse(new ReservationResource($reservation), 'Reservation cancelled');
     }
 
+    public function releaseCheckoutHold(Reservation $reservation)
+    {
+        $this->authorize('view', $reservation);
+
+        try {
+            $reservation = $this->service->releaseAbandonedCheckout($reservation, request()->user());
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), ['reservation' => ['cannot_release']], 409);
+        }
+
+        $reservation->loadMissing([
+            'resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc',
+            'room:id,name',
+            'client:id,name,email',
+        ]);
+
+        return $this->successResponse(new ReservationResource($reservation), 'Checkout hold released');
+    }
+
     public function cancel(Reservation $reservation, CancelReservationRequest $request)
     {
         try {

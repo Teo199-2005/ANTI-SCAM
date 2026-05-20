@@ -53,7 +53,7 @@ class RoomOccupancyService
         $reservations = Reservation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('room_id', $roomId)
-            ->whereIn('status', ['pending_payment', 'confirmed'])
+            ->occupyingInventory()
             ->where('check_in_date', '<', $windowEnd)
             ->where('check_out_date', '>', $monthStart)
             ->get(['check_in_date', 'check_out_date']);
@@ -202,7 +202,7 @@ class RoomOccupancyService
         return Reservation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('room_id', $roomId)
-            ->whereIn('status', ['pending_payment', 'confirmed'])
+            ->occupyingInventory()
             ->where(function ($q) use ($checkIn, $checkOut): void {
                 self::applyDateOverlap($q, $checkIn, $checkOut);
             })
@@ -261,7 +261,7 @@ class RoomOccupancyService
     {
         $rows = Reservation::withoutGlobalScopes()
             ->where('room_id', $roomId)
-            ->whereIn('status', ['pending_payment', 'confirmed'])
+            ->occupyingInventory()
             ->get(['check_in_date', 'check_out_date']);
 
         if ($rows->isEmpty()) {

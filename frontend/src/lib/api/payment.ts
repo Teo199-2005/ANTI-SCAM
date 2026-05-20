@@ -73,6 +73,58 @@ export async function getReservation(id: number | string): Promise<ReservationDe
   return data.data;
 }
 
+/** Release dates when the guest leaves Xendit without paying (does not cancel a confirmed stay). */
+export async function releaseCheckoutHold(reservationId: number | string): Promise<ReservationDetail> {
+  const { data } = await apiClient.post<ApiEnvelope<ReservationDetail>>(
+    `/reservations/${reservationId}/release-checkout-hold`,
+  );
+  return data.data;
+}
+
+const PENDING_CHECKOUT_STORAGE_KEY = "antiScamPendingCheckoutReservationId";
+
+export function rememberPendingCheckoutReservation(reservationId: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(PENDING_CHECKOUT_STORAGE_KEY, String(reservationId));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function clearPendingCheckoutReservation(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(PENDING_CHECKOUT_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** If the user returned from Xendit without paying, free the hold on the server. */
+export async function releasePendingCheckoutIfAny(): Promise<void> {
+  if (typeof window === "undefined") return;
+  let raw: string | null = null;
+  try {
+    raw = sessionStorage.getItem(PENDING_CHECKOUT_STORAGE_KEY);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+  const id = Number(raw);
+  if (!Number.isFinite(id)) {
+    clearPendingCheckoutReservation();
+    return;
+  }
+  try {
+    await releaseCheckoutHold(id);
+  } catch {
+    /* hold may already be expired server-side */
+  } finally {
+    clearPendingCheckoutReservation();
+  }
+}
+
 export async function cancelReservation(id: number | string, reason?: string) {
   const { data } = await apiClient.post<ApiEnvelope<ReservationDetail>>(
     `/reservations/${id}/cancel`,

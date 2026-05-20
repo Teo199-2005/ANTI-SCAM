@@ -38,6 +38,31 @@ class Reservation extends Model
         return $query->whereIn('status', self::REVENUE_ELIGIBLE_STATUSES);
     }
 
+    /**
+     * Confirmed stays plus pending_payment rows still inside the online payment hold window.
+     *
+     * @param  Builder<Reservation>  $query
+     * @return Builder<Reservation>
+     */
+    public function scopeOccupyingInventory(Builder $query): Builder
+    {
+        $cutoff = now()->subMinutes(max(1, (int) config('booking.payment_hold_minutes', 10)));
+
+        return $query->where(function (Builder $outer) use ($cutoff): void {
+            $outer->where('status', 'confirmed')
+                ->orWhere(function (Builder $pending) use ($cutoff): void {
+                    $pending->where('status', 'pending_payment')
+                        ->where(function (Builder $hold) use ($cutoff): void {
+                            $hold->where('reserved_at', '>=', $cutoff)
+                                ->orWhere(function (Builder $fallback) use ($cutoff): void {
+                                    $fallback->whereNull('reserved_at')
+                                        ->where('created_at', '>=', $cutoff);
+                                });
+                        });
+                });
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'resort_id',

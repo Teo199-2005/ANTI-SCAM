@@ -2,23 +2,14 @@
 
 import { ReservationFeeBreakdownPanel } from "@/components/booking/ReservationFeeBreakdownPanel";
 import { ResortRoomAvailabilityModal } from "@/components/resort-page/ResortRoomAvailabilityModal";
-import { useToast } from "@/components/shared/ToastProvider";
 import type { LandingComputedRoom } from "@/lib/api/landingPage";
-import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
-import { checkRoomAvailability } from "@/lib/api/public";
-import {
-  buildResortCheckoutHref,
-  addDaysIso,
-  defaultPublicStayDates,
-  todayIsoLocal,
-} from "@/lib/publicBookingLinks";
 import {
   normalizeRoomImages,
   roomImageDisplaySrc,
   type RoomImageAccess,
 } from "@/lib/roomImagePreview";
 import { formatGuestDisplayPhp, resolveGuestReservationFeePhp } from "@/lib/guestRoomPricing";
-import { amenityMeta, extractRoomMeta, formatPhp } from "@/lib/roomPreviewDisplay";
+import { amenityMeta, extractRoomMeta } from "@/lib/roomPreviewDisplay";
 import { displayInclusionLabel, isCustomInclusionToken } from "@/lib/roomInclusions";
 import { cn } from "@/lib/utils";
 import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
@@ -28,8 +19,7 @@ import {
   MARKETING_MODAL_PANEL_MAX_H,
   MARKETING_MODAL_Z_NESTED,
 } from "@/lib/marketingModalLayout";
-import { CalendarDays, ImageOff, Loader2, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { CalendarDays, ImageOff, Users } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,7 +34,7 @@ type Props = {
 };
 
 /**
- * Full-screen room details + stay dates + book / availability — same UX as the public resort landing “Our rooms” modal.
+ * Room details modal — Book now opens the availability calendar to pick dates, then checkout.
  */
 export function ResortRoomDetailsBookingModal({
   room,
@@ -53,15 +43,9 @@ export function ResortRoomDetailsBookingModal({
   imageAccess = "public",
   overlayZIndexClass = MARKETING_MODAL_Z_NESTED,
 }: Props) {
-  const router = useRouter();
-  const { pushToast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
-  const [modalCheckIn, setModalCheckIn] = useState(() => defaultPublicStayDates().checkIn);
-  const [modalCheckOut, setModalCheckOut] = useState(() => defaultPublicStayDates().checkOut);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const [bookChecking, setBookChecking] = useState(false);
-  const bookInFlightRef = useRef(false);
   const availabilityOpenRef = useRef(false);
   availabilityOpenRef.current = availabilityOpen;
 
@@ -71,13 +55,6 @@ export function ResortRoomDetailsBookingModal({
     [room],
   );
 
-  const todayStr = useMemo(() => todayIsoLocal(), []);
-  const checkOutMin = modalCheckIn ? addDaysIso(modalCheckIn, 1) : addDaysIso(todayStr, 1);
-  const datesValid =
-    Boolean(modalCheckIn && modalCheckOut) &&
-    modalCheckOut > modalCheckIn &&
-    modalCheckIn >= todayStr;
-
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -85,9 +62,6 @@ export function ResortRoomDetailsBookingModal({
   useEffect(() => {
     if (!room) return;
     setActiveImage(0);
-    const { checkIn, checkOut } = defaultPublicStayDates();
-    setModalCheckIn(checkIn);
-    setModalCheckOut(checkOut);
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (availabilityOpenRef.current) {
@@ -168,89 +142,18 @@ export function ResortRoomDetailsBookingModal({
                   <div className="rounded-xl border border-sky-200/80 bg-sky-50/80 p-3">
                     <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-900">
                       <CalendarDays size={14} className="shrink-0" />
-                      Stay dates
+                      Book your stay
                     </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="block text-[11px] font-medium text-zinc-600">
-                        Check-in
-                        <input
-                          type="date"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
-                          min={todayStr}
-                          value={modalCheckIn}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setModalCheckIn(v);
-                            if (!v) return;
-                            const minOut = addDaysIso(v, 1);
-                            setModalCheckOut((prev) => (prev <= v ? minOut : prev));
-                          }}
-                        />
-                      </label>
-                      <label className="block text-[11px] font-medium text-zinc-600">
-                        Check-out
-                        <input
-                          type="date"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-navy"
-                          min={checkOutMin}
-                          value={modalCheckOut}
-                          onChange={(e) => setModalCheckOut(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    {!datesValid ? (
-                      <p className="mt-2 text-[11px] text-amber-800">
-                        Choose check-out after check-in (from today onward).
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      disabled={!datesValid || bookChecking}
-                      onClick={async () => {
-                        if (!datesValid || !room || bookInFlightRef.current) return;
-                        bookInFlightRef.current = true;
-                        setBookChecking(true);
-                        try {
-                          const r = await checkRoomAvailability(Number(room.id), modalCheckIn, modalCheckOut);
-                          if (!r.available) {
-                            pushToast({
-                              title: "Those dates are not available",
-                              description:
-                                "This room is already booked, on hold, or blocked for part of your stay. Try other dates or open Check availability for a calendar view.",
-                              tone: "error",
-                            });
-                            return;
-                          }
-                          router.push(buildResortCheckoutHref(resortId, room.id, modalCheckIn, modalCheckOut));
-                        } catch (err) {
-                          pushToast({
-                            title: "Could not verify availability",
-                            description: parseApiErrorMessage(err, "Check your connection and try again."),
-                            tone: "error",
-                          });
-                        } finally {
-                          bookInFlightRef.current = false;
-                          setBookChecking(false);
-                        }
-                      }}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${
-                        datesValid
-                          ? "bg-navy text-white hover:bg-navy/90 disabled:opacity-80"
-                          : "cursor-not-allowed bg-zinc-200 text-zinc-500"
-                      }`}
-                    >
-                      {bookChecking ? <Loader2 size={16} className="shrink-0 animate-spin" aria-hidden /> : null}
-                      Book now
-                    </button>
+                    <p className="text-[13px] leading-relaxed text-zinc-600">
+                      Tap <strong className="font-semibold text-navy">Book now</strong> to open the calendar, pick your
+                      dates, then continue to checkout.
+                    </p>
                     <button
                       type="button"
                       onClick={() => setAvailabilityOpen(true)}
-                      className="inline-flex items-center justify-center rounded-xl border border-navy/20 bg-white px-4 py-2.5 text-sm font-semibold text-navy shadow-sm hover:bg-zinc-50"
+                      className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-navy/90"
                     >
-                      Check availability
+                      Book now
                     </button>
                   </div>
                 </div>
@@ -336,8 +239,7 @@ export function ResortRoomDetailsBookingModal({
           onClose={() => setAvailabilityOpen(false)}
           roomId={room.id}
           roomName={room.name}
-          checkIn={modalCheckIn}
-          checkOut={modalCheckOut}
+          resortId={resortId}
         />
       ) : null}
     </>

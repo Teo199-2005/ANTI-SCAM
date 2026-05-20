@@ -1,97 +1,13 @@
 "use client";
 
-import { checkRoomAvailability, getPublicResort, PublicRoom, PublicResort } from "@/lib/api/public";
+import { ResortRoomAvailabilityModal } from "@/components/resort-page/ResortRoomAvailabilityModal";
+import { getPublicResort, PublicRoom, PublicResort } from "@/lib/api/public";
 import { laravelPublicUrl } from "@/lib/publicAsset";
-import { BedDouble, CalendarRange, ChevronLeft, Loader2, MapPin, Phone, Users } from "lucide-react";
+import { BedDouble, ChevronLeft, MapPin, Phone, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatGuestDisplayPerNight } from "@/lib/guestRoomPricing";
-
-function addDays(iso: string, days: number): string {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function InlineAvailabilityPanel({ roomId, resortId }: { roomId: number; resortId: number }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [checking, setChecking] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [ok, setOk] = useState<boolean | null>(null);
-
-  const onCheck = async () => {
-    if (!checkIn || !checkOut) {
-      setMsg("Select both dates.");
-      return;
-    }
-    if (checkOut <= checkIn) {
-      setMsg("Check-out must be after check-in.");
-      return;
-    }
-    setChecking(true);
-    setMsg(null);
-    try {
-      const r = await checkRoomAvailability(roomId, checkIn, checkOut);
-      setOk(r.available);
-      setMsg(r.available ? "Available for these dates." : "Not available — try other dates.");
-    } catch (err) {
-      setOk(false);
-      setMsg("Could not check availability.");
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  return (
-    <div className="mt-3 rounded-xl border border-softBorder bg-softGray/40 p-3">
-      <p className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-zinc-500">
-        <CalendarRange size={12} /> Quick check
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <input
-          type="date"
-          min={today}
-          className="dash-input min-w-[140px] flex-1 text-sm"
-          value={checkIn}
-          onChange={(e) => {
-            setCheckIn(e.target.value);
-            setOk(null);
-            setMsg(null);
-          }}
-        />
-        <input
-          type="date"
-          min={checkIn ? addDays(checkIn, 1) : today}
-          className="dash-input min-w-[140px] flex-1 text-sm"
-          value={checkOut}
-          onChange={(e) => {
-            setCheckOut(e.target.value);
-            setOk(null);
-            setMsg(null);
-          }}
-        />
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <button type="button" disabled={checking} onClick={() => void onCheck()} className="dash-btn-sm">
-          {checking ? <Loader2 size={12} className="animate-spin" /> : null}
-          Check
-        </button>
-        <Link
-          href={`/dashboard/client/explore/${resortId}/rooms/${roomId}`}
-          className="dash-btn-neutral-strong"
-        >
-          Full calendar &amp; book
-        </Link>
-      </div>
-      {msg ? (
-        <p className={`mt-2 text-xs ${ok === true ? "text-emerald-700" : ok === false ? "text-rose-700" : "text-zinc-600"}`}>{msg}</p>
-      ) : null}
-    </div>
-  );
-}
 
 export default function ResortExplorePage() {
   const { resortId: resortIdParam } = useParams();
@@ -99,14 +15,14 @@ export default function ResortExplorePage() {
   const [resort, setResort] = useState<PublicResort | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedRoomId, setExpandedRoomId] = useState<number | null>(null);
+  const [bookingRoom, setBookingRoom] = useState<PublicRoom | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         const data = await getPublicResort(Number(resortId));
         setResort(data);
-      } catch (err) {
+      } catch {
         setError("Resort not found.");
       } finally {
         setLoading(false);
@@ -204,14 +120,16 @@ export default function ResortExplorePage() {
                 <div className="mt-3 flex flex-col gap-2">
                   <button
                     type="button"
-                    onClick={() => setExpandedRoomId((id) => (id === room.id ? null : room.id))}
-                    className="dash-btn-sm w-full justify-center"
+                    onClick={() => setBookingRoom(room)}
+                    className="dash-btn-primary w-full justify-center"
                   >
-                    {expandedRoomId === room.id ? "Hide availability" : "Check availability"}
+                    Book now
                   </button>
-                  {expandedRoomId === room.id ? <InlineAvailabilityPanel roomId={room.id} resortId={rid} /> : null}
-                  <Link href={`/dashboard/client/explore/${rid}/rooms/${room.id}`} className="dash-btn-primary w-full justify-center text-center">
-                    View &amp; book →
+                  <Link
+                    href={`/dashboard/client/explore/${rid}/rooms/${room.id}`}
+                    className="dash-btn-neutral-strong w-full justify-center text-center"
+                  >
+                    View room details
                   </Link>
                 </div>
               </div>
@@ -219,6 +137,17 @@ export default function ResortExplorePage() {
           </div>
         )}
       </div>
+
+      {bookingRoom ? (
+        <ResortRoomAvailabilityModal
+          open
+          onClose={() => setBookingRoom(null)}
+          roomId={bookingRoom.id}
+          roomName={bookingRoom.name}
+          resortId={rid}
+          variant="dashboard"
+        />
+      ) : null}
     </div>
   );
 }

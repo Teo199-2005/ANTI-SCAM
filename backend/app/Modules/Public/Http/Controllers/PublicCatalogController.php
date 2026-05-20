@@ -14,6 +14,7 @@ use App\Services\LandingReadinessService;
 use App\Services\PhilippineLocationService;
 use App\Support\SubscriptionPlan;
 use App\Support\YoutubeVideoId;
+use App\Services\ReservationCheckoutExpiryService;
 use App\Services\RoomOccupancyService;
 use App\Shared\Traits\ApiResponseTrait;
 
@@ -24,6 +25,7 @@ class PublicCatalogController extends Controller
     public function __construct(
         private readonly LandingReadinessService $readiness,
         private readonly PhilippineLocationService $locations,
+        private readonly ReservationCheckoutExpiryService $checkoutExpiry,
     ) {}
 
     public function resorts()
@@ -286,6 +288,8 @@ class PublicCatalogController extends Controller
             return $this->errorResponse('check_in_date and check_out_date are required.', null, 422);
         }
 
+        $this->checkoutExpiry->expireStalePendingPayments((int) $room->id);
+
         $tenantId = (int) $room->tenant_id;
         $units = max(1, (int) ($room->units ?? 1));
 
@@ -318,6 +322,8 @@ class PublicCatalogController extends Controller
         if ($month < 1 || $month > 12) {
             return $this->errorResponse('Invalid month.', null, 422);
         }
+
+        $this->checkoutExpiry->expireStalePendingPayments((int) $room->id);
 
         $tenantId = (int) $room->tenant_id;
         $units = max(1, (int) ($room->units ?? 1));

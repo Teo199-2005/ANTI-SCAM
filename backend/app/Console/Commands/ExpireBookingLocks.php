@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\BookingLock;
-use App\Models\Reservation;
+use App\Services\ReservationCheckoutExpiryService;
 use App\Services\RoomStayGuard;
 use Illuminate\Console\Command;
 
@@ -19,12 +19,7 @@ class ExpireBookingLocks extends Command
             ->where('expires_at', '<', now())
             ->update(['status' => 'released']);
 
-        // Mark reservations that have no invoice and have been pending for >15 min as expired
-        $expired = Reservation::withoutGlobalScopes()
-            ->where('status', 'pending_payment')
-            ->where('reserved_at', '<', now()->subMinutes(15))
-            ->whereNull('xendit_invoice_id')
-            ->update(['status' => 'expired']);
+        $expired = app(ReservationCheckoutExpiryService::class)->expireStalePendingPayments();
 
         $collapsed = RoomStayGuard::collapseDuplicatePendingStays();
         $overlapCleared = RoomStayGuard::expirePendingOverlappingConfirmed();

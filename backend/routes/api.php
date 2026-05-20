@@ -223,6 +223,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/booking-locks', [BookingLockController::class, 'store']);
             Route::post('/reservations', [ReservationController::class, 'store']);
             Route::post('/reservations/{reservation}/invoice', [XenditInvoiceController::class, 'create']);
+            Route::post('/reservations/{reservation}/release-checkout-hold', [ReservationController::class, 'releaseCheckoutHold']);
         });
 
         // Reservations

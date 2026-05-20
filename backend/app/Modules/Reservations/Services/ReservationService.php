@@ -10,6 +10,7 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Services\BookingReferralCommissionService;
+use App\Services\ReservationCheckoutExpiryService;
 use App\Services\RoomStayGuard;
 use App\Support\PricingPilot;
 use DateTimeInterface;
@@ -132,6 +133,7 @@ class ReservationService
                 ->where('room_id', $lock->room_id)
                 ->whereDate('check_in_date', $checkInStr)
                 ->whereDate('check_out_date', $checkOutStr)
+                ->occupyingInventory()
                 ->where('status', 'pending_payment')
                 ->lockForUpdate()
                 ->orderByDesc('id')
@@ -447,6 +449,15 @@ class ReservationService
         $this->maybeReverseBookingCommission($reservation, (string) ($oldValues['status'] ?? ''));
 
         return $reservation->refresh();
+    }
+
+    public function releaseAbandonedCheckout(Reservation $reservation, User $user): Reservation
+    {
+        if ($user->role !== 'admin' && (int) $reservation->client_id !== (int) $user->id) {
+            throw new RuntimeException('You can only release your own checkout hold.');
+        }
+
+        return app(ReservationCheckoutExpiryService::class)->releaseAbandonedCheckout($reservation);
     }
 
     public function cancelByClient(Reservation $reservation, int $clientId, ?string $reason = null): Reservation

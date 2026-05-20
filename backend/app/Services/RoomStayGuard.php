@@ -63,7 +63,7 @@ final class RoomStayGuard
         $q = Reservation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('room_id', $roomId)
-            ->whereIn('status', ['pending_payment', 'confirmed'])
+            ->occupyingInventory()
             ->where(function ($query) use ($checkIn, $checkOut): void {
                 RoomOccupancyService::applyDateOverlap($query, $checkIn, $checkOut);
             });
