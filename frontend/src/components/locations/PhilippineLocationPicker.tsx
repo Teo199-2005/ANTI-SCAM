@@ -1,9 +1,8 @@
 "use client";
 
-import type { PhilippineLocationRow } from "@/lib/locations/philippines";
-import { listMuncities, listProvinces } from "@jobuntux/psgc";
+import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useRef } from "react";
 
 export type PhilippineLocationValue = {
   provinceCode: string | null;
@@ -30,31 +29,25 @@ export function PhilippineLocationPicker({
   legacyBarangayCodeHint,
   barangayRowEnd,
 }: Props) {
-  const provinces = useMemo((): PhilippineLocationRow[] => {
-    const raw = listProvinces();
-    const rows = raw.map((p) => ({
-      code: p.psgcCode,
-      name: p.provName.trim(),
-    }));
-    rows.sort((a, b) => a.name.localeCompare(b.name));
-    return rows;
-  }, []);
+  const { provinces, cities, loadingProvinces, loadingCities, provincesError, citiesError } =
+    usePhilippineLocationDropdowns(value.provinceCode);
 
-  const selectedProvDef = useMemo(() => {
-    if (!value.provinceCode) return undefined;
-    return listProvinces().find((p) => p.psgcCode === value.provinceCode);
-  }, [value.provinceCode]);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-  const cities = useMemo((): PhilippineLocationRow[] => {
-    if (!selectedProvDef?.provCode) return [];
-    const raw = listMuncities(selectedProvDef.provCode);
-    const rows = raw.map((m) => ({
-      code: m.psgcCode,
-      name: m.munCityName.trim(),
-    }));
-    rows.sort((a, b) => a.name.localeCompare(b.name));
-    return rows;
-  }, [selectedProvDef]);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  useEffect(() => {
+    const v = valueRef.current;
+    if (!v.provinceCode || !v.cityCode || cities.length === 0) return;
+    if (!cities.some((c) => c.code === v.cityCode)) {
+      onChangeRef.current({ ...v, cityCode: null });
+    }
+  }, [value.provinceCode, value.cityCode, cities]);
+
+  const provinceSelectDisabled = Boolean(disabled || loadingProvinces);
+  const citySelectDisabled = Boolean(disabled || loadingProvinces || !value.provinceCode || loadingCities);
 
   const onProvincePick = (code: string) => {
     const c = code === "" ? null : code;
@@ -66,21 +59,23 @@ export function PhilippineLocationPicker({
     onChange({ ...value, cityCode: c });
   };
 
+  const locationError = provincesError ?? citiesError;
+
   return (
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <label htmlFor={`${idPrefix}-prov`} className="mb-1 block text-xs font-semibold text-zinc-600">
-            Province
+            Province / region
           </label>
           <select
             id={`${idPrefix}-prov`}
             className="dash-input"
-            disabled={disabled}
+            disabled={provinceSelectDisabled}
             value={value.provinceCode ?? ""}
             onChange={(e) => onProvincePick(e.target.value)}
           >
-            <option value="">Select province</option>
+            <option value="">{loadingProvinces ? "Loading…" : "Select province / region"}</option>
             {provinces.map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
@@ -95,11 +90,17 @@ export function PhilippineLocationPicker({
           <select
             id={`${idPrefix}-city`}
             className="dash-input"
-            disabled={disabled || !value.provinceCode}
+            disabled={citySelectDisabled}
             value={value.cityCode ?? ""}
             onChange={(e) => onCityPick(e.target.value)}
           >
-            <option value="">{value.provinceCode ? "Select city / municipality" : "Select province first"}</option>
+            <option value="">
+              {!value.provinceCode
+                ? "Select province / region first"
+                : loadingCities
+                  ? "Loading…"
+                  : "Select city / municipality"}
+            </option>
             {cities.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name}
@@ -108,6 +109,17 @@ export function PhilippineLocationPicker({
           </select>
         </div>
       </div>
+      {locationError ? (
+        <p className="text-[11px] text-rose-600" role="alert">
+          {locationError}
+        </p>
+      ) : (
+        <p className="text-[11px] leading-snug text-zinc-500">
+          Options come from the server PSGC data. For Metro Manila addresses, pick the province row that lists your city
+          (often named Metro Manila or similar), then your city or municipality.
+          {loadingProvinces || loadingCities ? " Loading lists…" : ""}
+        </p>
+      )}
       {barangayRowEnd ? (
         <div className="grid gap-3 md:grid-cols-2 md:items-start">
           <div className="min-w-0">

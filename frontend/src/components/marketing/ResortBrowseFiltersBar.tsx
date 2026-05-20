@@ -1,10 +1,10 @@
 "use client";
 
-import { listMuncities, listProvinces } from "@jobuntux/psgc";
 import type { LocationFilterValue } from "@/components/locations/LocationFilterBar";
+import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import { cn } from "@/lib/utils";
 import { Building2, ChevronDown, Crown, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const GOLD = "#f5a623";
 
@@ -47,25 +47,54 @@ export function ResortBrowseFiltersBar({
 }: Props) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const provinces = useMemo(
-    () =>
-      listProvinces()
-        .map((p) => ({ code: p.psgcCode, name: p.provName.trim() }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [],
-  );
+  const { provinces, cities, loadingProvinces, loadingCities } = usePhilippineLocationDropdowns(location.provincePsgc);
 
-  const selectedProv = useMemo(
-    () => listProvinces().find((p) => p.psgcCode === location.provincePsgc),
-    [location.provincePsgc],
-  );
+  const onLocationRef = useRef(onLocationChange);
+  onLocationRef.current = onLocationChange;
+  const locationRef = useRef(location);
+  locationRef.current = location;
 
-  const cities = useMemo(() => {
-    if (!selectedProv?.provCode) return [];
-    return listMuncities(selectedProv.provCode)
-      .map((m) => ({ code: m.psgcCode, name: m.munCityName.trim() }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedProv]);
+  useEffect(() => {
+    const loc = locationRef.current;
+    if (!loc.provincePsgc || !loc.cityPsgc || cities.length === 0) return;
+    if (!cities.some((c) => c.code === loc.cityPsgc)) {
+      onLocationRef.current({ ...loc, cityPsgc: null, cityLabel: null });
+    }
+  }, [location.provincePsgc, location.cityPsgc, cities]);
+
+  const setProvince = (code: string | null) => {
+    if (!code) {
+      onLocationChange({
+        ...location,
+        provincePsgc: null,
+        cityPsgc: null,
+        provinceLabel: null,
+        cityLabel: null,
+      });
+      return;
+    }
+    const row = provinces.find((p) => p.code === code);
+    onLocationChange({
+      ...location,
+      provincePsgc: code,
+      cityPsgc: null,
+      provinceLabel: row?.name ?? null,
+      cityLabel: null,
+    });
+  };
+
+  const setCity = (code: string | null) => {
+    if (!code) {
+      onLocationChange({ ...location, cityPsgc: null, cityLabel: null });
+      return;
+    }
+    const row = cities.find((c) => c.code === code);
+    onLocationChange({
+      ...location,
+      cityPsgc: code,
+      cityLabel: row?.name ?? null,
+    });
+  };
 
   const activeFilterCount =
     (location.provincePsgc ? 1 : 0) +
@@ -152,17 +181,13 @@ export function ResortBrowseFiltersBar({
             <div className="hidden items-center gap-0.5 sm:flex">
               <MapPin size={14} className="ms-1 shrink-0 text-zinc-400" aria-hidden />
               <select
-                aria-label="Province"
+                aria-label="Province or region"
                 className={selectClass}
+                disabled={loadingProvinces}
                 value={location.provincePsgc ?? ""}
-                onChange={(e) =>
-                  onLocationChange({
-                    provincePsgc: e.target.value || null,
-                    cityPsgc: null,
-                  })
-                }
+                onChange={(e) => setProvince(e.target.value || null)}
               >
-                <option value="">All provinces</option>
+                <option value="">{loadingProvinces ? "Loading…" : "All provinces / regions"}</option>
                 {provinces.map((p) => (
                   <option key={p.code} value={p.code}>
                     {p.name}
@@ -174,18 +199,19 @@ export function ResortBrowseFiltersBar({
             <div className="hidden items-center gap-0.5 sm:flex">
               <Building2 size={14} className="ms-1 shrink-0 text-zinc-400" aria-hidden />
               <select
-                aria-label="City"
+                aria-label="City or municipality"
                 className={selectClass}
                 value={location.cityPsgc ?? ""}
-                disabled={!location.provincePsgc}
-                onChange={(e) =>
-                  onLocationChange({
-                    ...location,
-                    cityPsgc: e.target.value || null,
-                  })
-                }
+                disabled={!location.provincePsgc || loadingProvinces || loadingCities}
+                onChange={(e) => setCity(e.target.value || null)}
               >
-                <option value="">All cities</option>
+                <option value="">
+                  {!location.provincePsgc
+                    ? "Province first"
+                    : loadingCities
+                      ? "Loading…"
+                      : "All cities"}
+                </option>
                 {cities.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.name}
@@ -236,19 +262,15 @@ export function ResortBrowseFiltersBar({
             )}
           >
             <label className="col-span-2 flex flex-col gap-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Province</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Province / region</span>
               <select
-                aria-label="Province"
+                aria-label="Province or region"
                 className={selectClass}
+                disabled={loadingProvinces}
                 value={location.provincePsgc ?? ""}
-                onChange={(e) =>
-                  onLocationChange({
-                    provincePsgc: e.target.value || null,
-                    cityPsgc: null,
-                  })
-                }
+                onChange={(e) => setProvince(e.target.value || null)}
               >
-                <option value="">All provinces</option>
+                <option value="">{loadingProvinces ? "Loading…" : "All provinces / regions"}</option>
                 {provinces.map((p) => (
                   <option key={p.code} value={p.code}>
                     {p.name}
@@ -257,20 +279,21 @@ export function ResortBrowseFiltersBar({
               </select>
             </label>
             <label className="col-span-2 flex flex-col gap-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">City</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">City / municipality</span>
               <select
-                aria-label="City"
+                aria-label="City or municipality"
                 className={selectClass}
                 value={location.cityPsgc ?? ""}
-                disabled={!location.provincePsgc}
-                onChange={(e) =>
-                  onLocationChange({
-                    ...location,
-                    cityPsgc: e.target.value || null,
-                  })
-                }
+                disabled={!location.provincePsgc || loadingProvinces || loadingCities}
+                onChange={(e) => setCity(e.target.value || null)}
               >
-                <option value="">All cities</option>
+                <option value="">
+                  {!location.provincePsgc
+                    ? "Province first"
+                    : loadingCities
+                      ? "Loading…"
+                      : "All cities"}
+                </option>
                 {cities.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.name}

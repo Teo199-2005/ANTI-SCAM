@@ -231,7 +231,7 @@ export default function AdminOverviewPage() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-dash text-base font-semibold text-navy">Top resort locations</h2>
-                  <p className="text-xs text-zinc-500">Top 5 by resort count · filter by province / city</p>
+                  <p className="text-xs text-zinc-500">Up to 5 locations by resort count (fewer when there are fewer distinct areas). Filter by province / city.</p>
                 </div>
               </div>
               <div className="dash-filter-bar dash-filter-bar--flat min-w-0 shrink-0 xl:max-w-[min(100%,28rem)]">

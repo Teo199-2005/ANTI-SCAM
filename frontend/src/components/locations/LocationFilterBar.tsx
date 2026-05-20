@@ -1,13 +1,16 @@
 "use client";
 
 import type { PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
-import { listMuncities, listProvinces } from "@jobuntux/psgc";
+import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import { MapPin } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useRef } from "react";
 
 export type LocationFilterValue = {
   provincePsgc: string | null;
   cityPsgc: string | null;
+  /** Display names from the same API list as codes (for admin stats when DB labels are incomplete). */
+  provinceLabel?: string | null;
+  cityLabel?: string | null;
 };
 
 type Props = {
@@ -18,7 +21,12 @@ type Props = {
   className?: string;
 };
 
-const empty: LocationFilterValue = { provincePsgc: null, cityPsgc: null };
+const empty: LocationFilterValue = {
+  provincePsgc: null,
+  cityPsgc: null,
+  provinceLabel: null,
+  cityLabel: null,
+};
 
 export function emptyLocationFilter(): LocationFilterValue {
   return { ...empty };
@@ -31,23 +39,18 @@ export function locationFilterToParams(value: LocationFilterValue): Record<strin
   };
 }
 
-/** Same codes as {@link locationFilterToParams}, plus SPA-known labels for admin stats when API PSGC tables are incomplete. */
+/** Same codes as {@link locationFilterToParams}, plus labels captured from the location API for admin stats. */
 export function locationFilterToParamsWithDisplayHints(value: LocationFilterValue): Record<string, string | undefined> {
   const base = locationFilterToParams(value);
-  if (!value.provincePsgc) {
+  const provinceDisplay = value.provinceLabel?.trim() || undefined;
+  const cityDisplay = value.cityLabel?.trim() || undefined;
+  if (!provinceDisplay && !cityDisplay) {
     return base;
-  }
-  const selectedProv = listProvinces().find((p) => p.psgcCode === value.provincePsgc);
-  const provinceDisplay = selectedProv?.provName.trim();
-  let cityDisplay: string | undefined;
-  if (value.cityPsgc && selectedProv?.provCode) {
-    const mun = listMuncities(selectedProv.provCode).find((m) => m.psgcCode === value.cityPsgc);
-    cityDisplay = mun?.munCityName.trim();
   }
   return {
     ...base,
-    province_display: provinceDisplay,
-    city_display: cityDisplay,
+    ...(provinceDisplay ? { province_display: provinceDisplay } : {}),
+    ...(cityDisplay ? { city_display: cityDisplay } : {}),
   };
 }
 
@@ -55,27 +58,46 @@ export function locationFilterFromPicker(value: PhilippineLocationValue): Locati
   return {
     provincePsgc: value.provinceCode,
     cityPsgc: value.cityCode,
+    provinceLabel: null,
+    cityLabel: null,
   };
 }
 
 export default function LocationFilterBar({ value, onChange, label = "Location", className = "" }: Props) {
-  const provinces = useMemo(() => {
-    return listProvinces()
-      .map((p) => ({ code: p.psgcCode, name: p.provName.trim() }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+  const { provinces, cities, loadingProvinces, loadingCities, provincesError, citiesError } =
+    usePhilippineLocationDropdowns(value.provincePsgc);
 
-  const selectedProv = useMemo(
-    () => listProvinces().find((p) => p.psgcCode === value.provincePsgc),
-    [value.provincePsgc],
-  );
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
-  const cities = useMemo(() => {
-    if (!selectedProv?.provCode) return [];
-    return listMuncities(selectedProv.provCode)
-      .map((m) => ({ code: m.psgcCode, name: m.munCityName.trim() }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedProv]);
+  useEffect(() => {
+    const v = valueRef.current;
+    if (!v.provincePsgc || !v.cityPsgc || cities.length === 0) return;
+    if (!cities.some((c) => c.code === v.cityPsgc)) {
+      onChangeRef.current({ ...v, cityPsgc: null, cityLabel: null });
+    }
+  }, [value.provincePsgc, value.cityPsgc, cities]);
+
+  const pickProvince = (code: string | null, name: string | null) => {
+    onChange({
+      provincePsgc: code,
+      cityPsgc: null,
+      provinceLabel: name,
+      cityLabel: null,
+    });
+  };
+
+  const pickCity = (code: string | null, name: string | null) => {
+    onChange({
+      ...value,
+      cityPsgc: code,
+      cityLabel: name,
+    });
+  };
+
+  const filterError = provincesError ?? citiesError;
 
   return (
     <div className={`dash-filter-location ${className}`.trim()} role="group" aria-label={label}>
@@ -86,13 +108,19 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
       <select
         className="dash-filter-select"
         value={value.provincePsgc ?? ""}
+        disabled={loadingProvinces}
         onChange={(e) => {
-          const code = e.target.value || null;
-          onChange({ provincePsgc: code, cityPsgc: null });
+          const raw = e.target.value;
+          if (!raw) {
+            pickProvince(null, null);
+            return;
+          }
+          const row = provinces.find((p) => p.code === raw);
+          pickProvince(raw, row?.name ?? null);
         }}
-        aria-label={`${label} — province`}
+        aria-label={`${label} — province or region`}
       >
-        <option value="">All provinces</option>
+        <option value="">{loadingProvinces ? "Loading…" : "All provinces / regions"}</option>
         {provinces.map((p) => (
           <option key={p.code} value={p.code}>
             {p.name}
@@ -102,13 +130,25 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
       <select
         className="dash-filter-select"
         value={value.cityPsgc ?? ""}
-        disabled={!value.provincePsgc}
+        disabled={!value.provincePsgc || loadingProvinces || loadingCities}
         onChange={(e) => {
-          onChange({ ...value, cityPsgc: e.target.value || null });
+          const raw = e.target.value;
+          if (!raw) {
+            pickCity(null, null);
+            return;
+          }
+          const row = cities.find((c) => c.code === raw);
+          pickCity(raw, row?.name ?? null);
         }}
         aria-label={`${label} — city or municipality`}
       >
-        <option value="">All cities</option>
+        <option value="">
+          {!value.provincePsgc
+            ? "Province first"
+            : loadingCities
+              ? "Loading…"
+              : "All cities"}
+        </option>
         {cities.map((c) => (
           <option key={c.code} value={c.code}>
             {c.name}
@@ -120,6 +160,11 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
           Clear
         </button>
       )}
+      {filterError ? (
+        <span className="sr-only" role="alert">
+          {filterError}
+        </span>
+      ) : null}
     </div>
   );
 }

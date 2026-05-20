@@ -16,7 +16,7 @@ function isGenericBagMessage(s: string): boolean {
 const FIELD_LABELS: Record<string, string> = {
   address_barangay_name: "Barangay",
   address_barangay_psgc: "Barangay",
-  address_province_psgc: "Province",
+  address_province_psgc: "Province / region",
   address_city_municipality_psgc: "City or municipality",
   contact_number: "Contact number",
   representative_contact_number: "Representative contact number",
@@ -47,6 +47,9 @@ const FIELD_LABELS: Record<string, string> = {
   otp: "Verification code",
   gcash_account_number: "GCash number",
   gcash_account_holder_name: "GCash account name",
+  mailing_province_psgc: "Province / region",
+  mailing_city_municipality_psgc: "City or municipality",
+  mailing_barangay_name: "Barangay",
 };
 
 function friendlyFieldLabel(fieldKey: string): string {

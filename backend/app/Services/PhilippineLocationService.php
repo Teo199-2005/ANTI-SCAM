@@ -217,6 +217,51 @@ class PhilippineLocationService
     }
 
     /**
+     * Human-readable "City, Province" from stored PSGC codes only (no street, barangay, or address_label).
+     * Used for admin aggregates so buckets match what owners selected in the location pickers.
+     */
+    public function administrativeAreaLabelFromCodes(?string $provinceCode, ?string $cityCode): ?string
+    {
+        if (! filled($provinceCode) || ! filled($cityCode)) {
+            return null;
+        }
+
+        $city = $this->findCityRow($cityCode);
+        if ($city === null) {
+            $br = $this->findBarangayRow($cityCode);
+            if ($br !== null) {
+                $city = $this->findCityRow((string) $br->city_municipality_code);
+            }
+        }
+
+        if ($city === null) {
+            return null;
+        }
+
+        if (! $this->provinceSelectionMatchesCityProvince($provinceCode, $city)) {
+            return null;
+        }
+
+        $prov = $this->findProvinceRow($provinceCode) ?? $this->findProvinceRow($city->province_code);
+        $cityName = trim((string) $city->name);
+        $cityName = preg_replace('/\s+/u', ' ', $cityName) ?? $cityName;
+        if ($prov === null) {
+            return $cityName !== '' ? $cityName : null;
+        }
+
+        $provName = trim((string) $prov->name);
+        $provName = preg_replace('/\s+/u', ' ', $provName) ?? $provName;
+        if ($cityName === '') {
+            return $provName !== '' ? $provName : null;
+        }
+        if ($provName !== '' && strcasecmp($cityName, $provName) === 0) {
+            return $cityName;
+        }
+
+        return $provName !== '' ? "{$cityName}, {$provName}" : $cityName;
+    }
+
+    /**
      * Comma-separated line: Barangay, City/Municipality, Province.
      *
      * @param  ?string  $barangayName  Free-text barangay (preferred when set)

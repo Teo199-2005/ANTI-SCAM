@@ -23,7 +23,7 @@ export default function AdminLocationStatsChart({ rows, limit = 5 }: AdminLocati
   return (
     <div className="space-y-5">
       <p className="text-sm text-zinc-500">
-        Top {Math.min(limit, topRows.length)} location{topRows.length === 1 ? "" : "s"} by resort count
+        Top {Math.min(limit, topRows.length)} of {limit} location{topRows.length === 1 ? "" : "s"} by resort count
       </p>
 
       <ul className="space-y-4 md:space-y-5" aria-label={`Top ${limit} resort locations`}>

@@ -203,15 +203,18 @@ class AdminLocationStatsController extends Controller
         $rows = match (true) {
             $cityPsgc !== null && $provincePsgc !== null => $this->rowsByCity($provincePsgc, $cityPsgc),
             $provincePsgc !== null => $this->rowsByCity($provincePsgc, null),
-            default => array_merge($this->rowsByCityNationwide(), $this->rowsByProvinceOnlyResorts()),
+            default => $this->rowsForTopResortsNationwideMerged(),
         };
 
         usort($rows, static fn (array $a, array $b): int => $b['resort_count'] <=> $a['resort_count']);
 
         $out = [];
         foreach (array_slice($rows, 0, $limit) as $row) {
+            $label = isset($row['location_label']) && is_string($row['location_label']) && trim($row['location_label']) !== ''
+                ? $this->sanitizeLocationLabelPart((string) $row['location_label'])
+                : $this->locationLabelFromRow($row);
             $out[] = [
-                'location_label' => $this->locationLabelFromRow($row),
+                'location_label' => $label,
                 'resort_count' => (int) $row['resort_count'],
             ];
         }
@@ -220,72 +223,90 @@ class AdminLocationStatsController extends Controller
     }
 
     /**
-     * @return list<array{city_psgc: string, city_name: string, province_psgc: string, province_name: string, resort_count: int, owner_count: int}>
+     * Nationwide top list: merge SQL buckets that resolve to the same human label (e.g. same city/province from PSGC).
+     *
+     * @return list<array{location_label: string, resort_count: int}>
      */
-    private function rowsByCityNationwide(): array
+    private function rowsForTopResortsNationwideMerged(): array
     {
-        $resortRows = Resort::withoutGlobalScopes()
+        /** @var array<string, array{location_label: string, resort_count: int}> $merge */
+        $merge = [];
+
+        $put = function (string $label, int $count) use (&$merge): void {
+            $norm = mb_strtolower($this->sanitizeLocationLabelPart($label));
+            if ($norm === '' || $norm === mb_strtolower('Unknown location')) {
+                return;
+            }
+            if (! isset($merge[$norm])) {
+                $merge[$norm] = [
+                    'location_label' => $this->sanitizeLocationLabelPart($label),
+                    'resort_count' => 0,
+                ];
+            }
+            $merge[$norm]['resort_count'] += $count;
+        };
+
+        $pairRows = Resort::withoutGlobalScopes()
+            ->whereNotNull('address_province_psgc')
             ->whereNotNull('address_city_municipality_psgc')
-            ->selectRaw('address_city_municipality_psgc as code, address_province_psgc as province_code, COUNT(*) as resort_count')
-            ->groupBy('address_city_municipality_psgc', 'address_province_psgc')
+            ->selectRaw('address_province_psgc as p, address_city_municipality_psgc as c, COUNT(*) as n')
+            ->groupBy('address_province_psgc', 'address_city_municipality_psgc')
             ->get();
 
-        if ($resortRows->isEmpty()) {
-            return [];
+        foreach ($pairRows as $row) {
+            $label = $this->labelForProvinceCityAggregate((string) $row->p, (string) $row->c);
+            $put($label, (int) $row->n);
         }
 
-        $out = [];
-        foreach ($resortRows as $row) {
-            $provinceCode = (string) $row->province_code;
-            $locCode = (string) $row->code;
-            $pair = $this->resolveCityProvinceForResortLocation($locCode, $provinceCode);
-            $out[] = [
-                'city_psgc' => $locCode,
-                'city_name' => $pair['city_name'],
-                'province_psgc' => $provinceCode,
-                'province_name' => $pair['province_name'],
-                'resort_count' => (int) $row->resort_count,
-                'owner_count' => 0,
-            ];
-        }
-
-        usort($out, static fn (array $a, array $b): int => $b['resort_count'] <=> $a['resort_count']);
-
-        return $out;
-    }
-
-    /**
-     * Resorts with a province but no city/municipality on file.
-     *
-     * @return list<array{province_psgc: string, province_name: string, resort_count: int, owner_count: int}>
-     */
-    private function rowsByProvinceOnlyResorts(): array
-    {
-        $resortRows = Resort::withoutGlobalScopes()
+        $provOnly = Resort::withoutGlobalScopes()
             ->whereNotNull('address_province_psgc')
             ->whereNull('address_city_municipality_psgc')
-            ->selectRaw('address_province_psgc as code, COUNT(*) as resort_count')
+            ->selectRaw('address_province_psgc as p, COUNT(*) as n')
             ->groupBy('address_province_psgc')
             ->get();
 
-        if ($resortRows->isEmpty()) {
-            return [];
+        foreach ($provOnly as $row) {
+            $p = (string) $row->p;
+            $name = $this->resolveProvinceDisplayName($p, true);
+            $label = $this->locationLabelFromRow([
+                'city_name' => '',
+                'province_name' => $name,
+            ]);
+            $put($label, (int) $row->n);
         }
 
-        $out = [];
-        foreach ($resortRows as $row) {
-            $code = (string) $row->code;
-            $out[] = [
-                'province_psgc' => $code,
-                'province_name' => $this->resolveProvinceDisplayName($code, true),
-                'resort_count' => (int) $row->resort_count,
-                'owner_count' => 0,
-            ];
+        $list = array_values($merge);
+        usort($list, static fn (array $a, array $b): int => $b['resort_count'] <=> $a['resort_count']);
+
+        return $list;
+    }
+
+    private function labelForProvinceCityAggregate(string $provincePsgc, string $cityPsgc): string
+    {
+        $svc = app(PhilippineLocationService::class);
+        $fromDb = $svc->administrativeAreaLabelFromCodes($provincePsgc, $cityPsgc);
+        if ($fromDb !== null && trim($fromDb) !== '') {
+            return $this->sanitizeLocationLabelPart($fromDb);
         }
 
-        usort($out, static fn (array $a, array $b): int => $b['resort_count'] <=> $a['resort_count']);
+        $res = $this->firstRepresentativeResort($provincePsgc, $cityPsgc, 'both');
+        $labels = $this->inferCityProvinceLabelsFromResort($res);
+        if ($labels !== null && ($labels['city'] !== '' || $labels['province'] !== '')) {
+            $label = $this->locationLabelFromRow([
+                'city_name' => $labels['city'],
+                'province_name' => $labels['province'],
+            ]);
+            if ($label !== 'Unknown location') {
+                return $label;
+            }
+        }
 
-        return $out;
+        $pair = $this->resolveCityProvinceForResortLocation($cityPsgc, $provincePsgc);
+
+        return $this->locationLabelFromRow([
+            'city_name' => $pair['city_name'],
+            'province_name' => $pair['province_name'],
+        ]);
     }
 
     /**
