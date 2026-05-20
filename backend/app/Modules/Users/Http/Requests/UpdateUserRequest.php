@@ -18,10 +18,15 @@ class UpdateUserRequest extends FormRequest
         $userId = $this->route('user')?->id;
 
         return [
-            'name' => ['sometimes', 'string', 'max:120'],
-            'email' => ['sometimes', 'email', 'max:190', Rule::unique('users', 'email')->ignore($userId)],
-            'password' => PlatformPasswordRules::optionalWithConfirmation(),
-            'role' => ['sometimes', 'in:user,client,guest,admin,resort_owner,marketing,admin_staff'],
+            'name'                          => ['sometimes', 'string', 'max:120'],
+            'email'                         => ['sometimes', 'email', 'max:190', Rule::unique('users', 'email')->ignore($userId)],
+            'password'                      => PlatformPasswordRules::optionalWithConfirmation(),
+            'role'                          => ['sometimes', 'in:user,client,guest,admin,resort_owner,marketing,admin_staff'],
+            'phone'                         => ['sometimes', 'nullable', 'string', 'max:30'],
+            'mailing_province_psgc'         => ['sometimes', 'nullable', 'string', 'max:20'],
+            'mailing_city_municipality_psgc'=> ['sometimes', 'nullable', 'string', 'max:20'],
+            'mailing_barangay_name'         => ['sometimes', 'nullable', 'string', 'max:180'],
+            'mailing_location_label'        => ['sometimes', 'nullable', 'string', 'max:300'],
         ];
     }
 }

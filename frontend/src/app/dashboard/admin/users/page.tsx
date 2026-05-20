@@ -9,6 +9,7 @@ import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import AdminCreateUserModal from "@/components/dashboard/AdminCreateUserModal";
+import AdminEditUserModal, { type AdminEditableUser } from "@/components/dashboard/AdminEditUserModal";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import BulkActionBar from "@/components/shared/BulkActionBar";
 import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
@@ -27,7 +28,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { bulkDeleteToastDescription, bulkDeleteUsers } from "@/lib/api/bulkDelete";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
-import { Trash2, UserPlus, Users } from "lucide-react";
+import { Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type User = {
@@ -35,6 +36,11 @@ type User = {
   name: string;
   email: string;
   role: string;
+  phone?: string | null;
+  mailing_province_psgc?: string | null;
+  mailing_city_municipality_psgc?: string | null;
+  mailing_barangay_name?: string | null;
+  mailing_location_label?: string | null;
   created_at?: string;
   createdAt?: string;
   tenant_id: number | null;
@@ -85,6 +91,7 @@ export default function AdminUsersPage() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editUser, setEditUser] = useState<AdminEditableUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const { pushToast } = useToast();
@@ -302,15 +309,25 @@ export default function AdminUsersPage() {
                   },
                 ]}
                 actions={
-                  <button
-                    type="button"
-                    disabled={deleting === u.id}
-                    onClick={() => setConfirmDelete(u)}
-                    className="dash-btn-danger w-full justify-center"
-                  >
-                    <Trash2 size={14} />
-                    Delete user
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditUser(u)}
+                      className="dash-btn-sm w-full justify-center"
+                    >
+                      <Pencil size={14} />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deleting === u.id}
+                      onClick={() => setConfirmDelete(u)}
+                      className="dash-btn-danger w-full justify-center"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
                 }
               />
             ))}
@@ -369,6 +386,10 @@ export default function AdminUsersPage() {
                 </td>
                 <DashTableActionsCell>
                   <DashTableActionsInner>
+                    <button type="button" onClick={() => setEditUser(u)} className="dash-btn-sm">
+                      <Pencil size={14} />
+                      Edit
+                    </button>
                     <button type="button" disabled={deleting === u.id} onClick={() => setConfirmDelete(u)} className="dash-btn-danger">
                       <Trash2 size={14} />
                       Delete
@@ -385,6 +406,13 @@ export default function AdminUsersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => void load(appliedQuery, page, perPage, sortBy, sortDir)}
+      />
+
+      <AdminEditUserModal
+        open={Boolean(editUser)}
+        user={editUser}
+        onClose={() => setEditUser(null)}
+        onSaved={() => void load(appliedQuery, page, perPage, sortBy, sortDir)}
       />
 
       <ConfirmDialog
