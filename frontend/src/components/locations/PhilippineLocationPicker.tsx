@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  NCR_PROVINCE_CODE,
-  isNcrHucProvinceCode,
-  normalizeProvinceCodeForDisplay,
-} from "@/lib/locations/phLocationApiCache";
+import { normalizeProvinceCodeForDisplay } from "@/lib/locations/phLocationApiCache";
 import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
