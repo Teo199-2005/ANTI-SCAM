@@ -29,16 +29,21 @@ export default function AdminLocationStatsChart({ rows, limit = 5 }: AdminLocati
       <ul className="space-y-3.5" aria-label={`Top ${limit} resort locations`}>
         {topRows.map((row, index) => (
           <li key={`${row.location_label}-${index}`}>
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <p className="min-w-0 truncate font-dash text-sm font-semibold text-navy" title={row.location_label}>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-baseline gap-2">
                 <span
-                  className="mr-2 inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-md bg-zinc-100 px-1.5 text-[11px] font-bold tabular-nums text-zinc-600"
+                  className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-md bg-zinc-100 px-1.5 text-[11px] font-bold tabular-nums text-zinc-600"
                   aria-label={`Rank ${index + 1}`}
                 >
                   {index + 1}
                 </span>
-                <span className="align-middle">{row.location_label}</span>
-              </p>
+                <span
+                  className="min-w-0 truncate font-dash text-sm font-semibold text-navy"
+                  title={row.location_label}
+                >
+                  {row.location_label}
+                </span>
+              </div>
               <span className="shrink-0 text-xs font-semibold tabular-nums text-navy">
                 {row.resort_count} {row.resort_count === 1 ? "resort" : "resorts"}
               </span>

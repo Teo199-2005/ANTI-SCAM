@@ -118,6 +118,37 @@ class AdminLocationStatsTest extends TestCase
             ->assertJsonFragment(['location_label' => 'Bangued, Abra']);
     }
 
+    public function test_location_stats_uses_resort_address_label_when_psgc_reference_missing(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $tenant = Tenant::create([
+            'name' => 'Off-catalog PSGC',
+            'slug' => 'off-catalog-psgc',
+            'subdomain' => 'off-catalog-psgc',
+            'status' => 'active',
+        ]);
+
+        User::factory()->create([
+            'role' => 'resort_owner',
+            'tenant_id' => $tenant->id,
+        ]);
+
+        Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Catalog mismatch resort',
+            'is_publicly_listed' => true,
+            'address_province_psgc' => '9999999999',
+            'address_city_municipality_psgc' => '9999999998',
+            'address_label' => 'Baybay, Leyte',
+        ]);
+
+        $this->getJson('/api/v1/admin/location-stats')
+            ->assertSuccessful()
+            ->assertJsonFragment(['location_label' => 'Baybay, Leyte']);
+    }
+
     public function test_admin_resort_list_filters_by_province_psgc(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

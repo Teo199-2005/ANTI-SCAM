@@ -173,7 +173,7 @@ class AdminLocationStatsController extends Controller
             $code = (string) $row->code;
             $out[] = [
                 'province_psgc' => $code,
-                'province_name' => $this->resolveProvinceDisplayName($code),
+                'province_name' => $this->resolveProvinceDisplayName($code, true),
                 'resort_count' => (int) $row->resort_count,
                 'owner_count' => 0,
             ];
@@ -319,23 +319,36 @@ class AdminLocationStatsController extends Controller
             return $t !== '' ? $t : 'Unknown location';
         }
 
-        return 'Unmapped geography';
+        return 'Incomplete resort address';
     }
 
-    private function resolveProvinceDisplayName(string $code): string
+    private function resolveProvinceDisplayName(string $code, bool $provinceBucketWithoutCity = false): string
     {
-        if (isset($this->provinceNameCache[$code])) {
-            return $this->provinceNameCache[$code];
+        $cacheKey = $code.'|pc='.($provinceBucketWithoutCity ? '1' : '0');
+        if (isset($this->provinceNameCache[$cacheKey])) {
+            return $this->provinceNameCache[$cacheKey];
         }
 
         foreach ($this->psgcCodeCandidates($code) as $try) {
             $name = PsgcProvince::query()->where('code', $try)->value('name');
             if ($name !== null && trim((string) $name) !== '') {
-                return $this->provinceNameCache[$code] = (string) $name;
+                return $this->provinceNameCache[$cacheKey] = (string) $name;
             }
         }
 
-        return $this->provinceNameCache[$code] = $this->humanizeUnmappedCode($code);
+        $mode = $provinceBucketWithoutCity ? 'province_city_null' : 'province_any';
+        $hint = $this->representativeResortAddressLabel($code, null, $mode);
+        if ($hint !== null) {
+            $parsed = $this->parseCityProvinceFromAddressLabel($hint);
+            $label = $parsed['province'] !== ''
+                ? $parsed['province']
+                : ($parsed['city'] !== '' ? $parsed['city'] : null);
+            if ($label !== null && $label !== '') {
+                return $this->provinceNameCache[$cacheKey] = $label;
+            }
+        }
+
+        return $this->provinceNameCache[$cacheKey] = $this->humanizeUnmappedCode($code);
     }
 
     /**
@@ -375,11 +388,83 @@ class AdminLocationStatsController extends Controller
             }
         }
 
+        $hint = $this->representativeResortAddressLabel($provinceFromResort, $locCode, 'both');
+        if ($hint !== null) {
+            $parsed = $this->parseCityProvinceFromAddressLabel($hint);
+            if ($parsed['city'] !== '' || $parsed['province'] !== '') {
+                return $this->cityProvinceDisplayCache[$key] = [
+                    'city_name' => $parsed['city'],
+                    'province_name' => $parsed['province'] !== '' ? $parsed['province'] : $parsed['city'],
+                ];
+            }
+        }
+
         $pname = $this->resolveProvinceDisplayName($provinceFromResort);
 
         return $this->cityProvinceDisplayCache[$key] = [
             'city_name' => '',
             'province_name' => $pname,
         ];
+    }
+
+    /**
+     * @param  'both'|'province_city_null'|'province_any'  $mode
+     */
+    private function representativeResortAddressLabel(string $provincePsgc, ?string $cityPsgc, string $mode): ?string
+    {
+        foreach ($this->psgcCodeCandidates($provincePsgc) as $provTry) {
+            $base = Resort::withoutGlobalScopes()
+                ->where('address_province_psgc', $provTry)
+                ->whereNotNull('address_label')
+                ->where('address_label', '!=', '');
+
+            if ($mode === 'province_city_null') {
+                $label = (clone $base)->whereNull('address_city_municipality_psgc')->orderBy('id')->value('address_label');
+                if (is_string($label) && trim($label) !== '') {
+                    return trim($label);
+                }
+
+                continue;
+            }
+
+            if ($mode === 'province_any') {
+                $label = (clone $base)->orderBy('id')->value('address_label');
+                if (is_string($label) && trim($label) !== '') {
+                    return trim($label);
+                }
+
+                continue;
+            }
+
+            if ($cityPsgc === null || $cityPsgc === '') {
+                return null;
+            }
+
+            foreach ($this->psgcCodeCandidates($cityPsgc) as $cityTry) {
+                $label = (clone $base)->where('address_city_municipality_psgc', $cityTry)->orderBy('id')->value('address_label');
+                if (is_string($label) && trim($label) !== '') {
+                    return trim($label);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{city: string, province: string}
+     */
+    private function parseCityProvinceFromAddressLabel(string $addressLabel): array
+    {
+        $parts = array_values(array_filter(array_map('trim', explode(',', $addressLabel)), static fn (string $p): bool => $p !== ''));
+        $n = count($parts);
+        if ($n === 0) {
+            return ['city' => '', 'province' => ''];
+        }
+        if ($n === 1) {
+            return ['city' => '', 'province' => $parts[0]];
+        }
+
+        return ['city' => $parts[$n - 2], 'province' => $parts[$n - 1]];
     }
 }
