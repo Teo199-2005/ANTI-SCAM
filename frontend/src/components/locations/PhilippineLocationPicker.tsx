@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  NCR_PROVINCE_CODE,
+  isNcrHucProvinceCode,
+  normalizeProvinceCodeForDisplay,
+} from "@/lib/locations/phLocationApiCache";
 import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
@@ -29,8 +34,15 @@ export function PhilippineLocationPicker({
   legacyBarangayCodeHint,
   barangayRowEnd,
 }: Props) {
+  /**
+   * If an existing record stored an NCR city code (e.g. 1381300000 for Quezon City)
+   * in the province slot, normalise it to the Metro Manila entry so the dropdown
+   * shows the right selection. The hook also handles this internally for city loading.
+   */
+  const displayProvinceCode = normalizeProvinceCodeForDisplay(value.provinceCode);
+
   const { provinces, cities, loadingProvinces, loadingCities, provincesError, citiesError } =
-    usePhilippineLocationDropdowns(value.provinceCode);
+    usePhilippineLocationDropdowns(displayProvinceCode);
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -38,6 +50,7 @@ export function PhilippineLocationPicker({
   const valueRef = useRef(value);
   valueRef.current = value;
 
+  // When province changes and the saved city is no longer in the list, clear it.
   useEffect(() => {
     const v = valueRef.current;
     if (!v.provinceCode || !v.cityCode || cities.length === 0) return;
@@ -72,7 +85,7 @@ export function PhilippineLocationPicker({
             id={`${idPrefix}-prov`}
             className="dash-input"
             disabled={provinceSelectDisabled}
-            value={value.provinceCode ?? ""}
+            value={displayProvinceCode ?? ""}
             onChange={(e) => onProvincePick(e.target.value)}
           >
             <option value="">{loadingProvinces ? "Loading…" : "Select province / region"}</option>
@@ -115,8 +128,8 @@ export function PhilippineLocationPicker({
         </p>
       ) : (
         <p className="text-[11px] leading-snug text-zinc-500">
-          Options come from the server PSGC data. For Metro Manila addresses, pick the province row that lists your city
-          (often named Metro Manila or similar), then your city or municipality.
+          For Metro Manila addresses, select <strong className="font-medium text-zinc-700">Metro Manila (NCR)</strong> as
+          province / region, then pick your city.
           {loadingProvinces || loadingCities ? " Loading lists…" : ""}
         </p>
       )}

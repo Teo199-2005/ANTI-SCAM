@@ -1,6 +1,10 @@
 "use client";
 
-import { getPhilippineCitiesCached, getPhilippineProvincesCached } from "@/lib/locations/phLocationApiCache";
+import {
+  getPhilippineCitiesCached,
+  getPhilippineProvincesCached,
+  normalizeProvinceCodeForDisplay,
+} from "@/lib/locations/phLocationApiCache";
 import type { PhilippineLocationRow } from "@/lib/locations/philippines";
 import { useEffect, useState } from "react";
 
@@ -16,7 +20,9 @@ export type PhilippineLocationDropdownsState = {
 /**
  * Loads province and city rows from the Laravel public location API (same source as validation).
  */
-export function usePhilippineLocationDropdowns(selectedProvinceCode: string | null): PhilippineLocationDropdownsState {
+export function usePhilippineLocationDropdowns(selectedProvinceCodeRaw: string | null): PhilippineLocationDropdownsState {
+  // Normalise NCR HUC codes (e.g. Quezon City used as province) to the Metro Manila entry.
+  const selectedProvinceCode = normalizeProvinceCodeForDisplay(selectedProvinceCodeRaw);
   const [provinces, setProvinces] = useState<PhilippineLocationRow[]>([]);
   const [cities, setCities] = useState<PhilippineLocationRow[]>([]);
   const [loadingProvinces, setLoadingProvinces] = useState(true);
