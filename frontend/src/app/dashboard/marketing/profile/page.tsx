@@ -586,6 +586,11 @@ export default function MarketingProfilePage() {
                 }}
               />
               <FieldInlineError message={personalErrors.mailingLocation} />
+              <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+                NCR cities (for example Quezon City): choose <span className="font-medium text-zinc-700">Metro Manila / NCR</span> as
+                province when it appears that way. If the province list only shows your city, you can pick it there and again as
+                city — we match that to the official hierarchy when you save.
+              </p>
             </div>
 
             <div className="md:col-span-2">

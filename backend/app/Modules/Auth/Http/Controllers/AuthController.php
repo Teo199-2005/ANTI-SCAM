@@ -361,7 +361,16 @@ class AuthController extends Controller
                 ['mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_name', 'mailing_barangay_psgc'],
             );
 
-            if (array_key_exists('mailing_province_psgc', $kycIn)) {
+            $anyLoc = array_key_exists('mailing_province_psgc', $kycIn)
+                || array_key_exists('mailing_city_municipality_psgc', $kycIn)
+                || array_key_exists('mailing_barangay_name', $kycIn)
+                || array_key_exists('mailing_barangay_psgc', $kycIn);
+
+            if ($anyLoc && filled($finalP) && filled($finalC)) {
+                $finalP = $this->locations->canonicalProvinceCodeForMailing($finalP, $finalC);
+            }
+
+            if (array_key_exists('mailing_province_psgc', $kycIn) || ($anyLoc && filled($finalP) && filled($finalC))) {
                 $kycPayload['mailing_province_psgc'] = $finalP;
             }
             if (array_key_exists('mailing_city_municipality_psgc', $kycIn)) {

@@ -101,7 +101,50 @@ class PhilippineLocationService
             return $this->looksLikePsgcCode($provinceCode) && $this->looksLikePsgcCode($cityCode);
         }
 
-        return PsgcCode::same($city->province_code, $provinceCode);
+        return $this->provinceSelectionMatchesCityProvince($provinceCode, $city);
+    }
+
+    /**
+     * True when the SPA "province" code matches the city row's PSA province, or when the province
+     * slot repeats the city/municipality code (common for NCR HUCs such as Quezon City in flat pickers).
+     */
+    private function provinceSelectionMatchesCityProvince(?string $provinceCode, PsgcCityMunicipality $city): bool
+    {
+        if (! filled($provinceCode)) {
+            return false;
+        }
+
+        if (PsgcCode::same($city->province_code, $provinceCode)) {
+            return true;
+        }
+
+        if (PsgcCode::same($city->code, $provinceCode)) {
+            return true;
+        }
+
+        $provinceAsCity = $this->findCityRow($provinceCode);
+
+        return $provinceAsCity !== null && PsgcCode::same($provinceAsCity->code, $city->code);
+    }
+
+    /**
+     * Return the PSA province code string stored on {@see PsgcProvince} for this pair, or the city's
+     * {@see PsgcCityMunicipality::$province_code} when the SPA "province" value was a city code / alias.
+     */
+    public function canonicalProvinceCodeForMailing(?string $provinceCode, ?string $cityCode): ?string
+    {
+        if (! filled($provinceCode) || ! filled($cityCode)) {
+            return $provinceCode;
+        }
+
+        $city = $this->findCityRow($cityCode);
+        if ($city === null || ! $this->provinceSelectionMatchesCityProvince($provinceCode, $city)) {
+            return $provinceCode;
+        }
+
+        $prov = $this->findProvinceRow($provinceCode);
+
+        return $prov !== null ? (string) $prov->code : (string) $city->province_code;
     }
 
     private function looksLikePsgcCode(string $code): bool
@@ -116,7 +159,7 @@ class PhilippineLocationService
         }
 
         $city = $this->findCityRow($cityCode);
-        if ($city === null || ! PsgcCode::same($city->province_code, $provinceCode)) {
+        if ($city === null || ! $this->provinceSelectionMatchesCityProvince($provinceCode, $city)) {
             return false;
         }
 
@@ -190,8 +233,20 @@ class PhilippineLocationService
         }
 
         $city = $this->findCityRow($cityCode);
-        $prov = $this->findProvinceRow($provinceCode);
-        if ($city !== null && $prov !== null && PsgcCode::same($city->province_code, $provinceCode)) {
+        if ($city === null) {
+            return null;
+        }
+
+        if (! $this->provinceSelectionMatchesCityProvince($provinceCode, $city)) {
+            if (filled($barangayName) && $this->isValidProvinceCityPair($provinceCode, $cityCode)) {
+                return trim((string) $barangayName);
+            }
+
+            return null;
+        }
+
+        $prov = $this->findProvinceRow($provinceCode) ?? $this->findProvinceRow($city->province_code);
+        if ($prov !== null) {
             if (filled($barangayName)) {
                 return trim((string) $barangayName).', '.$city->name.', '.$prov->name;
             }

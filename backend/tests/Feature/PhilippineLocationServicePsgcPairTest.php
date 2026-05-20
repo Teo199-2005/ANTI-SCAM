@@ -31,4 +31,27 @@ class PhilippineLocationServicePsgcPairTest extends TestCase
             PsgcReferenceSeeder::DEMO_CITY_CODE,
         ));
     }
+
+    public function test_validates_when_spa_puts_city_psgc_in_province_slot_flat_picker(): void
+    {
+        $svc = app(PhilippineLocationService::class);
+
+        $this->assertTrue($svc->isValidProvinceCityPair(
+            PsgcReferenceSeeder::DEMO_CITY_CODE,
+            PsgcReferenceSeeder::DEMO_CITY_CODE,
+        ));
+    }
+
+    public function test_canonical_province_for_mailing_when_province_slot_is_city_code(): void
+    {
+        $svc = app(PhilippineLocationService::class);
+
+        $this->assertSame(
+            PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            $svc->canonicalProvinceCodeForMailing(
+                PsgcReferenceSeeder::DEMO_CITY_CODE,
+                PsgcReferenceSeeder::DEMO_CITY_CODE,
+            ),
+        );
+    }
 }
