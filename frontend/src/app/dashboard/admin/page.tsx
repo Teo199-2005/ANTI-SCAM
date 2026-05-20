@@ -169,7 +169,7 @@ export default function AdminOverviewPage() {
             </div>
             <div>
               <h2 className="font-dash text-base font-semibold text-navy">Top resort locations</h2>
-              <p className="text-xs text-zinc-500">Top 5 by resort count · filter by address (PSGC)</p>
+              <p className="text-xs text-zinc-500">Top 5 by resort count · filter by province / city</p>
             </div>
           </div>
           <div className="dash-filter-bar dash-filter-bar--flat">

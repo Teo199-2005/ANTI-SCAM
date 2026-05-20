@@ -88,6 +88,36 @@ class AdminLocationStatsTest extends TestCase
             ->assertJsonPath('data.filtered_totals.owner_count', 1);
     }
 
+    public function test_location_stats_resolves_barangay_psgc_when_saved_in_city_field(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $tenant = Tenant::create([
+            'name' => 'Barangay City Tenant',
+            'slug' => 'br-city-tenant',
+            'subdomain' => 'br-city-tenant',
+            'status' => 'active',
+        ]);
+
+        User::factory()->create([
+            'role' => 'resort_owner',
+            'tenant_id' => $tenant->id,
+        ]);
+
+        Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Mis-keyed City Code Resort',
+            'is_publicly_listed' => true,
+            'address_province_psgc' => PsgcReferenceSeeder::DEMO_PROVINCE_CODE,
+            'address_city_municipality_psgc' => PsgcReferenceSeeder::DEMO_BARANGAY_CODE,
+        ]);
+
+        $this->getJson('/api/v1/admin/location-stats')
+            ->assertSuccessful()
+            ->assertJsonFragment(['location_label' => 'Bangued, Abra']);
+    }
+
     public function test_admin_resort_list_filters_by_province_psgc(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

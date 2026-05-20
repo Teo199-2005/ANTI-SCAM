@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\PsgcBarangay;
 use App\Models\PsgcCityMunicipality;
 use App\Models\PsgcProvince;
 use App\Models\Resort;
@@ -16,6 +17,12 @@ use Illuminate\Support\Facades\DB;
 class AdminLocationStatsController extends Controller
 {
     use ApiResponseTrait;
+
+    /** @var array<string, string> */
+    private array $provinceNameCache = [];
+
+    /** @var array<string, array{city_name: string, province_name: string}> */
+    private array $cityProvinceDisplayCache = [];
 
     public function index(Request $request)
     {
@@ -69,15 +76,11 @@ class AdminLocationStatsController extends Controller
 
         $codes = $resortRows->keys()->merge($ownerRows->keys())->unique()->filter();
 
-        $names = PsgcProvince::query()
-            ->whereIn('code', $codes)
-            ->pluck('name', 'code');
-
         $out = [];
         foreach ($codes as $code) {
             $out[] = [
                 'province_psgc' => (string) $code,
-                'province_name' => (string) ($names[$code] ?? $code),
+                'province_name' => $this->resolveProvinceDisplayName((string) $code),
                 'resort_count' => (int) ($resortRows[$code]->resort_count ?? 0),
                 'owner_count' => (int) ($ownerRows[$code]->owner_count ?? 0),
             ];
@@ -127,24 +130,16 @@ class AdminLocationStatsController extends Controller
             return [];
         }
 
-        $cityCodes = $resortRows->pluck('code')->unique()->filter()->values();
-        $provinceCodes = $resortRows->pluck('province_code')->unique()->filter()->values();
-
-        $cityNames = PsgcCityMunicipality::query()
-            ->whereIn('code', $cityCodes)
-            ->pluck('name', 'code');
-        $provinceNames = PsgcProvince::query()
-            ->whereIn('code', $provinceCodes)
-            ->pluck('name', 'code');
-
         $out = [];
         foreach ($resortRows as $row) {
             $provinceCode = (string) $row->province_code;
+            $locCode = (string) $row->code;
+            $pair = $this->resolveCityProvinceForResortLocation($locCode, $provinceCode);
             $out[] = [
-                'city_psgc' => (string) $row->code,
-                'city_name' => (string) ($cityNames[$row->code] ?? $row->code),
+                'city_psgc' => $locCode,
+                'city_name' => $pair['city_name'],
                 'province_psgc' => $provinceCode,
-                'province_name' => (string) ($provinceNames[$provinceCode] ?? $provinceCode),
+                'province_name' => $pair['province_name'],
                 'resort_count' => (int) $row->resort_count,
                 'owner_count' => 0,
             ];
@@ -173,16 +168,12 @@ class AdminLocationStatsController extends Controller
             return [];
         }
 
-        $names = PsgcProvince::query()
-            ->whereIn('code', $resortRows->pluck('code'))
-            ->pluck('name', 'code');
-
         $out = [];
         foreach ($resortRows as $row) {
             $code = (string) $row->code;
             $out[] = [
                 'province_psgc' => $code,
-                'province_name' => (string) ($names[$code] ?? $code),
+                'province_name' => $this->resolveProvinceDisplayName($code),
                 'resort_count' => (int) $row->resort_count,
                 'owner_count' => 0,
             ];
@@ -242,19 +233,16 @@ class AdminLocationStatsController extends Controller
 
         $codes = $resortRows->keys()->merge($ownerRows->keys())->unique()->filter();
 
-        $names = PsgcCityMunicipality::query()
-            ->whereIn('code', $codes)
-            ->pluck('name', 'code');
-
-        $provinceName = (string) (PsgcProvince::query()->where('code', $provincePsgc)->value('name') ?? $provincePsgc);
+        $provinceName = $this->resolveProvinceDisplayName($provincePsgc);
 
         $out = [];
         foreach ($codes as $code) {
+            $pair = $this->resolveCityProvinceForResortLocation((string) $code, $provincePsgc);
             $out[] = [
                 'city_psgc' => (string) $code,
-                'city_name' => (string) ($names[$code] ?? $code),
+                'city_name' => $pair['city_name'],
                 'province_psgc' => $provincePsgc,
-                'province_name' => $provinceName,
+                'province_name' => $pair['province_name'] !== '' ? $pair['province_name'] : $provinceName,
                 'resort_count' => (int) ($resortRows[$code]->resort_count ?? 0),
                 'owner_count' => (int) ($ownerRows[$code]->owner_count ?? 0),
             ];
@@ -286,6 +274,112 @@ class AdminLocationStatsController extends Controller
         return [
             'resort_count' => $resortQuery->count(),
             'owner_count' => $ownerQuery->count(),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function psgcCodeCandidates(string $raw): array
+    {
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $digits = preg_replace('/\D+/', '', $trimmed) ?? '';
+        $out = [$trimmed];
+        if ($digits !== '' && $digits !== $trimmed) {
+            $out[] = $digits;
+        }
+        if ($digits !== '') {
+            if (strlen($digits) < 10) {
+                $padded = str_pad($digits, 10, '0', STR_PAD_LEFT);
+                if (! in_array($padded, $out, true)) {
+                    $out[] = $padded;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($out, static fn (string $v): bool => $v !== '')));
+    }
+
+    private function looksLikeRawPsgcDigits(string $value): bool
+    {
+        $digits = preg_replace('/\D+/', '', $value) ?? '';
+
+        return $digits !== '' && (bool) preg_match('/^\d{7,12}$/', $digits);
+    }
+
+    private function humanizeUnmappedCode(string $code): string
+    {
+        if (! $this->looksLikeRawPsgcDigits($code)) {
+            $t = trim($code);
+
+            return $t !== '' ? $t : 'Unknown location';
+        }
+
+        return 'Unmapped geography';
+    }
+
+    private function resolveProvinceDisplayName(string $code): string
+    {
+        if (isset($this->provinceNameCache[$code])) {
+            return $this->provinceNameCache[$code];
+        }
+
+        foreach ($this->psgcCodeCandidates($code) as $try) {
+            $name = PsgcProvince::query()->where('code', $try)->value('name');
+            if ($name !== null && trim((string) $name) !== '') {
+                return $this->provinceNameCache[$code] = (string) $name;
+            }
+        }
+
+        return $this->provinceNameCache[$code] = $this->humanizeUnmappedCode($code);
+    }
+
+    /**
+     * @return array{city_name: string, province_name: string}
+     */
+    private function resolveCityProvinceForResortLocation(string $locCode, string $provinceFromResort): array
+    {
+        $key = $locCode.'|'.$provinceFromResort;
+        if (isset($this->cityProvinceDisplayCache[$key])) {
+            return $this->cityProvinceDisplayCache[$key];
+        }
+
+        foreach ($this->psgcCodeCandidates($locCode) as $try) {
+            $city = PsgcCityMunicipality::query()->where('code', $try)->first();
+            if ($city !== null) {
+                $pname = $this->resolveProvinceDisplayName((string) $city->province_code);
+
+                return $this->cityProvinceDisplayCache[$key] = [
+                    'city_name' => (string) $city->name,
+                    'province_name' => $pname,
+                ];
+            }
+        }
+
+        foreach ($this->psgcCodeCandidates($locCode) as $try) {
+            $br = PsgcBarangay::query()->where('code', $try)->first();
+            if ($br !== null) {
+                $city = PsgcCityMunicipality::query()->where('code', $br->city_municipality_code)->first();
+                if ($city !== null) {
+                    $pname = $this->resolveProvinceDisplayName((string) $city->province_code);
+
+                    return $this->cityProvinceDisplayCache[$key] = [
+                        'city_name' => (string) $city->name,
+                        'province_name' => $pname,
+                    ];
+                }
+            }
+        }
+
+        $pname = $this->resolveProvinceDisplayName($provinceFromResort);
+
+        return $this->cityProvinceDisplayCache[$key] = [
+            'city_name' => '',
+            'province_name' => $pname,
         ];
     }
 }

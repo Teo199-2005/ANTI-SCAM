@@ -31,8 +31,13 @@ export default function AdminLocationStatsChart({ rows, limit = 5 }: AdminLocati
           <li key={`${row.location_label}-${index}`}>
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <p className="min-w-0 truncate font-dash text-sm font-semibold text-navy" title={row.location_label}>
-                <span className="mr-1.5 text-[11px] font-bold text-zinc-400">#{index + 1}</span>
-                {row.location_label}
+                <span
+                  className="mr-2 inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-md bg-zinc-100 px-1.5 text-[11px] font-bold tabular-nums text-zinc-600"
+                  aria-label={`Rank ${index + 1}`}
+                >
+                  {index + 1}
+                </span>
+                <span className="align-middle">{row.location_label}</span>
               </p>
               <span className="shrink-0 text-xs font-semibold tabular-nums text-navy">
                 {row.resort_count} {row.resort_count === 1 ? "resort" : "resorts"}
