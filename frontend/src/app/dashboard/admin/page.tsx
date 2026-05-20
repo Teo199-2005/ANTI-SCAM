@@ -7,7 +7,7 @@ import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifie
 import StatCard from "@/components/dashboard/StatCard";
 import LocationFilterBar, {
   emptyLocationFilter,
-  locationFilterToParams,
+  locationFilterToParamsWithDisplayHints,
   type LocationFilterValue,
 } from "@/components/locations/LocationFilterBar";
 import { getAdminLocationStats, getAdminStats, type AdminLocationStats, AdminStats } from "@/lib/api/admin";
@@ -76,7 +76,7 @@ export default function AdminOverviewPage() {
     const run = async () => {
       setLocationStatsLoading(true);
       try {
-        const data = await getAdminLocationStats(locationFilterToParams(locationFilter));
+        const data = await getAdminLocationStats(locationFilterToParamsWithDisplayHints(locationFilter));
         if (!cancelled) setLocationStats(data);
       } catch {
         if (!cancelled) setLocationStats(null);

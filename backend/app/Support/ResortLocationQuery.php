@@ -110,13 +110,35 @@ final class ResortLocationQuery
     }
 
     /**
-     * @return array{province_psgc: ?string, city_municipality_psgc: ?string}
+     * Optional human labels from the same PSGC source as the SPA (e.g. admin location filter).
+     * Controllers may ignore these; they are used when reference tables are incomplete.
+     */
+    public static function normalizeDisplayHint(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $t = trim($value);
+
+        return $t !== '' ? $t : null;
+    }
+
+    /**
+     * @return array{
+     *     province_psgc: ?string,
+     *     city_municipality_psgc: ?string,
+     *     province_display: ?string,
+     *     city_display: ?string,
+     * }
      */
     public static function fromRequest(\Illuminate\Http\Request $request): array
     {
         return [
             'province_psgc' => self::normalize($request->query('province_psgc') ?: $request->query('province_code')),
             'city_municipality_psgc' => self::normalize($request->query('city_municipality_psgc') ?: $request->query('city_code')),
+            'province_display' => self::normalizeDisplayHint($request->query('province_display')),
+            'city_display' => self::normalizeDisplayHint($request->query('city_display')),
         ];
     }
 }

@@ -94,11 +94,16 @@ export type AdminLocationStats = {
 export async function getAdminLocationStats(params?: {
   province_psgc?: string | null;
   city_municipality_psgc?: string | null;
+  /** Human province name from the SPA PSGC picker (helps admin charts when API reference tables are incomplete). */
+  province_display?: string | null;
+  city_display?: string | null;
 }): Promise<AdminLocationStats> {
   const { data } = await apiClient.get<ApiEnvelope<AdminLocationStats>>("/admin/location-stats", {
     params: {
       province_psgc: params?.province_psgc ?? undefined,
       city_municipality_psgc: params?.city_municipality_psgc ?? undefined,
+      province_display: params?.province_display ?? undefined,
+      city_display: params?.city_display ?? undefined,
     },
   });
   const payload = data.data;

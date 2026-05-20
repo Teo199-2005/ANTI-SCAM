@@ -8,6 +8,7 @@ use App\Models\PsgcCityMunicipality;
 use App\Models\PsgcProvince;
 use App\Models\Resort;
 use App\Models\User;
+use App\Services\PhilippineLocationService;
 use App\Support\CacheSafe;
 use App\Support\ResortLocationQuery;
 use App\Shared\Traits\ApiResponseTrait;
@@ -24,33 +25,148 @@ class AdminLocationStatsController extends Controller
     /** @var array<string, array{city_name: string, province_name: string}> */
     private array $cityProvinceDisplayCache = [];
 
+    private ?string $hintProvincePsgc = null;
+
+    private ?string $hintProvinceLabel = null;
+
+    private ?string $hintCityPsgc = null;
+
+    private ?string $hintCityLabel = null;
+
     public function index(Request $request)
     {
         $location = ResortLocationQuery::fromRequest($request);
         $provincePsgc = $location['province_psgc'];
         $cityPsgc = $location['city_municipality_psgc'];
+        $provinceDisplay = $location['province_display'] ?? null;
+        $cityDisplay = $location['city_display'] ?? null;
 
-        $cacheKey = 'dashboard:admin_location_stats:'.md5(($provincePsgc ?? '').':'.($cityPsgc ?? ''));
+        $cacheKey = 'dashboard:admin_location_stats:'.md5(implode(':', [
+            $provincePsgc ?? '',
+            $cityPsgc ?? '',
+            $provinceDisplay ?? '',
+            $cityDisplay ?? '',
+        ]));
 
-        $payload = CacheSafe::remember($cacheKey, now()->addSeconds(45), function () use ($provincePsgc, $cityPsgc) {
-            if ($cityPsgc !== null) {
+        $payload = CacheSafe::remember($cacheKey, now()->addSeconds(45), function () use ($provincePsgc, $cityPsgc, $provinceDisplay, $cityDisplay) {
+            $this->beginLocationHintScope($provincePsgc, $cityPsgc, $provinceDisplay, $cityDisplay);
+            try {
+                if ($cityPsgc !== null) {
+                    return [
+                        'by_province' => [],
+                        'by_city' => $this->rowsByCity($provincePsgc, $cityPsgc),
+                        'top_resorts' => $this->topResortsByLocation($provincePsgc, $cityPsgc, 5),
+                        'filtered_totals' => $this->filteredTotals($provincePsgc, $cityPsgc),
+                    ];
+                }
+
                 return [
-                    'by_province' => [],
-                    'by_city' => $this->rowsByCity($provincePsgc, $cityPsgc),
+                    'by_province' => $this->rowsByProvince(),
+                    'by_city' => $provincePsgc !== null ? $this->rowsByCity($provincePsgc, null) : [],
                     'top_resorts' => $this->topResortsByLocation($provincePsgc, $cityPsgc, 5),
                     'filtered_totals' => $this->filteredTotals($provincePsgc, $cityPsgc),
                 ];
+            } finally {
+                $this->endLocationHintScope();
             }
-
-            return [
-                'by_province' => $this->rowsByProvince(),
-                'by_city' => $provincePsgc !== null ? $this->rowsByCity($provincePsgc, null) : [],
-                'top_resorts' => $this->topResortsByLocation($provincePsgc, $cityPsgc, 5),
-                'filtered_totals' => $this->filteredTotals($provincePsgc, $cityPsgc),
-            ];
         });
 
         return $this->successResponse($payload, 'Location stats fetched');
+    }
+
+    private function beginLocationHintScope(
+        ?string $provincePsgc,
+        ?string $cityPsgc,
+        ?string $provinceDisplay,
+        ?string $cityDisplay,
+    ): void {
+        $this->hintProvincePsgc = $provincePsgc;
+        $this->hintProvinceLabel = $provinceDisplay;
+        $this->hintCityPsgc = $cityPsgc;
+        $this->hintCityLabel = $cityDisplay;
+    }
+
+    private function endLocationHintScope(): void
+    {
+        $this->hintProvincePsgc = null;
+        $this->hintProvinceLabel = null;
+        $this->hintCityPsgc = null;
+        $this->hintCityLabel = null;
+        $this->provinceNameCache = [];
+        $this->cityProvinceDisplayCache = [];
+    }
+
+    private function matchesHintProvince(string $code): bool
+    {
+        if ($this->hintProvincePsgc === null || $this->hintProvinceLabel === null) {
+            return false;
+        }
+
+        return $this->psgcCodesOverlap($code, $this->hintProvincePsgc);
+    }
+
+    private function matchesHintCity(string $code): bool
+    {
+        if ($this->hintCityPsgc === null || $this->hintCityLabel === null) {
+            return false;
+        }
+
+        return $this->psgcCodesOverlap($code, $this->hintCityPsgc);
+    }
+
+    private function psgcCodesOverlap(string $a, string $b): bool
+    {
+        $as = $this->psgcCodeCandidates($a);
+        $bs = $this->psgcCodeCandidates($b);
+        foreach ($as as $x) {
+            if (in_array($x, $bs, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{city: string, province: string}|null
+     */
+    private function inferCityProvinceLabelsFromResort(?Resort $res): ?array
+    {
+        if ($res === null) {
+            return null;
+        }
+
+        $street = is_string($res->address_street_line) ? trim($res->address_street_line) : '';
+        $barangay = is_string($res->address_barangay_name) ? trim($res->address_barangay_name) : '';
+
+        if (is_string($res->address_label) && trim($res->address_label) !== '') {
+            $suffix = $this->normalizeLabelSuffixForLocationStats(
+                trim($res->address_label),
+                $res->address_street_line,
+                $res->address_barangay_name,
+            );
+            $parsed = $this->parseCityProvinceFromAddressLabel($suffix, $street, $barangay);
+            if ($parsed['city'] !== '' || $parsed['province'] !== '') {
+                return $parsed;
+            }
+        }
+
+        $line = app(PhilippineLocationService::class)->resortDisplayLine($res);
+        if (! is_string($line) || trim($line) === '') {
+            return null;
+        }
+
+        $suffix = $this->normalizeLabelSuffixForLocationStats(
+            trim($line),
+            $res->address_street_line,
+            $res->address_barangay_name,
+        );
+        $parsed = $this->parseCityProvinceFromAddressLabel($suffix, $street, $barangay);
+        if ($parsed['city'] === '' && $parsed['province'] === '') {
+            return null;
+        }
+
+        return $parsed;
     }
 
     /**
@@ -319,7 +435,9 @@ class AdminLocationStatsController extends Controller
             return $t !== '' ? $t : 'Unknown location';
         }
 
-        return 'Incomplete resort address';
+        $digits = preg_replace('/\D+/', '', $code) ?? '';
+
+        return 'PSGC '.$digits;
     }
 
     private function resolveProvinceDisplayName(string $code, bool $provinceBucketWithoutCity = false): string
@@ -336,22 +454,21 @@ class AdminLocationStatsController extends Controller
             }
         }
 
+        if ($this->matchesHintProvince($code)) {
+            $hint = $this->hintProvinceLabel;
+            $hint = is_string($hint) ? trim($hint) : '';
+            if ($hint !== '') {
+                return $this->provinceNameCache[$cacheKey] = $hint;
+            }
+        }
+
         $mode = $provinceBucketWithoutCity ? 'province_city_null' : 'province_any';
         $res = $this->firstRepresentativeResort($code, null, $mode);
-        if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
-            $suffix = $this->normalizeLabelSuffixForLocationStats(
-                trim($res->address_label),
-                $res->address_street_line,
-                $res->address_barangay_name,
-            );
-            $parsed = $this->parseCityProvinceFromAddressLabel(
-                $suffix,
-                is_string($res->address_street_line) ? trim($res->address_street_line) : '',
-                is_string($res->address_barangay_name) ? trim($res->address_barangay_name) : '',
-            );
-            $label = $parsed['province'] !== ''
-                ? $parsed['province']
-                : ($parsed['city'] !== '' ? $parsed['city'] : null);
+        $labels = $this->inferCityProvinceLabelsFromResort($res);
+        if ($labels !== null) {
+            $label = $labels['province'] !== ''
+                ? $labels['province']
+                : ($labels['city'] !== '' ? $labels['city'] : null);
             if ($label !== null && $label !== '') {
                 return $this->provinceNameCache[$cacheKey] = $label;
             }
@@ -365,41 +482,39 @@ class AdminLocationStatsController extends Controller
      */
     private function firstRepresentativeResort(string $provincePsgc, ?string $cityPsgc, string $mode): ?Resort
     {
-        $columns = ['id', 'address_label', 'address_street_line', 'address_barangay_name'];
+        $columns = [
+            'id',
+            'address_label',
+            'address_street_line',
+            'address_barangay_name',
+            'address_province_psgc',
+            'address_city_municipality_psgc',
+            'address_barangay_psgc',
+        ];
 
         foreach ($this->psgcCodeCandidates($provincePsgc) as $provTry) {
-            $base = Resort::withoutGlobalScopes()
-                ->where('address_province_psgc', $provTry)
-                ->whereNotNull('address_label')
-                ->where('address_label', '!=', '');
+            $base = Resort::withoutGlobalScopes()->where('address_province_psgc', $provTry);
 
             if ($mode === 'province_city_null') {
-                $res = (clone $base)->whereNull('address_city_municipality_psgc')->orderBy('id')->first($columns);
-                if ($res !== null) {
-                    return $res;
+                $base->whereNull('address_city_municipality_psgc');
+            } elseif ($mode === 'both') {
+                if ($cityPsgc === null || $cityPsgc === '') {
+                    return null;
                 }
-
-                continue;
+                $cityCandidates = $this->psgcCodeCandidates($cityPsgc);
+                if ($cityCandidates === []) {
+                    return null;
+                }
+                $base->whereIn('address_city_municipality_psgc', $cityCandidates);
             }
 
-            if ($mode === 'province_any') {
-                $res = (clone $base)->orderBy('id')->first($columns);
-                if ($res !== null) {
-                    return $res;
-                }
+            $res = (clone $base)
+                ->orderByRaw("(CASE WHEN COALESCE(TRIM(address_label), '') != '' THEN 0 ELSE 1 END) ASC")
+                ->orderBy('id')
+                ->first($columns);
 
-                continue;
-            }
-
-            if ($cityPsgc === null || $cityPsgc === '') {
-                return null;
-            }
-
-            foreach ($this->psgcCodeCandidates($cityPsgc) as $cityTry) {
-                $res = (clone $base)->where('address_city_municipality_psgc', $cityTry)->orderBy('id')->first($columns);
-                if ($res !== null) {
-                    return $res;
-                }
+            if ($res !== null) {
+                return $res;
             }
         }
 
@@ -477,33 +592,42 @@ class AdminLocationStatsController extends Controller
         }
 
         $res = $this->firstRepresentativeResort($provinceFromResort, $locCode, 'both');
-        if ($res !== null && is_string($res->address_label) && trim($res->address_label) !== '') {
-            $suffix = $this->normalizeLabelSuffixForLocationStats(
-                trim($res->address_label),
-                $res->address_street_line,
-                $res->address_barangay_name,
-            );
-            $parsed = $this->parseCityProvinceFromAddressLabel(
-                $suffix,
-                is_string($res->address_street_line) ? trim($res->address_street_line) : '',
-                is_string($res->address_barangay_name) ? trim($res->address_barangay_name) : '',
-            );
-            if ($parsed['city'] !== '' || $parsed['province'] !== '') {
-                $provName = $parsed['province'] !== ''
-                    ? $parsed['province']
-                    : $this->resolveProvinceDisplayName($provinceFromResort);
-
-                return $this->cityProvinceDisplayCache[$key] = [
-                    'city_name' => $parsed['city'],
-                    'province_name' => $provName,
-                ];
+        $labels = $this->inferCityProvinceLabelsFromResort($res);
+        if ($labels !== null && ($labels['city'] !== '' || $labels['province'] !== '')) {
+            $cityName = $labels['city'];
+            if ($cityName === '' && $this->matchesHintCity($locCode)) {
+                $cityName = is_string($this->hintCityLabel) ? trim($this->hintCityLabel) : '';
             }
+            $provName = $labels['province'] !== ''
+                ? $labels['province']
+                : $this->resolveProvinceDisplayName($provinceFromResort);
+            if ($this->matchesHintProvince($provinceFromResort)) {
+                $h = is_string($this->hintProvinceLabel) ? trim($this->hintProvinceLabel) : '';
+                if ($h !== '') {
+                    $provName = $h;
+                }
+            }
+
+            return $this->cityProvinceDisplayCache[$key] = [
+                'city_name' => $cityName,
+                'province_name' => $provName,
+            ];
         }
 
         $pname = $this->resolveProvinceDisplayName($provinceFromResort);
+        $cname = '';
+        if ($this->matchesHintCity($locCode)) {
+            $cname = is_string($this->hintCityLabel) ? trim($this->hintCityLabel) : '';
+        }
+        if ($this->matchesHintProvince($provinceFromResort)) {
+            $h = is_string($this->hintProvinceLabel) ? trim($this->hintProvinceLabel) : '';
+            if ($h !== '') {
+                $pname = $h;
+            }
+        }
 
         return $this->cityProvinceDisplayCache[$key] = [
-            'city_name' => '',
+            'city_name' => $cname,
             'province_name' => $pname,
         ];
     }
@@ -529,7 +653,11 @@ class AdminLocationStatsController extends Controller
             return ['city' => '', 'province' => ''];
         }
         if ($n === 1) {
-            return ['city' => '', 'province' => ''];
+            if ($this->segmentLooksLikeDetailedStreetSegment($parts[0])) {
+                return ['city' => '', 'province' => ''];
+            }
+
+            return ['city' => $parts[0], 'province' => ''];
         }
         if ($n === 2) {
             if ($this->segmentLooksLikeDetailedStreetSegment($parts[0])) {
@@ -575,8 +703,8 @@ class AdminLocationStatsController extends Controller
     private function segmentLooksLikeDetailedStreetSegment(string $segment): bool
     {
         return (bool) preg_match(
-            '/\b(street|st\.|road|rd\.|avenue|ave|boulevard|blvd|highway|hwy|blk|block|lot|phase|district|subdivision|subd\.|purok|sitio|bldg|building|unit|floor|house|#\d)\b/i',
-            $s,
+            '/\b(street|st\.|road|rd\.|avenue|ave|boulevard|blvd|highway|hwy|blk|block|lot|phase|subdivision|subd\.|purok|sitio|bldg|building|unit|floor|house|#\d)\b/i',
+            $segment,
         );
     }
 }

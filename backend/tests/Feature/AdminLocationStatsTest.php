@@ -214,6 +214,50 @@ class AdminLocationStatsTest extends TestCase
             ->assertJsonFragment(['location_label' => 'Baybay, Leyte']);
     }
 
+    public function test_location_stats_uses_province_display_hint_when_reference_missing(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $tenant = Tenant::create([
+            'name' => 'Hint Tenant',
+            'slug' => 'hint-tenant',
+            'subdomain' => 'hint-tenant',
+            'status' => 'active',
+        ]);
+
+        User::factory()->create([
+            'role' => 'resort_owner',
+            'tenant_id' => $tenant->id,
+        ]);
+
+        $offCatalogProvince = '1122334455';
+        $offCatalogCity = '1122334454';
+
+        Resort::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'No label resort',
+            'is_publicly_listed' => true,
+            'address_province_psgc' => $offCatalogProvince,
+            'address_city_municipality_psgc' => $offCatalogCity,
+            'address_label' => null,
+            'address_street_line' => null,
+            'address_barangay_name' => null,
+        ]);
+
+        $query = http_build_query([
+            'province_psgc' => $offCatalogProvince,
+            'city_municipality_psgc' => $offCatalogCity,
+            'province_display' => 'Isabela',
+            'city_display' => 'City of Cauayan',
+        ]);
+
+        $this->getJson('/api/v1/admin/location-stats?'.$query)
+            ->assertSuccessful()
+            ->assertJsonPath('data.by_city.0.province_name', 'Isabela')
+            ->assertJsonPath('data.top_resorts.0.location_label', 'City of Cauayan, Isabela');
+    }
+
     public function test_admin_resort_list_filters_by_province_psgc(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

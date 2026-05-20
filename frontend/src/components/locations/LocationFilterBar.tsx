@@ -31,6 +31,26 @@ export function locationFilterToParams(value: LocationFilterValue): Record<strin
   };
 }
 
+/** Same codes as {@link locationFilterToParams}, plus SPA-known labels for admin stats when API PSGC tables are incomplete. */
+export function locationFilterToParamsWithDisplayHints(value: LocationFilterValue): Record<string, string | undefined> {
+  const base = locationFilterToParams(value);
+  if (!value.provincePsgc) {
+    return base;
+  }
+  const selectedProv = listProvinces().find((p) => p.psgcCode === value.provincePsgc);
+  const provinceDisplay = selectedProv?.provName.trim();
+  let cityDisplay: string | undefined;
+  if (value.cityPsgc && selectedProv?.provCode) {
+    const mun = listMuncities(selectedProv.provCode).find((m) => m.psgcCode === value.cityPsgc);
+    cityDisplay = mun?.munCityName.trim();
+  }
+  return {
+    ...base,
+    province_display: provinceDisplay,
+    city_display: cityDisplay,
+  };
+}
+
 export function locationFilterFromPicker(value: PhilippineLocationValue): LocationFilterValue {
   return {
     provincePsgc: value.provinceCode,
