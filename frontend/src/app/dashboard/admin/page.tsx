@@ -2,15 +2,10 @@
 
 import DashCard from "@/components/dash/DashCard";
 import DashMobileTableCard from "@/components/shared/DashMobileTableCard";
-import AdminLocationStatsChart from "@/components/dashboard/AdminLocationStatsChart";
+import AdminResortFootprintPanel from "@/components/dashboard/AdminResortFootprintPanel";
 import { BusinessProVerifiedBadge } from "@/components/badges/BusinessProVerifiedBadge";
 import StatCard from "@/components/dashboard/StatCard";
-import LocationFilterBar, {
-  emptyLocationFilter,
-  locationFilterToParamsWithDisplayHints,
-  type LocationFilterValue,
-} from "@/components/locations/LocationFilterBar";
-import { getAdminLocationStats, getAdminStats, type AdminLocationStats, AdminStats } from "@/lib/api/admin";
+import { getAdminStats, type AdminStats } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { color } from "@/lib/design-tokens";
 import {
@@ -46,9 +41,6 @@ function percent(value: number, total: number): number {
 
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [locationStats, setLocationStats] = useState<AdminLocationStats | null>(null);
-  const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
-  const [locationStatsLoading, setLocationStatsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,25 +61,6 @@ export default function AdminOverviewPage() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLocationStatsLoading(true);
-      try {
-        const data = await getAdminLocationStats(locationFilterToParamsWithDisplayHints(locationFilter));
-        if (!cancelled) setLocationStats(data);
-      } catch {
-        if (!cancelled) setLocationStats(null);
-      } finally {
-        if (!cancelled) setLocationStatsLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [locationFilter]);
 
   if (loading) {
     return (
@@ -160,7 +133,7 @@ export default function AdminOverviewPage() {
         <StatCard compact label="Failed payments" value={stats.failedPayments ?? 0} icon={AlertTriangle} iconTone="rose" />
       </div>
 
-      {/* ── KPI split: booking/resort ratios left, top locations right ─────────── */}
+      {/* ── KPI split: booking/resort ratios left, resort footprint right ─────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
         <DashCard className="flex h-full min-h-0 flex-col overflow-hidden p-0">
           <div className="grid grid-cols-1 divide-y divide-softBorder">
@@ -224,41 +197,24 @@ export default function AdminOverviewPage() {
 
         <DashCard className="flex h-full min-h-[20rem] flex-col overflow-hidden p-0 lg:min-h-0">
           <div className="shrink-0 border-b border-softBorder px-4 py-4 md:px-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="flex items-start gap-2.5">
-                <div className="inline-flex shrink-0 rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
-                  <Globe2 size={16} className="text-clOcean" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="font-dash text-base font-semibold text-navy">Top resort locations</h2>
-                  <p className="text-xs text-zinc-500">Up to 5 locations by resort count (fewer when there are fewer distinct areas). Filter by province / city.</p>
-                </div>
+            <div className="flex items-start gap-2.5">
+              <div className="inline-flex shrink-0 rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
+                <Building2 size={16} className="text-clOcean" />
               </div>
-              <div className="dash-filter-bar dash-filter-bar--flat min-w-0 shrink-0 xl:max-w-[min(100%,28rem)]">
-                <LocationFilterBar label="Resort location" value={locationFilter} onChange={setLocationFilter} />
+              <div className="min-w-0">
+                <h2 className="font-dash text-base font-semibold text-navy">Resort footprint</h2>
+                <p className="text-xs text-zinc-500">
+                  Who is on the platform — resort name, address, listing status, and plan. Better than PSGC codes when you only have a few properties.
+                </p>
               </div>
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
-            {locationStatsLoading ? (
-              <p className="text-sm text-zinc-500">Loading location breakdown…</p>
-            ) : locationStats ? (
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <p>
-                    <span className="text-zinc-500">Resorts in filter:</span>{" "}
-                    <span className="font-semibold text-navy">{locationStats.filtered_totals.resort_count}</span>
-                  </p>
-                  <p>
-                    <span className="text-zinc-500">Resort owners in filter:</span>{" "}
-                    <span className="font-semibold text-navy">{locationStats.filtered_totals.owner_count}</span>
-                  </p>
-                </div>
-                <AdminLocationStatsChart rows={locationStats.top_resorts ?? []} limit={5} />
-              </div>
-            ) : (
-              <p className="text-sm text-zinc-500">Location stats unavailable.</p>
-            )}
+            <AdminResortFootprintPanel
+              totalResorts={stats.totalResorts}
+              publicResorts={stats.publicResorts}
+              suspendedResorts={stats.suspendedResorts}
+            />
           </div>
         </DashCard>
       </div>
