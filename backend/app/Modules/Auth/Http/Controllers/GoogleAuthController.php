@@ -5,6 +5,8 @@ namespace App\Modules\Auth\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\FrontendOriginResolver;
+use App\Support\GoogleOAuthState;
+use App\Support\ProductionFrontendUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -21,19 +23,29 @@ class GoogleAuthController extends Controller
         }
 
         $returnTo = trim((string) $request->query('returnTo', ''));
+        $safeReturnTo = null;
         if ($returnTo !== '' && str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//')) {
+            $safeReturnTo = $returnTo;
             $request->session()->put('google_auth_return_to', $returnTo);
         }
 
-        $frontendBase = app(FrontendOriginResolver::class)->resolve($request);
+        $frontendBase = ProductionFrontendUrl::sanitize(
+            app(FrontendOriginResolver::class)->resolve($request),
+            $request,
+        );
         $request->session()->put('google_auth_frontend_base', $frontendBase);
 
-        return Socialite::driver('google')->redirect();
+        $oauthState = GoogleOAuthState::encode($safeReturnTo, $frontendBase);
+
+        return Socialite::driver('google')
+            ->stateless()
+            ->with(['state' => $oauthState])
+            ->redirect();
     }
 
     public function callback(): RedirectResponse
     {
-        $googleUser = Socialite::driver('google')->user();
+        $googleUser = Socialite::driver('google')->stateless()->user();
 
         $email = $googleUser->getEmail();
         if (! $email) {
@@ -68,17 +80,35 @@ class GoogleAuthController extends Controller
 
         $token = $user->createToken('spa-token')->plainTextToken;
 
-        $returnTo = (string) request()->session()->pull('google_auth_return_to', '');
+        $request = request();
+        $decoded = GoogleOAuthState::decode($request->query('state'));
+
+        $returnTo = '';
+        if (is_array($decoded) && is_string($decoded['return_to'] ?? null) && $decoded['return_to'] !== '') {
+            $returnTo = $decoded['return_to'];
+        }
+        if ($returnTo === '') {
+            $returnTo = (string) $request->session()->pull('google_auth_return_to', '');
+        }
         if ($returnTo === '' || ! str_starts_with($returnTo, '/') || str_starts_with($returnTo, '//')) {
             $returnTo = in_array($user->role, ['client', 'user', 'guest'], true)
                 ? '/dashboard/client'
                 : '/dashboard';
         }
 
-        $sessionBase = (string) request()->session()->pull('google_auth_frontend_base', '');
-        $frontend = $sessionBase !== ''
-            ? rtrim($sessionBase, '/')
-            : app(FrontendOriginResolver::class)->resolve(request());
+        $frontend = '';
+        if (is_array($decoded) && is_string($decoded['frontend'] ?? null) && $decoded['frontend'] !== '') {
+            $frontend = $decoded['frontend'];
+        }
+        if ($frontend === '') {
+            $frontend = (string) $request->session()->pull('google_auth_frontend_base', '');
+        }
+        if ($frontend === '') {
+            $frontend = app(FrontendOriginResolver::class)->resolve($request);
+        }
+
+        $frontend = ProductionFrontendUrl::sanitize(rtrim($frontend, '/'), $request);
+
         $url = $frontend.'/api/auth/google-callback?token='.rawurlencode($token)
             .'&redirect='.rawurlencode($returnTo);
 
