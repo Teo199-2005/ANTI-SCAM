@@ -12,7 +12,12 @@ export function getLaravelWebOrigin(): string {
 }
 
 export function googleOAuthRedirectUrl(returnTo?: string | null): string {
-  const base = `${getLaravelWebOrigin()}/auth/google/redirect`;
+  // Production serves the marketing host via Next.js; OAuth is proxied at /auth/google/* on the same origin.
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin.replace(/\/$/, "")
+      : getLaravelWebOrigin();
+  const base = `${origin}/auth/google/redirect`;
   if (!returnTo?.trim() || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
     return base;
   }

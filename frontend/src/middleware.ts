@@ -24,6 +24,7 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/api") ||
+    pathname.startsWith("/auth/google") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/storage")
   ) {
