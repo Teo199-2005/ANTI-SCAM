@@ -139,7 +139,7 @@ function RegisterPageInner() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/backend/auth/google-pending?google_token=${encodeURIComponent(googleToken)}`);
+        const res = await fetch(`/api/auth/google-pending?google_token=${encodeURIComponent(googleToken)}`);
         const payload = (await res.json()) as {
           success?: boolean;
           data?: { name?: string; email?: string };
