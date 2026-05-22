@@ -2,17 +2,19 @@
 
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { formatPhp } from "@/lib/formatPhp";
+import { marketingCommissionPolicySections } from "@/lib/marketingCommissionCopy";
 import { cn } from "@/lib/utils";
 import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
-import { BedDouble, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
+import { BedDouble, ShieldCheck, Sparkles } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 
 type MarketingTiersInfoModalProps = {
   open: boolean;
   onClose: () => void;
-  bookingCommissionPolicy: string;
   commissionPerBookingPhp: number;
+  usesCustomBookingCommission?: boolean;
+  platformDefaultBookingCommissionPhp?: number;
   qualifyingBookingsCount: number;
   qualifyingBookingsMtd: number;
   pendingCommissionsGross?: number;
@@ -26,8 +28,9 @@ type MarketingTiersInfoModalProps = {
 export default function MarketingTiersInfoModal({
   open,
   onClose,
-  bookingCommissionPolicy,
   commissionPerBookingPhp,
+  usesCustomBookingCommission = false,
+  platformDefaultBookingCommissionPhp = 10,
   qualifyingBookingsCount,
   qualifyingBookingsMtd,
   pendingCommissionsGross = 0,
@@ -37,6 +40,11 @@ export default function MarketingTiersInfoModal({
   loading,
   title = "Booking commission program",
 }: MarketingTiersInfoModalProps) {
+  const policy = useMemo(
+    () => marketingCommissionPolicySections(commissionPerBookingPhp),
+    [commissionPerBookingPhp],
+  );
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -96,11 +104,21 @@ export default function MarketingTiersInfoModal({
                     <BedDouble size={14} aria-hidden />
                     {formatPhp(commissionPerBookingPhp)} / booking
                   </span>
-                  <span className="text-sm text-zinc-700">
-                    <strong className="tabular-nums text-navy">{qualifyingBookingsCount}</strong> lifetime ·{" "}
-                    <strong className="tabular-nums text-navy">{qualifyingBookingsMtd}</strong> this month
-                  </span>
+                  {usesCustomBookingCommission ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/90 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                      <Sparkles size={11} aria-hidden />
+                      Custom rate
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                      Platform default {formatPhp(platformDefaultBookingCommissionPhp)}
+                    </span>
+                  )}
                 </div>
+                <p className="mt-2 text-sm text-zinc-700">
+                  <strong className="tabular-nums text-navy">{qualifyingBookingsCount}</strong> lifetime ·{" "}
+                  <strong className="tabular-nums text-navy">{qualifyingBookingsMtd}</strong> this month
+                </p>
                 <p className="mt-2 text-sm text-zinc-700">
                   Pending gross <strong className="text-navy">{formatPhp(pendingCommissionsGross)}</strong>
                   {pendingPayoutNetEstimate > 0 ? (
@@ -111,6 +129,13 @@ export default function MarketingTiersInfoModal({
                     </>
                   ) : null}
                 </p>
+                {usesCustomBookingCommission &&
+                platformDefaultBookingCommissionPhp !== commissionPerBookingPhp ? (
+                  <p className="mt-2 text-xs text-amber-900/90">
+                    Your admin set a custom rate of {formatPhp(commissionPerBookingPhp)} (platform default is{" "}
+                    {formatPhp(platformDefaultBookingCommissionPhp)}). New booking credits use your current rate.
+                  </p>
+                ) : null}
               </div>
 
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-3 text-xs leading-relaxed text-emerald-950">
@@ -122,14 +147,21 @@ export default function MarketingTiersInfoModal({
                   <li>Online guest booking at a resort assigned to you</li>
                   <li>Status confirmed and payment marked paid (Xendit)</li>
                   <li>Manual or unpaid bookings do not earn commission</li>
+                  <li>
+                    <strong className="text-emerald-950">{policy.qualifyingRateLine}</strong>
+                  </li>
                 </ul>
               </div>
 
-              {bookingCommissionPolicy ? (
-                <div className="rounded-xl border border-sky-100 bg-sky-50/90 px-3 py-3 text-xs leading-relaxed text-sky-950">
-                  {bookingCommissionPolicy}
-                </div>
-              ) : null}
+              <div className="rounded-xl border border-sky-100 bg-sky-50/90 px-3 py-3 text-xs leading-relaxed text-sky-950">
+                <p className="font-semibold text-sky-950">How you earn</p>
+                <ul className="mt-2 list-inside list-disc space-y-1.5">
+                  <li>{policy.earnLine}</li>
+                  <li>Manual bookings and unpaid checkouts do not qualify.</li>
+                  <li>{policy.reversalLine}</li>
+                  <li>{policy.payoutLine}</li>
+                </ul>
+              </div>
 
               {commissionPayoutSchedule ? (
                 <p className="text-xs text-zinc-600">

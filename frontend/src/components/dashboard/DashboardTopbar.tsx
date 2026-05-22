@@ -504,8 +504,9 @@ export default function DashboardTopbar({ onOpenMenu }: DashboardTopbarProps) {
                   <MarketingTiersInfoModal
                     open={marketingTierModalOpen}
                     onClose={() => setMarketingTierModalOpen(false)}
-                    bookingCommissionPolicy={marketingStats?.bookingCommissionPolicy ?? ""}
                     commissionPerBookingPhp={marketingStats?.commissionPerBookingPhp ?? 10}
+                    usesCustomBookingCommission={marketingStats?.usesCustomBookingCommission}
+                    platformDefaultBookingCommissionPhp={marketingStats?.platformDefaultBookingCommissionPhp}
                     qualifyingBookingsCount={marketingStats?.qualifyingBookingsCount ?? 0}
                     qualifyingBookingsMtd={marketingStats?.qualifyingBookingsMtd ?? 0}
                     pendingCommissionsGross={marketingStats?.pendingCommissions ?? 0}

@@ -78,6 +78,8 @@ export type MarketingStats = {
   qualifyingBookingsMtd: number;
   reversedBookingsMtd: number;
   commissionPerBookingPhp: number;
+  usesCustomBookingCommission?: boolean;
+  platformDefaultBookingCommissionPhp?: number;
   bookingCommissionPolicy: string;
   referral_code: string | null;
   referral_share_register_url: string | null;
@@ -173,6 +175,12 @@ function mapStats(raw: Record<string, unknown>): MarketingStats {
     qualifyingBookingsMtd: Number(raw.qualifyingBookingsMtd ?? raw.qualifying_bookings_mtd ?? 0),
     reversedBookingsMtd: Number(raw.reversedBookingsMtd ?? raw.reversed_bookings_mtd ?? 0),
     commissionPerBookingPhp: Number(raw.commissionPerBookingPhp ?? raw.commission_per_booking_php ?? 10),
+    usesCustomBookingCommission: Boolean(
+      raw.usesCustomBookingCommission ?? raw.uses_custom_booking_commission ?? false,
+    ),
+    platformDefaultBookingCommissionPhp: Number(
+      raw.platformDefaultBookingCommissionPhp ?? raw.platform_default_booking_commission_php ?? 10,
+    ),
     bookingCommissionPolicy: String(raw.bookingCommissionPolicy ?? raw.booking_commission_policy ?? ""),
     marketerTier: mapMarketerTier(raw.marketerTier ?? raw.marketer_tier),
     tierLadder: mapTierLadder(raw.tierLadder ?? raw.tier_ladder),

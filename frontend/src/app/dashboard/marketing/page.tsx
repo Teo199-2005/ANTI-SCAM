@@ -77,8 +77,9 @@ export default function MarketingDashboardPage() {
       <MarketingTiersInfoModal
         open={tiersModalOpen}
         onClose={() => setTiersModalOpen(false)}
-        bookingCommissionPolicy={stats?.bookingCommissionPolicy ?? ""}
         commissionPerBookingPhp={stats?.commissionPerBookingPhp ?? 10}
+        usesCustomBookingCommission={stats?.usesCustomBookingCommission}
+        platformDefaultBookingCommissionPhp={stats?.platformDefaultBookingCommissionPhp}
         qualifyingBookingsCount={stats?.qualifyingBookingsCount ?? 0}
         qualifyingBookingsMtd={stats?.qualifyingBookingsMtd ?? 0}
         pendingCommissionsGross={stats?.pendingCommissions ?? 0}

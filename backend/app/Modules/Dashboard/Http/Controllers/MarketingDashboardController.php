@@ -11,6 +11,7 @@ use App\Models\MarketerBookingCommissionEvent;
 use App\Models\User;
 use App\Support\ResortLocationQuery;
 use App\Services\LegacySubscriptionCommissionCleanupService;
+use App\Services\MarketerBookingCommissionRateService;
 use App\Services\MarketerBookingCommissionStatsService;
 use App\Modules\Billing\Services\PhilippinesPayoutBankChannelService;
 use App\Services\MarketerCommissionPayoutService;
@@ -28,6 +29,7 @@ class MarketingDashboardController extends Controller
     public function __construct(
         private readonly MarketerCommissionPayoutService $marketerPayouts,
         private readonly MarketerBookingCommissionStatsService $bookingStats,
+        private readonly MarketerBookingCommissionRateService $commissionRates,
         private readonly ReferralSignupTrialService $referralSignupTrial,
         private readonly LegacySubscriptionCommissionCleanupService $commissionScope,
         private readonly PhilippinesPayoutBankChannelService $payoutBanks,
@@ -72,9 +74,9 @@ class MarketingDashboardController extends Controller
         $qualifyingBookingsMtd = $this->bookingStats->qualifyingBookingsCount($marketerId, $currentPeriod, $currentPeriod);
         $reversedBookingsMtd = $this->bookingStats->reversedBookingsCount($marketerId, $currentPeriod, $currentPeriod);
         $commissionPerBooking = $this->bookingStats->commissionPerBookingPhp($marketerId);
-        $bookingPolicy = $this->bookingStats->bookingCommissionPolicySummary();
-
         $user = $request->user();
+        $rateSummary = $this->commissionRates->summaryForMarketer($user);
+        $bookingPolicy = $this->bookingStats->bookingCommissionPolicySummary($marketerId);
         $frontend = $this->publicRegistrationBaseUrl($request);
         $code = $user->referral_code;
         $shareRegister = $code !== null && $code !== ''
@@ -100,6 +102,8 @@ class MarketingDashboardController extends Controller
             'qualifyingBookingsMtd' => $qualifyingBookingsMtd,
             'reversedBookingsMtd' => $reversedBookingsMtd,
             'commissionPerBookingPhp' => $commissionPerBooking,
+            'usesCustomBookingCommission' => $rateSummary['uses_custom'],
+            'platformDefaultBookingCommissionPhp' => $rateSummary['platform_default_php'],
             'bookingCommissionPolicy' => $bookingPolicy,
             'referral_code' => $code,
             'referral_share_register_url' => $shareRegister,
@@ -260,7 +264,7 @@ class MarketingDashboardController extends Controller
                     'trial_total' => $signupReferralTotal,
                     'trial_active_total' => 0,
                 ],
-                'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
+                'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary($marketerId),
             ],
             'Marketing clients',
         );
