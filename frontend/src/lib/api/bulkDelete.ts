@@ -42,6 +42,35 @@ export function bulkDeleteGuestFavorites(roomIds: number[]) {
   return postBulkDelete("/guest/favorites/bulk-delete", { room_ids: roomIds });
 }
 
+export function bulkDeleteAuditLogs(ids: number[]) {
+  return postBulkDelete("/admin/audit-logs/bulk-delete", { ids });
+}
+
+export function bulkDeleteXenditLogs(ids: number[]) {
+  return postBulkDelete("/admin/xendit-logs/bulk-delete", { ids });
+}
+
+export type PaymentLedgerDeleteEntry = {
+  entry_type: "subscription" | "booking";
+  entry_id: number;
+};
+
+export function bulkDeletePaymentLedger(entries: PaymentLedgerDeleteEntry[]) {
+  return postBulkDelete("/admin/finance/payment-ledger/bulk-delete", { entries });
+}
+
+export function bulkDeleteFinanceCommissions(ids: number[]) {
+  return postBulkDelete("/admin/finance/commissions/bulk-delete", { ids });
+}
+
+export function bulkDeleteFinancePayoutBatches(ids: number[]) {
+  return postBulkDelete("/admin/finance/payout-batches/bulk-delete", { ids });
+}
+
+export function bulkDeleteFinanceCommissionReleases(ids: number[]) {
+  return postBulkDelete("/admin/finance/commission-releases/bulk-delete", { ids });
+}
+
 function sanitizeBulkDeleteMessage(raw: string | undefined): string {
   const msg = (raw ?? "").trim();
   if (!msg) {

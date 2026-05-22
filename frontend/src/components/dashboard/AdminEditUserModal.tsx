@@ -65,6 +65,8 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
   const [subCycleEnd, setSubCycleEnd] = useState("");
   const [subLoading, setSubLoading] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [useCustomBookingRate, setUseCustomBookingRate] = useState(false);
+  const [customBookingRate, setCustomBookingRate] = useState("");
 
   // Populate form when the user prop changes.
   useEffect(() => {
@@ -82,6 +84,18 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
     setShowPw(false);
     setResortName(null);
     setHasSubscription(false);
+    setUseCustomBookingRate(false);
+    setCustomBookingRate("");
+    if (user.role === "marketing") {
+      void apiClient
+        .get<{ data: { booking_commission_php?: number | null } }>(`/users/${user.id}`)
+        .then(({ data }) => {
+          const custom = data.data?.booking_commission_php != null;
+          setUseCustomBookingRate(custom);
+          setCustomBookingRate(custom ? String(data.data.booking_commission_php) : "");
+        })
+        .catch(() => {});
+    }
     if (user.role === "resort_owner") {
       setSubLoading(true);
       void getAdminUserSubscription(user.id)
@@ -124,6 +138,23 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
       if (newPassword) {
         payload.password = newPassword;
         payload.password_confirmation = newPassword;
+      }
+      if (role === "marketing") {
+        if (useCustomBookingRate) {
+          const parsed = Number(String(customBookingRate).replace(/,/g, "").trim());
+          if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5000) {
+            pushToast({
+              title: "Invalid booking commission",
+              description: "Enter ₱1–₱5,000 or uncheck custom rate to use the platform default.",
+              tone: "error",
+            });
+            setSaving(false);
+            return;
+          }
+          payload.booking_commission_php = Math.round(parsed * 100) / 100;
+        } else {
+          payload.booking_commission_php = null;
+        }
       }
       await apiClient.put(`/users/${user.id}`, payload);
       if (role === "resort_owner" && hasSubscription) {
@@ -320,6 +351,44 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
             ) : (
               <p className="text-xs text-zinc-500">No resort workspace or subscription yet for this owner.</p>
             )}
+          </div>
+        ) : null}
+
+        {role === "marketing" ? (
+          <div className="rounded-xl border border-violet-200/80 bg-violet-50/40 p-4">
+            <p className="text-xs font-semibold text-violet-950">Booking commission (per paid online guest booking)</p>
+            <p className="mt-1 text-[11px] text-violet-900/80">
+              Leave unchecked to use the platform default (₱10 unless changed in System Settings).
+            </p>
+            <label className="mt-3 flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={useCustomBookingRate}
+                onChange={(e) => {
+                  setUseCustomBookingRate(e.target.checked);
+                  if (!e.target.checked) setCustomBookingRate("");
+                }}
+              />
+              <span className="text-sm text-zinc-800">Custom rate for this partner</span>
+            </label>
+            {useCustomBookingRate ? (
+              <div className="mt-3">
+                <label htmlFor="admin-edit-booking-rate" className="mb-1 block text-xs font-semibold text-zinc-600">
+                  Amount (PHP)
+                </label>
+                <input
+                  id="admin-edit-booking-rate"
+                  className="dash-input"
+                  type="number"
+                  min={1}
+                  max={5000}
+                  step={0.01}
+                  value={customBookingRate}
+                  onChange={(e) => setCustomBookingRate(e.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 

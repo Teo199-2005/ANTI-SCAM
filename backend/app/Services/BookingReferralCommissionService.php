@@ -14,6 +14,7 @@ class BookingReferralCommissionService
     public function __construct(
         private readonly MarketerResortAttributionService $attribution,
         private readonly MarketingBookingCommissionSettingsService $settings,
+        private readonly MarketerBookingCommissionRateService $commissionRates,
     ) {}
 
     public function isEnabled(): bool
@@ -21,10 +22,16 @@ class BookingReferralCommissionService
         return $this->settings->isEnabled();
     }
 
-    /** Current admin-configured rate (new credits only). */
+    /** Platform default rate (new credits when marketer has no override). */
     public function amountPhp(): float
     {
         return $this->settings->amountPhpForNewCredits();
+    }
+
+    /** Rate for a specific marketer (override or platform default). */
+    public function amountPhpForMarketer(int $marketerId): float
+    {
+        return $this->commissionRates->effectiveAmountPhpForMarketer($marketerId);
     }
 
     public function qualifiesForCredit(Reservation $reservation): bool
@@ -48,7 +55,7 @@ class BookingReferralCommissionService
             return;
         }
 
-        $amount = $this->amountPhp();
+        $amount = $this->amountPhpForMarketer($marketerId);
         $period = $this->periodForReservation($reservation);
         $tierKey = (string) config('marketing_booking_commission.tier_key', 'booking_flat');
 

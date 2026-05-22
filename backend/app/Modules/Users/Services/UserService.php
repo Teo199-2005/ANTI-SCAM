@@ -4,11 +4,15 @@ namespace App\Modules\Users\Services;
 
 use App\Models\User;
 use App\Modules\Users\Repositories\UserRepositoryInterface;
+use App\Services\MarketerBookingCommissionRateService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class UserService
 {
-    public function __construct(private readonly UserRepositoryInterface $users) {}
+    public function __construct(
+        private readonly UserRepositoryInterface $users,
+        private readonly MarketerBookingCommissionRateService $marketerCommissionRates,
+    ) {}
 
     public function list(
         int $perPage = 10,
@@ -34,6 +38,19 @@ class UserService
 
     public function update(User $user, array $attributes): User
     {
+        if (array_key_exists('booking_commission_php', $attributes)) {
+            $targetRole = (string) ($attributes['role'] ?? $user->role);
+            if ($targetRole !== 'marketing') {
+                $attributes['booking_commission_php'] = null;
+            } else {
+                $attributes['booking_commission_php'] = $this->marketerCommissionRates->normalizeOverrideForStorage(
+                    $attributes['booking_commission_php'],
+                );
+            }
+        } elseif (isset($attributes['role']) && $attributes['role'] !== 'marketing') {
+            $attributes['booking_commission_php'] = null;
+        }
+
         return $this->users->update($user, $attributes);
     }
 

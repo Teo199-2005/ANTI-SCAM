@@ -19,6 +19,9 @@ class UserResource extends JsonResource
             'mailing_city_municipality_psgc' => $this->mailing_city_municipality_psgc,
             'mailing_barangay_name'          => $this->mailing_barangay_name,
             'mailing_location_label'         => $this->mailing_location_label,
+            'booking_commission_php'           => $this->role === 'marketing' && $this->booking_commission_php !== null
+                ? round((float) $this->booking_commission_php, 2)
+                : null,
             'createdAt'                      => $this->created_at?->toISOString(),
             'created_at'                     => $this->created_at?->toISOString(),
         ];

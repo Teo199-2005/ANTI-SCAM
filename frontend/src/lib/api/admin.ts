@@ -680,7 +680,7 @@ export type AdminMarketerMonitorRow = {
   referral_code: string | null;
   joined_at: string | null;
   assigned_resorts_count: number;
-  /** Distinct owner orgs (tenants) with qualifying referral subscription payments — drives tier. */
+  /** Distinct owner orgs (tenants) with qualifying referral subscription payments. */
   referred_clients_count: number;
   /** Distinct resorts that have had such a payment (can exceed clients). */
   referred_resorts_count: number;
@@ -695,6 +695,8 @@ export type AdminMarketerMonitorRow = {
   booking_reversals_count: number;
   booking_credits_gross_php: number;
   current_commission_per_booking_php: number;
+  booking_commission_php?: number | null;
+  uses_custom_booking_commission?: boolean;
 };
 
 export type AdminBookingCommissionAnalytics = {
@@ -749,8 +751,7 @@ export type AdminMarketerMonitoringPayload = {
     new_client_definition: string;
     booking_commission_policy?: string;
     commission_per_booking_php?: number;
-    tier_ladder?: AdminTierLadderRow[];
-    tier_policy?: string;
+    platform_default_commission_per_booking_php?: number;
   };
 };
 
@@ -923,8 +924,10 @@ export async function getAdminMarketersMonitoring(
         typeof meta.booking_commission_policy === "string" ? meta.booking_commission_policy : undefined,
       commission_per_booking_php:
         typeof meta.commission_per_booking_php === "number" ? meta.commission_per_booking_php : undefined,
-      tier_ladder: Array.isArray(meta.tier_ladder) ? (meta.tier_ladder as AdminTierLadderRow[]) : undefined,
-      tier_policy: typeof meta.tier_policy === "string" ? meta.tier_policy : undefined,
+      platform_default_commission_per_booking_php:
+        typeof meta.platform_default_commission_per_booking_php === "number"
+          ? meta.platform_default_commission_per_booking_php
+          : meta.commission_per_booking_php,
     },
   };
 }

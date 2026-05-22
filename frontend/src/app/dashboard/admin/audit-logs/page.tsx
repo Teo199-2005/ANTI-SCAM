@@ -1,14 +1,21 @@
 "use client";
 
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import SortableTh from "@/components/shared/SortableTh";
 import TablePaginationBar from "@/components/shared/TablePaginationBar";
+import { useToast } from "@/components/shared/ToastProvider";
+import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import { AuditLog, getAuditLogs } from "@/lib/api/admin";
+import { bulkDeleteAuditLogs, bulkDeleteToastDescriptionGeneric } from "@/lib/api/bulkDelete";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { sanitizeSearchQuery } from "@/lib/inputRestrictions";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
-import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -21,6 +28,7 @@ const SORT_FIRST: Record<string, SortDir> = {
 };
 
 export default function AuditLogsPage() {
+  const { pushToast } = useToast();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState("");
@@ -34,6 +42,10 @@ export default function AuditLogsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [error, setError] = useState<string | null>(null);
   const [openLogId, setOpenLogId] = useState<number | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const bulk = useBulkSelection(logs, (log) => log.id);
 
   const load = async (a: string, e: string, pg: number, pp: number, sb: string, sd: SortDir) => {
     setLoading(true);
@@ -71,6 +83,7 @@ export default function AuditLogsPage() {
     setAppliedAction(actionFilter);
     setAppliedEntity(entityFilter);
     setPage(1);
+    bulk.clear();
     void load(actionFilter, entityFilter, 1, perPage, sortBy, sortDir);
   };
 
@@ -79,18 +92,46 @@ export default function AuditLogsPage() {
     setSortBy(n.key);
     setSortDir(n.dir);
     setPage(1);
+    bulk.clear();
     void load(appliedAction, appliedEntity, 1, perPage, n.key, n.dir);
   };
 
   const onPageChange = (p: number) => {
     setPage(p);
+    bulk.clear();
     void load(appliedAction, appliedEntity, p, perPage, sortBy, sortDir);
   };
 
   const onPerPageChange = (pp: number) => {
     setPerPage(pp);
     setPage(1);
+    bulk.clear();
     void load(appliedAction, appliedEntity, 1, pp, sortBy, sortDir);
+  };
+
+  const onBulkDelete = async () => {
+    const ids = bulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const result = await bulkDeleteAuditLogs(ids);
+      bulk.clear();
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Audit logs deleted",
+        description: bulkDeleteToastDescriptionGeneric(result, "log"),
+        tone: result.failed.length ? "warning" : "success",
+      });
+      await load(appliedAction, appliedEntity, page, perPage, sortBy, sortDir);
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete selected audit logs."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
+    }
   };
 
   const paginationFooter = !error && (
@@ -133,6 +174,14 @@ export default function AuditLogsPage() {
         </form>
       </div>
 
+      <BulkActionBar
+        count={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setConfirmBulkDelete(true)}
+        deleting={bulkDeleting}
+        deleteLabel="Delete selected logs"
+      />
+
       <div className="md:hidden">
         {loading ? (
           <DashMobileTableSkeleton rows={5} />
@@ -149,7 +198,16 @@ export default function AuditLogsPage() {
               return (
                 <DashMobileTableCard
                   key={log.id}
-                  title={<span className="dash-badge-sky text-xs">{log.action}</span>}
+                  title={
+                    <span className="inline-flex items-center gap-2">
+                      <BulkSelectMobile
+                        checked={bulk.isSelected(log.id)}
+                        onChange={() => bulk.toggle(log.id)}
+                        ariaLabel={`Select audit log ${log.id}`}
+                      />
+                      <span className="dash-badge-sky text-xs">{log.action}</span>
+                    </span>
+                  }
                   fields={[
                     { label: "Time", value: new Date(log.created_at).toLocaleString() },
                     {
@@ -201,6 +259,11 @@ export default function AuditLogsPage() {
           footer={paginationFooter}
           headers={
             <>
+              <BulkSelectTh
+                checked={bulk.isAllSelected}
+                indeterminate={bulk.isSomeSelected}
+                onChange={() => (bulk.isAllSelected ? bulk.clear() : bulk.selectAll())}
+              />
               <SortableTh label="Timestamp" sortKey="created_at" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <SortableTh label="Action" sortKey="action" activeKey={sortBy} direction={sortDir} onSort={onSort} />
               <SortableTh label="Entity" sortKey="entity_type" activeKey={sortBy} direction={sortDir} onSort={onSort} />
@@ -209,9 +272,14 @@ export default function AuditLogsPage() {
             </>
           }
         >
-          <AsyncStatePanel loading={loading} error={error} isEmpty={logs.length === 0} emptyText="No audit logs found." withinTable colSpan={5}>
+          <AsyncStatePanel loading={loading} error={error} isEmpty={logs.length === 0} emptyText="No audit logs found." withinTable colSpan={6}>
             {logs.map((log) => (
               <tr key={log.id}>
+                <BulkSelectTd
+                  checked={bulk.isSelected(log.id)}
+                  onChange={() => bulk.toggle(log.id)}
+                  ariaLabel={`Select audit log ${log.id}`}
+                />
                 <td className="font-mono text-xs text-zinc-600">{new Date(log.created_at).toLocaleString()}</td>
                 <td>
                   <span className="dash-badge-sky">{log.action}</span>
@@ -224,6 +292,17 @@ export default function AuditLogsPage() {
           </AsyncStatePanel>
         </DataTable>
       </div>
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected audit logs?"
+        description={`Permanently remove ${bulk.selectedCount} log${bulk.selectedCount === 1 ? "" : "s"} from this page. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        tone="danger"
+        loading={bulkDeleting}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void onBulkDelete()}
+      />
     </div>
   );
 }

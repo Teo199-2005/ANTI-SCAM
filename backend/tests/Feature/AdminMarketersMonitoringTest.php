@@ -83,8 +83,10 @@ class AdminMarketersMonitoringTest extends TestCase
             'marketer_id' => $marketer->id,
             'resort_id' => $resort->id,
             'period' => '2026-04',
-            'gross_bookings' => 0,
+            'gross_bookings' => 250,
             'commission_rate' => 0,
+            'marketer_tier' => 'booking_flat',
+            'unit_commission_php' => 250,
             'commission_amount' => 250,
             'status' => 'pending',
         ]);
@@ -96,6 +98,7 @@ class AdminMarketersMonitoringTest extends TestCase
             ->assertJsonPath('data.rows.0.referred_resorts_count', 1)
             ->assertJsonPath('data.rows.0.commission_pending_php', fn ($v) => (float) $v === 250.0)
             ->assertJsonPath('data.rows.0.current_commission_per_booking_php', fn ($v) => (float) $v === 10.0)
+            ->assertJsonPath('data.rows.0.uses_custom_booking_commission', false)
             ->assertJsonPath('data.meta.new_client_definition', fn ($v) => is_string($v) && $v !== '')
             ->assertJsonPath('data.meta.booking_commission_policy', fn ($v) => is_string($v) && $v !== '')
             ->assertJsonPath('data.meta.commission_per_booking_php', 10);

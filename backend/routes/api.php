@@ -167,6 +167,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/admin/finance/withholding-batches', [AdminFinanceController::class, 'withholdingBatches']);
             Route::get('/admin/finance/commission-releases', [AdminFinanceController::class, 'commissionReleases']);
             Route::get('/admin/audit-logs', [AuditLogController::class, 'index']);
+            Route::post('/admin/audit-logs/bulk-delete', [BulkDeleteController::class, 'auditLogs']);
+            Route::post('/admin/finance/payment-ledger/bulk-delete', [BulkDeleteController::class, 'paymentLedger']);
+            Route::post('/admin/finance/commissions/bulk-delete', [BulkDeleteController::class, 'financeCommissions']);
+            Route::post('/admin/finance/payout-batches/bulk-delete', [BulkDeleteController::class, 'financePayoutBatches']);
+            Route::post('/admin/finance/commission-releases/bulk-delete', [BulkDeleteController::class, 'financeCommissionReleases']);
             Route::get('/admin/resorts/assignable-owners', [AdminOnboardController::class, 'assignableOwners']);
             Route::post('/admin/resorts/onboard', [AdminOnboardController::class, 'store']);
             Route::post('/admin/resorts/onboard/upload-logo', [AdminOnboardController::class, 'uploadLogo']);
@@ -183,6 +188,7 @@ Route::prefix('v1')->group(function (): void {
 
             // Xendit payment logs
             Route::get('/admin/xendit-logs', [XenditLogController::class, 'index']);
+            Route::post('/admin/xendit-logs/bulk-delete', [BulkDeleteController::class, 'xenditLogs']);
             Route::post('/admin/resorts/{resort}/subscriptions/trigger-invoice', [SubscriptionInvoiceController::class, 'create']);
             Route::post('/admin/mail/test', [AdminMailHealthController::class, 'send']);
 

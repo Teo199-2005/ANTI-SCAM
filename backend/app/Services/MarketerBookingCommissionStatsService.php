@@ -10,16 +10,21 @@ class MarketerBookingCommissionStatsService
 {
     public function __construct(
         private readonly MarketingBookingCommissionSettingsService $settings,
+        private readonly MarketerBookingCommissionRateService $commissionRates,
     ) {}
 
-    public function commissionPerBookingPhp(): float
+    public function commissionPerBookingPhp(?int $marketerId = null): float
     {
+        if ($marketerId !== null) {
+            return $this->commissionRates->effectiveAmountPhpForMarketer($marketerId);
+        }
+
         return $this->settings->amountPhpForNewCredits();
     }
 
-    public function bookingCommissionPolicySummary(): string
+    public function bookingCommissionPolicySummary(?int $marketerId = null): string
     {
-        $amount = $this->commissionPerBookingPhp();
+        $amount = $this->commissionPerBookingPhp($marketerId);
 
         return "You earn ₱{$amount} for each paid online guest booking at resorts linked to your referral. "
             .'Manual bookings and unpaid checkouts do not qualify. If a paid booking is cancelled before your commission is paid out, the ₱'

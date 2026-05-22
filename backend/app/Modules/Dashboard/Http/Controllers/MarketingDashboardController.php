@@ -58,7 +58,7 @@ class MarketingDashboardController extends Controller
         $qualifyingBookingsLifetime = $this->bookingStats->qualifyingBookingsCount($marketerId);
         $qualifyingBookingsMtd = $this->bookingStats->qualifyingBookingsCount($marketerId, $currentPeriod, $currentPeriod);
         $reversedBookingsMtd = $this->bookingStats->reversedBookingsCount($marketerId, $currentPeriod, $currentPeriod);
-        $commissionPerBooking = $this->bookingStats->commissionPerBookingPhp();
+        $commissionPerBooking = $this->bookingStats->commissionPerBookingPhp($marketerId);
         $bookingPolicy = $this->bookingStats->bookingCommissionPolicySummary();
 
         $user = $request->user();

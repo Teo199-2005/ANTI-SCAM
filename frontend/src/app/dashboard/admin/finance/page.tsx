@@ -1,8 +1,12 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import BulkActionBar from "@/components/shared/BulkActionBar";
+import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
+import { useToast } from "@/components/shared/ToastProvider";
 import {
   getAdminBookingCommissionAnalytics,
   getAdminCommissionReleases,
@@ -28,8 +32,39 @@ import {
   Receipt,
   RefreshCw,
 } from "lucide-react";
+import {
+  bulkDeleteFinanceCommissionReleases,
+  bulkDeleteFinanceCommissions,
+  bulkDeleteFinancePayoutBatches,
+  bulkDeletePaymentLedger,
+  bulkDeleteToastDescriptionGeneric,
+  type PaymentLedgerDeleteEntry,
+} from "@/lib/api/bulkDelete";
+import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { useCallback, useEffect, useState } from "react";
 import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
+
+function ledgerRowKey(row: FinanceLedgerRow): string {
+  return `${row.entry_type}:${row.entry_id}`;
+}
+
+function parseLedgerKeys(keys: string[]): PaymentLedgerDeleteEntry[] {
+  const seen = new Set<string>();
+  const entries: PaymentLedgerDeleteEntry[] = [];
+  for (const key of keys) {
+    if (seen.has(key)) continue;
+    const [entry_type, entry_id] = key.split(":");
+    if (entry_type !== "subscription" && entry_type !== "booking") continue;
+    const id = Number(entry_id);
+    if (!Number.isFinite(id) || id < 1) continue;
+    seen.add(key);
+    entries.push({ entry_type, entry_id: id });
+  }
+  return entries;
+}
+
+type FinanceBulkTab = "ledger" | "commissions" | "withholding" | "releases";
 
 type TabId = "overview" | "booking_commissions" | "ledger" | "commissions" | "withholding" | "releases";
 
@@ -60,7 +95,10 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminFinancePage() {
+  const { pushToast } = useToast();
   const [tab, setTab] = useState<TabId>("overview");
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [overview, setOverview] = useState<AdminFinanceOverview | null>(null);
@@ -100,6 +138,118 @@ export default function AdminFinancePage() {
   const [bookingAnalytics, setBookingAnalytics] = useState<AdminBookingCommissionAnalytics | null>(null);
 
   const perPage = 15;
+
+  const ledgerBulk = useBulkSelection(ledgerRows, ledgerRowKey);
+  const commBulk = useBulkSelection(commRows, (c) => c.id);
+  const batchBulk = useBulkSelection(batchRows, (b) => b.id);
+  const relBulk = useBulkSelection(relRows, (r) => r.id);
+
+  useEffect(() => {
+    ledgerBulk.clear();
+    commBulk.clear();
+    batchBulk.clear();
+    relBulk.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, ledgerPage, commPage, batchPage, relPage]);
+
+  const activeBulkTab: FinanceBulkTab | null =
+    tab === "ledger" || tab === "commissions" || tab === "withholding" || tab === "releases" ? tab : null;
+
+  const activeBulk =
+    activeBulkTab === "ledger"
+      ? ledgerBulk
+      : activeBulkTab === "commissions"
+        ? commBulk
+        : activeBulkTab === "withholding"
+          ? batchBulk
+          : activeBulkTab === "releases"
+            ? relBulk
+            : null;
+
+  const bulkDeleteLabels: Record<FinanceBulkTab, { action: string; item: string; warning: string }> = {
+    ledger: {
+      action: "Delete selected ledger rows?",
+      item: "row",
+      warning: "Removes the underlying subscription invoice or guest reservation for each selected row.",
+    },
+    commissions: {
+      action: "Delete selected commissions?",
+      item: "commission",
+      warning: "Also removes related release and booking-credit links for those commission rows.",
+    },
+    withholding: {
+      action: "Delete selected payout batches?",
+      item: "batch",
+      warning: "Unlinks commissions from these batches and removes batch line items.",
+    },
+    releases: {
+      action: "Delete selected release log entries?",
+      item: "entry",
+      warning: "Removes release audit rows only; linked commissions are not deleted.",
+    },
+  };
+
+  const onFinanceBulkDelete = async () => {
+    if (!activeBulkTab || !activeBulk) return;
+    setBulkDeleting(true);
+    try {
+      let result: Awaited<ReturnType<typeof bulkDeletePaymentLedger>> | undefined;
+      if (activeBulkTab === "ledger") {
+        const entries = parseLedgerKeys(activeBulk.selectedIds);
+        if (entries.length === 0) {
+          pushToast({
+            title: "Nothing to delete",
+            description: "Select at least one valid ledger row on this page.",
+            tone: "error",
+          });
+          return;
+        }
+        result = await bulkDeletePaymentLedger(entries);
+        await loadLedger();
+      } else if (activeBulkTab === "commissions") {
+        const ids = activeBulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+        if (ids.length === 0) {
+          pushToast({ title: "Nothing to delete", description: "Select at least one commission.", tone: "error" });
+          return;
+        }
+        result = await bulkDeleteFinanceCommissions(ids);
+        await loadCommissions();
+      } else if (activeBulkTab === "withholding") {
+        const ids = activeBulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+        if (ids.length === 0) {
+          pushToast({ title: "Nothing to delete", description: "Select at least one payout batch.", tone: "error" });
+          return;
+        }
+        result = await bulkDeleteFinancePayoutBatches(ids);
+        await loadBatches();
+      } else {
+        const ids = activeBulk.selectedIds.map((id) => Number(id)).filter((id) => id > 0);
+        if (ids.length === 0) {
+          pushToast({ title: "Nothing to delete", description: "Select at least one release entry.", tone: "error" });
+          return;
+        }
+        result = await bulkDeleteFinanceCommissionReleases(ids);
+        await loadReleases();
+      }
+      if (!result) return;
+      activeBulk.clear();
+      const label = bulkDeleteLabels[activeBulkTab].item;
+      pushToast({
+        title: result.failed.length ? "Bulk delete completed with errors" : "Deleted",
+        description: bulkDeleteToastDescriptionGeneric(result, label),
+        tone: result.failed.length ? "warning" : "success",
+      });
+    } catch (err) {
+      pushToast({
+        title: "Bulk delete failed",
+        description: parseApiErrorMessage(err, "Unable to delete selected rows."),
+        tone: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
+    }
+  };
 
   const loadOverview = useCallback(async () => {
     const o = await getAdminFinanceOverview();
@@ -243,6 +393,16 @@ export default function AdminFinancePage() {
         </button>
       </div>
 
+      {activeBulkTab && activeBulk ? (
+        <BulkActionBar
+          count={activeBulk.selectedCount}
+          onClear={activeBulk.clear}
+          onDelete={() => setConfirmBulkDelete(true)}
+          deleting={bulkDeleting}
+          deleteLabel="Delete selected"
+        />
+      ) : null}
+
       <div className="flex flex-wrap gap-2 border-b border-softBorder pb-3">
         {TABS.map((t) => {
           const Icon = t.icon;
@@ -251,7 +411,9 @@ export default function AdminFinancePage() {
             <button
               key={t.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                setTab(t.id);
+              }}
               className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
                 active
                   ? "bg-navy text-white shadow-soft-sm"
@@ -433,8 +595,15 @@ export default function AdminFinancePage() {
                   <DashMobileTableCard
                     key={`${row.entry_type}-${row.entry_id}`}
                     title={
-                      <span className="font-semibold text-navy">
-                        {row.entry_type === "subscription" ? "Subscription" : "Booking"} · {row.resort_name}
+                      <span className="inline-flex items-start gap-2 font-semibold text-navy">
+                        <BulkSelectMobile
+                          checked={ledgerBulk.isSelected(ledgerRowKey(row))}
+                          onChange={() => ledgerBulk.toggle(ledgerRowKey(row))}
+                          ariaLabel={`Select ledger row ${row.entry_type} ${row.entry_id}`}
+                        />
+                        <span>
+                          {row.entry_type === "subscription" ? "Subscription" : "Booking"} · {row.resort_name}
+                        </span>
                       </span>
                     }
                     fields={[
@@ -454,6 +623,11 @@ export default function AdminFinancePage() {
                   <table className="dash-table min-w-[720px]">
                   <thead>
                     <tr>
+                      <BulkSelectTh
+                        checked={ledgerBulk.isAllSelected}
+                        indeterminate={ledgerBulk.isSomeSelected}
+                        onChange={() => (ledgerBulk.isAllSelected ? ledgerBulk.clear() : ledgerBulk.selectAll())}
+                      />
                       <th>Type</th>
                       <th>Resort</th>
                       <th>Amount</th>
@@ -465,6 +639,11 @@ export default function AdminFinancePage() {
                   <tbody>
                     {ledgerRows.map((row) => (
                       <tr key={`${row.entry_type}-${row.entry_id}`}>
+                        <BulkSelectTd
+                          checked={ledgerBulk.isSelected(ledgerRowKey(row))}
+                          onChange={() => ledgerBulk.toggle(ledgerRowKey(row))}
+                          ariaLabel={`Select ledger row ${row.entry_type} ${row.entry_id}`}
+                        />
                         <td className="capitalize text-sm">{row.entry_type}</td>
                         <td className="text-sm">{row.resort_name}</td>
                         <td className="font-mono text-sm">{fmtPhp(row.amount)}</td>
@@ -538,7 +717,16 @@ export default function AdminFinancePage() {
                 {commRows.map((c) => (
                   <DashMobileTableCard
                     key={c.id}
-                    title={<span className="font-mono text-sm text-navy">Commission #{c.id}</span>}
+                    title={
+                      <span className="inline-flex items-center gap-2 font-mono text-sm text-navy">
+                        <BulkSelectMobile
+                          checked={commBulk.isSelected(c.id)}
+                          onChange={() => commBulk.toggle(c.id)}
+                          ariaLabel={`Select commission ${c.id}`}
+                        />
+                        Commission #{c.id}
+                      </span>
+                    }
                     fields={[
                       { label: "Marketer", value: c.marketer?.name ?? String(c.marketer_id) },
                       { label: "Resort", value: c.resort?.name ?? String(c.resort_id) },
@@ -582,6 +770,11 @@ export default function AdminFinancePage() {
                   <table className="dash-table min-w-[1080px]">
                   <thead>
                     <tr>
+                      <BulkSelectTh
+                        checked={commBulk.isAllSelected}
+                        indeterminate={commBulk.isSomeSelected}
+                        onChange={() => (commBulk.isAllSelected ? commBulk.clear() : commBulk.selectAll())}
+                      />
                       <th>ID</th>
                       <th>Marketer</th>
                       <th>Resort</th>
@@ -595,6 +788,11 @@ export default function AdminFinancePage() {
                   <tbody>
                     {commRows.map((c) => (
                       <tr key={c.id}>
+                        <BulkSelectTd
+                          checked={commBulk.isSelected(c.id)}
+                          onChange={() => commBulk.toggle(c.id)}
+                          ariaLabel={`Select commission ${c.id}`}
+                        />
                         <td className="font-mono text-xs">{c.id}</td>
                         <td className="text-sm">{c.marketer?.name ?? c.marketer_id}</td>
                         <td className="text-sm">{c.resort?.name ?? c.resort_id}</td>
@@ -695,7 +893,16 @@ export default function AdminFinancePage() {
                 {batchRows.map((b) => (
                   <DashMobileTableCard
                     key={b.id}
-                    title={<span className="font-mono text-sm text-navy">Batch #{b.id}</span>}
+                    title={
+                      <span className="inline-flex items-center gap-2 font-mono text-sm text-navy">
+                        <BulkSelectMobile
+                          checked={batchBulk.isSelected(b.id)}
+                          onChange={() => batchBulk.toggle(b.id)}
+                          ariaLabel={`Select batch ${b.id}`}
+                        />
+                        Batch #{b.id}
+                      </span>
+                    }
                     fields={[
                       { label: "Marketer", value: b.marketer?.name ?? String(b.marketer_id) },
                       { label: "Period", value: <span className="font-mono text-xs">{b.run_period}</span> },
@@ -716,6 +923,11 @@ export default function AdminFinancePage() {
                   <table className="dash-table min-w-[1000px]">
                   <thead>
                     <tr>
+                      <BulkSelectTh
+                        checked={batchBulk.isAllSelected}
+                        indeterminate={batchBulk.isSomeSelected}
+                        onChange={() => (batchBulk.isAllSelected ? batchBulk.clear() : batchBulk.selectAll())}
+                      />
                       <th>ID</th>
                       <th>Marketer</th>
                       <th>Period</th>
@@ -729,6 +941,11 @@ export default function AdminFinancePage() {
                   <tbody>
                     {batchRows.map((b) => (
                       <tr key={b.id}>
+                        <BulkSelectTd
+                          checked={batchBulk.isSelected(b.id)}
+                          onChange={() => batchBulk.toggle(b.id)}
+                          ariaLabel={`Select batch ${b.id}`}
+                        />
                         <td className="font-mono text-xs">{b.id}</td>
                         <td className="text-sm">{b.marketer?.name ?? b.marketer_id}</td>
                         <td className="font-mono text-xs">{b.run_period}</td>
@@ -771,7 +988,16 @@ export default function AdminFinancePage() {
                 {relRows.map((r) => (
                   <DashMobileTableCard
                     key={r.id}
-                    title={fmtPhp(r.amount)}
+                    title={
+                      <span className="inline-flex items-center gap-2">
+                        <BulkSelectMobile
+                          checked={relBulk.isSelected(r.id)}
+                          onChange={() => relBulk.toggle(r.id)}
+                          ariaLabel={`Select release ${r.id}`}
+                        />
+                        {fmtPhp(r.amount)}
+                      </span>
+                    }
                     fields={[
                       { label: "Released", value: new Date(r.released_at).toLocaleString() },
                       { label: "Source", value: <span className="capitalize">{r.release_source}</span> },
@@ -790,6 +1016,11 @@ export default function AdminFinancePage() {
                   <table className="dash-table min-w-[880px]">
                   <thead>
                     <tr>
+                      <BulkSelectTh
+                        checked={relBulk.isAllSelected}
+                        indeterminate={relBulk.isSomeSelected}
+                        onChange={() => (relBulk.isAllSelected ? relBulk.clear() : relBulk.selectAll())}
+                      />
                       <th>Released</th>
                       <th>Amount</th>
                       <th>Source</th>
@@ -801,6 +1032,11 @@ export default function AdminFinancePage() {
                   <tbody>
                     {relRows.map((r) => (
                       <tr key={r.id}>
+                        <BulkSelectTd
+                          checked={relBulk.isSelected(r.id)}
+                          onChange={() => relBulk.toggle(r.id)}
+                          ariaLabel={`Select release ${r.id}`}
+                        />
                         <td className="text-xs">{new Date(r.released_at).toLocaleString()}</td>
                         <td className="font-mono text-sm">{fmtPhp(r.amount)}</td>
                         <td className="text-xs capitalize">{r.release_source}</td>
@@ -824,6 +1060,19 @@ export default function AdminFinancePage() {
           )}
         </DashCard>
       )}
+
+      {activeBulkTab ? (
+        <ConfirmDialog
+          open={confirmBulkDelete}
+          title={bulkDeleteLabels[activeBulkTab].action}
+          description={`Permanently remove ${activeBulk?.selectedCount ?? 0} ${bulkDeleteLabels[activeBulkTab].item}${(activeBulk?.selectedCount ?? 0) === 1 ? "" : "s"} from this page. ${bulkDeleteLabels[activeBulkTab].warning} This cannot be undone.`}
+          confirmLabel="Delete selected"
+          tone="danger"
+          loading={bulkDeleting}
+          onCancel={() => setConfirmBulkDelete(false)}
+          onConfirm={() => void onFinanceBulkDelete()}
+        />
+      ) : null}
     </div>
   );
 }

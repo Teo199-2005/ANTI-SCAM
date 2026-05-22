@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Resort;
 use App\Models\Room;
 use App\Models\User;
+use App\Services\AdminBulkDeleteService;
 use App\Services\BulkDeleteService;
 use App\Shared\Traits\ApiResponseTrait;
 use App\Support\Tenancy\TenantContext;
@@ -14,7 +15,10 @@ class BulkDeleteController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private readonly BulkDeleteService $bulkDelete) {}
+    public function __construct(
+        private readonly BulkDeleteService $bulkDelete,
+        private readonly AdminBulkDeleteService $adminBulkDelete,
+    ) {}
 
     public function users(Request $request)
     {
@@ -124,5 +128,102 @@ class BulkDeleteController extends Controller
         $result = $this->bulkDelete->deleteGuestFavorites($auth, $validated['room_ids']);
 
         return $this->successResponse($result->toArray(), 'Bulk delete completed');
+    }
+
+    public function auditLogs(Request $request)
+    {
+        $auth = $request->user();
+        $this->adminBulkDelete->assertAdmin($auth);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'max:'.AdminBulkDeleteService::MAX_BATCH],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        return $this->successResponse(
+            $this->adminBulkDelete->deleteAuditLogs($validated['ids'])->toArray(),
+            'Bulk delete completed',
+        );
+    }
+
+    public function xenditLogs(Request $request)
+    {
+        $auth = $request->user();
+        $this->adminBulkDelete->assertAdmin($auth);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'max:'.AdminBulkDeleteService::MAX_BATCH],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        return $this->successResponse(
+            $this->adminBulkDelete->deleteXenditWebhookEvents($validated['ids'])->toArray(),
+            'Bulk delete completed',
+        );
+    }
+
+    public function paymentLedger(Request $request)
+    {
+        $auth = $request->user();
+        $this->adminBulkDelete->assertAdmin($auth);
+
+        $validated = $request->validate([
+            'entries' => ['required', 'array', 'max:'.AdminBulkDeleteService::MAX_BATCH],
+            'entries.*.entry_type' => ['required', 'string', 'in:subscription,booking'],
+            'entries.*.entry_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        return $this->successResponse(
+            $this->adminBulkDelete->deletePaymentLedgerEntries($validated['entries'])->toArray(),
+            'Bulk delete completed',
+        );
+    }
+
+    public function financeCommissions(Request $request)
+    {
+        $auth = $request->user();
+        $this->adminBulkDelete->assertAdmin($auth);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'max:'.AdminBulkDeleteService::MAX_BATCH],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        return $this->successResponse(
+            $this->adminBulkDelete->deleteCommissions($validated['ids'])->toArray(),
+            'Bulk delete completed',
+        );
+    }
+
+    public function financePayoutBatches(Request $request)
+    {
+        $auth = $request->user();
+        $this->adminBulkDelete->assertAdmin($auth);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'max:'.AdminBulkDeleteService::MAX_BATCH],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        return $this->successResponse(
+            $this->adminBulkDelete->deletePayoutBatches($validated['ids'])->toArray(),
+            'Bulk delete completed',
+        );
+    }
+
+    public function financeCommissionReleases(Request $request)
+    {
+        $auth = $request->user();
+        $this->adminBulkDelete->assertAdmin($auth);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'max:'.AdminBulkDeleteService::MAX_BATCH],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        return $this->successResponse(
+            $this->adminBulkDelete->deleteCommissionReleases($validated['ids'])->toArray(),
+            'Bulk delete completed',
+        );
     }
 }

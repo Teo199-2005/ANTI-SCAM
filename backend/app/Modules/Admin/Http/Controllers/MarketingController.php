@@ -14,6 +14,7 @@ use App\Services\MarketerBookingCommissionStatsService;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\AdminBookingCommissionAnalyticsService;
 use App\Services\LegacySubscriptionCommissionCleanupService;
+use App\Services\MarketerBookingCommissionRateService;
 use App\Services\MarketerReferralDetailService;
 use App\Services\MarketingBookingCommissionSettingsService;
 use App\Support\MarketerAdminProfilePresenter;
@@ -35,6 +36,7 @@ class MarketingController extends Controller
         private readonly MarketerCommissionPayoutService $marketerPayouts,
         private readonly MarketerReferralDetailService $marketerReferralDetail,
         private readonly LegacySubscriptionCommissionCleanupService $legacyCommissionCleanup,
+        private readonly MarketerBookingCommissionRateService $marketerCommissionRates,
     ) {}
 
     /** List all marketers with their assigned resort count. */
@@ -190,7 +192,11 @@ class MarketingController extends Controller
                 'booking_credits_count' => $bookingCredits,
                 'booking_reversals_count' => $bookingReversals,
                 'booking_credits_gross_php' => round((float) ($bookingGrossByMarketer->get($m->id) ?? 0), 2),
-                'current_commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
+                'booking_commission_php' => $m->booking_commission_php !== null
+                    ? round((float) $m->booking_commission_php, 2)
+                    : null,
+                'uses_custom_booking_commission' => $this->marketerCommissionRates->usesCustomRate($m),
+                'current_commission_per_booking_php' => $this->marketerCommissionRates->effectiveAmountPhpForUser($m),
                 '_sort_idle' => $sortIdle,
             ];
         }
@@ -211,6 +217,7 @@ class MarketingController extends Controller
                 'new_client_definition' => 'Signup funnel: distinct resort-owner organizations with referral attribution (paid subscription or referred signup awaiting payment). Booking commissions: paid online guest bookings at assigned resorts (flat rate per credit). Subscription invoice payments do not create marketer commission.',
                 'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
                 'commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
+                'platform_default_commission_per_booking_php' => $this->marketerCommissionRates->platformDefaultAmountPhp(),
                 'commissions_enabled' => $this->bookingSettings->isEnabled(),
                 'settings_policy_note' => $this->bookingSettings->policyNote(),
             ],
@@ -282,7 +289,12 @@ class MarketingController extends Controller
                     ->where('marketer_id', $marketerId)
                     ->where('type', MarketerBookingCommissionEvent::TYPE_CREDIT)
                     ->sum('amount'), 2),
-                'current_commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
+                'booking_commission_php' => $marketer->booking_commission_php !== null
+                    ? round((float) $marketer->booking_commission_php, 2)
+                    : null,
+                'uses_custom_booking_commission' => $this->marketerCommissionRates->usesCustomRate($marketer),
+                'current_commission_per_booking_php' => $this->marketerCommissionRates->effectiveAmountPhpForUser($marketer),
+                'platform_default_commission_per_booking_php' => $this->marketerCommissionRates->platformDefaultAmountPhp(),
                 'commission_pending_php' => $commissionStats ? round((float) $commissionStats->pending_commission, 2) : 0.0,
                 'commission_released_gross_php' => $commissionStats ? round((float) $commissionStats->released_commission_gross, 2) : 0.0,
                 'commission_total_gross_php' => $commissionStats ? round((float) $commissionStats->total_commission_gross, 2) : 0.0,

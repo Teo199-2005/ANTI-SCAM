@@ -15,6 +15,7 @@ import LocationFilterBar, {
   locationFilterToParams,
   type LocationFilterValue,
 } from "@/components/locations/LocationFilterBar";
+import AdminEditMarketerModal, { type AdminEditableMarketer } from "@/components/dashboard/AdminEditMarketerModal";
 import AdminMarketerDetailModal from "@/components/dashboard/AdminMarketerDetailModal";
 import {
   getAdminMarketersMonitoring,
@@ -27,7 +28,7 @@ import { compareNullable, nextSort, paginateLocal, type SortDir } from "@/lib/ta
 import { cn } from "@/lib/utils";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
 import { TableEntityThumb } from "@/components/shared/TableEntityThumb";
-import { Activity, Eye, Info, RefreshCw } from "lucide-react";
+import { Activity, Eye, Info, Pencil, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPhpLedger as fmtPhp } from "@/lib/formatPhp";
 
@@ -105,6 +106,13 @@ function BookingCounts({ r }: { r: AdminMarketerMonitorRow }) {
 function CommissionStack({ r }: { r: AdminMarketerMonitorRow }) {
   return (
     <div className="space-y-0.5 text-right text-[11px] leading-snug tabular-nums">
+      <p title="Per paid online guest booking at assigned resorts">
+        <span className="text-zinc-500">Rate </span>
+        <span className={r.uses_custom_booking_commission ? "font-semibold text-violet-800" : "text-navy"}>
+          {fmtPhp(r.current_commission_per_booking_php)}
+          {r.uses_custom_booking_commission ? " custom" : ""}
+        </span>
+      </p>
       <p title="Commission earned, not yet paid out">
         <span className="text-zinc-500">Pending </span>
         {fmtPhp(r.commission_pending_php)}
@@ -134,6 +142,7 @@ export default function AdminMarketingMonitorPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [locationFilter, setLocationFilter] = useState<LocationFilterValue>(emptyLocationFilter);
   const [detailMarketerId, setDetailMarketerId] = useState<number | null>(null);
+  const [editMarketer, setEditMarketer] = useState<AdminEditableMarketer | null>(null);
 
   const load = useCallback(async (search: string, loc: LocationFilterValue = locationFilter) => {
     setLoading(true);
@@ -401,14 +410,24 @@ export default function AdminMarketingMonitorPage() {
                     },
                   ]}
                   actions={
-                    <button
-                      type="button"
-                      className="dash-btn-sm inline-flex w-full items-center justify-center gap-1.5 border border-zinc-200 bg-white"
-                      onClick={() => setDetailMarketerId(r.id)}
-                    >
-                      <Eye size={13} aria-hidden />
-                      View details
-                    </button>
+                    <div className="flex w-full flex-col gap-1.5">
+                      <button
+                        type="button"
+                        className="dash-btn-sm inline-flex w-full items-center justify-center gap-1.5 border border-zinc-200 bg-white"
+                        onClick={() => setEditMarketer(r)}
+                      >
+                        <Pencil size={13} aria-hidden />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="dash-btn-sm inline-flex w-full items-center justify-center gap-1.5 border border-zinc-200 bg-white"
+                        onClick={() => setDetailMarketerId(r.id)}
+                      >
+                        <Eye size={13} aria-hidden />
+                        View details
+                      </button>
+                    </div>
                   }
                 />
               ))}
@@ -530,15 +549,26 @@ export default function AdminMarketingMonitorPage() {
                     <CommissionStack r={r} />
                   </td>
                   <DashTableActionsCell>
-                    <button
-                      type="button"
-                      className="dash-btn-sm inline-flex items-center gap-1 border border-zinc-200 bg-white px-2 py-1 text-[11px]"
-                      onClick={() => setDetailMarketerId(r.id)}
-                      aria-label={`View details for ${r.name}`}
-                    >
-                      <Eye size={12} aria-hidden />
-                      View
-                    </button>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        className="dash-btn-sm inline-flex items-center gap-1 border border-zinc-200 bg-white px-2 py-1 text-[11px]"
+                        onClick={() => setEditMarketer(r)}
+                        aria-label={`Edit ${r.name}`}
+                      >
+                        <Pencil size={12} aria-hidden />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="dash-btn-sm inline-flex items-center gap-1 border border-zinc-200 bg-white px-2 py-1 text-[11px]"
+                        onClick={() => setDetailMarketerId(r.id)}
+                        aria-label={`View details for ${r.name}`}
+                      >
+                        <Eye size={12} aria-hidden />
+                        View
+                      </button>
+                    </div>
                   </DashTableActionsCell>
                 </tr>
               ))}
@@ -546,6 +576,16 @@ export default function AdminMarketingMonitorPage() {
           </DataTable>
         </div>
       </DashCard>
+
+      <AdminEditMarketerModal
+        open={editMarketer != null}
+        marketer={editMarketer}
+        platformDefaultPhp={
+          meta?.platform_default_commission_per_booking_php ?? meta?.commission_per_booking_php ?? 10
+        }
+        onClose={() => setEditMarketer(null)}
+        onSaved={() => void load(applied, locationFilter)}
+      />
 
       <AdminMarketerDetailModal
         marketerId={detailMarketerId}

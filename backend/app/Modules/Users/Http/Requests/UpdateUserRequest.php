@@ -27,6 +27,7 @@ class UpdateUserRequest extends FormRequest
             'mailing_city_municipality_psgc'=> ['sometimes', 'nullable', 'string', 'max:20'],
             'mailing_barangay_name'         => ['sometimes', 'nullable', 'string', 'max:180'],
             'mailing_location_label'        => ['sometimes', 'nullable', 'string', 'max:300'],
+            'booking_commission_php'      => ['sometimes', 'nullable', 'numeric', 'min:1', 'max:5000'],
         ];
     }
 }
