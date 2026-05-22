@@ -291,12 +291,16 @@ export default function AdminEditMarketerModal({
             <button type="button" className="dash-btn-sm border border-zinc-200 bg-white" onClick={handleClose} disabled={saving}>
               Cancel
             </button>
-            <button type="submit" className="dash-btn-primary dash-btn-sm" disabled={saving}>
+            <button
+              type="submit"
+              className="dash-btn-primary justify-center px-6 py-2.5 disabled:opacity-60"
+              disabled={saving}
+            >
               {saving ? (
-                <>
+                <span className="inline-flex items-center gap-2">
                   <Loader2 size={14} className="animate-spin" aria-hidden />
                   Saving…
-                </>
+                </span>
               ) : (
                 "Save changes"
               )}
