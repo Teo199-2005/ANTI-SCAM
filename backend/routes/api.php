@@ -80,6 +80,8 @@ Route::prefix('v1')->group(function (): void {
     // 5 new accounts per hour per IP (registration abuse protection).
     Route::middleware('throttle:5,60')->group(function (): void {
         Route::post('/auth/register', [AuthController::class, 'register']);
+        Route::get('/auth/google-pending', [AuthController::class, 'googlePendingSignup']);
+        Route::post('/auth/google-complete', [AuthController::class, 'completeGoogleSignup']);
     });
     Route::middleware('throttle:password-reset-request')->group(function (): void {
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPasswordRequest']);

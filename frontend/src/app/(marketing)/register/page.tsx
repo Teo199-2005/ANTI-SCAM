@@ -37,7 +37,7 @@ const authInput =
 function RegisterPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { register } = useAuth();
+  const { register, completeGoogleSignup } = useAuth();
   const hydrated = useHydrated();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -66,14 +66,16 @@ function RegisterPageInner() {
   const hasReferralRef = Boolean(sanitizeReferralCodeInput(refFromQuery));
 
   const intentRaw = searchParams.get("intent")?.trim() ?? "";
+  const googleToken = searchParams.get("google_token")?.trim() ?? "";
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
   const returnTo = searchParams.get("returnTo")?.trim() ?? "";
+  const isGoogleOwnerSignup = Boolean(googleToken) && (intentRaw === "owner" || hasReferralRef);
   /** Marketer referral codes apply to resort-owner signup only. */
   const isOwnerFlow = intentRaw === "owner" || hasReferralRef;
   const isClientFlow = !hasReferralRef && (intentRaw === "client" || Boolean(resortSlug));
   /** Resort slug signup hides marketing nav — use the compact guest shell only then. */
   const isGuestFromResort = isClientFlow && Boolean(resortSlug);
-  const needsRolePick = !isOwnerFlow && !isClientFlow;
+  const needsRolePick = !isOwnerFlow && !isClientFlow && !googleToken;
   const { openRegisterModal } = useRegisterModal();
   const legacyResortBanner = Boolean(resortSlug) && intentRaw !== "client";
   const [resortBrand, setResortBrand] = useState<{
@@ -120,9 +122,46 @@ function RegisterPageInner() {
   }, []);
 
   useEffect(() => {
+    if (googleToken && !isOwnerFlow && !isClientFlow) {
+      const params = new URLSearchParams({ google_token: googleToken });
+      if (returnTo) params.set("returnTo", returnTo);
+      router.replace(`/register/choose-role?${params.toString()}`);
+    }
+  }, [googleToken, isOwnerFlow, isClientFlow, returnTo, router]);
+
+  useEffect(() => {
     if (!needsRolePick) return;
     openRegisterModal({ onClose: () => router.push("/") });
   }, [needsRolePick, openRegisterModal, router]);
+
+  useEffect(() => {
+    if (!isGoogleOwnerSignup || !googleToken) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/backend/auth/google-pending?google_token=${encodeURIComponent(googleToken)}`);
+        const payload = (await res.json()) as {
+          success?: boolean;
+          data?: { name?: string; email?: string };
+          message?: string;
+        };
+        if (cancelled) return;
+        if (payload.success && payload.data) {
+          if (payload.data.name) setName(payload.data.name);
+          if (payload.data.email) setEmail(payload.data.email);
+        } else if (!res.ok) {
+          setError(payload.message ?? "Google sign-up link expired. Try Continue with Google again.");
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Could not load your Google profile. Try Continue with Google again.");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGoogleOwnerSignup, googleToken]);
 
   /** Legacy shared links used `/register?ref=` without `intent=owner` — normalize the URL. */
   useEffect(() => {
@@ -197,16 +236,39 @@ function RegisterPageInner() {
       setError("Please accept the terms and privacy policy to continue.");
       return;
     }
-    if (!passwordPolicyMet(getPasswordPolicyChecks(password))) {
-      setError("Password does not meet minimum security requirements.");
-      return;
-    }
-    if (password !== passwordConfirmation) {
-      setError("Passwords do not match.");
-      return;
+    if (!isGoogleOwnerSignup) {
+      if (!passwordPolicyMet(getPasswordPolicyChecks(password))) {
+        setError("Password does not meet minimum security requirements.");
+        return;
+      }
+      if (password !== passwordConfirmation) {
+        setError("Passwords do not match.");
+        return;
+      }
     }
     setPending(true);
     try {
+      if (isGoogleOwnerSignup && googleToken) {
+        const { user, referralTrial } = await completeGoogleSignup({
+          google_token: googleToken,
+          role_intent: "resort_owner",
+          accept_terms: true,
+          phone: phone.trim() || undefined,
+          business_name: businessName.trim() || undefined,
+          referral_code: appliedReferral ? appliedReferral.code : undefined,
+        });
+        if (appliedReferral || referralTrial?.code) {
+          setTrialSuccessModal({
+            marketerName: referralTrial?.marketer_name ?? appliedReferral?.marketerName ?? "your partner",
+            code: referralTrial?.code ?? appliedReferral?.code ?? "",
+            endsAt: null,
+          });
+          return;
+        }
+        router.push(returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard");
+        return;
+      }
+
       const { user, referralTrial } = await register({
         name: name.trim(),
         email: email.trim(),
@@ -382,6 +444,7 @@ function RegisterPageInner() {
           </div>
         </div>
 
+        {!isGoogleOwnerSignup ? (
         <div className="max-lg:mb-3 max-lg:rounded-xl max-lg:border max-lg:border-clOcean/12 max-lg:bg-gradient-to-b max-lg:from-sky-50/80 max-lg:to-white max-lg:p-2.5 max-lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] lg:contents">
         <a
           href={googleOAuthRedirectUrl(returnTo || (resortSlug ? `/resort/${resortSlug}` : undefined))}
@@ -403,6 +466,11 @@ function RegisterPageInner() {
           <span className="absolute left-0 right-0 top-1/2 z-0 h-px -translate-y-1/2 bg-zinc-200/90" />
         </div>
         </div>
+        ) : (
+          <p className="mb-3 rounded-lg border border-sky-200/80 bg-sky-50 px-3 py-2 text-center text-xs text-sky-950">
+            Finish your resort owner account with Google — add contact details and accept terms below.
+          </p>
+        )}
 
         <div className="max-lg:rounded-xl max-lg:border max-lg:border-zinc-200/60 max-lg:bg-white max-lg:p-3 max-lg:shadow-[inset_0_2px_8px_rgba(13,30,66,0.04)] lg:contents">
         <form className="space-y-2.5 md:space-y-2" onSubmit={onSubmit}>
@@ -422,6 +490,7 @@ function RegisterPageInner() {
               className={authInput}
               autoComplete="name"
               required
+              readOnly={isGoogleOwnerSignup}
               value={name}
               onChange={(e) => setName(sanitizePersonName(e.target.value))}
               placeholder="Maria Santos"
@@ -476,6 +545,7 @@ function RegisterPageInner() {
                 type="email"
                 autoComplete="email"
                 required
+                readOnly={isGoogleOwnerSignup}
                 value={email}
                 inputMode="email"
                 onChange={(e) => setEmail(sanitizeEmailTyping(e.target.value).toLowerCase())}
@@ -484,6 +554,7 @@ function RegisterPageInner() {
             </div>
           </div>
 
+          {!isGoogleOwnerSignup ? (
           <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-x-3 lg:gap-y-1">
             <div className="min-w-0">
               <label htmlFor="register-password" className="mb-1 block text-[11px] font-semibold text-zinc-700">
@@ -564,6 +635,7 @@ function RegisterPageInner() {
               id="register-password-meter"
             />
           </div>
+          ) : null}
 
           {isOwnerFlow ? (
             <div className="space-y-1">

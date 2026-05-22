@@ -42,6 +42,14 @@ type AuthContextValue = {
     password_confirmation: string;
     accept_terms: boolean;
   }) => Promise<{ user: AuthUser; referralTrial: AuthUser["referral_trial"] }>;
+  completeGoogleSignup: (input: {
+    google_token: string;
+    role_intent: "resort_owner" | "client";
+    accept_terms: boolean;
+    phone?: string;
+    business_name?: string;
+    referral_code?: string;
+  }) => Promise<{ user: AuthUser; referralTrial: AuthUser["referral_trial"] }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -62,7 +70,7 @@ const ME_TIMEOUT_MS = 20_000;
 
 /** One retry after a short pause — masks brief nginx/Node upstream 502s after restarts or load blips. */
 async function postAuthEnvelopeWithTransientRetry(
-  url: "/login" | "/register",
+  url: "/login" | "/register" | "/google-complete",
   body: unknown,
 ): Promise<AuthEnvelope> {
   const run = () => authClient.post<AuthEnvelope>(url, body);
@@ -223,6 +231,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [bumpAuthEpoch],
   );
 
+  const completeGoogleSignup = useCallback(
+    async (input: {
+      google_token: string;
+      role_intent: "resort_owner" | "client";
+      accept_terms: boolean;
+      phone?: string;
+      business_name?: string;
+      referral_code?: string;
+    }): Promise<{ user: AuthUser; referralTrial: AuthUser["referral_trial"] }> => {
+      bumpAuthEpoch();
+      try {
+        const data = await postAuthEnvelopeWithTransientRetry("/google-complete", input);
+        if (!data.success || !data.data?.user) {
+          throw new Error(data.message ?? "Registration failed.");
+        }
+        const userPayload = {
+          ...data.data.user,
+          referral_trial: data.data.user.referral_trial ?? data.data.referral_trial ?? null,
+        };
+        setUser(userPayload);
+        setLoading(false);
+        return {
+          user: userPayload,
+          referralTrial: data.data.referral_trial ?? userPayload.referral_trial ?? null,
+        };
+      } catch (err) {
+        setLoading(false);
+        throw new Error(parseApiErrorMessage(err, "Registration failed."));
+      }
+    },
+    [bumpAuthEpoch],
+  );
+
   const logout = useCallback(async () => {
     bumpAuthEpoch();
     try {
@@ -235,8 +276,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [bumpAuthEpoch]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, register, logout, refreshUser }),
-    [user, loading, login, register, logout, refreshUser],
+    () => ({ user, loading, login, register, completeGoogleSignup, logout, refreshUser }),
+    [user, loading, login, register, completeGoogleSignup, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

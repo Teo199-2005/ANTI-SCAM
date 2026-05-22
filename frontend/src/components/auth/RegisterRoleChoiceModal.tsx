@@ -3,10 +3,13 @@
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import { DismissibleModalShell } from "@/components/ui/DismissibleModalShell";
 import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
+import { useAuth } from "@/contexts/AuthContext";
+import { resolveGuestPostAuthPath } from "@/lib/auth/clientAuthUrls";
 import { cn } from "@/lib/utils";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   MARKETING_MODAL_PANEL_MAX_H,
   MARKETING_MODAL_Z_REGISTER,
@@ -19,10 +22,16 @@ const NAVY = "#0d1f3c";
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** Set when the user started Google OAuth without an existing account. */
+  googleToken?: string;
+  returnTo?: string;
 };
 
 type RoleCardProps = {
-  href: string;
+  href?: string;
+  onSelect?: () => void;
+  disabled?: boolean;
+  pending?: boolean;
   title: string;
   imageSrc: string;
   imageAlt: string;
@@ -34,6 +43,9 @@ type RoleCardProps = {
 
 function RegisterRoleCard({
   href,
+  onSelect,
+  disabled,
+  pending,
   title,
   imageSrc,
   imageAlt,
@@ -44,20 +56,8 @@ function RegisterRoleCard({
 }: RoleCardProps) {
   const isGuest = accent === "guest";
 
-  return (
-    <Link
-      href={href}
-      onClick={onClose}
-      className={cn(
-        "group relative flex h-full min-h-[20rem] flex-col overflow-hidden rounded-2xl border-2 bg-white",
-        "shadow-[0_8px_32px_-12px_rgba(13,30,60,0.22)]",
-        "transition duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[0_14px_36px_-10px_rgba(13,30,60,0.28)]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clOcean/40 focus-visible:ring-offset-2",
-        isGuest
-          ? "border-sky-200/90 hover:border-sky-400/80"
-          : "border-amber-200/90 hover:border-amber-400/80",
-      )}
-    >
+  const inner = (
+    <>
       <div className="relative min-h-[min(38vh,17.5rem)] w-full flex-1 overflow-hidden bg-zinc-900 max-sm:min-h-[14rem]">
         <Image
           src={imageSrc}
@@ -102,20 +102,100 @@ function RegisterRoleCard({
               : "bg-gradient-to-r from-amber-400 to-amber-500 text-[#0d1f3c] group-hover:brightness-105",
           )}
         >
-          {cta}
-          <ArrowRight size={14} className="opacity-90" aria-hidden />
+          {pending ? (
+            <>
+              <Loader2 size={14} className="animate-spin opacity-90" aria-hidden />
+              Creating account…
+            </>
+          ) : (
+            <>
+              {cta}
+              <ArrowRight size={14} className="opacity-90" aria-hidden />
+            </>
+          )}
         </span>
       </div>
-    </Link>
+    </>
+  );
+
+  const className = cn(
+    "group relative flex h-full min-h-[20rem] flex-col overflow-hidden rounded-2xl border-2 bg-white",
+    "shadow-[0_8px_32px_-12px_rgba(13,30,60,0.22)]",
+    "transition duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[0_14px_36px_-10px_rgba(13,30,60,0.28)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clOcean/40 focus-visible:ring-offset-2",
+    disabled && "pointer-events-none opacity-60",
+    isGuest
+      ? "border-sky-200/90 hover:border-sky-400/80"
+      : "border-amber-200/90 hover:border-amber-400/80",
+  );
+
+  if (href) {
+    return (
+      <Link href={href} onClick={onClose} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        onSelect?.();
+      }}
+      className={cn(className, "w-full text-left")}
+    >
+      {inner}
+    </button>
   );
 }
 
-export function RegisterRoleChoiceModal({ open, onClose }: Props) {
+export function RegisterRoleChoiceModal({ open, onClose, googleToken, returnTo }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guestPending, setGuestPending] = useState(false);
+  const router = useRouter();
+  const { completeGoogleSignup, refreshUser } = useAuth();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const ownerHref = googleToken
+    ? `/register?intent=owner&google_token=${encodeURIComponent(googleToken)}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`
+    : "/register?intent=owner";
+
+  const guestHref = googleToken ? undefined : "/register?intent=client";
+
+  const completeGuestWithGoogle = async () => {
+    if (!googleToken) return;
+    if (!acceptTerms) {
+      setError("Please accept the terms and privacy policy to continue.");
+      return;
+    }
+    setError(null);
+    setGuestPending(true);
+    try {
+      const { user } = await completeGoogleSignup({
+        google_token: googleToken,
+        role_intent: "client",
+        accept_terms: true,
+      });
+      await refreshUser();
+      onClose();
+      router.push(
+        resolveGuestPostAuthPath(user.role, {
+          returnTo: returnTo ?? "",
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create your account.");
+    } finally {
+      setGuestPending(false);
+    }
+  };
 
   if (!mounted || !open) return null;
 
@@ -151,15 +231,53 @@ export function RegisterRoleChoiceModal({ open, onClose }: Props) {
                   <strong className="font-semibold text-zinc-800">Resort owners</strong> list and manage their
                   property.
                 </p>
+                {googleToken ? (
+                  <p className="mt-1.5 text-xs text-zinc-500">
+                    Signed in with Google — choose how you will use Anti-Scam PH.
+                  </p>
+                ) : null}
               </div>
               <ModalCloseButton onClose={onClose} className="shrink-0" />
             </div>
           </div>
 
-          {/* Mobile: 1×1 stack. Desktop: 2-column grid. */}
+          {googleToken ? (
+            <label className="mx-3 mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2.5 text-xs text-zinc-600 sm:mx-4">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-clOcean focus:ring-clOcean/30"
+                checked={acceptTerms}
+                onChange={(e) => {
+                  setAcceptTerms(e.target.checked);
+                  if (e.target.checked) setError(null);
+                }}
+              />
+              <span>
+                I agree to the{" "}
+                <Link href="/legal/terms" className="font-semibold text-clOcean hover:underline" onClick={(e) => e.stopPropagation()}>
+                  Terms & Conditions
+                </Link>{" "}
+                and{" "}
+                <Link href="/legal/privacy" className="font-semibold text-clOcean hover:underline" onClick={(e) => e.stopPropagation()}>
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+          ) : null}
+
+          {error ? (
+            <p className="mx-3 mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 sm:mx-4" role="alert">
+              {error}
+            </p>
+          ) : null}
+
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:gap-4 sm:p-4">
             <RegisterRoleCard
-              href="/register?intent=client"
+              href={guestHref}
+              onSelect={googleToken ? completeGuestWithGoogle : undefined}
+              disabled={guestPending}
+              pending={guestPending}
               title="Guests"
               imageSrc="/register-guests.png"
               imageAlt="Guests enjoying a verified resort stay"
@@ -174,7 +292,7 @@ export function RegisterRoleChoiceModal({ open, onClose }: Props) {
               onClose={onClose}
             />
             <RegisterRoleCard
-              href="/register?intent=owner"
+              href={ownerHref}
               title="Resort Owner"
               imageSrc="/register-resort-owner.png"
               imageAlt="Resort owner welcoming verified guests"

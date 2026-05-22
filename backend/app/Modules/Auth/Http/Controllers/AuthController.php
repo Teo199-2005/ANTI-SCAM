@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\EmailNotificationService;
 use App\Services\EmailVerificationOtpService;
+use App\Services\GooglePendingSignupService;
 use App\Services\PasswordResetOtpService;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
@@ -22,6 +23,7 @@ use App\Support\StoredMedia;
 use App\Support\UserProfilePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -37,7 +39,91 @@ class AuthController extends Controller
         private readonly ReferralSignupTrialService $referralSignupTrial,
         private readonly ResortOwnerOnboardingService $ownerOnboarding,
         private readonly PhilippinesPayoutBankChannelService $payoutBanks,
+        private readonly GooglePendingSignupService $googlePendingSignup,
     ) {}
+
+    public function googlePendingSignup(Request $request)
+    {
+        $validated = $request->validate([
+            'google_token' => ['required', 'string', 'min:32', 'max:128'],
+        ]);
+
+        $pending = $this->googlePendingSignup->peek($validated['google_token']);
+        if ($pending === null) {
+            return $this->errorResponse('This Google sign-up link expired. Try Continue with Google again.', null, 410);
+        }
+
+        return $this->successResponse([
+            'email' => $pending['email'],
+            'name' => $pending['name'],
+        ]);
+    }
+
+    public function completeGoogleSignup(Request $request)
+    {
+        $validated = $request->validate([
+            'google_token' => ['required', 'string', 'min:32', 'max:128'],
+            'role_intent' => ['required', 'in:resort_owner,client'],
+            'accept_terms' => ['required', 'accepted'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'business_name' => ['nullable', 'string', 'max:190'],
+            'referral_code' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $pending = $this->googlePendingSignup->consume($validated['google_token']);
+        if ($pending === null) {
+            return $this->errorResponse('This Google sign-up link expired. Try Continue with Google again.', null, 410);
+        }
+
+        if (User::query()->where('email', $pending['email'])->orWhere('google_id', $pending['google_id'])->exists()) {
+            return $this->errorResponse('An account with this email already exists. Sign in instead.', null, 409);
+        }
+
+        $roleIntent = $validated['role_intent'];
+
+        $user = User::create([
+            'name' => $pending['name'],
+            'email' => $pending['email'],
+            'google_id' => $pending['google_id'],
+            'phone' => $validated['phone'] ?? null,
+            'password' => Hash::make(Str::random(48)),
+            'role' => $roleIntent,
+            'email_verified_at' => now(),
+            'terms_accepted_at' => now(),
+            'terms_version' => PlatformTerms::version(),
+        ]);
+
+        $referralTrialPayload = ['referral_trial' => $this->referralSignupTrial->trialPayloadForUser($user)];
+        $referralCode = trim((string) ($validated['referral_code'] ?? ''));
+        $businessName = isset($validated['business_name']) ? trim((string) $validated['business_name']) : null;
+
+        if ($referralCode !== '' && $roleIntent === 'resort_owner') {
+            $referralTrialPayload = $this->referralSignupTrial->redeemAtRegistration(
+                $user,
+                $referralCode,
+                $businessName !== '' ? $businessName : null,
+            );
+            $user->refresh();
+        }
+
+        if ($roleIntent === 'resort_owner') {
+            $this->ownerOnboarding->onboardOwner($user, [
+                'business_name' => $businessName !== '' ? $businessName : null,
+                'is_publicly_listed' => false,
+            ]);
+            $user->refresh();
+        }
+
+        $this->emailNotifications->sendTermsAccepted($user, 'Google account registration');
+
+        $token = $user->createToken('spa-token')->plainTextToken;
+
+        return $this->successResponse([
+            'user' => UserProfilePresenter::toArray($user),
+            'token' => $token,
+            ...$referralTrialPayload,
+        ], 'Account created', 201);
+    }
 
     public function register(Request $request)
     {
