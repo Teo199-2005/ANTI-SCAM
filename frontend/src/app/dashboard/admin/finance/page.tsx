@@ -385,7 +385,7 @@ export default function AdminFinancePage() {
             Finance &amp; payouts
           </h1>
           <p className="dash-page-sub">
-            Monitor subscription inflows, guest payments, marketer commissions, withholding, and GCash payout batches in one place.
+            Monitor subscription inflows, guest payments, marketer commissions, withholding, and bank payout batches in one place.
           </p>
         </div>
         <button type="button" className="dash-btn-sm shrink-0" onClick={() => void refresh()}>
@@ -443,7 +443,7 @@ export default function AdminFinancePage() {
                 <p className="font-semibold text-navy">Configured marketer payout withholding</p>
                 <p className="mt-1">
                   Platform rate: <strong>{overview.withholding_percent_label}</strong> of gross marketer commissions is withheld
-                  before GCash disbursement. Payout batches sum frozen commission row amounts — they never recalculate historical
+                  before bank disbursement. Payout batches sum frozen commission row amounts — they never recalculate historical
                   credits when you change the rate in System Settings.
                 </p>
               </DashCard>
@@ -932,6 +932,7 @@ export default function AdminFinancePage() {
                       <th>Marketer</th>
                       <th>Period</th>
                       <th>Status</th>
+                      <th>Bank</th>
                       <th>Gross</th>
                       <th>Net out</th>
                       <th>Withheld</th>
@@ -951,6 +952,10 @@ export default function AdminFinancePage() {
                         <td className="font-mono text-xs">{b.run_period}</td>
                         <td>
                           <StatusBadge status={b.status} />
+                        </td>
+                        <td className="text-xs text-zinc-600">
+                          {b.bank_display_name ?? b.bank_channel_code ?? b.destination_type ?? "—"}
+                          {b.bank_last4 ? ` ·••${b.bank_last4}` : ""}
                         </td>
                         <td className="font-mono text-sm">{fmtPhp(b.gross_commissions)}</td>
                         <td className="font-mono text-sm">{fmtPhp(b.net_disbursed)}</td>

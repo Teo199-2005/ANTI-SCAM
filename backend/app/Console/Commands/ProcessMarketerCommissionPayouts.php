@@ -12,7 +12,7 @@ class ProcessMarketerCommissionPayouts extends Command
                             {--dry-run : Compute eligible payouts without calling Xendit or locking funds}
                             {--date= : ISO date (Y-m-d) treated as payout run day in Asia/Manila; default today}';
 
-    protected $description = 'Pay marketing partners pending commissions (GCash via Xendit) for eligible periods.';
+    protected $description = 'Pay marketing partners pending commissions (bank transfer via Xendit) for eligible periods.';
 
     public function handle(MarketerCommissionPayoutService $payouts): int
     {

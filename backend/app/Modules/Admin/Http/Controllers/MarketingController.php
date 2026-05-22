@@ -383,7 +383,7 @@ class MarketingController extends Controller
                 MarketerPayoutBatch::STATUS_SUBMITTED,
             ], true)) {
                 return $this->errorResponse(
-                    'This commission is locked for an automated GCash payout. Wait for Xendit to finish or fail before releasing manually.',
+                    'This commission is locked for an automated bank payout. Wait for Xendit to finish or fail before releasing manually.',
                     null,
                     422
                 );
@@ -396,7 +396,7 @@ class MarketingController extends Controller
             $net = round($gross * $this->marketerPayouts->netPayoutFactor(), 2);
             $userNote = isset($data['notes']) ? trim((string) $data['notes']) : '';
             $systemNote = sprintf(
-                'Manual release: net ₱%s (gross ₱%s, %s%% platform withholding — same basis as GCash batches).',
+                'Manual release: net ₱%s (gross ₱%s, %s%% platform withholding — same basis as bank payout batches).',
                 number_format($net, 2, '.', ''),
                 number_format($gross, 2, '.', ''),
                 number_format($rate * 100, 2, '.', ''),

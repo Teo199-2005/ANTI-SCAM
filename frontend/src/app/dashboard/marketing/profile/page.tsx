@@ -6,7 +6,8 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import GovIdDocumentPreview from "@/components/marketing/GovIdDocumentPreview";
-import { getMarketingGovIdOptions, type MarketingGovIdOption } from "@/lib/api/marketingGovId";
+import { getMarketingGovIdOptions, getMarketingPayoutBanks, type MarketingPayoutBankOption } from "@/lib/api/marketing";
+import type { MarketingGovIdOption } from "@/lib/api/marketingGovId";
 import { isXenditLiveMode, isXenditTestMode } from "@/lib/billingXendit";
 import { formatRoleLabel } from "@/lib/utils";
 import {
@@ -21,9 +22,16 @@ import {
   Phone,
   Settings,
   User,
-  Wallet,
+  Landmark,
 } from "lucide-react";
-import { INPUT_MAX, sanitizeEmailTyping, sanitizePersonName, sanitizePhilippinesMobileInput, sanitizeTinTyping } from "@/lib/inputRestrictions";
+import {
+  INPUT_MAX,
+  sanitizeBankAccountNumber,
+  sanitizeEmailTyping,
+  sanitizePersonName,
+  sanitizePhilippinesMobileInput,
+  sanitizeTinTyping,
+} from "@/lib/inputRestrictions";
 import {
   formatGovIdDisplay,
   formatPhilippinesMobileDisplay,
@@ -31,7 +39,7 @@ import {
   hasFieldErrors,
   sanitizeBarangayName,
   sanitizeGovIdNumberForType,
-  validateMarketingGcashForm,
+  validateMarketingBankPayoutForm,
   validateMarketingGovIdForm,
   validateMarketingPersonalForm,
   type MarketingProfileFieldErrors,
@@ -78,10 +86,13 @@ export default function MarketingProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  const [gcashNumber, setGcashNumber] = useState("");
-  const [gcashHolder, setGcashHolder] = useState("");
-  const [savingGcash, setSavingGcash] = useState(false);
-  const [gcashErrors, setGcashErrors] = useState<MarketingProfileFieldErrors>({});
+  const [payoutBanks, setPayoutBanks] = useState<MarketingPayoutBankOption[]>([]);
+  const [bankChannel, setBankChannel] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankErrors, setBankErrors] = useState<MarketingProfileFieldErrors>({});
   const [govErrors, setGovErrors] = useState<MarketingProfileFieldErrors>({});
 
   const [govOptions, setGovOptions] = useState<MarketingGovIdOption[]>([]);
@@ -111,6 +122,21 @@ export default function MarketingProfilePage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const banks = await getMarketingPayoutBanks();
+        if (!cancelled) setPayoutBanks(banks);
+      } catch {
+        if (!cancelled) setPayoutBanks([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (user) {
       setName(user.name);
       setEmail(user.email);
@@ -121,8 +147,10 @@ export default function MarketingProfilePage() {
         barangayName: user.mailing_barangay_name ?? null,
       });
       setTin("");
-      setGcashHolder(user.gcash_account_holder_name ?? "");
-      setGcashNumber("");
+      setBankChannel(user.marketer_bank_channel_code ?? "");
+      setBankAccountName(user.marketer_bank_account_name ?? "");
+      setBankAccountNumber("");
+      setBankBranch(user.marketer_bank_branch ?? "");
       setGovIdType(user.marketer_gov_id_type ?? "");
       setGovIdNumber("");
     }
@@ -168,7 +196,7 @@ export default function MarketingProfilePage() {
     };
   }, [govDocPreviewUrl]);
 
-  const payoutDetailsOk = Boolean(user?.gcash_payout_configured);
+  const payoutDetailsOk = Boolean(user?.bank_payout_configured);
   const checklistItems = [
     { label: "Full name", ok: Boolean(user?.name?.trim()) },
     { label: "Philippine mailing location", ok: Boolean(user?.marketer_mailing_address?.trim()) },
@@ -176,7 +204,7 @@ export default function MarketingProfilePage() {
     { label: "TIN (strongly recommended)", ok: Boolean(user?.marketer_tin_masked) },
     { label: "Mobile number", ok: Boolean(user?.phone?.trim()) },
     { label: "Email", ok: Boolean(user?.email?.trim()) },
-    { label: "GCash payout details (on file)", ok: payoutDetailsOk },
+    { label: "Bank payout details (on file)", ok: payoutDetailsOk },
   ] as const;
 
   const onSave = async (e: React.FormEvent) => {
@@ -305,54 +333,51 @@ export default function MarketingProfilePage() {
     }
   };
 
-  const onSaveGcash = async (e: React.FormEvent) => {
+  const onSaveBank = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validateMarketingGcashForm({
-      gcashNumber,
-      gcashHolder,
-      hasExistingNumber: Boolean(user?.gcash_masked_number || user?.gcash_payout_configured),
+    const errors = validateMarketingBankPayoutForm({
+      bankChannel,
+      bankAccountName,
+      bankAccountNumber,
     });
-    setGcashErrors(errors);
+    setBankErrors(errors);
     if (hasFieldErrors(errors)) {
       pushToast({
-        title: "Check GCash details",
+        title: "Check bank details",
         description: Object.values(errors).find(Boolean) ?? "Fix the highlighted fields and try again.",
         tone: "warning",
       });
       return;
     }
-    setSavingGcash(true);
+    setSavingBank(true);
     try {
-      const payload: Record<string, string> = {};
-      const num = sanitizePhilippinesMobileInput(gcashNumber);
-      const holder = sanitizePersonName(gcashHolder, INPUT_MAX.gcashHolder);
-      if (num !== "") {
-        payload.gcash_account_number = num;
-        payload.gcash_account_holder_name = holder;
-      } else if (holder !== "") {
-        payload.gcash_account_holder_name = holder;
-      }
-      await apiClient.patch("/auth/profile", payload);
+      await apiClient.patch("/auth/profile", {
+        marketer_bank_channel_code: bankChannel.trim(),
+        marketer_bank_account_name: sanitizePersonName(bankAccountName, INPUT_MAX.bankAccountHolder),
+        marketer_bank_account_number: sanitizeBankAccountNumber(bankAccountNumber),
+        marketer_bank_branch: bankBranch.trim(),
+      });
       await refreshUser();
-      setGcashNumber("");
-      setGcashErrors({});
+      setBankAccountNumber("");
+      setBankErrors({});
       pushToast({
         title: "Payout details saved",
         description: xenditLiveMode
-          ? "Your GCash wallet is on file for live commission payouts."
-          : "Your GCash information was updated.",
+          ? "Your bank account is on file for live commission payouts."
+          : "Your bank information was updated.",
         tone: "success",
       });
     } catch (error: unknown) {
       const axiosErr = error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const msg =
-        axiosErr?.response?.data?.errors?.gcash_account_number?.[0] ??
-        axiosErr?.response?.data?.errors?.gcash_account_holder_name?.[0] ??
+        axiosErr?.response?.data?.errors?.marketer_bank_channel_code?.[0] ??
+        axiosErr?.response?.data?.errors?.marketer_bank_account_number?.[0] ??
+        axiosErr?.response?.data?.errors?.marketer_bank_account_name?.[0] ??
         axiosErr?.response?.data?.message ??
-        "Could not save GCash details.";
+        "Could not save bank details.";
       pushToast({ title: "Could not save profile", description: msg, tone: "error" });
     } finally {
-      setSavingGcash(false);
+      setSavingBank(false);
     }
   };
 
@@ -562,7 +587,7 @@ export default function MarketingProfilePage() {
                 />
               </div>
               <FieldInlineError message={personalErrors.phone} />
-              <p className="mt-1 text-[11px] text-zinc-500">11 digits starting with 09. May differ from your GCash wallet number.</p>
+              <p className="mt-1 text-[11px] text-zinc-500">11 digits starting with 09. May differ from your bank-registered mobile number.</p>
             </div>
 
             <div className="md:col-span-2">
@@ -777,15 +802,16 @@ export default function MarketingProfilePage() {
         </div>
       </div>
 
-      {/* GCash payouts */}
+      {/* Bank payouts */}
       <div className="dash-card p-6">
         <h2 className="mb-2 font-dash text-lg text-navy inline-flex items-center gap-2">
-          <Wallet size={22} className="text-skyBlue" />
-          Payout details: GCash
+          <Landmark size={22} className="text-skyBlue" />
+          Payout details: Bank account
         </h2>
         <p className="dash-page-sub mb-4">
-          Automated commissions are paid to your <strong className="font-semibold text-navy">GCash wallet</strong> on the <strong>10th of each month</strong>{" "}
-          (Asia/Manila) when platform automation is on. Add the mobile number and account name that match your GCash registration.
+          Automated commissions are paid to your <strong className="font-semibold text-navy">Philippine bank account</strong> on the{" "}
+          <strong>10th of each month</strong> (Asia/Manila) when platform automation is on. Select your bank and enter the account details that
+          match your bank records.
         </p>
         {xenditTestMode ? (
           <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
@@ -796,70 +822,106 @@ export default function MarketingProfilePage() {
           <div className="mb-4 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
             <strong>Live payouts:</strong> Xendit is configured for production.{" "}
             {payoutAutomationOn
-              ? "Eligible commissions are sent to your GCash on the 10th of each month (Asia/Manila) when your profile and KYC are complete."
+              ? "Eligible commissions are sent to your bank account on the 10th of each month (Asia/Manila) when your profile and KYC are complete."
               : "Automated monthly payouts are not enabled on the server yet — contact platform admin if you expect auto-disbursement."}
           </div>
         ) : null}
-        {user?.gcash_payout_configured ? (
+        {user?.bank_payout_configured ? (
           <p className="mb-3 text-sm text-zinc-600">
-            <span className="font-semibold text-navy">GCash on file:</span> {user.gcash_masked_number ?? "GCash number"} ·{" "}
-            {user.gcash_account_holder_name ?? "—"}
+            <span className="font-semibold text-navy">Bank on file:</span> {user.marketer_bank_label ?? user.marketer_bank_channel_code ?? "Bank"}{" "}
+            · {user.marketer_bank_account_masked ?? "Account"} · {user.marketer_bank_account_name ?? "—"}
           </p>
         ) : (
-          <p className="mb-3 text-sm text-rose-700">Add your GCash number and account name to receive automated payouts.</p>
+          <p className="mb-3 text-sm text-rose-700">Add your bank account to receive automated commission payouts.</p>
         )}
-        <h3 className="mb-2 mt-2 font-dash text-sm font-semibold text-navy">GCash wallet</h3>
-        <form className="space-y-4" onSubmit={onSaveGcash}>
+        <h3 className="mb-2 mt-2 font-dash text-sm font-semibold text-navy">Bank account</h3>
+        <form className="space-y-4" onSubmit={onSaveBank}>
           <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="gcash-number" className="mb-1.5 block text-xs font-semibold text-zinc-600">
-                GCash mobile number
+            <div className="md:col-span-2">
+              <label htmlFor="bank-channel" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+                Bank
               </label>
-              <input
-                id="gcash-number"
-                className={inputClass(Boolean(gcashErrors.gcashNumber))}
-                type="tel"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder={user?.gcash_masked_number ? "0917 123 4567 (replace on file)" : "0917 123 4567"}
-                maxLength={13}
-                aria-invalid={Boolean(gcashErrors.gcashNumber)}
-                value={formatPhilippinesMobileDisplay(gcashNumber)}
+              <select
+                id="bank-channel"
+                className={inputClass(Boolean(bankErrors.bankChannel))}
+                value={bankChannel}
+                aria-invalid={Boolean(bankErrors.bankChannel)}
                 onChange={(e) => {
-                  setGcashNumber(sanitizePhilippinesMobileInput(e.target.value));
-                  if (gcashErrors.gcashNumber) setGcashErrors((p) => ({ ...p, gcashNumber: undefined }));
+                  setBankChannel(e.target.value);
+                  if (bankErrors.bankChannel) setBankErrors((p) => ({ ...p, bankChannel: undefined }));
                 }}
-              />
-              <FieldInlineError message={gcashErrors.gcashNumber} />
-              <p className="mt-1 text-[11px] text-zinc-500">11 digits starting with 09. Leave blank to only update the name on file.</p>
+              >
+                <option value="">Select your bank…</option>
+                {payoutBanks.map((b) => (
+                  <option key={b.channel_code} value={b.channel_code}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <FieldInlineError message={bankErrors.bankChannel} />
+              {payoutBanks.length === 0 ? (
+                <p className="mt-1 text-[11px] text-zinc-500">Bank list is loading or temporarily unavailable. Try refreshing the page.</p>
+              ) : null}
             </div>
             <div>
-              <label htmlFor="gcash-holder" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+              <label htmlFor="bank-account-name" className="mb-1.5 block text-xs font-semibold text-zinc-600">
                 Account holder name
               </label>
               <input
-                id="gcash-holder"
-                className={inputClass(Boolean(gcashErrors.gcashHolder))}
+                id="bank-account-name"
+                className={inputClass(Boolean(bankErrors.bankAccountName))}
                 autoComplete="name"
-                placeholder="Name on GCash"
-                maxLength={INPUT_MAX.gcashHolder}
-                aria-invalid={Boolean(gcashErrors.gcashHolder)}
-                value={gcashHolder}
+                placeholder="Name on bank account"
+                maxLength={INPUT_MAX.bankAccountHolder}
+                aria-invalid={Boolean(bankErrors.bankAccountName)}
+                value={bankAccountName}
                 onChange={(e) => {
-                  setGcashHolder(sanitizePersonName(e.target.value, INPUT_MAX.gcashHolder));
-                  if (gcashErrors.gcashHolder) setGcashErrors((p) => ({ ...p, gcashHolder: undefined }));
+                  setBankAccountName(sanitizePersonName(e.target.value, INPUT_MAX.bankAccountHolder));
+                  if (bankErrors.bankAccountName) setBankErrors((p) => ({ ...p, bankAccountName: undefined }));
                 }}
               />
-              <FieldInlineError message={gcashErrors.gcashHolder} />
+              <FieldInlineError message={bankErrors.bankAccountName} />
+            </div>
+            <div>
+              <label htmlFor="bank-account-number" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+                Account number
+              </label>
+              <input
+                id="bank-account-number"
+                className={inputClass(Boolean(bankErrors.bankAccountNumber), "dash-input font-mono text-sm")}
+                autoComplete="off"
+                placeholder={user?.marketer_bank_account_masked ? "Enter new number to replace on file" : "Account number"}
+                maxLength={INPUT_MAX.bankAccountNumber}
+                aria-invalid={Boolean(bankErrors.bankAccountNumber)}
+                value={bankAccountNumber}
+                onChange={(e) => {
+                  setBankAccountNumber(sanitizeBankAccountNumber(e.target.value));
+                  if (bankErrors.bankAccountNumber) setBankErrors((p) => ({ ...p, bankAccountNumber: undefined }));
+                }}
+              />
+              <FieldInlineError message={bankErrors.bankAccountNumber} />
             </div>
             <div className="md:col-span-2">
-              <button type="submit" disabled={savingGcash} className="dash-btn-primary disabled:opacity-60">
-                {savingGcash ? (
+              <label htmlFor="bank-branch" className="mb-1.5 block text-xs font-semibold text-zinc-600">
+                Branch (optional)
+              </label>
+              <input
+                id="bank-branch"
+                className="dash-input"
+                placeholder="Branch name or location"
+                maxLength={INPUT_MAX.bankBranch}
+                value={bankBranch}
+                onChange={(e) => setBankBranch(e.target.value.slice(0, INPUT_MAX.bankBranch))}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <button type="submit" disabled={savingBank} className="dash-btn-primary disabled:opacity-60">
+                {savingBank ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin" /> Saving…
                   </span>
                 ) : (
-                  "Save GCash details"
+                  "Save bank details"
                 )}
               </button>
             </div>

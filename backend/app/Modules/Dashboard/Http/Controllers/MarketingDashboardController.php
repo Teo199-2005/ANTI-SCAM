@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\ResortLocationQuery;
 use App\Services\LegacySubscriptionCommissionCleanupService;
 use App\Services\MarketerBookingCommissionStatsService;
+use App\Modules\Billing\Services\PhilippinesPayoutBankChannelService;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\ReferralSignupTrialService;
 use App\Services\PhilippineLocationService;
@@ -29,7 +30,19 @@ class MarketingDashboardController extends Controller
         private readonly MarketerBookingCommissionStatsService $bookingStats,
         private readonly ReferralSignupTrialService $referralSignupTrial,
         private readonly LegacySubscriptionCommissionCleanupService $commissionScope,
+        private readonly PhilippinesPayoutBankChannelService $payoutBanks,
     ) {}
+
+    public function payoutBanks(Request $request)
+    {
+        if ($request->user()->role !== 'marketing') {
+            return $this->errorResponse('Forbidden', null, 403);
+        }
+
+        return $this->successResponse([
+            'banks' => $this->payoutBanks->listBanks(),
+        ], 'Payout banks');
+    }
 
     public function stats(Request $request)
     {
@@ -91,7 +104,7 @@ class MarketingDashboardController extends Controller
             'referral_code' => $code,
             'referral_share_register_url' => $shareRegister,
             'referral_subscribe_hint' => $referralHint,
-            'commission_payout_schedule' => 'Pending booking commissions are paid automatically via GCash (Xendit) on the 10th of each month (Asia/Manila), for earnings through the previous calendar month, when automation is enabled and payout details are complete. A platform withholding (taxes and fees) is deducted before each disbursement; see payoutWithholdingRate.',
+            'commission_payout_schedule' => 'Pending booking commissions are paid automatically to your bank account (Xendit) on the 10th of each month (Asia/Manila), for earnings through the previous calendar month, when automation is enabled and payout details are complete. A platform withholding (taxes and fees) is deducted before each disbursement; see payoutWithholdingRate.',
         ], 'Marketing stats');
     }
 

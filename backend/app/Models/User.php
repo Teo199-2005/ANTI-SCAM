@@ -15,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['tenant_id', 'home_resort_id', 'name', 'email', 'avatar_url', 'phone', 'google_id', 'password', 'role', 'referral_code', 'booking_commission_php', 'referred_by_marketer_id', 'signup_referral_code', 'referral_trial_ends_at', 'referral_trial_redeemed_at', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_type', 'marketer_gov_id_number', 'marketer_gov_id_document_url', 'mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc', 'mailing_barangay_name', 'mailing_location_label', 'marketer_tin', 'marketer_bank_name', 'marketer_bank_branch', 'marketer_bank_account_name', 'marketer_bank_account_number', 'email_verified_at', 'terms_accepted_at', 'terms_version'])]
+#[Fillable(['tenant_id', 'home_resort_id', 'name', 'email', 'avatar_url', 'phone', 'google_id', 'password', 'role', 'referral_code', 'booking_commission_php', 'referred_by_marketer_id', 'signup_referral_code', 'referral_trial_ends_at', 'referral_trial_redeemed_at', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_type', 'marketer_gov_id_number', 'marketer_gov_id_document_url', 'mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc', 'mailing_barangay_name', 'mailing_location_label', 'marketer_tin', 'marketer_bank_channel_code', 'marketer_bank_name', 'marketer_bank_branch', 'marketer_bank_account_name', 'marketer_bank_account_number', 'email_verified_at', 'terms_accepted_at', 'terms_version'])]
 #[Hidden(['password', 'remember_token', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_number', 'marketer_tin', 'marketer_bank_account_number'])]
 class User extends Authenticatable
 {
@@ -108,6 +108,13 @@ class User extends Authenticatable
         }
 
         return str_repeat('•', $len - 4).substr($n, -4);
+    }
+
+    public function bankPayoutConfigured(): bool
+    {
+        return filled($this->marketer_bank_channel_code)
+            && filled($this->marketer_bank_account_name)
+            && filled($this->marketer_bank_account_number);
     }
 
     /** Resorts assigned to this marketer. */

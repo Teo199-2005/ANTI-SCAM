@@ -8,6 +8,7 @@ use App\Models\MarketerPayoutBatchItem;
 use App\Models\User;
 use App\Modules\Audit\Services\AuditLogService;
 use App\Modules\Billing\Services\XenditPayoutService;
+use App\Support\BankAccountNormalizer;
 use App\Support\GcashAccountNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
@@ -19,16 +20,17 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Batches pending {@link Commission} rows for GCash disbursement via Xendit.
+ * Batches pending {@link Commission} rows for bank disbursement via Xendit.
  *
  * Gross per row is whatever was credited (booking referral amounts from
  * {@see \App\Services\BookingReferralCommissionService}); this service only sums gross, applies
  * withholding, allocates net to line items, and submits the batch. It does not recalculate tiers.
  *
  * Hardening notes:
- *  - Destination GCash account, account-holder name, marketer name + email are SNAPSHOTTED on the
- *    batch at create time. Submit/reconcile re-uses the snapshot, never live user data, so a
- *    marketer cannot redirect funds by editing their profile after a batch is created.
+ *  - Destination bank channel, account number, account-holder name, marketer name + email are
+ *    SNAPSHOTTED on the batch at create time. Submit/reconcile re-uses the snapshot, never live
+ *    user data, so a marketer cannot redirect funds by editing their profile after a batch is created.
+ *  - Legacy in-flight batches with GCash snapshots still submit via PH_GCASH.
  *  - Per-item gross is also snapshotted (audit trail).
  *  - Transient gateway errors (network, 5xx, 429, 401/403 config) increment submit_attempts and
  *    leave the batch in pending_submit so the same idempotency key is retried — preventing the
@@ -159,10 +161,15 @@ class MarketerCommissionPayoutService
             return ['action' => 'skip', 'message' => 'payout already in flight for this period'];
         }
 
-        $gcash = GcashAccountNormalizer::normalizeMobile((string) ($marketer->gcash_account_number ?? ''));
-        $holder = GcashAccountNormalizer::normalizeHolderName((string) ($marketer->gcash_account_holder_name ?? ''));
-        if (! $gcash['ok'] || $holder === '' || strlen($holder) < 2) {
-            return ['action' => 'skip', 'message' => 'GCash payout details incomplete'];
+        if (! $marketer->bankPayoutConfigured()) {
+            return ['action' => 'skip', 'message' => 'Bank payout details incomplete'];
+        }
+
+        $channelCode = trim((string) ($marketer->marketer_bank_channel_code ?? ''));
+        $acctNorm = BankAccountNormalizer::normalizeAccountNumber((string) ($marketer->marketer_bank_account_number ?? ''));
+        $holder = BankAccountNormalizer::normalizeHolderName((string) ($marketer->marketer_bank_account_name ?? ''));
+        if ($channelCode === '' || ! $acctNorm['ok'] || $holder === '' || strlen($holder) < 2) {
+            return ['action' => 'skip', 'message' => 'Bank payout details incomplete'];
         }
 
         // KYC gate (BSP Circular 1108 / AMLC Tier-1) — ops feature flag.
@@ -173,18 +180,18 @@ class MarketerCommissionPayoutService
             }
         }
 
-        // Money-mule guard: GCash holder must resemble marketer name when feature flag is on.
+        // Money-mule guard: bank account holder must resemble marketer name when feature flag is on.
         if ((bool) config('services.marketing_payout.require_name_match', false)) {
             $threshold = (int) config('services.marketing_payout.name_match_threshold', 70);
             $sim = $this->nameSimilarityPercent((string) $marketer->name, $holder);
             if ($sim < $threshold) {
-                Log::warning('Marketer payout blocked: GCash holder name too dissimilar from marketer name', [
+                Log::warning('Marketer payout blocked: bank account holder name too dissimilar from marketer name', [
                     'marketer_id' => $marketerId,
                     'similarity_percent' => $sim,
                     'threshold' => $threshold,
                 ]);
 
-                return ['action' => 'skip', 'message' => 'GCash holder name does not match marketer name (manual review required)'];
+                return ['action' => 'skip', 'message' => 'Bank account name does not match marketer name (manual review required)'];
             }
         }
 
@@ -230,14 +237,15 @@ class MarketerCommissionPayoutService
             return ['action' => 'dry_run', 'message' => "dry-run: gross {$grossPreview} PHP → net payout {$netPreview} PHP after {$pct}% withholding ({$previewCount} commissions)"];
         }
 
-        $gcashNormalized = (string) $gcash['normalized'];
-        $gcashLast4 = strlen($gcashNormalized) >= 4 ? substr($gcashNormalized, -4) : $gcashNormalized;
+        $bankAccount = (string) $acctNorm['normalized'];
+        $bankLast4 = strlen($bankAccount) >= 4 ? substr($bankAccount, -4) : $bankAccount;
+        $bankDisplay = (string) ($marketer->marketer_bank_name ?? $channelCode);
         $marketerName = (string) ($marketer->name ?? '');
         $marketerEmail = (string) ($marketer->email ?? '');
 
         $batchId = DB::transaction(function () use (
             $marketerId, $runPeriod, $cutoffPeriod,
-            $gcashNormalized, $gcashLast4, $holder, $marketerName, $marketerEmail
+            $channelCode, $bankAccount, $bankLast4, $holder, $bankDisplay, $marketerName, $marketerEmail
         ): int {
             $commissions = $this->commissionScope->bookingCommissionsForMarketer($marketerId)
                 ->where('status', 'pending')
@@ -289,9 +297,11 @@ class MarketerCommissionPayoutService
                 'withholding_rate_applied' => $this->withholdingRate(),
                 'currency' => 'PHP',
                 'status' => MarketerPayoutBatch::STATUS_PENDING_SUBMIT,
-                'gcash_account_number_snapshot' => $gcashNormalized,
-                'gcash_last4_snapshot' => $gcashLast4,
-                'gcash_account_holder_name_snapshot' => $holder,
+                'payout_channel_code_snapshot' => $channelCode,
+                'bank_account_number_snapshot' => $bankAccount,
+                'bank_account_last4_snapshot' => $bankLast4,
+                'bank_account_holder_name_snapshot' => $holder,
+                'bank_display_name_snapshot' => mb_substr($bankDisplay, 0, 120),
                 'marketer_name_snapshot' => $marketerName !== '' ? mb_substr($marketerName, 0, 191) : null,
                 'marketer_email_snapshot' => $marketerEmail !== '' ? mb_substr($marketerEmail, 0, 191) : null,
             ]);
@@ -322,7 +332,8 @@ class MarketerCommissionPayoutService
                 'reference_id' => $referenceId,
                 'gross' => $grossLocked,
                 'net' => $netLocked,
-                'gcash_last4' => $gcashLast4,
+                'bank_channel' => $channelCode,
+                'bank_last4' => $bankLast4,
             ]);
 
             return (int) $batch->id;
@@ -427,29 +438,58 @@ class MarketerCommissionPayoutService
 
         // Source destination from the batch snapshot — never live user data, to defeat
         // post-batch profile-edit redirection.
-        $gcashDigits = (string) ($batch->gcash_account_number_snapshot ?? '');
-        $holder = (string) ($batch->gcash_account_holder_name_snapshot ?? '');
+        $channelCode = (string) ($batch->payout_channel_code_snapshot ?? '');
+        $accountNumber = (string) ($batch->bank_account_number_snapshot ?? '');
+        $holder = (string) ($batch->bank_account_holder_name_snapshot ?? '');
+        $useLegacyGcash = false;
 
-        if ($gcashDigits === '' || $holder === '') {
-            // Fallback for any pre-snapshot batch created before this migration.
+        if ($batch->usesBankDestination()) {
+            // bank snapshots already set
+        } elseif ($batch->usesLegacyGcashDestination()) {
+            $useLegacyGcash = true;
+            $accountNumber = (string) ($batch->gcash_account_number_snapshot ?? '');
+            $holder = (string) ($batch->gcash_account_holder_name_snapshot ?? '');
+            $channelCode = (string) config('services.xendit.payout_channel_code', 'PH_GCASH');
+        } else {
             $marketer = User::query()->find($batch->marketer_id);
             if (! $marketer) {
                 $this->markBatchPermanentlyFailed($batch, 'Marketer missing and no batch snapshot available', null);
 
                 return;
             }
-            $g = GcashAccountNormalizer::normalizeMobile((string) ($marketer->gcash_account_number ?? ''));
-            $h = GcashAccountNormalizer::normalizeHolderName((string) ($marketer->gcash_account_holder_name ?? ''));
-            if (! $g['ok'] || $h === '') {
-                $this->markBatchPermanentlyFailed($batch, 'Invalid GCash details (no batch snapshot)', null);
+            if ($marketer->bankPayoutConfigured()) {
+                $channelCode = trim((string) $marketer->marketer_bank_channel_code);
+                $acct = BankAccountNormalizer::normalizeAccountNumber((string) $marketer->marketer_bank_account_number);
+                $holder = BankAccountNormalizer::normalizeHolderName((string) $marketer->marketer_bank_account_name);
+                if ($channelCode === '' || ! $acct['ok'] || $holder === '') {
+                    $this->markBatchPermanentlyFailed($batch, 'Invalid bank details (no batch snapshot)', null);
 
-                return;
+                    return;
+                }
+                $accountNumber = (string) $acct['normalized'];
+            } else {
+                $g = GcashAccountNormalizer::normalizeMobile((string) ($marketer->gcash_account_number ?? ''));
+                $h = GcashAccountNormalizer::normalizeHolderName((string) ($marketer->gcash_account_holder_name ?? ''));
+                if (! $g['ok'] || $h === '') {
+                    $this->markBatchPermanentlyFailed($batch, 'Invalid payout destination (no batch snapshot)', null);
+
+                    return;
+                }
+                $useLegacyGcash = true;
+                $accountNumber = (string) $g['normalized'];
+                $holder = $h;
+                $channelCode = (string) config('services.xendit.payout_channel_code', 'PH_GCASH');
             }
-            $gcashDigits = (string) $g['normalized'];
-            $holder = $h;
             Log::warning('Marketer payout batch missing snapshot; using live user data (legacy batch).', [
                 'batch_id' => $batch->id,
+                'legacy_gcash' => $useLegacyGcash,
             ]);
+        }
+
+        if ($channelCode === '' || $accountNumber === '' || $holder === '') {
+            $this->markBatchPermanentlyFailed($batch, 'Payout destination snapshot incomplete', null);
+
+            return;
         }
 
         $itemSum = round((float) $batch->liveItems()->sum('amount'), 2);
@@ -460,10 +500,11 @@ class MarketerCommissionPayoutService
         }
 
         try {
-            $resp = $this->xenditPayout->createGcashPayout(
+            $resp = $this->xenditPayout->createPayout(
                 $batch->reference_id,
                 (float) $batch->total_amount,
-                $gcashDigits,
+                $channelCode,
+                $accountNumber,
                 $holder,
                 'Commission payout '.$batch->run_period,
             );
@@ -471,6 +512,8 @@ class MarketerCommissionPayoutService
                 'batch_id' => $batch->id,
                 'marketer_id' => $batch->marketer_id,
                 'reference_id' => $batch->reference_id,
+                'channel_code' => $channelCode,
+                'bank_last4' => $batch->bank_account_last4_snapshot ?? ($useLegacyGcash ? $batch->gcash_last4_snapshot : null),
                 'net_amount' => (float) $batch->total_amount,
                 'gross_snapshot' => $batch->gross_commissions_total !== null ? (float) $batch->gross_commissions_total : null,
                 'xendit_payout_id' => $resp['id'] ?? null,

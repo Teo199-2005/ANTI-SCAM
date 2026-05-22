@@ -17,6 +17,9 @@ export const INPUT_MAX = {
   roomName: 120,
   govIdNumber: 64,
   gcashHolder: 120,
+  bankAccountHolder: 120,
+  bankAccountNumber: 34,
+  bankBranch: 120,
   subdomain: 63,
   numericId: 12,
   otp: 6,
@@ -140,4 +143,13 @@ export function sanitizeUnsignedDecimal(raw: string, maxIntDigits = 9, maxFrac =
   if (frac.length === 0 && s.endsWith(".")) return intPart === "" ? "" : `${intPart}.`;
   if (frac.length && intPart === "") return `0.${frac}`;
   return frac.length ? `${intPart}.${frac}` : intPart;
+}
+
+/** Bank account number: letters, digits, hyphens; spaces stripped on save. */
+export function sanitizeBankAccountNumber(raw: string, maxLen: number = INPUT_MAX.bankAccountNumber): string {
+  return raw
+    .replace(CTRL, "")
+    .replace(/\s/g, "")
+    .replace(/[^\p{L}\p{N}\-]/gu, "")
+    .slice(0, maxLen);
 }

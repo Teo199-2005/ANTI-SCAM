@@ -25,12 +25,16 @@ class MarketerPayoutBatch extends Model
         'gcash_account_number_snapshot', 'gcash_last4_snapshot',
         'gcash_account_holder_name_snapshot',
         'marketer_name_snapshot', 'marketer_email_snapshot',
+        'payout_channel_code_snapshot', 'bank_account_number_snapshot',
+        'bank_account_last4_snapshot', 'bank_account_holder_name_snapshot',
+        'bank_display_name_snapshot',
         'submit_attempts', 'last_attempt_at', 'last_attempt_error', 'last_attempt_error_code',
         'manually_aborted',
     ];
 
     protected $hidden = [
         'gcash_account_number_snapshot',
+        'bank_account_number_snapshot',
     ];
 
     protected function casts(): array
@@ -45,7 +49,18 @@ class MarketerPayoutBatch extends Model
             'submit_attempts' => 'integer',
             'manually_aborted' => 'boolean',
             'gcash_account_number_snapshot' => 'encrypted',
+            'bank_account_number_snapshot' => 'encrypted',
         ];
+    }
+
+    public function usesBankDestination(): bool
+    {
+        return filled($this->payout_channel_code_snapshot) && filled($this->bank_account_number_snapshot);
+    }
+
+    public function usesLegacyGcashDestination(): bool
+    {
+        return ! $this->usesBankDestination() && filled($this->gcash_account_number_snapshot);
     }
 
     public function marketer(): BelongsTo

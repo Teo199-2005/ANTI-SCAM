@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\XenditWebhookEvent;
 use Database\Seeders\PsgcReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -20,6 +21,29 @@ use Tests\TestCase;
 class MarketerPayoutFlowTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Cache::flush();
+    }
+
+    /** @param array<string, mixed>|null $payoutResponse */
+    private function fakeXenditBankChannelsAndPayout(?array $payoutResponse = null): void
+    {
+        $payoutResponse ??= [
+            'id' => 'disb_test_123',
+            'status' => 'ACCEPTED',
+            'reference_id' => 'PLACEHOLDER',
+        ];
+
+        Http::fake([
+            'https://api.xendit.co/payouts_channels*' => Http::response([
+                ['channel_code' => 'PH_BDO', 'channel_name' => 'BDO Unibank'],
+            ], 200),
+            'https://api.xendit.co/v2/payouts' => Http::response($payoutResponse, 200),
+        ]);
+    }
 
     private function seedMarketerWithCommission(): array
     {
@@ -39,8 +63,10 @@ class MarketerPayoutFlowTest extends TestCase
         $marketer = User::factory()->create([
             'tenant_id' => null,
             'role' => 'marketing',
-            'gcash_account_number' => '09123456789',
-            'gcash_account_holder_name' => 'Test Marketer',
+            'marketer_bank_channel_code' => 'PH_BDO',
+            'marketer_bank_name' => 'BDO Unibank',
+            'marketer_bank_account_name' => 'Test Marketer',
+            'marketer_bank_account_number' => '1234567890',
         ]);
 
         $commission = Commission::query()->create([
@@ -50,8 +76,14 @@ class MarketerPayoutFlowTest extends TestCase
             'gross_bookings' => 0,
             'commission_rate' => 0,
             'commission_amount' => 250,
+            'marketer_tier' => 'booking_flat',
             'status' => 'pending',
         ]);
+
+        $marketer->refresh();
+        if (! $marketer->bankPayoutConfigured()) {
+            throw new \RuntimeException('Test marketer missing bank payout fields.');
+        }
 
         return compact('tenant', 'resort', 'marketer', 'commission');
     }
@@ -66,13 +98,7 @@ class MarketerPayoutFlowTest extends TestCase
 
         $seed = $this->seedMarketerWithCommission();
 
-        Http::fake([
-            'https://api.xendit.co/v2/payouts' => Http::response([
-                'id' => 'disb_test_123',
-                'status' => 'ACCEPTED',
-                'reference_id' => 'PLACEHOLDER',
-            ], 200),
-        ]);
+        $this->fakeXenditBankChannelsAndPayout();
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10'])
             ->assertSuccessful();
@@ -128,6 +154,9 @@ class MarketerPayoutFlowTest extends TestCase
         $seed = $this->seedMarketerWithCommission();
 
         Http::fake([
+            'https://api.xendit.co/payouts_channels*' => Http::response([
+                ['channel_code' => 'PH_BDO', 'channel_name' => 'BDO Unibank'],
+            ], 200),
             'https://api.xendit.co/v2/payouts' => Http::response([
                 'id' => 'disb_test_no_amt_wh',
                 'status' => 'ACCEPTED',
@@ -230,12 +259,10 @@ class MarketerPayoutFlowTest extends TestCase
 
         $seed = $this->seedMarketerWithCommission();
 
-        Http::fake([
-            'https://api.xendit.co/v2/payouts' => Http::response([
-                'id' => 'disb_test_456',
-                'status' => 'ACCEPTED',
-                'reference_id' => 'PLACEHOLDER',
-            ], 200),
+        $this->fakeXenditBankChannelsAndPayout([
+            'id' => 'disb_test_456',
+            'status' => 'ACCEPTED',
+            'reference_id' => 'PLACEHOLDER',
         ]);
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10']);
@@ -272,12 +299,10 @@ class MarketerPayoutFlowTest extends TestCase
 
         $seed = $this->seedMarketerWithCommission();
 
-        Http::fake([
-            'https://api.xendit.co/v2/payouts' => Http::response([
-                'id' => 'disb_snapshot_1',
-                'status' => 'ACCEPTED',
-                'reference_id' => 'PLACEHOLDER',
-            ], 200),
+        $this->fakeXenditBankChannelsAndPayout([
+            'id' => 'disb_snapshot_1',
+            'status' => 'ACCEPTED',
+            'reference_id' => 'PLACEHOLDER',
         ]);
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10'])
@@ -285,9 +310,10 @@ class MarketerPayoutFlowTest extends TestCase
 
         $batch = MarketerPayoutBatch::query()->first();
         $this->assertNotNull($batch);
-        $this->assertSame('09123456789', $batch->gcash_account_number_snapshot);
-        $this->assertSame('6789', $batch->gcash_last4_snapshot);
-        $this->assertSame('Test Marketer', $batch->gcash_account_holder_name_snapshot);
+        $this->assertSame('PH_BDO', $batch->payout_channel_code_snapshot);
+        $this->assertSame('1234567890', $batch->bank_account_number_snapshot);
+        $this->assertSame('7890', $batch->bank_account_last4_snapshot);
+        $this->assertSame('Test Marketer', $batch->bank_account_holder_name_snapshot);
         $this->assertNotNull($batch->marketer_email_snapshot);
 
         $this->assertDatabaseHas('marketer_payout_batch_items', [
@@ -310,13 +336,18 @@ class MarketerPayoutFlowTest extends TestCase
         // First call: simulate a transient 504 (gateway timeout). Batch must NOT be aborted —
         // aborting + recreating with a new reference_id would create a different idempotency
         // key on Xendit's side and risk double-pay if the original POST had actually landed.
-        Http::fakeSequence('https://api.xendit.co/v2/payouts')
-            ->push(['message' => 'gateway timeout'], 504)
-            ->push([
-                'id' => 'disb_after_retry',
-                'status' => 'ACCEPTED',
-                'reference_id' => 'PLACEHOLDER',
-            ], 200);
+        Http::fake([
+            'https://api.xendit.co/payouts_channels*' => Http::response([
+                ['channel_code' => 'PH_BDO', 'channel_name' => 'BDO Unibank'],
+            ], 200),
+            'https://api.xendit.co/v2/payouts' => Http::sequence()
+                ->push(['message' => 'gateway timeout'], 504)
+                ->push([
+                    'id' => 'disb_after_retry',
+                    'status' => 'ACCEPTED',
+                    'reference_id' => 'PLACEHOLDER',
+                ], 200),
+        ]);
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10']);
 
@@ -360,12 +391,10 @@ class MarketerPayoutFlowTest extends TestCase
 
         $seed = $this->seedMarketerWithCommission();
 
-        Http::fake([
-            'https://api.xendit.co/v2/payouts' => Http::response([
-                'id' => 'disb_failed_keep',
-                'status' => 'ACCEPTED',
-                'reference_id' => 'PLACEHOLDER',
-            ], 200),
+        $this->fakeXenditBankChannelsAndPayout([
+            'id' => 'disb_failed_keep',
+            'status' => 'ACCEPTED',
+            'reference_id' => 'PLACEHOLDER',
         ]);
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10']);
@@ -428,7 +457,7 @@ class MarketerPayoutFlowTest extends TestCase
         $seed = $this->seedMarketerWithCommission();
         $seed['marketer']->update([
             'name' => 'Juan Dela Cruz',
-            'gcash_account_holder_name' => 'Acme Mule Corp',
+            'marketer_bank_account_name' => 'Acme Mule Corp',
         ]);
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10'])
@@ -447,12 +476,10 @@ class MarketerPayoutFlowTest extends TestCase
 
         $seed = $this->seedMarketerWithCommission();
 
-        Http::fake([
-            'https://api.xendit.co/v2/payouts' => Http::response([
-                'id' => 'disb_detach_test',
-                'status' => 'ACCEPTED',
-                'reference_id' => 'PLACEHOLDER',
-            ], 200),
+        $this->fakeXenditBankChannelsAndPayout([
+            'id' => 'disb_detach_test',
+            'status' => 'ACCEPTED',
+            'reference_id' => 'PLACEHOLDER',
         ]);
 
         $this->artisan('marketing:process-commission-payouts', ['--date' => '2026-05-10']);
@@ -482,21 +509,35 @@ class MarketerPayoutFlowTest extends TestCase
             ->count());
     }
 
-    public function test_marketing_user_can_update_gcash_via_profile(): void
+    public function test_gcash_fields_rejected_on_profile_update(): void
     {
-        $user = User::factory()->create([
-            'role' => 'marketing',
-        ]);
+        $user = User::factory()->create(['role' => 'marketing']);
         Sanctum::actingAs($user);
 
         $this->patchJson('/api/v1/auth/profile', [
             'gcash_account_number' => '09171234567',
             'gcash_account_holder_name' => 'Maria Santos',
-        ])->assertSuccessful();
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['gcash_account_number']);
+    }
 
-        $user->refresh();
-        $this->assertSame('09171234567', $user->gcash_account_number);
-        $this->assertSame('Maria Santos', $user->gcash_account_holder_name);
+    public function test_marketing_payout_banks_endpoint_returns_cached_channels(): void
+    {
+        config(['services.xendit.secret_key' => 'xnd_development_test_key']);
+
+        $marketer = User::factory()->create(['role' => 'marketing']);
+        Sanctum::actingAs($marketer);
+
+        Http::fake([
+            'https://api.xendit.co/payouts_channels*' => Http::response([
+                ['channel_code' => 'PH_BPI', 'channel_name' => 'BPI'],
+            ], 200),
+        ]);
+
+        $this->getJson('/api/v1/marketing/payout-banks')
+            ->assertSuccessful()
+            ->assertJsonPath('data.banks.0.channel_code', 'PH_BPI')
+            ->assertJsonPath('data.banks.0.name', 'BPI');
     }
 
     public function test_marketing_user_can_update_contact_tin_and_bank_via_profile(): void
@@ -528,17 +569,26 @@ class MarketerPayoutFlowTest extends TestCase
         $this->assertSame('Agtangao, Bangued, Abra', $user->mailing_location_label);
         $this->assertSame('123456789000', $user->marketer_tin);
 
+        config(['services.xendit.secret_key' => 'xnd_development_test_key']);
+        Http::fake([
+            'https://api.xendit.co/payouts_channels*' => Http::response([
+                ['channel_code' => 'PH_BPI', 'channel_name' => 'BPI'],
+            ], 200),
+        ]);
+
         $this->patchJson('/api/v1/auth/profile', [
-            'marketer_bank_name' => 'BPI',
+            'marketer_bank_channel_code' => 'PH_BPI',
             'marketer_bank_branch' => 'Katipunan',
             'marketer_bank_account_name' => 'Maria Clara Santos',
             'marketer_bank_account_number' => '1234-5678901',
         ])->assertSuccessful();
 
         $user->refresh();
+        $this->assertSame('PH_BPI', $user->marketer_bank_channel_code);
         $this->assertSame('BPI', $user->marketer_bank_name);
         $this->assertSame('Katipunan', $user->marketer_bank_branch);
         $this->assertSame('Maria Clara Santos', $user->marketer_bank_account_name);
         $this->assertSame('1234-5678901', $user->marketer_bank_account_number);
+        $this->assertTrue($user->bankPayoutConfigured());
     }
 }

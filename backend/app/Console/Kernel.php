@@ -6,6 +6,7 @@ use App\Console\Commands\BackfillSubscriptions;
 use App\Console\Commands\EnforceSubscriptionGrace;
 use App\Console\Commands\ExpireBookingLocks;
 use App\Console\Commands\GenerateMonthlyInvoices;
+use App\Console\Commands\ClearMarketerGcashPayoutDetails;
 use App\Console\Commands\ProcessMarketerCommissionPayouts;
 use App\Console\Commands\ReconcileMarketerPayoutBatches;
 use App\Console\Commands\ReportStaleMarketerPayoutBatches;
@@ -23,6 +24,7 @@ class Kernel extends ConsoleKernel
         EnforceSubscriptionGrace::class,
         SendSubscriptionExpiryReminders::class,
         SendTestEmail::class,
+        ClearMarketerGcashPayoutDetails::class,
         ProcessMarketerCommissionPayouts::class,
         ReconcileMarketerPayoutBatches::class,
         ReportStaleMarketerPayoutBatches::class,

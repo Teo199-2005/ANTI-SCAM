@@ -15,11 +15,6 @@ class XenditPayoutService
         return (string) config('services.xendit.secret_key');
     }
 
-    private function channelCode(): string
-    {
-        return (string) config('services.xendit.payout_channel_code', 'PH_GCASH');
-    }
-
     public function isConfigured(): bool
     {
         return trim($this->secretKey()) !== '';
@@ -28,9 +23,10 @@ class XenditPayoutService
     /**
      * @return array{id: string, status: string, reference_id: string}
      */
-    public function createGcashPayout(
+    public function createPayout(
         string $referenceId,
         float $amount,
+        string $channelCode,
         string $accountNumber,
         string $accountHolderName,
         string $description = 'Marketing commission payout',
@@ -43,9 +39,14 @@ class XenditPayoutService
             throw new RuntimeException('Payout amount must be greater than zero.');
         }
 
+        $channelCode = trim($channelCode);
+        if ($channelCode === '') {
+            throw new RuntimeException('Payout channel code is required.');
+        }
+
         $payload = [
             'reference_id' => $referenceId,
-            'channel_code' => $this->channelCode(),
+            'channel_code' => $channelCode,
             'channel_properties' => [
                 'account_number' => $accountNumber,
                 'account_holder_name' => $accountHolderName,
@@ -53,6 +54,7 @@ class XenditPayoutService
             'amount' => round($amount, 2),
             'currency' => 'PHP',
             'description' => mb_substr($description, 0, 100),
+            'type' => 'DIRECT_DISBURSEMENT',
         ];
 
         try {
@@ -89,6 +91,7 @@ class XenditPayoutService
                 'status' => $response->status(),
                 'body' => $errorBody,
                 'reference_id' => $referenceId,
+                'channel_code' => $channelCode,
             ]);
             throw new RuntimeException($this->buildGatewayErrorMessage($response->status(), $errorBody));
         }
@@ -105,6 +108,28 @@ class XenditPayoutService
             'status' => $status,
             'reference_id' => (string) ($data['reference_id'] ?? $referenceId),
         ];
+    }
+
+    /**
+     * @deprecated Legacy GCash batches only — new marketer payouts use createPayout with a bank channel_code.
+     *
+     * @return array{id: string, status: string, reference_id: string}
+     */
+    public function createGcashPayout(
+        string $referenceId,
+        float $amount,
+        string $accountNumber,
+        string $accountHolderName,
+        string $description = 'Marketing commission payout',
+    ): array {
+        return $this->createPayout(
+            $referenceId,
+            $amount,
+            (string) config('services.xendit.payout_channel_code', 'PH_GCASH'),
+            $accountNumber,
+            $accountHolderName,
+            $description,
+        );
     }
 
     /**

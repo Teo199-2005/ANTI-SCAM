@@ -25,7 +25,7 @@ import {
   MapPin,
   Phone,
   UserRound,
-  Wallet,
+  Landmark,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -93,7 +93,7 @@ function ProfileTab({ marketer, profile }: { marketer: MarketerSummary; profile:
     { label: "TIN (strongly recommended)", ok: Boolean(profile.marketer_tin_masked) },
     { label: "Mobile number", ok: Boolean(profile.phone?.trim()) },
     { label: "Email", ok: Boolean(marketer.email?.trim()) },
-    { label: "GCash payout details (on file)", ok: profile.gcash_payout_configured },
+    { label: "Bank payout details (on file)", ok: profile.bank_payout_configured },
     { label: "Profile photo", ok: Boolean(profile.avatar_url) },
   ] as const;
 
@@ -194,18 +194,20 @@ function ProfileTab({ marketer, profile }: { marketer: MarketerSummary; profile:
 
       <section className="space-y-4 rounded-xl border border-softBorder bg-white p-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-navy">
-          <Wallet size={16} className="text-skyBlue" />
-          GCash payout
+          <Landmark size={16} className="text-skyBlue" />
+          Bank payout
         </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ProfileField
-            label="GCash number (masked)"
-            value={profile.gcash_masked_number ?? (profile.gcash_payout_configured ? "On file" : "Not set")}
+            label="Bank"
+            value={profile.marketer_bank_label ?? profile.marketer_bank_channel_code ?? "Not set"}
           />
-          <ProfileField label="Account holder name" value={profile.gcash_account_holder_name} />
+          <ProfileField label="Account (masked)" value={profile.marketer_bank_account_masked ?? "Not set"} />
+          <ProfileField label="Account holder name" value={profile.marketer_bank_account_name} />
+          <ProfileField label="Branch" value={profile.marketer_bank_branch} />
           <ProfileField
             label="Payout ready"
-            value={profile.gcash_payout_configured ? "Yes" : "No — number or name missing"}
+            value={profile.bank_payout_configured ? "Yes" : "No — bank details incomplete"}
           />
           <ProfileField label="Xendit mode (platform)" value={xenditLabel} />
           <ProfileField
@@ -214,18 +216,6 @@ function ProfileTab({ marketer, profile }: { marketer: MarketerSummary; profile:
           />
         </div>
       </section>
-
-      {(profile.marketer_bank_name || profile.marketer_bank_account_masked) && (
-        <section className="space-y-3 rounded-xl border border-softBorder bg-white p-4">
-          <h3 className="text-sm font-semibold text-navy">Bank details (legacy)</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ProfileField label="Bank" value={profile.marketer_bank_name} />
-            <ProfileField label="Branch" value={profile.marketer_bank_branch} />
-            <ProfileField label="Account name" value={profile.marketer_bank_account_name} />
-            <ProfileField label="Account (masked)" value={profile.marketer_bank_account_masked} />
-          </div>
-        </section>
-      )}
     </div>
   );
 }

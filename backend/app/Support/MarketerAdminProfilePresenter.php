@@ -35,9 +35,9 @@ final class MarketerAdminProfilePresenter
             'marketer_gov_id_complete' => filled($user->marketer_gov_id_type)
                 && filled($user->marketer_gov_id_number)
                 && filled($user->marketer_gov_id_document_url),
-            'gcash_masked_number' => $user->gcashAccountNumberMasked(),
-            'gcash_account_holder_name' => $user->gcash_account_holder_name,
-            'gcash_payout_configured' => filled($user->gcash_account_number) && filled($user->gcash_account_holder_name),
+            'marketer_bank_channel_code' => $user->marketer_bank_channel_code,
+            'marketer_bank_label' => $user->marketer_bank_name,
+            'bank_payout_configured' => $user->bankPayoutConfigured(),
             'marketer_bank_name' => $user->marketer_bank_name,
             'marketer_bank_branch' => $user->marketer_bank_branch,
             'marketer_bank_account_name' => $user->marketer_bank_account_name,

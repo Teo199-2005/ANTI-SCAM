@@ -73,7 +73,7 @@ class MarketerPayoutSuccessFinalizer
                 'commission_id' => $commission->id,
                 'released_by' => null,
                 'amount' => $item->amount,
-                'notes' => 'Xendit GCash payout '.$batch->reference_id.' (net after withholding)',
+                'notes' => 'Xendit bank payout '.$batch->reference_id.' (net after withholding)',
                 'released_at' => now(),
                 'release_source' => CommissionRelease::SOURCE_XENDIT,
                 'payout_batch_id' => $batch->id,

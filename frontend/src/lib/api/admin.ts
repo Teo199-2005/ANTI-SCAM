@@ -514,6 +514,10 @@ export type FinanceWithholdingBatchRow = {
   submitted_at: string | null;
   completed_at: string | null;
   created_at: string;
+  destination_type?: "bank" | "gcash" | "unknown";
+  bank_channel_code?: string | null;
+  bank_last4?: string | null;
+  bank_display_name?: string | null;
 };
 
 export type FinanceWithholdingSummary = {
@@ -810,9 +814,9 @@ export type AdminMarketerProfileDetail = {
   marketer_gov_id_has_number: boolean;
   marketer_gov_id_document_url: string | null;
   marketer_gov_id_complete: boolean;
-  gcash_masked_number: string | null;
-  gcash_account_holder_name: string | null;
-  gcash_payout_configured: boolean;
+  marketer_bank_channel_code: string | null;
+  marketer_bank_label: string | null;
+  bank_payout_configured: boolean;
   marketer_bank_name: string | null;
   marketer_bank_branch: string | null;
   marketer_bank_account_name: string | null;

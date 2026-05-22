@@ -29,7 +29,7 @@ class MarketerBookingCommissionStatsService
         return "You earn ₱{$amount} for each paid online guest booking at resorts linked to your referral. "
             .'Manual bookings and unpaid checkouts do not qualify. If a paid booking is cancelled before your commission is paid out, the ₱'
             .$amount.' credit is reversed while it is still pending. '
-            .'Pending earnings are disbursed via GCash on the platform schedule after withholding.';
+            .'Pending earnings are disbursed to your bank account on the platform schedule after withholding.';
     }
 
     public function qualifyingBookingsCount(int $marketerId, ?string $periodFrom = null, ?string $periodTo = null): int

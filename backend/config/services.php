@@ -60,7 +60,7 @@ return [
         'allow_mock_paid' => env('XENDIT_ALLOW_MOCK_PAID', false),
         // if true, forbidden key (403) can also use local mock flow (still local-only)
         'local_mock_on_forbidden' => env('XENDIT_LOCAL_MOCK_ON_FORBIDDEN', false),
-        /** GCash channel for Create Payout (PH). */
+        /** Legacy default channel for in-flight GCash payout batches only (PH_GCASH). */
         'payout_channel_code' => env('XENDIT_PAYOUT_CHANNEL_CODE', 'PH_GCASH'),
     ],
 
@@ -69,8 +69,10 @@ return [
         'enabled' => env('MARKETING_PAYOUT_ENABLED', false),
         'min_php' => (float) env('MARKETING_PAYOUT_MIN_PHP', 1),
         'timezone' => env('MARKETING_PAYOUT_TIMEZONE', 'Asia/Manila'),
-        /** Fraction withheld from gross commissions before GCash payout (taxes & platform fees), e.g. 0.10 = 10%. */
+        /** Fraction withheld from gross commissions before bank payout (taxes & platform fees), e.g. 0.10 = 10%. */
         'withholding_rate' => (float) env('MARKETING_PAYOUT_WITHHOLDING_RATE', 0.10),
+        /** Cache TTL (seconds) for Xendit PHP bank channel catalog. */
+        'bank_channels_cache_seconds' => (int) env('MARKETING_PAYOUT_BANK_CHANNELS_CACHE_SECONDS', 86400),
         /**
          * Optional safety cap: if set (> 0), skip auto-batching when net payout exceeds this PHP amount
          * (forces ops to split or review — reduces blast-radius if data is wrong).
@@ -109,7 +111,7 @@ return [
          */
         'require_kyc' => filter_var(env('MARKETING_PAYOUT_REQUIRE_KYC', false), FILTER_VALIDATE_BOOL),
         /**
-         * Require the GCash account-holder name to be similar (>= MARKETING_PAYOUT_NAME_MATCH_THRESHOLD %)
+         * Require the bank account-holder name to be similar (>= MARKETING_PAYOUT_NAME_MATCH_THRESHOLD %)
          * to the marketer's account name. Mitigates money-mule risk where partner routes funds to a
          * third party. Defaults FALSE for compatibility; set TRUE in production.
          */

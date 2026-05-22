@@ -1,6 +1,18 @@
 import { apiClient } from "@/lib/api/client";
 import type { ApiEnvelope } from "@/lib/api/types";
 
+export type MarketingPayoutBankOption = {
+  channel_code: string;
+  name: string;
+};
+
+export async function getMarketingPayoutBanks(): Promise<MarketingPayoutBankOption[]> {
+  const { data } = await apiClient.get<ApiEnvelope<{ banks: MarketingPayoutBankOption[] }>>(
+    "/marketing/payout-banks",
+  );
+  return data.data?.banks ?? [];
+}
+
 export type MarketingAnalyticsTotals = {
   commission_pending_ytd: number;
   commission_released_ytd: number;
@@ -54,7 +66,7 @@ export type TierLadderEntry = {
 export type MarketingStats = {
   totalCommissions: number;
   pendingCommissions: number;
-  /** Estimated GCash disbursement for current pending rows after withholding */
+  /** Estimated bank disbursement for current pending rows after withholding */
   pendingPayoutNetEstimate: number;
   /** Sum of release amounts actually paid (net for Xendit; gross for manual admin releases) */
   releasedCommissions: number;

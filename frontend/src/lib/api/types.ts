@@ -58,10 +58,10 @@ export type AuthUser = {
     code: string | null;
     marketer_name: string | null;
   } | null;
-  /** Marketing: masked GCash number, e.g. ••••••1234 */
-  gcash_masked_number?: string | null;
-  gcash_account_holder_name?: string | null;
-  gcash_payout_configured?: boolean;
+  /** Marketing: Xendit bank channel code for commission payouts */
+  marketer_bank_channel_code?: string | null;
+  marketer_bank_label?: string | null;
+  bank_payout_configured?: boolean;
   /** Marketing: government ID verification */
   marketer_gov_id_type?: string | null;
   /** True when an ID number is stored (use for UI gating; masked may be absent in edge cases). */

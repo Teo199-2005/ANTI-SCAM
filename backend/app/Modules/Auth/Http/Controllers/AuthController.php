@@ -14,7 +14,8 @@ use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
 use App\Services\ResortOwnerOnboardingService;
 use App\Shared\Traits\ApiResponseTrait;
-use App\Support\GcashAccountNormalizer;
+use App\Modules\Billing\Services\PhilippinesPayoutBankChannelService;
+use App\Support\BankAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
 use App\Support\PlatformPasswordRules;
 use App\Support\StoredMedia;
@@ -35,6 +36,7 @@ class AuthController extends Controller
         private readonly PhilippineLocationService $locations,
         private readonly ReferralSignupTrialService $referralSignupTrial,
         private readonly ResortOwnerOnboardingService $ownerOnboarding,
+        private readonly PhilippinesPayoutBankChannelService $payoutBanks,
     ) {}
 
     public function register(Request $request)
@@ -223,62 +225,83 @@ class AuthController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
 
-        $gcashPayload = [];
         if ($user->role === 'marketing' && $request->hasAny(['gcash_account_number', 'gcash_account_holder_name'])) {
-            $gcashIn = $request->validate([
-                'gcash_account_number' => ['nullable', 'string', 'max:32'],
-                'gcash_account_holder_name' => ['nullable', 'string', 'max:120'],
+            throw ValidationException::withMessages([
+                'gcash_account_number' => ['GCash payouts are no longer supported. Add your bank account under payout details instead.'],
             ]);
-            $rawNum = trim((string) ($gcashIn['gcash_account_number'] ?? ''));
-            $holderRaw = trim((string) ($gcashIn['gcash_account_holder_name'] ?? ''));
+        }
 
-            if ($rawNum !== '' && $holderRaw === '') {
-                throw ValidationException::withMessages([
-                    'gcash_account_holder_name' => ['Enter the account holder name registered on GCash.'],
-                ]);
-            }
+        $bankPayoutPayload = [];
+        if ($user->role === 'marketing' && $request->hasAny([
+            'marketer_bank_channel_code',
+            'marketer_bank_account_name',
+            'marketer_bank_account_number',
+            'marketer_bank_branch',
+        ])) {
+            $bankIn = $request->validate([
+                'marketer_bank_channel_code' => ['nullable', 'string', 'max:32'],
+                'marketer_bank_account_name' => ['nullable', 'string', 'max:120'],
+                'marketer_bank_account_number' => ['nullable', 'string', 'max:64'],
+                'marketer_bank_branch' => ['nullable', 'string', 'max:120'],
+            ]);
 
-            if ($rawNum === '' && $holderRaw !== '') {
-                if (! filled($user->gcash_account_number)) {
+            $channel = trim((string) ($bankIn['marketer_bank_channel_code'] ?? ''));
+            $holderRaw = trim((string) ($bankIn['marketer_bank_account_name'] ?? ''));
+            $acctRaw = trim((string) ($bankIn['marketer_bank_account_number'] ?? ''));
+            $branch = trim((string) ($bankIn['marketer_bank_branch'] ?? ''));
+            $any = $channel !== '' || $holderRaw !== '' || $acctRaw !== '' || $branch !== '';
+
+            if ($any) {
+                if ($channel === '' || $holderRaw === '' || $acctRaw === '') {
                     throw ValidationException::withMessages([
-                        'gcash_account_number' => ['Add your GCash mobile number first.'],
+                        'marketer_bank_account_number' => ['Select a bank, account holder name, and account number together.'],
                     ]);
                 }
-                $holder = GcashAccountNormalizer::normalizeHolderName($holderRaw);
+
+                try {
+                    $this->payoutBanks->assertChannelCodeAllowed($channel);
+                } catch (\RuntimeException $e) {
+                    throw ValidationException::withMessages([
+                        'marketer_bank_channel_code' => [$e->getMessage()],
+                    ]);
+                }
+
+                $holder = BankAccountNormalizer::normalizeHolderName($holderRaw);
                 if (strlen($holder) < 2) {
                     throw ValidationException::withMessages([
-                        'gcash_account_holder_name' => ['Enter the full name registered on the GCash wallet.'],
+                        'marketer_bank_account_name' => ['Enter the full name on the bank account.'],
                     ]);
                 }
                 if (! preg_match('/^[\p{L}\p{M}\s\-\'\.]+$/u', $holder)) {
                     throw ValidationException::withMessages([
-                        'gcash_account_holder_name' => ['Use letters and spaces only for the account name.'],
+                        'marketer_bank_account_name' => ['Use letters and spaces only for the account name.'],
                     ]);
                 }
-                $gcashPayload['gcash_account_holder_name'] = $holder;
-            }
 
-            if ($rawNum !== '' && $holderRaw !== '') {
-                $norm = GcashAccountNormalizer::normalizeMobile($rawNum);
-                if (! $norm['ok']) {
+                $acct = BankAccountNormalizer::normalizeAccountNumber($acctRaw);
+                if (! $acct['ok']) {
                     throw ValidationException::withMessages([
-                        'gcash_account_number' => [$norm['error'] ?? 'Invalid number.'],
+                        'marketer_bank_account_number' => [$acct['error'] ?? 'Invalid account number.'],
                     ]);
                 }
-                $holder = GcashAccountNormalizer::normalizeHolderName($holderRaw);
-                if (strlen($holder) < 2) {
-                    throw ValidationException::withMessages([
-                        'gcash_account_holder_name' => ['Enter the full name registered on the GCash wallet.'],
-                    ]);
-                }
-                if (! preg_match('/^[\p{L}\p{M}\s\-\'\.]+$/u', $holder)) {
-                    throw ValidationException::withMessages([
-                        'gcash_account_holder_name' => ['Use letters and spaces only for the account name.'],
-                    ]);
-                }
-                $gcashPayload = [
-                    'gcash_account_number' => $norm['normalized'],
-                    'gcash_account_holder_name' => $holder,
+
+                $bankPayoutPayload = [
+                    'marketer_bank_channel_code' => $channel,
+                    'marketer_bank_name' => $this->payoutBanks->labelForChannelCode($channel) ?? $channel,
+                    'marketer_bank_account_name' => $holder,
+                    'marketer_bank_account_number' => $acct['normalized'],
+                    'marketer_bank_branch' => $branch === '' ? null : $branch,
+                ];
+            } elseif (array_key_exists('marketer_bank_channel_code', $bankIn)
+                || array_key_exists('marketer_bank_account_name', $bankIn)
+                || array_key_exists('marketer_bank_account_number', $bankIn)
+                || array_key_exists('marketer_bank_branch', $bankIn)) {
+                $bankPayoutPayload = [
+                    'marketer_bank_channel_code' => null,
+                    'marketer_bank_name' => null,
+                    'marketer_bank_branch' => null,
+                    'marketer_bank_account_name' => null,
+                    'marketer_bank_account_number' => null,
                 ];
             }
         }
@@ -322,10 +345,6 @@ class AuthController extends Controller
             'mailing_barangay_name',
             'mailing_location_label',
             'marketer_tin',
-            'marketer_bank_name',
-            'marketer_bank_branch',
-            'marketer_bank_account_name',
-            'marketer_bank_account_number',
         ])) {
             $kycIn = $request->validate([
                 'mailing_province_psgc' => ['nullable', 'string', 'max:12'],
@@ -334,10 +353,6 @@ class AuthController extends Controller
                 'mailing_barangay_name' => ['nullable', 'string', 'max:180'],
                 'mailing_location_label' => ['nullable', 'string', 'max:512'],
                 'marketer_tin' => ['nullable', 'string', 'max:32'],
-                'marketer_bank_name' => ['nullable', 'string', 'max:120'],
-                'marketer_bank_branch' => ['nullable', 'string', 'max:120'],
-                'marketer_bank_account_name' => ['nullable', 'string', 'max:120'],
-                'marketer_bank_account_number' => ['nullable', 'string', 'max:64'],
             ]);
 
             $finalP = array_key_exists('mailing_province_psgc', $kycIn)
@@ -402,56 +417,9 @@ class AuthController extends Controller
                 }
             }
 
-            $bn = trim((string) ($kycIn['marketer_bank_name'] ?? ''));
-            $bb = trim((string) ($kycIn['marketer_bank_branch'] ?? ''));
-            $ban = trim((string) ($kycIn['marketer_bank_account_name'] ?? ''));
-            $bac = trim((string) ($kycIn['marketer_bank_account_number'] ?? ''));
-            $anyBank = $bn !== '' || $bb !== '' || $ban !== '' || $bac !== '';
-
-            if ($anyBank) {
-                if ($bn === '' || $ban === '' || $bac === '') {
-                    throw ValidationException::withMessages([
-                        'marketer_bank_account_number' => ['Bank name, account holder name, and account number are required together.'],
-                    ]);
-                }
-                $holder = GcashAccountNormalizer::normalizeHolderName($ban);
-                if (strlen($holder) < 2) {
-                    throw ValidationException::withMessages([
-                        'marketer_bank_account_name' => ['Enter the full name on the bank account.'],
-                    ]);
-                }
-                if (! preg_match('/^[\p{L}\p{M}\s\-\'\.]+$/u', $holder)) {
-                    throw ValidationException::withMessages([
-                        'marketer_bank_account_name' => ['Use letters and spaces only for the account name.'],
-                    ]);
-                }
-                $acct = preg_replace('/\s+/', '', $bac) ?? $bac;
-                if ($acct === '' || strlen($acct) < 4) {
-                    throw ValidationException::withMessages([
-                        'marketer_bank_account_number' => ['Enter a valid account number.'],
-                    ]);
-                }
-                if (! preg_match('/^[\p{L}\p{N}\-]+$/u', $acct)) {
-                    throw ValidationException::withMessages([
-                        'marketer_bank_account_number' => ['Use only letters, numbers, and hyphens.'],
-                    ]);
-                }
-                $kycPayload['marketer_bank_name'] = $bn;
-                $kycPayload['marketer_bank_branch'] = $bb === '' ? null : $bb;
-                $kycPayload['marketer_bank_account_name'] = $holder;
-                $kycPayload['marketer_bank_account_number'] = $acct;
-            } elseif (array_key_exists('marketer_bank_name', $kycIn)
-                || array_key_exists('marketer_bank_branch', $kycIn)
-                || array_key_exists('marketer_bank_account_name', $kycIn)
-                || array_key_exists('marketer_bank_account_number', $kycIn)) {
-                $kycPayload['marketer_bank_name'] = null;
-                $kycPayload['marketer_bank_branch'] = null;
-                $kycPayload['marketer_bank_account_name'] = null;
-                $kycPayload['marketer_bank_account_number'] = null;
-            }
         }
 
-        $user->update([...$validated, ...$gcashPayload, ...$govPayload, ...$kycPayload]);
+        $user->update([...$validated, ...$bankPayoutPayload, ...$govPayload, ...$kycPayload]);
 
         if ($user->role === 'marketing') {
             $this->locations->syncUserMailingLabel($user->fresh());

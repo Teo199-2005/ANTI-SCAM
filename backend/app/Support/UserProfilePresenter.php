@@ -30,9 +30,9 @@ final class UserProfilePresenter
         }
 
         if ($user->role === 'marketing') {
-            $a['gcash_masked_number'] = $user->gcashAccountNumberMasked();
-            $a['gcash_account_holder_name'] = $user->gcash_account_holder_name;
-            $a['gcash_payout_configured'] = filled($user->gcash_account_number) && filled($user->gcash_account_holder_name);
+            $a['marketer_bank_channel_code'] = $user->marketer_bank_channel_code;
+            $a['marketer_bank_label'] = $user->marketer_bank_name;
+            $a['bank_payout_configured'] = $user->bankPayoutConfigured();
 
             $govMeta = $user->marketer_gov_id_type
                 ? MarketingGovIdCatalog::find((string) $user->marketer_gov_id_type)
@@ -60,9 +60,7 @@ final class UserProfilePresenter
             $a['marketer_bank_branch'] = $user->marketer_bank_branch;
             $a['marketer_bank_account_name'] = $user->marketer_bank_account_name;
             $a['marketer_bank_account_masked'] = $user->marketerBankAccountMasked();
-            $a['marketer_bank_details_complete'] = filled($user->marketer_bank_name)
-                && filled($user->marketer_bank_account_name)
-                && filled($user->marketer_bank_account_number);
+            $a['marketer_bank_details_complete'] = $user->bankPayoutConfigured();
 
             $a['billing_xendit_mode'] = XenditMode::current();
             $a['marketing_payout_automation_enabled'] = (bool) config('services.marketing_payout.enabled');

@@ -120,8 +120,10 @@ export type MarketingProfileFieldErrors = Partial<{
   tin: string;
   govIdType: string;
   govIdNumber: string;
-  gcashNumber: string;
-  gcashHolder: string;
+  bankChannel: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
 }>;
 
 export function validateMarketingPersonalForm(input: {
@@ -188,33 +190,28 @@ export function validateMarketingGovIdForm(input: {
   return errors;
 }
 
-export function validateMarketingGcashForm(input: {
-  gcashNumber: string;
-  gcashHolder: string;
-  hasExistingNumber: boolean;
+export function validateMarketingBankPayoutForm(input: {
+  bankChannel: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
 }): MarketingProfileFieldErrors {
   const errors: MarketingProfileFieldErrors = {};
-  const num = sanitizePhilippinesMobileInput(input.gcashNumber);
-  const holder = sanitizePersonName(input.gcashHolder, INPUT_MAX.gcashHolder);
-  if (!num && !holder) {
-    errors.gcashNumber = "Enter your GCash mobile number and account name, or update the name only.";
-    return errors;
+  const channel = input.bankChannel.trim();
+  const holder = sanitizePersonName(input.bankAccountName, INPUT_MAX.bankAccountHolder);
+  const acct = input.bankAccountNumber.replace(/\s/g, "");
+
+  if (!channel) {
+    errors.bankChannel = "Select your bank.";
   }
-  if (num) {
-    if (!PH_MOBILE_RE.test(num)) {
-      errors.gcashNumber = "GCash number must be 11 digits starting with 09 (e.g. 09171234567).";
-    }
-    if (!holder || holder.length < 2) {
-      errors.gcashHolder = "Enter the full name registered on your GCash wallet (letters only).";
-    }
-  } else if (holder) {
-    if (holder.length < 2) {
-      errors.gcashHolder = "Account name must be at least 2 characters.";
-    }
-    if (!input.hasExistingNumber) {
-      errors.gcashNumber = "Add your GCash mobile number when setting the account name for the first time.";
-    }
+  if (!holder || holder.length < 2) {
+    errors.bankAccountName = "Enter the full name on your bank account (letters only).";
   }
+  if (!acct || acct.length < 4) {
+    errors.bankAccountNumber = "Enter a valid bank account number.";
+  } else if (!/^[\p{L}\p{N}\-]+$/u.test(acct)) {
+    errors.bankAccountNumber = "Use only letters, numbers, and hyphens.";
+  }
+
   return errors;
 }
 

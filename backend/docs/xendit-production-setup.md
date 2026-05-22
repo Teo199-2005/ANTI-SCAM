@@ -140,7 +140,25 @@ Behavior:
 
 Owners cancel auto-renewal from the dashboard subscription details menu (`POST /api/v1/resorts/{resort}/subscriptions/cancel-recurring`). Access remains until the current `billing_cycle_end`.
 
-## 8) Verify end-to-end flow
+## 8) Marketing partner commission payouts (bank)
+
+Marketer commissions are disbursed via **Xendit bank transfer** (not GCash). Each marketer selects a bank from the Xendit PHP channel list on their profile (`GET /api/v1/marketing/payout-banks`).
+
+1. Enable **Payouts / Money Out** and **bank** channels on your Xendit merchant account.
+2. Fund the payout balance in the Xendit dashboard.
+3. Register the payout webhook (unchanged):
+
+```text
+POST https://your-api-domain.com/api/v1/webhooks/xendit/payout
+```
+
+4. Set `MARKETING_PAYOUT_ENABLED=true` only after marketers have saved bank details on Profile.
+5. Dry-run before the 10th: `php artisan marketing:process-commission-payouts --dry-run`
+6. Optional one-time cleanup of legacy GCash fields: `php artisan marketing:clear-gcash-payout-details`
+
+`XENDIT_PAYOUT_CHANNEL_CODE` is only used for **legacy** in-flight GCash batches created before the bank cutover.
+
+## 9) Verify end-to-end flow
 
 1. Create reservation from frontend checkout.
 2. Confirm Laravel returns a real `invoice_url` from Xendit.

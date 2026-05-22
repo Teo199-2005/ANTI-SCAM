@@ -297,6 +297,10 @@ class AdminFinanceController extends Controller
                 'withholding_rate_applied' => $batch->withholding_rate_applied !== null
                     ? round((float) $batch->withholding_rate_applied, 4)
                     : null,
+                'destination_type' => $batch->usesBankDestination() ? 'bank' : ($batch->usesLegacyGcashDestination() ? 'gcash' : 'unknown'),
+                'bank_channel_code' => $batch->payout_channel_code_snapshot,
+                'bank_last4' => $batch->bank_account_last4_snapshot ?? $batch->gcash_last4_snapshot,
+                'bank_display_name' => $batch->bank_display_name_snapshot,
             ];
         });
 
