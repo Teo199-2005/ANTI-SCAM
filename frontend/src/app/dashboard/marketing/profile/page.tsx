@@ -6,8 +6,8 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import GovIdDocumentPreview from "@/components/marketing/GovIdDocumentPreview";
-import { getMarketingGovIdOptions, getMarketingPayoutBanks, type MarketingPayoutBankOption } from "@/lib/api/marketing";
-import type { MarketingGovIdOption } from "@/lib/api/marketingGovId";
+import { getMarketingPayoutBanks, type MarketingPayoutBankOption } from "@/lib/api/marketing";
+import { getMarketingGovIdOptions, type MarketingGovIdOption } from "@/lib/api/marketingGovId";
 import { isXenditLiveMode, isXenditTestMode } from "@/lib/billingXendit";
 import { formatRoleLabel } from "@/lib/utils";
 import {
