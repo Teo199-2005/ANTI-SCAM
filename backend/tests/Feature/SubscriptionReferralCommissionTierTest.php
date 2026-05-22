@@ -75,7 +75,7 @@ class SubscriptionReferralCommissionTierTest extends TestCase
         $this->assertSame(0, Commission::query()->where('marketer_id', $marketer->id)->count());
     }
 
-    public function test_legacy_subscription_commission_service_still_runs_when_called_directly(): void
+    public function test_legacy_subscription_commission_service_is_disabled(): void
     {
         config(['marketing_tiers.emergency_flat_per_payment_php' => null]);
 
@@ -125,9 +125,6 @@ class SubscriptionReferralCommissionTierTest extends TestCase
 
         app(SubscriptionReferralCommissionService::class)->creditFromPaidMonthlyInvoice($invoice->refresh());
 
-        $this->assertDatabaseHas('commissions', [
-            'marketer_id' => $marketer->id,
-            'commission_amount' => 150,
-        ]);
+        $this->assertSame(0, Commission::query()->where('marketer_id', $marketer->id)->count());
     }
 }

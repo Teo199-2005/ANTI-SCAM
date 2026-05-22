@@ -19,7 +19,6 @@ import {
   Activity,
   CheckCircle2,
   Circle,
-  Gift,
   IdCard,
   Loader2,
   Mail,
@@ -232,12 +231,13 @@ function ProfileTab({ marketer, profile }: { marketer: MarketerSummary; profile:
 }
 
 function ClientCard({ c }: { c: AdminMarketerDetailClient }) {
-  const isTrial = c.source === "signup_trial";
+  const isSignupReferral =
+    c.source === "signup_referral" || c.source === "signup_trial";
   return (
     <div
       className={cn(
         "rounded-xl border p-3",
-        isTrial ? "border-emerald-200/80 bg-emerald-50/40" : "border-softBorder bg-white",
+        isSignupReferral ? "border-violet-200/80 bg-violet-50/30" : "border-softBorder bg-white",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -251,19 +251,17 @@ function ClientCard({ c }: { c: AdminMarketerDetailClient }) {
           ) : null}
           {c.tenant_slug ? <p className="mt-1 text-[11px] text-zinc-500">Tenant · {c.tenant_slug}</p> : null}
         </div>
-        {isTrial ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-            <Gift size={11} aria-hidden />
-            {c.trial_active ? "Trial active" : "Referred signup"}
-          </span>
+        {isSignupReferral ? (
+          <span className="dash-badge-violet text-[10px]">Referred signup</span>
         ) : (
           <span className="dash-badge-sky text-[10px]">Converting client</span>
         )}
       </div>
-      {isTrial ? (
+      {isSignupReferral ? (
         <p className="mt-2 text-xs text-zinc-600">
-          Trial {c.trial_active ? "ends" : "ended"} {fmtWhen(c.trial_ends_at)}
+          Referred {fmtWhen(c.referred_at ?? c.trial_ends_at)}
           {c.referral_code ? <span className="ml-1 font-mono text-violet-700">· {c.referral_code}</span> : null}
+          <span className="block text-zinc-500">No paid subscription yet — booking commissions apply after guest bookings are paid online.</span>
         </p>
       ) : (
         <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-zinc-600 sm:grid-cols-3">
@@ -363,6 +361,47 @@ function MonitoringTab({ detail, marketer: m }: { detail: AdminMarketerDetailPay
         </div>
       </div>
 
+      {(detail.legacy_subscription_commissions?.length ?? 0) > 0 ? (
+        <section className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
+          <h3 className="font-dash text-base font-semibold text-amber-950">
+            Legacy subscription commissions (audit)
+          </h3>
+          <p className="mt-1 text-xs text-amber-900/90">
+            {detail.legacy_subscription_commissions_meta?.definition ??
+              "Deprecated tier payouts from paid platform subscriptions — not booking commissions."}
+            {(detail.legacy_subscription_commissions_meta?.voided_pending_rows ?? 0) > 0 ? (
+              <span className="mt-1 block font-medium">
+                Removed {detail.legacy_subscription_commissions_meta?.voided_pending_rows} incorrect pending
+                row(s) on this load.
+              </span>
+            ) : null}
+          </p>
+          <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto text-sm">
+            {detail.legacy_subscription_commissions?.map((row) => (
+              <li key={row.commission_id} className="rounded-lg border border-amber-200/60 bg-white/80 px-3 py-2">
+                <p className="font-medium text-navy">
+                  {fmtPhp(row.amount_php)} · {row.marketer_tier ?? "legacy"} · {row.resort_name ?? "Resort"} ·{" "}
+                  {row.period}
+                </p>
+                <p className="text-[11px] text-zinc-600">
+                  Status: {row.status}
+                  {row.unit_commission_php != null ? ` · Tier rate ${fmtPhp(row.unit_commission_php)}` : null}
+                </p>
+                {row.trigger ? (
+                  <p className="mt-1 text-[11px] text-zinc-700">
+                    Triggered by paid subscription invoice {fmtPhp(row.trigger.amount_php)} (
+                    {row.trigger.plan ?? "plan"}) on {fmtWhen(row.trigger.paid_at)} — invoice #
+                    {row.trigger.subscription_invoice_id}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-zinc-500">No matching paid invoice found for this period.</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section>
         <h3 className="mb-1 font-dash text-base font-semibold text-navy">
           Booking commissions ({detail.booking_commissions_meta?.total ?? detail.booking_commissions.length})
@@ -385,8 +424,8 @@ function MonitoringTab({ detail, marketer: m }: { detail: AdminMarketerDetailPay
         <h3 className="mb-2 flex items-center gap-2 font-dash text-base font-semibold text-navy">
           <UserRound size={16} className="text-skyBlue" />
           Clients ({detail.clients_meta.paid_converting} converting
-          {detail.clients_meta.signup_trial > 0
-            ? `, ${detail.clients_meta.signup_trial} trial signup${detail.clients_meta.signup_trial === 1 ? "" : "s"}`
+          {(detail.clients_meta.signup_referral ?? detail.clients_meta.signup_trial) > 0
+            ? `, ${detail.clients_meta.signup_referral ?? detail.clients_meta.signup_trial} referred signup${(detail.clients_meta.signup_referral ?? detail.clients_meta.signup_trial) === 1 ? "" : "s"}`
             : ""}
           )
         </h3>

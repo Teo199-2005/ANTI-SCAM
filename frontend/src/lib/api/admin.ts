@@ -755,7 +755,7 @@ export type AdminMarketerMonitoringPayload = {
 };
 
 export type AdminMarketerDetailClient = {
-  source: "paid_subscription" | "signup_trial";
+  source: "paid_subscription" | "signup_referral" | "signup_trial";
   tenant_id: number | null;
   tenant_name: string;
   tenant_slug: string;
@@ -770,6 +770,27 @@ export type AdminMarketerDetailClient = {
   referral_code: string | null;
   trial_active: boolean;
   referred_user_id: number | null;
+  referred_at?: string | null;
+};
+
+export type AdminLegacySubscriptionCommission = {
+  commission_id: number;
+  resort_id: number | null;
+  resort_name: string | null;
+  period: string;
+  status: string;
+  amount_php: number;
+  marketer_tier: string | null;
+  unit_commission_php: number | null;
+  policy: string;
+  trigger: {
+    subscription_invoice_id: number;
+    xendit_invoice_id: string | null;
+    amount_php: number;
+    plan: string | null;
+    paid_at: string | null;
+    tenant_id: number | null;
+  } | null;
 };
 
 export type AdminMarketerProfileDetail = {
@@ -852,7 +873,14 @@ export type AdminMarketerDetailPayload = {
   clients_meta: {
     total: number;
     paid_converting: number;
+    signup_referral?: number;
     signup_trial: number;
+  };
+  legacy_subscription_commissions?: AdminLegacySubscriptionCommission[];
+  legacy_subscription_commissions_meta?: {
+    total: number;
+    voided_pending_rows: number;
+    definition: string;
   };
   transactions: AdminMarketerDetailTransaction[];
   transactions_meta: {

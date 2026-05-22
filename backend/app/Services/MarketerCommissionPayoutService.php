@@ -39,6 +39,7 @@ class MarketerCommissionPayoutService
 {
     public function __construct(
         private readonly XenditPayoutService $xenditPayout,
+        private readonly LegacySubscriptionCommissionCleanupService $commissionScope,
         private readonly ?AuditLogService $audits = null,
     ) {}
 
@@ -55,13 +56,15 @@ class MarketerCommissionPayoutService
             return ['processed' => 0, 'skipped' => 0, 'errors' => ['Xendit is not configured.'], 'dry_run' => $dryRun];
         }
 
+        $this->commissionScope->voidPendingLegacyRows();
+
         $tz = (string) config('services.marketing_payout.timezone', 'Asia/Manila');
         $run = $asOf->copy()->timezone($tz);
         $runPeriod = $run->format('Y-m');
         $cutoffPeriod = $run->copy()->subMonthNoOverflow()->format('Y-m');
         $minPhp = (float) config('services.marketing_payout.min_php', 1);
 
-        $marketerIds = Commission::query()
+        $marketerIds = $this->commissionScope->scopeBookingCommissionsOnly(Commission::query())
             ->where('status', 'pending')
             ->whereNull('payout_batch_id')
             ->where('period', '<=', $cutoffPeriod)
@@ -185,8 +188,7 @@ class MarketerCommissionPayoutService
             }
         }
 
-        $previewCount = Commission::query()
-            ->where('marketer_id', $marketerId)
+        $previewCount = $this->commissionScope->bookingCommissionsForMarketer($marketerId)
             ->where('status', 'pending')
             ->whereNull('payout_batch_id')
             ->where('period', '<=', $cutoffPeriod)
@@ -196,8 +198,7 @@ class MarketerCommissionPayoutService
             return ['action' => 'skip', 'message' => 'no eligible commissions'];
         }
 
-        $previewCommissions = Commission::query()
-            ->where('marketer_id', $marketerId)
+        $previewCommissions = $this->commissionScope->bookingCommissionsForMarketer($marketerId)
             ->where('status', 'pending')
             ->whereNull('payout_batch_id')
             ->where('period', '<=', $cutoffPeriod)
@@ -238,8 +239,7 @@ class MarketerCommissionPayoutService
             $marketerId, $runPeriod, $cutoffPeriod,
             $gcashNormalized, $gcashLast4, $holder, $marketerName, $marketerEmail
         ): int {
-            $commissions = Commission::query()
-                ->where('marketer_id', $marketerId)
+            $commissions = $this->commissionScope->bookingCommissionsForMarketer($marketerId)
                 ->where('status', 'pending')
                 ->whereNull('payout_batch_id')
                 ->where('period', '<=', $cutoffPeriod)

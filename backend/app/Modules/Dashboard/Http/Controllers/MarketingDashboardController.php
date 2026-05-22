@@ -10,6 +10,7 @@ use App\Models\Resort;
 use App\Models\MarketerBookingCommissionEvent;
 use App\Models\User;
 use App\Support\ResortLocationQuery;
+use App\Services\LegacySubscriptionCommissionCleanupService;
 use App\Services\MarketerBookingCommissionStatsService;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\ReferralSignupTrialService;
@@ -27,23 +28,29 @@ class MarketingDashboardController extends Controller
         private readonly MarketerCommissionPayoutService $marketerPayouts,
         private readonly MarketerBookingCommissionStatsService $bookingStats,
         private readonly ReferralSignupTrialService $referralSignupTrial,
+        private readonly LegacySubscriptionCommissionCleanupService $commissionScope,
     ) {}
 
     public function stats(Request $request)
     {
         $marketerId = $request->user()->id;
 
-        $totalCommissions = Commission::where('marketer_id', $marketerId)->sum('commission_amount');
-        $pendingCommissions = Commission::where('marketer_id', $marketerId)->where('status', 'pending')->sum('commission_amount');
-        $pendingRows = Commission::where('marketer_id', $marketerId)->where('status', 'pending')->orderBy('id')->get();
+        $this->commissionScope->voidPendingLegacyRows($marketerId);
+
+        $totalCommissions = $this->commissionScope->sumTotalBookingGross($marketerId);
+        $pendingCommissions = $this->commissionScope->sumPendingBookingGross($marketerId);
+        $pendingRows = $this->commissionScope->pendingBookingRows($marketerId);
         $pendingPayoutNetEstimate = $pendingRows->isEmpty()
             ? 0.0
             : (float) $this->marketerPayouts->allocateNetByCommission($pendingRows)['net_total'];
 
+        $bookingTier = $this->commissionScope->bookingTierKey();
         $releasedCommissionsPaidOut = (float) CommissionRelease::query()
-            ->whereHas('commission', fn ($q) => $q->where('marketer_id', $marketerId))
+            ->whereHas('commission', fn ($q) => $q
+                ->where('marketer_id', $marketerId)
+                ->where('marketer_tier', $bookingTier))
             ->sum('amount');
-        $releasedCommissionsGross = Commission::where('marketer_id', $marketerId)->where('status', 'released')->sum('commission_amount');
+        $releasedCommissionsGross = $this->commissionScope->sumReleasedBookingGross($marketerId);
 
         $resortCount = DB::table('marketer_resorts')->where('marketer_id', $marketerId)->count();
 
@@ -62,7 +69,7 @@ class MarketingDashboardController extends Controller
             : null;
         $referralSignupClientsCount = $this->referralSignupTrial->countSignupClients($marketerId);
         $referralHint = $code !== null && $code !== ''
-            ? "Share your registration link — resort owners who sign up with code {$code} receive 1 month of platform access free. You earn ₱{$commissionPerBooking} per paid online guest booking at each resort you refer."
+            ? "Share your registration link — resort owners who sign up with code {$code} are attributed to you. You earn ₱{$commissionPerBooking} per paid online guest booking at resorts assigned to you (not on subscription payments)."
             : null;
 
         $wh = $this->marketerPayouts->withholdingRate();
@@ -176,7 +183,7 @@ class MarketingDashboardController extends Controller
 
             $owner = $signup->referredUser;
             $clients[] = [
-                'source' => 'signup_trial',
+                'source' => 'signup_referral',
                 'sort_at' => $signup->trial_starts_at->timestamp,
                 'tenant_id' => $signup->tenant_id,
                 'tenant_name' => $signup->tenant?->name ?? ($owner?->name ?? 'Resort owner'),
@@ -188,24 +195,22 @@ class MarketingDashboardController extends Controller
                 'qualifying_subscription_invoices' => 0,
                 'referred_resorts_count' => $signup->tenant_id !== null ? 1 : 0,
                 'total_subscription_volume_php' => 0.0,
-                'trial_ends_at' => $signup->trial_ends_at->toIso8601String(),
+                'trial_ends_at' => null,
                 'referral_code' => $signup->referral_code,
-                'trial_active' => $signup->trial_ends_at->isFuture(),
+                'trial_active' => false,
                 'referred_user_id' => $signup->referred_user_id,
+                'referred_at' => $signup->trial_starts_at->toIso8601String(),
             ];
         }
 
         $paidTotal = 0;
-        $trialTotal = 0;
-        $trialActiveTotal = 0;
+        $signupReferralTotal = 0;
         foreach ($clients as $clientRow) {
-            if (($clientRow['source'] ?? '') === 'paid_subscription') {
+            $source = (string) ($clientRow['source'] ?? '');
+            if ($source === 'paid_subscription') {
                 $paidTotal++;
-            } elseif (($clientRow['source'] ?? '') === 'signup_trial') {
-                $trialTotal++;
-                if ($clientRow['trial_active'] ?? false) {
-                    $trialActiveTotal++;
-                }
+            } elseif ($source === 'signup_referral' || $source === 'signup_trial') {
+                $signupReferralTotal++;
             }
         }
 
@@ -238,8 +243,9 @@ class MarketingDashboardController extends Controller
                     'per_page' => $perPage,
                     'total' => $total,
                     'paid_total' => $paidTotal,
-                    'trial_total' => $trialTotal,
-                    'trial_active_total' => $trialActiveTotal,
+                    'signup_referral_total' => $signupReferralTotal,
+                    'trial_total' => $signupReferralTotal,
+                    'trial_active_total' => 0,
                 ],
                 'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
             ],
@@ -344,8 +350,8 @@ class MarketingDashboardController extends Controller
         $marketerId = $request->user()->id;
         $perPage = (int) $request->integer('perPage', 12);
 
-        $commissions = Commission::with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc,address_barangay_name', 'releases'])
-            ->where('marketer_id', $marketerId)
+        $commissions = $this->commissionScope->bookingCommissionsForMarketer($marketerId)
+            ->with(['resort:id,name,address_label,address_province_psgc,address_city_municipality_psgc,address_barangay_psgc,address_barangay_name', 'releases'])
             ->latest()
             ->paginate($perPage);
 
@@ -391,8 +397,7 @@ class MarketingDashboardController extends Controller
             ];
         }
 
-        $commissionsYtd = Commission::query()
-            ->where('marketer_id', $marketerId)
+        $commissionsYtd = $this->commissionScope->bookingCommissionsForMarketer($marketerId)
             ->whereBetween('period', [$periodStart, $periodEnd])
             ->with(['resort:id,name'])
             ->get();

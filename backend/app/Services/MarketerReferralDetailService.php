@@ -96,7 +96,7 @@ class MarketerReferralDetailService
 
             $owner = $signup->referredUser;
             $clients[] = [
-                'source' => 'signup_trial',
+                'source' => 'signup_referral',
                 'sort_at' => $signup->trial_starts_at->timestamp,
                 'tenant_id' => $signup->tenant_id,
                 'tenant_name' => $signup->tenant?->name ?? ($owner?->name ?? 'Resort owner'),
@@ -108,10 +108,11 @@ class MarketerReferralDetailService
                 'qualifying_subscription_invoices' => 0,
                 'referred_resorts_count' => $signup->tenant_id !== null ? 1 : 0,
                 'total_subscription_volume_php' => 0.0,
-                'trial_ends_at' => $signup->trial_ends_at->toIso8601String(),
+                'trial_ends_at' => null,
                 'referral_code' => $signup->referral_code,
-                'trial_active' => $signup->trial_ends_at->isFuture(),
+                'trial_active' => false,
                 'referred_user_id' => $signup->referred_user_id,
+                'referred_at' => $signup->trial_starts_at->toIso8601String(),
             ];
         }
 

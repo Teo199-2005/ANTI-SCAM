@@ -42,8 +42,6 @@ const SORT_FIRST: Record<string, SortDir> = {
   commission_pending_php: "desc",
   commission_released_gross_php: "desc",
   commission_total_gross_php: "desc",
-  marketer_tier_key: "desc",
-  per_payment_php: "desc",
 };
 
 function fmtDate(iso: string | null | undefined) {

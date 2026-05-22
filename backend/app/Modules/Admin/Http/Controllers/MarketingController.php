@@ -13,6 +13,7 @@ use App\Modules\Audit\Services\AuditLogService;
 use App\Services\MarketerBookingCommissionStatsService;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\AdminBookingCommissionAnalyticsService;
+use App\Services\LegacySubscriptionCommissionCleanupService;
 use App\Services\MarketerReferralDetailService;
 use App\Services\MarketingBookingCommissionSettingsService;
 use App\Support\MarketerAdminProfilePresenter;
@@ -33,6 +34,7 @@ class MarketingController extends Controller
         private readonly AdminBookingCommissionAnalyticsService $bookingAnalytics,
         private readonly MarketerCommissionPayoutService $marketerPayouts,
         private readonly MarketerReferralDetailService $marketerReferralDetail,
+        private readonly LegacySubscriptionCommissionCleanupService $legacyCommissionCleanup,
     ) {}
 
     /** List all marketers with their assigned resort count. */
@@ -52,6 +54,8 @@ class MarketingController extends Controller
      */
     public function marketersMonitoring(Request $request)
     {
+        $this->legacyCommissionCleanup->voidPendingLegacyRows();
+
         $search = $request->string('search')->trim()->toString();
 
         $location = ResortLocationQuery::fromRequest($request);
@@ -121,7 +125,9 @@ class MarketingController extends Controller
             ->get()
             ->keyBy('marketer_id');
 
+        $bookingTier = $this->legacyCommissionCleanup->bookingTierKey();
         $commissionStats = Commission::query()
+            ->where('marketer_tier', $bookingTier)
             ->selectRaw(
                 'marketer_id,
                 SUM(CASE WHEN status = \'pending\' THEN commission_amount ELSE 0 END) as pending_commission,
@@ -202,7 +208,7 @@ class MarketingController extends Controller
             'rows' => $rows,
             'meta' => [
                 'generated_at' => $now->toIso8601String(),
-                'new_client_definition' => 'Signup funnel: distinct resort-owner organizations with referral attribution (paid subscription or referred signup). Booking commissions: paid online guest bookings at assigned resorts (flat rate per credit).',
+                'new_client_definition' => 'Signup funnel: distinct resort-owner organizations with referral attribution (paid subscription or referred signup awaiting payment). Booking commissions: paid online guest bookings at assigned resorts (flat rate per credit). Subscription invoice payments do not create marketer commission.',
                 'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
                 'commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
                 'commissions_enabled' => $this->bookingSettings->isEnabled(),
@@ -232,13 +238,15 @@ class MarketingController extends Controller
 
         $marketerId = (int) $marketer->id;
 
-        $commissionStats = Commission::query()
+        $legacyLedger = $this->legacyCommissionCleanup->legacyRowsForMarketer($marketerId);
+        $voidedLegacyPending = $this->legacyCommissionCleanup->voidPendingLegacyRows($marketerId);
+
+        $commissionStats = $this->legacyCommissionCleanup->bookingCommissionsForMarketer($marketerId)
             ->selectRaw(
                 'SUM(CASE WHEN status = \'pending\' THEN commission_amount ELSE 0 END) as pending_commission,
                 SUM(CASE WHEN status = \'released\' THEN commission_amount ELSE 0 END) as released_commission_gross,
                 SUM(commission_amount) as total_commission_gross'
             )
-            ->where('marketer_id', $marketerId)
             ->first();
 
         $clients = $this->marketerReferralDetail->clientsForMarketer($marketerId);
@@ -246,16 +254,17 @@ class MarketingController extends Controller
         $bookingCommissions = $this->marketerReferralDetail->bookingCommissionsForMarketer($marketerId);
 
         $paidClients = 0;
-        $trialClients = 0;
+        $signupReferralClients = 0;
         foreach ($clients as $c) {
-            if (($c['source'] ?? '') === 'paid_subscription') {
+            $source = (string) ($c['source'] ?? '');
+            if ($source === 'paid_subscription') {
                 $paidClients++;
-            } elseif (($c['source'] ?? '') === 'signup_trial') {
-                $trialClients++;
+            } elseif ($source === 'signup_referral' || $source === 'signup_trial') {
+                $signupReferralClients++;
             }
         }
 
-        $referralClientsCount = $paidClients + $trialClients;
+        $referralClientsCount = $paidClients + $signupReferralClients;
 
         return $this->successResponse([
             'marketer' => [
@@ -282,7 +291,14 @@ class MarketingController extends Controller
             'clients_meta' => [
                 'total' => count($clients),
                 'paid_converting' => $paidClients,
-                'signup_trial' => $trialClients,
+                'signup_referral' => $signupReferralClients,
+                'signup_trial' => $signupReferralClients,
+            ],
+            'legacy_subscription_commissions' => $legacyLedger,
+            'legacy_subscription_commissions_meta' => [
+                'total' => count($legacyLedger),
+                'voided_pending_rows' => $voidedLegacyPending,
+                'definition' => 'Deprecated per-subscription-payment tier credits (e.g. Silver ₱150). Shown for audit; pending rows are removed automatically. Earnings are booking commissions only.',
             ],
             'transactions' => $transactions,
             'transactions_meta' => [
@@ -338,6 +354,14 @@ class MarketingController extends Controller
 
         if ($commission->status === 'released') {
             return $this->errorResponse('Commission already released.', null, 422);
+        }
+
+        if ($this->legacyCommissionCleanup->isLegacySubscriptionCommission($commission)) {
+            return $this->errorResponse(
+                'This commission is from the retired subscription-tier program. Only booking commissions (₱ per paid online guest booking) can be released.',
+                null,
+                422
+            );
         }
 
         if ($commission->payout_batch_id !== null) {

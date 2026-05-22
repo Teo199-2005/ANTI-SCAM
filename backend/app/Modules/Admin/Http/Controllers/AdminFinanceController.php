@@ -9,6 +9,7 @@ use App\Models\MarketerPayoutBatch;
 use App\Models\Reservation;
 use App\Models\SubscriptionInvoice;
 use App\Services\AdminBookingCommissionAnalyticsService;
+use App\Services\LegacySubscriptionCommissionCleanupService;
 use App\Services\MarketerCommissionPayoutService;
 use App\Services\MarketingBookingCommissionSettingsService;
 use App\Shared\Traits\ApiResponseTrait;
@@ -23,6 +24,7 @@ class AdminFinanceController extends Controller
         private readonly MarketerCommissionPayoutService $payoutService,
         private readonly AdminBookingCommissionAnalyticsService $bookingAnalytics,
         private readonly MarketingBookingCommissionSettingsService $bookingSettings,
+        private readonly LegacySubscriptionCommissionCleanupService $commissionScope,
     ) {}
 
     /** Platform-wide money snapshot for admin monitoring. */
@@ -44,12 +46,14 @@ class AdminFinanceController extends Controller
             ->revenueEligible()
             ->sum('reservation_fee');
 
-        $commissionGrossPending = (float) Commission::query()
-            ->where('status', 'pending')
-            ->sum('commission_amount');
-        $commissionGrossReleased = (float) Commission::query()
-            ->where('status', 'released')
-            ->sum('commission_amount');
+        $this->commissionScope->voidPendingLegacyRows();
+
+        $commissionGrossPending = (float) $this->commissionScope->scopeBookingCommissionsOnly(
+            Commission::query()->where('status', 'pending')
+        )->sum('commission_amount');
+        $commissionGrossReleased = (float) $this->commissionScope->scopeBookingCommissionsOnly(
+            Commission::query()->where('status', 'released')
+        )->sum('commission_amount');
 
         $commissionNetPaidOut = (float) CommissionRelease::query()->sum('amount');
 
@@ -96,8 +100,12 @@ class AdminFinanceController extends Controller
                     ->where('xendit_payment_status', 'paid')
                     ->revenueEligible()
                     ->count(),
-                'commissions_pending' => Commission::query()->where('status', 'pending')->count(),
-                'commissions_released' => Commission::query()->where('status', 'released')->count(),
+                'commissions_pending' => $this->commissionScope->scopeBookingCommissionsOnly(
+                    Commission::query()->where('status', 'pending')
+                )->count(),
+                'commissions_released' => $this->commissionScope->scopeBookingCommissionsOnly(
+                    Commission::query()->where('status', 'released')
+                )->count(),
                 'payout_batches_total' => MarketerPayoutBatch::query()->count(),
             ],
         ], 'Finance overview');
@@ -195,7 +203,7 @@ class AdminFinanceController extends Controller
         $perPage = max(5, min(100, (int) $request->integer('per_page', 20)));
         $status = $request->string('status')->toString();
 
-        $q = Commission::query()
+        $q = $this->commissionScope->scopeBookingCommissionsOnly(Commission::query())
             ->with([
                 'marketer:id,name,email',
                 'resort:id,name',
@@ -219,10 +227,18 @@ class AdminFinanceController extends Controller
         });
 
         $summary = [
-            'pending_count' => Commission::query()->where('status', 'pending')->count(),
-            'released_count' => Commission::query()->where('status', 'released')->count(),
-            'pending_gross' => round((float) Commission::query()->where('status', 'pending')->sum('commission_amount'), 2),
-            'released_gross' => round((float) Commission::query()->where('status', 'released')->sum('commission_amount'), 2),
+            'pending_count' => $this->commissionScope->scopeBookingCommissionsOnly(
+                Commission::query()->where('status', 'pending')
+            )->count(),
+            'released_count' => $this->commissionScope->scopeBookingCommissionsOnly(
+                Commission::query()->where('status', 'released')
+            )->count(),
+            'pending_gross' => round((float) $this->commissionScope->scopeBookingCommissionsOnly(
+                Commission::query()->where('status', 'pending')
+            )->sum('commission_amount'), 2),
+            'released_gross' => round((float) $this->commissionScope->scopeBookingCommissionsOnly(
+                Commission::query()->where('status', 'released')
+            )->sum('commission_amount'), 2),
         ];
 
         return $this->successResponse([

@@ -237,7 +237,7 @@ export async function getReleaseHistory(params?: { page?: number; perPage?: numb
   };
 }
 
-export type MarketingClientSource = "paid_subscription" | "signup_trial";
+export type MarketingClientSource = "paid_subscription" | "signup_referral" | "signup_trial";
 
 export type MarketingClientRow = {
   tenant_id: number | null;
@@ -275,7 +275,9 @@ export type MarketingClientsPayload = {
 function mapMarketingClientRow(o: Record<string, unknown>): MarketingClientRow {
   const sourceRaw = o.source;
   const source: MarketingClientSource =
-    sourceRaw === "signup_trial" || sourceRaw === "paid_subscription" ? sourceRaw : "paid_subscription";
+    sourceRaw === "signup_referral" || sourceRaw === "signup_trial" || sourceRaw === "paid_subscription"
+      ? (sourceRaw as MarketingClientSource)
+      : "paid_subscription";
   const tenantIdRaw = o.tenant_id;
 
   return {
