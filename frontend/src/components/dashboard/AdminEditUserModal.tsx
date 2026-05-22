@@ -3,6 +3,11 @@
 import DashModal from "@/components/dash/DashModal";
 import { PhilippineLocationPicker, type PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
 import { useToast } from "@/components/shared/ToastProvider";
+import {
+  getAdminUserSubscription,
+  updateAdminUserSubscription,
+  type AdminUserSubscriptionInfo,
+} from "@/lib/api/admin";
 import { apiClient } from "@/lib/api/client";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeEmailTyping, sanitizePersonName } from "@/lib/inputRestrictions";
@@ -53,6 +58,13 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
   const [newPassword, setNewPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resortName, setResortName] = useState<string | null>(null);
+  const [subPlan, setSubPlan] = useState("standard");
+  const [subStatus, setSubStatus] = useState("active");
+  const [subNextDue, setSubNextDue] = useState("");
+  const [subCycleEnd, setSubCycleEnd] = useState("");
+  const [subLoading, setSubLoading] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(false);
 
   // Populate form when the user prop changes.
   useEffect(() => {
@@ -68,6 +80,26 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
     });
     setNewPassword("");
     setShowPw(false);
+    setResortName(null);
+    setHasSubscription(false);
+    if (user.role === "resort_owner") {
+      setSubLoading(true);
+      void getAdminUserSubscription(user.id)
+        .then((res) => {
+          if (!res?.subscription) return;
+          const s: AdminUserSubscriptionInfo = res.subscription;
+          setResortName(res.resort_name);
+          setHasSubscription(true);
+          setSubPlan(s.plan);
+          setSubStatus(s.status);
+          setSubNextDue(s.next_due_date ?? "");
+          setSubCycleEnd(s.billing_cycle_end ?? "");
+        })
+        .catch(() => {
+          setHasSubscription(false);
+        })
+        .finally(() => setSubLoading(false));
+    }
   }, [user]);
 
   const handleClose = () => {
@@ -94,6 +126,14 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
         payload.password_confirmation = newPassword;
       }
       await apiClient.put(`/users/${user.id}`, payload);
+      if (role === "resort_owner" && hasSubscription) {
+        await updateAdminUserSubscription(user.id, {
+          plan: subPlan,
+          status: subStatus,
+          next_due_date: subNextDue || null,
+          billing_cycle_end: subCycleEnd || null,
+        });
+      }
       pushToast({ title: "User updated", description: `${name.trim()} has been updated.`, tone: "success" });
       onClose();
       onSaved?.();
@@ -204,6 +244,84 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
           </p>
           <PhilippineLocationPicker value={location} onChange={setLocation} idPrefix="admin-edit-user-loc" />
         </div>
+
+        {role === "resort_owner" ? (
+          <div className="rounded-xl border border-softBorder bg-zinc-50/80 p-4">
+            <p className="mb-3 text-xs font-semibold text-zinc-700">Resort subscription</p>
+            {subLoading ? (
+              <p className="text-xs text-zinc-500">Loading subscription…</p>
+            ) : hasSubscription ? (
+              <div className="space-y-3">
+                {resortName ? (
+                  <p className="text-[11px] text-zinc-500">
+                    Resort: <span className="font-medium text-zinc-700">{resortName}</span>
+                  </p>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="admin-edit-sub-plan" className="mb-1 block text-xs font-semibold text-zinc-600">
+                      Plan
+                    </label>
+                    <select
+                      id="admin-edit-sub-plan"
+                      className="dash-input"
+                      value={subPlan}
+                      onChange={(e) => setSubPlan(e.target.value)}
+                    >
+                      <option value="standard">Standard</option>
+                      <option value="business_pro">Business Pro</option>
+                      <option value="enterprise">Enterprise</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="admin-edit-sub-status" className="mb-1 block text-xs font-semibold text-zinc-600">
+                      Status
+                    </label>
+                    <select
+                      id="admin-edit-sub-status"
+                      className="dash-input"
+                      value={subStatus}
+                      onChange={(e) => setSubStatus(e.target.value)}
+                    >
+                      <option value="active">Active</option>
+                      <option value="pending_payment">Pending payment</option>
+                      <option value="grace_period">Grace period</option>
+                      <option value="suspended">Suspended</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="expired">Expired</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="admin-edit-sub-due" className="mb-1 block text-xs font-semibold text-zinc-600">
+                      Next due date
+                    </label>
+                    <input
+                      id="admin-edit-sub-due"
+                      type="date"
+                      className="dash-input"
+                      value={subNextDue}
+                      onChange={(e) => setSubNextDue(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="admin-edit-sub-cycle" className="mb-1 block text-xs font-semibold text-zinc-600">
+                      Billing cycle end
+                    </label>
+                    <input
+                      id="admin-edit-sub-cycle"
+                      type="date"
+                      className="dash-input"
+                      value={subCycleEnd}
+                      onChange={(e) => setSubCycleEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500">No resort workspace or subscription yet for this owner.</p>
+            )}
+          </div>
+        ) : null}
 
         {/* New password (optional) */}
         <div>

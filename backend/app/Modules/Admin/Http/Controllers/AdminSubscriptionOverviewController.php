@@ -58,7 +58,7 @@ class AdminSubscriptionOverviewController extends Controller
             })
             ->pluck('subscription_invoices.status', 'subscription_invoices.resort_id');
 
-        $payload = $resorts->map(function (Resort $resort) use ($latestStatuses): array {
+        $payload = $resorts->map(function (Resort $resort) use ($latestStatuses, $loc): array {
             return [
                 'id' => $resort->id,
                 'tenant_id' => $resort->tenant_id,

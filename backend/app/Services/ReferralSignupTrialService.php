@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Referral code at resort-owner signup: attribute the marketer only (no free Business Pro trial).
+ */
 class ReferralSignupTrialService
 {
     public function __construct(
@@ -40,22 +43,14 @@ class ReferralSignupTrialService
      */
     public function trialPayloadForUser(User $user): array
     {
-        if (! $this->hasActiveTrial($user)) {
-            return [
-                'active' => false,
-                'ends_at' => null,
-                'code' => null,
-                'marketer_name' => null,
-            ];
-        }
-
+        // No free referral trial — always inactive for API/UI consumers.
         $marketer = $user->referred_by_marketer_id
             ? User::query()->find($user->referred_by_marketer_id)
             : null;
 
         return [
-            'active' => true,
-            'ends_at' => $user->referral_trial_ends_at?->toIso8601String(),
+            'active' => false,
+            'ends_at' => null,
             'code' => $user->signup_referral_code,
             'marketer_name' => $marketer?->name,
         ];
@@ -63,12 +58,11 @@ class ReferralSignupTrialService
 
     public function hasActiveTrial(User $user): bool
     {
-        return $user->referral_trial_ends_at !== null
-            && $user->referral_trial_ends_at->isFuture();
+        return false;
     }
 
     /**
-     * Redeem referral at registration for a resort owner.
+     * Redeem referral at registration for a resort owner (attribution only, no free plan).
      *
      * @return array{referral_trial: array<string, mixed>}
      */
@@ -86,15 +80,14 @@ class ReferralSignupTrialService
         }
 
         $normalized = $this->referralCodes->normalize($referralCode);
-        $trialStarts = now();
-        $trialEnds = $trialStarts->copy()->addMonth();
+        $attributedAt = now();
 
-        DB::transaction(function () use ($user, $marketer, $normalized, $trialStarts, $trialEnds, $businessName): void {
+        DB::transaction(function () use ($user, $marketer, $normalized, $attributedAt, $businessName): void {
             $user->forceFill([
                 'referred_by_marketer_id' => $marketer->id,
                 'signup_referral_code' => $normalized,
-                'referral_trial_ends_at' => $trialEnds,
-                'referral_trial_redeemed_at' => $trialStarts,
+                'referral_trial_ends_at' => null,
+                'referral_trial_redeemed_at' => $attributedAt,
             ])->save();
 
             ReferralSignupAttribution::query()->create([
@@ -102,13 +95,13 @@ class ReferralSignupTrialService
                 'referred_user_id' => $user->id,
                 'tenant_id' => null,
                 'referral_code' => $normalized,
-                'trial_starts_at' => $trialStarts,
-                'trial_ends_at' => $trialEnds,
+                'trial_starts_at' => $attributedAt,
+                'trial_ends_at' => $attributedAt,
             ]);
 
             $business = trim((string) $businessName);
             if ($business !== '' && $user->tenant_id === null) {
-                $this->provisionMinimalWorkspace($user, $business, $marketer, $trialEnds);
+                $this->provisionMinimalWorkspace($user, $business, $marketer);
             }
         });
 
@@ -118,25 +111,10 @@ class ReferralSignupTrialService
     }
 
     /**
-     * After owner onboard: align subscription with signup trial if still active.
+     * After owner onboard: link marketer to resort (no plan upgrade).
      */
     public function applyTrialAfterOnboard(User $user, Resort $resort, Subscription $subscription): Subscription
     {
-        if (! $this->hasActiveTrial($user)) {
-            return $subscription;
-        }
-
-        $trialEnd = Carbon::parse($user->referral_trial_ends_at);
-        $trialEndDate = $trialEnd->toDateString();
-
-        $this->subscriptions->upgradeToBusinessPro($subscription);
-        $subscription->update([
-            'billing_cycle_start' => now()->toDateString(),
-            'billing_cycle_end' => $trialEndDate,
-            'next_due_date' => $trialEndDate,
-            'grace_until' => null,
-        ]);
-
         $marketerId = (int) $user->referred_by_marketer_id;
         if ($marketerId > 0) {
             DB::table('marketer_resorts')->updateOrInsert(
@@ -158,12 +136,16 @@ class ReferralSignupTrialService
 
     public function countSignupClients(int $marketerId): int
     {
+        if (! Schema::hasTable('referral_signup_attributions')) {
+            return 0;
+        }
+
         return ReferralSignupAttribution::query()
             ->where('marketer_id', $marketerId)
             ->count();
     }
 
-    /** After signup trial ends, downgrade to free Standard (stay listed). */
+    /** Legacy: downgrade owners who still have unpaid Business Pro from old referral trials. */
     public function expireLapsedTrials(): int
     {
         $updated = 0;
@@ -191,7 +173,7 @@ class ReferralSignupTrialService
         return $updated;
     }
 
-    private function provisionMinimalWorkspace(User $user, string $businessName, User $marketer, Carbon $trialEnds): void
+    private function provisionMinimalWorkspace(User $user, string $businessName, User $marketer): void
     {
         $base = TenantPublicIdentifier::preferredSubdomainBaseFromResortName($businessName, $businessName);
         $publicKey = TenantPublicIdentifier::allocateUniqueSubdomain($base);
@@ -218,16 +200,7 @@ class ReferralSignupTrialService
 
         $resort = Resort::withoutGlobalScopes()->create($resortPayload);
 
-        $subscription = $this->subscriptions->refreshForResort($resort, SubscriptionPlan::STANDARD, activateIfNew: true);
-        $this->subscriptions->upgradeToBusinessPro($subscription);
-        $trialEndDate = $trialEnds->toDateString();
-
-        $subscription->update([
-            'status' => 'active',
-            'billing_cycle_start' => now()->toDateString(),
-            'billing_cycle_end' => $trialEndDate,
-            'next_due_date' => $trialEndDate,
-        ]);
+        $this->subscriptions->refreshForResort($resort, SubscriptionPlan::STANDARD, activateIfNew: true);
 
         DB::table('marketer_resorts')->updateOrInsert(
             ['marketer_id' => $marketer->id, 'resort_id' => $resort->id],

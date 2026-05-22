@@ -93,7 +93,7 @@ export default function MarketingReferralsPage() {
           <div>
             <h2 className="font-dash text-base font-semibold text-navy">Resort owner registration link</h2>
             <p className="mt-1 text-xs text-zinc-500">
-              Opens owner signup with your referral code applied (1-month trial when eligible).
+              Opens owner signup with your referral code applied (attribution only; no free plan trial).
             </p>
           </div>
           <button

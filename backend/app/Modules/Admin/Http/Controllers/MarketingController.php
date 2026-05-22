@@ -202,7 +202,7 @@ class MarketingController extends Controller
             'rows' => $rows,
             'meta' => [
                 'generated_at' => $now->toIso8601String(),
-                'new_client_definition' => 'Signup funnel: distinct resort-owner organizations with referral attribution (paid subscription or trial). Booking commissions: paid online guest bookings at assigned resorts (flat rate per credit).',
+                'new_client_definition' => 'Signup funnel: distinct resort-owner organizations with referral attribution (paid subscription or referred signup). Booking commissions: paid online guest bookings at assigned resorts (flat rate per credit).',
                 'booking_commission_policy' => $this->bookingStats->bookingCommissionPolicySummary(),
                 'commission_per_booking_php' => $this->bookingSettings->amountPhpForNewCredits(),
                 'commissions_enabled' => $this->bookingSettings->isEnabled(),

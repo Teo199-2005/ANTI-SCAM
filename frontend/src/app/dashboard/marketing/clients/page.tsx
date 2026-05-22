@@ -236,7 +236,7 @@ export default function MarketingClientsPage() {
         <p className="font-dash text-dash-xs font-medium text-white/70">Marketing</p>
         <h1 className="mt-1 font-dash text-dash-2xl font-bold text-white md:text-dash-3xl">Referral clients</h1>
         <p className="mt-2 max-w-2xl font-dash text-dash-sm text-white/85">
-          Paid subscriptions count toward your tier. Owners who register with your code get a 30-day platform free trial
+          Paid subscriptions count toward your tier. Owners who register with your code are attributed to you (no free plan trial).
           and appear separately until they pay.
         </p>
       </div>

@@ -341,7 +341,60 @@ export async function getAdminSubscriptionOverview(params?: {
       },
     },
   );
-  return data.data;
+  if (!data.success) {
+    throw new Error(data.message ?? "Could not load subscriptions.");
+  }
+  return normalizeArray<AdminSubscriptionOverviewItem>(data.data);
+}
+
+export type AdminUserSubscriptionInfo = {
+  id: number;
+  plan: string;
+  status: string;
+  base_price: string;
+  included_rooms: number;
+  extra_room_fee: string;
+  active_room_count: number;
+  total_monthly_fee: string;
+  billing_cycle_start: string | null;
+  billing_cycle_end: string | null;
+  next_due_date: string | null;
+  grace_until: string | null;
+};
+
+export type AdminUserSubscriptionResponse = {
+  resort_id: number;
+  resort_name: string;
+  subscription: AdminUserSubscriptionInfo | null;
+};
+
+export async function getAdminUserSubscription(userId: number): Promise<AdminUserSubscriptionResponse | null> {
+  const { data } = await apiClient.get<ApiEnvelope<AdminUserSubscriptionResponse | null>>(
+    `/admin/users/${userId}/subscription`,
+  );
+  if (!data.success) {
+    throw new Error(data.message ?? "Could not load subscription.");
+  }
+  return data.data ?? null;
+}
+
+export async function updateAdminUserSubscription(
+  userId: number,
+  payload: {
+    plan: string;
+    status: string;
+    next_due_date?: string | null;
+    billing_cycle_end?: string | null;
+  },
+): Promise<AdminUserSubscriptionResponse> {
+  const { data } = await apiClient.put<ApiEnvelope<AdminUserSubscriptionResponse>>(
+    `/admin/users/${userId}/subscription`,
+    payload,
+  );
+  if (!data.success) {
+    throw new Error(data.message ?? "Could not update subscription.");
+  }
+  return data.data as AdminUserSubscriptionResponse;
 }
 
 function normalizeArray<T>(value: unknown): T[] {

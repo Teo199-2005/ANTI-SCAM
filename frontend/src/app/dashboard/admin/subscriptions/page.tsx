@@ -74,7 +74,7 @@ export default function AdminSubscriptionsPage() {
       setError(null);
     } catch (err) {
       setResorts([]);
-      setError("Failed to load subscriptions.");
+      setError(parseApiErrorMessage(err, "Failed to load subscriptions."));
     } finally {
       setLoading(false);
     }

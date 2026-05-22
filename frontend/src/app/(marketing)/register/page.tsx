@@ -219,11 +219,11 @@ function RegisterPageInner() {
         password_confirmation: passwordConfirmation,
         accept_terms: true,
       });
-      if (isOwnerFlow && referralTrial?.active) {
+      if (isOwnerFlow && (appliedReferral || referralTrial?.code)) {
         setTrialSuccessModal({
-          marketerName: referralTrial.marketer_name ?? appliedReferral?.marketerName ?? "your partner",
-          code: referralTrial.code ?? appliedReferral?.code ?? "",
-          endsAt: referralTrial.ends_at ?? null,
+          marketerName: referralTrial?.marketer_name ?? appliedReferral?.marketerName ?? "your partner",
+          code: referralTrial?.code ?? appliedReferral?.code ?? "",
+          endsAt: null,
         });
         return;
       }
@@ -243,15 +243,6 @@ function RegisterPageInner() {
 
   const resortLogoAbs =
     isClientFlow && resortBrand?.logoUrl ? laravelPublicUrl(resortBrand.logoUrl) : "";
-
-  const trialEndLabel =
-    trialSuccessModal?.endsAt != null
-      ? new Date(trialSuccessModal.endsAt).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })
-      : null;
 
   return (
     <AuthSplitShell
@@ -286,12 +277,13 @@ function RegisterPageInner() {
                   <Gift className="h-7 w-7" aria-hidden />
                 </div>
                 <h2 id="register-trial-success-title" className="mt-4 font-heading text-xl font-semibold text-zinc-900">
-                  You&apos;re on a 1-month free trial
+                  Referral code applied
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                  Referral <span className="font-mono font-semibold text-zinc-800">{trialSuccessModal.code}</span> from{" "}
-                  <span className="font-semibold text-zinc-800">{trialSuccessModal.marketerName}</span> is active. Your
-                  platform access is unlocked{trialEndLabel ? ` until ${trialEndLabel}` : ""}.
+                  Your signup is linked to referral{" "}
+                  <span className="font-mono font-semibold text-zinc-800">{trialSuccessModal.code}</span> from{" "}
+                  <span className="font-semibold text-zinc-800">{trialSuccessModal.marketerName}</span>. Choose a paid
+                  plan when you are ready — there is no free Business Pro trial.
                 </p>
                 <button
                   type="button"

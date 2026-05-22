@@ -12,6 +12,7 @@ use App\Modules\Admin\Http\Controllers\AdminLocationStatsController;
 use App\Modules\Admin\Http\Controllers\AdminClientController;
 use App\Modules\Admin\Http\Controllers\AdminStatsController;
 use App\Modules\Admin\Http\Controllers\AdminSubscriptionOverviewController;
+use App\Modules\Admin\Http\Controllers\AdminUserSubscriptionController;
 use App\Modules\Admin\Http\Controllers\MarketingController;
 use App\Modules\Admin\Http\Controllers\SuspensionController;
 use App\Modules\Admin\Http\Controllers\SystemSettingController;
@@ -158,6 +159,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/admin/analytics', [AdminAnalyticsController::class, 'index']);
             Route::get('/admin/analytics/company', [AdminAnalyticsController::class, 'company']);
             Route::get('/admin/subscriptions/overview', [AdminSubscriptionOverviewController::class, 'index']);
+            Route::get('/admin/users/{user}/subscription', [AdminUserSubscriptionController::class, 'show']);
+            Route::put('/admin/users/{user}/subscription', [AdminUserSubscriptionController::class, 'update']);
             Route::get('/admin/finance/overview', [AdminFinanceController::class, 'overview']);
             Route::get('/admin/finance/payment-ledger', [AdminFinanceController::class, 'paymentLedger']);
             Route::get('/admin/finance/commissions', [AdminFinanceController::class, 'commissions']);

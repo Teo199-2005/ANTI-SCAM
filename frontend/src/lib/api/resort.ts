@@ -4,7 +4,7 @@ import { shrinkRasterForUpload } from "@/lib/uploads/shrinkRasterForUpload";
 
 export type SubscriptionInfo = {
   id: number;
-  plan: "standard" | "basic" | "premium" | "vip";
+  plan: "standard" | "business_pro" | "enterprise" | "basic" | "premium" | "vip";
   base_price: string;
   included_rooms: number;
   extra_room_fee: string;

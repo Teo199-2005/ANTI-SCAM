@@ -254,7 +254,7 @@ function ClientCard({ c }: { c: AdminMarketerDetailClient }) {
         {isTrial ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
             <Gift size={11} aria-hidden />
-            {c.trial_active ? "Trial active" : "Trial ended"}
+            {c.trial_active ? "Trial active" : "Referred signup"}
           </span>
         ) : (
           <span className="dash-badge-sky text-[10px]">Converting client</span>
