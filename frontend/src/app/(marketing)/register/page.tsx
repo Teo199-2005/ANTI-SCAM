@@ -10,6 +10,7 @@ import { useRegisterModal } from "@/contexts/RegisterModalContext";
 import { googleOAuthRedirectUrl } from "@/lib/api/baseUrl";
 import { buildLoginUrl, resolveGuestPostAuthPath } from "@/lib/auth/clientAuthUrls";
 import { publicClient } from "@/lib/api/client";
+import type { ApiEnvelope } from "@/lib/api/types";
 import { validateReferralCodePublic } from "@/lib/api/referral";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import {
@@ -67,6 +68,8 @@ function RegisterPageInner() {
 
   const intentRaw = searchParams.get("intent")?.trim() ?? "";
   const googleToken = searchParams.get("google_token")?.trim() ?? "";
+  const googleNameFromUrl = searchParams.get("google_name")?.trim() ?? "";
+  const googleEmailFromUrl = searchParams.get("google_email")?.trim() ?? "";
   const resortSlug = searchParams.get("resort")?.trim() ?? "";
   const returnTo = searchParams.get("returnTo")?.trim() ?? "";
   const isGoogleOwnerSignup = Boolean(googleToken) && (intentRaw === "owner" || hasReferralRef);
@@ -136,24 +139,29 @@ function RegisterPageInner() {
 
   useEffect(() => {
     if (!isGoogleOwnerSignup || !googleToken) return;
+
+    if (googleNameFromUrl) setName(googleNameFromUrl);
+    if (googleEmailFromUrl) setEmail(googleEmailFromUrl);
+    if (googleNameFromUrl && googleEmailFromUrl) return;
+
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/auth/google-pending?google_token=${encodeURIComponent(googleToken)}`);
-        const payload = (await res.json()) as {
-          success?: boolean;
-          data?: { name?: string; email?: string };
-          message?: string;
-        };
+        const { data: payload } = await publicClient.get<
+          ApiEnvelope<{ name?: string; email?: string }>
+        >("/auth/google-pending", { params: { google_token: googleToken } });
         if (cancelled) return;
         if (payload.success && payload.data) {
           if (payload.data.name) setName(payload.data.name);
           if (payload.data.email) setEmail(payload.data.email);
-        } else if (!res.ok) {
-          setError(payload.message ?? "Google sign-up link expired. Try Continue with Google again.");
+        } else if (!payload.success) {
+          const msg = payload.message ?? "";
+          if (msg.toLowerCase() !== "not authenticated.") {
+            setError(msg || "Google sign-up link expired. Try Continue with Google again.");
+          }
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !googleNameFromUrl && !googleEmailFromUrl) {
           setError("Could not load your Google profile. Try Continue with Google again.");
         }
       }
@@ -161,7 +169,7 @@ function RegisterPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [isGoogleOwnerSignup, googleToken]);
+  }, [isGoogleOwnerSignup, googleToken, googleNameFromUrl, googleEmailFromUrl]);
 
   /** Legacy shared links used `/register?ref=` without `intent=owner` — normalize the URL. */
   useEffect(() => {

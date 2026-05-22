@@ -24,6 +24,8 @@ type Props = {
   onClose: () => void;
   /** Set when the user started Google OAuth without an existing account. */
   googleToken?: string;
+  googleName?: string;
+  googleEmail?: string;
   returnTo?: string;
 };
 
@@ -151,7 +153,14 @@ function RegisterRoleCard({
   );
 }
 
-export function RegisterRoleChoiceModal({ open, onClose, googleToken, returnTo }: Props) {
+export function RegisterRoleChoiceModal({
+  open,
+  onClose,
+  googleToken,
+  googleName,
+  googleEmail,
+  returnTo,
+}: Props) {
   const [mounted, setMounted] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +173,16 @@ export function RegisterRoleChoiceModal({ open, onClose, googleToken, returnTo }
   }, []);
 
   const ownerHref = googleToken
-    ? `/register?intent=owner&google_token=${encodeURIComponent(googleToken)}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`
+    ? (() => {
+        const q = new URLSearchParams({
+          intent: "owner",
+          google_token: googleToken,
+        });
+        if (returnTo) q.set("returnTo", returnTo);
+        if (googleName) q.set("google_name", googleName);
+        if (googleEmail) q.set("google_email", googleEmail);
+        return `/register?${q.toString()}`;
+      })()
     : "/register?intent=owner";
 
   const guestHref = googleToken ? undefined : "/register?intent=client";

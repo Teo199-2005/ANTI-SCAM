@@ -9,6 +9,8 @@ function ChooseRoleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const googleToken = searchParams.get("google_token")?.trim() ?? "";
+  const googleName = searchParams.get("google_name")?.trim() ?? "";
+  const googleEmail = searchParams.get("google_email")?.trim() ?? "";
   const returnTo = searchParams.get("returnTo")?.trim() ?? "";
 
   useEffect(() => {
@@ -31,6 +33,8 @@ function ChooseRoleContent() {
         open
         onClose={() => router.push("/login")}
         googleToken={googleToken}
+        googleName={googleName || undefined}
+        googleEmail={googleEmail || undefined}
         returnTo={returnTo || undefined}
       />
     </AuthSplitShell>

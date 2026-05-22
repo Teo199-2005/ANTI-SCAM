@@ -10,6 +10,7 @@ use App\Support\GoogleOAuthState;
 use App\Support\ProductionFrontendUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -92,7 +93,9 @@ class GoogleAuthController extends Controller
             if ($returnTo === '') {
                 $returnTo = (string) $request->session()->pull('google_auth_return_to', '');
             }
-            $chooseRoleUrl = $frontend.'/register/choose-role?google_token='.rawurlencode($pendingToken);
+            $chooseRoleUrl = $frontend.'/register/choose-role?google_token='.rawurlencode($pendingToken)
+                .'&google_name='.rawurlencode($name)
+                .'&google_email='.rawurlencode($email);
             if ($returnTo !== '' && str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//')) {
                 $chooseRoleUrl .= '&returnTo='.rawurlencode($returnTo);
             }
