@@ -35,6 +35,14 @@ export async function proxyLaravelWebGet(
       forwardHeaders[name] = value;
     }
   }
+  const host = req.headers.get("host");
+  if (host) {
+    forwardHeaders["x-forwarded-host"] = host;
+  }
+  const proto = req.nextUrl.protocol.replace(":", "");
+  if (proto) {
+    forwardHeaders["x-forwarded-proto"] = proto;
+  }
 
   let upstream: Response;
   try {

@@ -4,6 +4,7 @@ namespace App\Modules\Auth\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\FrontendOriginResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -23,6 +24,9 @@ class GoogleAuthController extends Controller
         if ($returnTo !== '' && str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//')) {
             $request->session()->put('google_auth_return_to', $returnTo);
         }
+
+        $frontendBase = app(FrontendOriginResolver::class)->resolve($request);
+        $request->session()->put('google_auth_frontend_base', $frontendBase);
 
         return Socialite::driver('google')->redirect();
     }
@@ -71,7 +75,10 @@ class GoogleAuthController extends Controller
                 : '/dashboard';
         }
 
-        $frontend = rtrim((string) config('app.frontend_url'), '/');
+        $sessionBase = (string) request()->session()->pull('google_auth_frontend_base', '');
+        $frontend = $sessionBase !== ''
+            ? rtrim($sessionBase, '/')
+            : app(FrontendOriginResolver::class)->resolve(request());
         $url = $frontend.'/api/auth/google-callback?token='.rawurlencode($token)
             .'&redirect='.rawurlencode($returnTo);
 
