@@ -927,7 +927,9 @@ export async function getAdminMarketersMonitoring(
       platform_default_commission_per_booking_php:
         typeof meta.platform_default_commission_per_booking_php === "number"
           ? meta.platform_default_commission_per_booking_php
-          : meta.commission_per_booking_php,
+          : typeof meta.commission_per_booking_php === "number"
+            ? meta.commission_per_booking_php
+            : undefined,
     },
   };
 }

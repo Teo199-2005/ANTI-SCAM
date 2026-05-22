@@ -126,7 +126,7 @@ export default function AdminEditUserModal({ open, user, onClose, onSaved }: Pro
     if (!user) return;
     setSaving(true);
     try {
-      const payload: Record<string, string | null | undefined> = {
+      const payload: Record<string, string | number | null | undefined> = {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         role,
