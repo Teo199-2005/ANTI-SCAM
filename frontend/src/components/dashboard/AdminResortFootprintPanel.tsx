@@ -1,6 +1,7 @@
 "use client";
 
 import { SubscriptionPlanLabel } from "@/components/badges/SubscriptionPlanLabel";
+import { EntityIdHint } from "@/components/shared/EntityIdHint";
 import { TableEntityThumb } from "@/components/shared/TableEntityThumb";
 import { listResorts, type ResortItem } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -96,6 +97,7 @@ export default function AdminResortFootprintPanel({
                 <TableEntityThumb imageUrl={r.logo_url} name={r.name} kind="resort" size="sm" className="h-10 w-10 shrink-0 rounded-lg" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-dash text-sm font-semibold text-navy">{r.name}</p>
+                  <EntityIdHint id={r.id} className="mt-0.5" />
                   <p className="mt-0.5 flex items-start gap-1 text-xs text-zinc-500">
                     <MapPin size={12} className="mt-0.5 shrink-0 text-zinc-400" aria-hidden />
                     <span className="line-clamp-2">{resortLocationLine(r)}</span>

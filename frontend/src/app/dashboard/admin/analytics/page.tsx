@@ -29,6 +29,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EntityIdHint } from "@/components/shared/EntityIdHint";
 import { formatPhp } from "@/lib/formatPhp";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -596,12 +597,15 @@ export default function AdminAnalyticsPage() {
                     return (
                       <div key={r.resort_id}>
                         <div className="mb-1 flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-2 font-medium text-zinc-700">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                          <span className="flex min-w-0 flex-1 items-center gap-2 font-medium text-zinc-700">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
                               {i + 1}
                             </span>
-                            <Building2 size={12} className="text-zinc-400" />
-                            {r.name}
+                            <Building2 size={12} className="shrink-0 text-zinc-400" />
+                            <span className="min-w-0 truncate">
+                              {r.name}
+                              <EntityIdHint id={r.resort_id} className="mt-0.5 block" />
+                            </span>
                           </span>
                           <span className="font-semibold text-emerald-700">{formatPhp(r.revenue)}</span>
                         </div>
@@ -631,12 +635,15 @@ export default function AdminAnalyticsPage() {
                     return (
                       <div key={r.resort_id}>
                         <div className="mb-1 flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-2 font-medium text-zinc-700">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-skyBlue">
+                          <span className="flex min-w-0 flex-1 items-center gap-2 font-medium text-zinc-700">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-skyBlue">
                               {i + 1}
                             </span>
-                            <Building2 size={12} className="text-zinc-400" />
-                            {r.name}
+                            <Building2 size={12} className="shrink-0 text-zinc-400" />
+                            <span className="min-w-0 truncate">
+                              {r.name}
+                              <EntityIdHint id={r.resort_id} className="mt-0.5 block" />
+                            </span>
                           </span>
                           <span className="font-semibold text-navy">{r.count} bookings</span>
                         </div>

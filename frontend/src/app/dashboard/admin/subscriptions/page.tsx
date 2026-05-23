@@ -13,6 +13,7 @@ import {
   DashTableActionsInner,
 } from "@/components/shared/DashTableActions";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
+import { TableEntityNameWithId } from "@/components/shared/EntityIdHint";
 import { useToast } from "@/components/shared/ToastProvider";
 import { apiClient } from "@/lib/api/client";
 import LocationFilterBar, {
@@ -251,7 +252,7 @@ export default function AdminSubscriptionsPage() {
               return (
                 <DashMobileTableCard
                   key={resort.id}
-                  title={resort.name}
+                  title={<TableEntityNameWithId name={resort.name} id={resort.id} />}
                   fields={[
                     {
                       label: "Plan",
@@ -335,7 +336,9 @@ export default function AdminSubscriptionsPage() {
               const sub = resort.subscription;
               return (
                 <tr key={resort.id} className="group">
-                  <td className="font-semibold text-navy">{resort.name}</td>
+                  <td>
+                    <TableEntityNameWithId name={resort.name} id={resort.id} tenantId={resort.tenant_id} />
+                  </td>
                   <td className="text-zinc-700">
                     {sub?.plan ? <SubscriptionPlanLabel plan={sub.plan} /> : "—"}
                   </td>

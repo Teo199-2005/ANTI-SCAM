@@ -1,6 +1,7 @@
 "use client";
 
 import DashCard from "@/components/dash/DashCard";
+import { TableEntityNameWithId } from "@/components/shared/EntityIdHint";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
 import LocationFilterBar, {
@@ -92,10 +93,14 @@ export default function SuspensionsPage() {
                 <DashMobileTableCard
                   key={item.subscriptionId}
                   title={
-                    <span className="inline-flex flex-wrap items-center gap-2">
-                      <span>{item.resort?.name ?? "—"}</span>
-                      {item.resort?.isVip ? <span className="dash-badge-amber">VIP</span> : null}
-                    </span>
+                    item.resort ? (
+                      <span className="inline-flex flex-wrap items-start gap-2">
+                        <TableEntityNameWithId name={item.resort.name} id={item.resort.id} />
+                        {item.resort.isVip ? <span className="dash-badge-amber shrink-0">VIP</span> : null}
+                      </span>
+                    ) : (
+                      "—"
+                    )
                   }
                   fields={[
                     { label: "Address", value: item.resort?.address ?? "—" },
@@ -128,12 +133,16 @@ export default function SuspensionsPage() {
                   {items.map((item) => (
                     <tr key={item.subscriptionId}>
                       <td>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-navy">{item.resort?.name ?? "—"}</span>
-                          {item.resort?.isVip ? (
-                            <span className="dash-badge-amber">VIP</span>
-                          ) : null}
-                        </div>
+                        {item.resort ? (
+                          <div className="flex flex-wrap items-start gap-1.5">
+                            <TableEntityNameWithId name={item.resort.name} id={item.resort.id} />
+                            {item.resort.isVip ? (
+                              <span className="dash-badge-amber shrink-0">VIP</span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
                         {item.resort?.address ? <p className="text-xs text-zinc-400">{item.resort.address}</p> : null}
                       </td>
                       <td className="capitalize">{item.plan}</td>

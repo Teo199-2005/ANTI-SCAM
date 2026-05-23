@@ -27,6 +27,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import AdminResortViewModal from "@/components/dashboard/AdminResortViewModal";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import DashboardFilterSearch from "@/components/dashboard/DashboardFilterSearch";
+import { TableEntityNameWithId } from "@/components/shared/EntityIdHint";
 import { TableEntityThumb } from "@/components/shared/TableEntityThumb";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { BadgeCheck, Building2, Crown, Eye, PenLine, XCircle } from "lucide-react";
@@ -313,7 +314,7 @@ export default function AdminResortsPage() {
                       ariaLabel={`Select ${resort.name}`}
                     />
                     <TableEntityThumb imageUrl={resort.logo_url} name={resort.name} kind="resort" />
-                    <span>{resort.name}</span>
+                    <TableEntityNameWithId name={resort.name} id={resort.id} nameClassName="font-semibold" />
                   </span>
                 }
                 fields={[
@@ -401,7 +402,7 @@ export default function AdminResortsPage() {
                 <td>
                   <div className="flex items-center gap-3">
                     <TableEntityThumb imageUrl={resort.logo_url} name={resort.name} kind="resort" />
-                    <span className="font-semibold text-navy">{resort.name}</span>
+                    <TableEntityNameWithId name={resort.name} id={resort.id} tenantId={resort.tenant_id} />
                   </div>
                 </td>
                 <td className="text-zinc-600">{resort.address ?? "—"}</td>

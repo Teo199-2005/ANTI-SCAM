@@ -4,6 +4,7 @@ import DashCard from "@/components/dash/DashCard";
 import BulkActionBar from "@/components/shared/BulkActionBar";
 import { BulkSelectMobile, BulkSelectTd, BulkSelectTh } from "@/components/shared/BulkSelectCheckbox";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { EntityIdHint, ResortEntityLabel, TableEntityNameWithId } from "@/components/shared/EntityIdHint";
 import DashMobileTableCard, { DashMobileTableSkeleton } from "@/components/shared/DashMobileTableCard";
 import DashTableScrollRegion from "@/components/shared/DashTableScrollRegion";
 import { useToast } from "@/components/shared/ToastProvider";
@@ -601,8 +602,11 @@ export default function AdminFinancePage() {
                           onChange={() => ledgerBulk.toggle(ledgerRowKey(row))}
                           ariaLabel={`Select ledger row ${row.entry_type} ${row.entry_id}`}
                         />
-                        <span>
-                          {row.entry_type === "subscription" ? "Subscription" : "Booking"} · {row.resort_name}
+                        <span className="min-w-0">
+                          <span className="block text-sm">
+                            {row.entry_type === "subscription" ? "Subscription" : "Booking"} · {row.resort_name}
+                          </span>
+                          <EntityIdHint id={row.resort_id} className="mt-0.5 block" />
                         </span>
                       </span>
                     }
@@ -645,7 +649,9 @@ export default function AdminFinancePage() {
                           ariaLabel={`Select ledger row ${row.entry_type} ${row.entry_id}`}
                         />
                         <td className="capitalize text-sm">{row.entry_type}</td>
-                        <td className="text-sm">{row.resort_name}</td>
+                        <td>
+                          <TableEntityNameWithId name={row.resort_name} id={row.resort_id} nameClassName="text-sm font-normal" />
+                        </td>
                         <td className="font-mono text-sm">{fmtPhp(row.amount)}</td>
                         <td>
                           <StatusBadge status={row.status} />
@@ -729,7 +735,10 @@ export default function AdminFinancePage() {
                     }
                     fields={[
                       { label: "Marketer", value: c.marketer?.name ?? String(c.marketer_id) },
-                      { label: "Resort", value: c.resort?.name ?? String(c.resort_id) },
+                      {
+                        label: "Resort",
+                        value: <ResortEntityLabel name={c.resort?.name} id={c.resort?.id ?? c.resort_id} />,
+                      },
                       { label: "Period", value: <span className="font-mono text-xs">{c.period}</span> },
                       {
                         label: "Tier (last credit)",
@@ -795,7 +804,9 @@ export default function AdminFinancePage() {
                         />
                         <td className="font-mono text-xs">{c.id}</td>
                         <td className="text-sm">{c.marketer?.name ?? c.marketer_id}</td>
-                        <td className="text-sm">{c.resort?.name ?? c.resort_id}</td>
+                        <td>
+                          <ResortEntityLabel name={c.resort?.name} id={c.resort?.id ?? c.resort_id} nameClassName="text-sm font-normal" />
+                        </td>
                         <td className="font-mono text-xs">{c.period}</td>
                         <td>
                           {c.commission_source === "booking_commission" ? (
@@ -1007,7 +1018,15 @@ export default function AdminFinancePage() {
                       { label: "Released", value: new Date(r.released_at).toLocaleString() },
                       { label: "Source", value: <span className="capitalize">{r.release_source}</span> },
                       { label: "Marketer", value: r.commission?.marketer?.name ?? "—" },
-                      { label: "Resort", value: r.commission?.resort?.name ?? "—" },
+                      {
+                        label: "Resort",
+                        value: (
+                          <ResortEntityLabel
+                            name={r.commission?.resort?.name}
+                            id={r.commission?.resort?.id}
+                          />
+                        ),
+                      },
                       {
                         label: "Batch ref",
                         value: <span className="font-mono text-xs">{r.payout_batch?.reference_id ?? "—"}</span>,
@@ -1046,7 +1065,13 @@ export default function AdminFinancePage() {
                         <td className="font-mono text-sm">{fmtPhp(r.amount)}</td>
                         <td className="text-xs capitalize">{r.release_source}</td>
                         <td className="text-sm">{r.commission?.marketer?.name ?? "—"}</td>
-                        <td className="text-sm">{r.commission?.resort?.name ?? "—"}</td>
+                        <td>
+                          <ResortEntityLabel
+                            name={r.commission?.resort?.name}
+                            id={r.commission?.resort?.id}
+                            nameClassName="text-sm font-normal"
+                          />
+                        </td>
                         <td className="font-mono text-xs">{r.payout_batch?.reference_id ?? "—"}</td>
                       </tr>
                     ))}

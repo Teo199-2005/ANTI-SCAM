@@ -2,6 +2,7 @@
 
 import DashCard from "@/components/dash/DashCard";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
+import { TableEntityNameWithId } from "@/components/shared/EntityIdHint";
 import { useToast } from "@/components/shared/ToastProvider";
 import { updateAdminResortLandingEmbed } from "@/lib/api/admin";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -349,7 +350,9 @@ export default function AdminLandingEmbedPage() {
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td className="font-medium text-navy">{r.name}</td>
+                    <td>
+                      <TableEntityNameWithId name={r.name} id={r.id} nameClassName="font-medium" />
+                    </td>
                     <td className="max-w-[min(24rem,52vw)] align-top">
                       <PublicLandingUrlCell subdomain={r.subdomain} />
                     </td>

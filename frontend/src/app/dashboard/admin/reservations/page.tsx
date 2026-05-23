@@ -1,5 +1,6 @@
 "use client";
 
+import { EntityIdHint } from "@/components/shared/EntityIdHint";
 import AsyncStatePanel from "@/components/shared/AsyncStatePanel";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import DataTable from "@/components/shared/DataTable";
@@ -257,10 +258,13 @@ export default function AdminReservationsPage() {
                               href={`/resorts/${r.resortId}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 font-semibold text-sky-700 underline"
+                              className="inline-flex flex-col items-start gap-0.5 font-semibold text-sky-700 underline"
                             >
-                              {r.resortName ?? `Resort #${r.resortId}`}
-                              <ExternalLink size={12} />
+                              <span className="inline-flex items-center gap-1">
+                                {r.resortName ?? `Resort #${r.resortId}`}
+                                <ExternalLink size={12} className="shrink-0" />
+                              </span>
+                              <EntityIdHint id={r.resortId} className="no-underline" />
                             </Link>
                           ),
                         },
@@ -357,10 +361,13 @@ export default function AdminReservationsPage() {
                       href={`/resorts/${r.resortId}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-sky-700 underline"
+                      className="inline-flex min-w-0 flex-col items-start gap-0.5 text-sky-700 underline"
                     >
-                      <span className="truncate">{r.resortName ?? `#${r.resortId}`}</span>
-                      <ExternalLink size={12} className="shrink-0" />
+                      <span className="inline-flex max-w-full items-center gap-1">
+                        <span className="truncate">{r.resortName ?? `Resort #${r.resortId}`}</span>
+                        <ExternalLink size={12} className="shrink-0" />
+                      </span>
+                      <EntityIdHint id={r.resortId} className="no-underline" />
                     </Link>
                   ) : (
                     "—"

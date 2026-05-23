@@ -2,6 +2,7 @@
 
 import { SubscriptionPlanLabel } from "@/components/badges/SubscriptionPlanLabel";
 import DashModal from "@/components/dash/DashModal";
+import { EntityIdHint } from "@/components/shared/EntityIdHint";
 import { getResort, type ResortItem } from "@/lib/api/resort";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -89,7 +90,7 @@ export default function AdminResortViewModal({ resortId, open, onClose }: AdminR
       open={open}
       onClose={onClose}
       title={resort?.name ?? "Resort details"}
-      description={loading ? "Loading…" : resort ? `Resort #${resort.id} · Tenant #${resort.tenant_id}` : undefined}
+      description={loading ? "Loading…" : resort ? "Profile, listing, and subscription" : undefined}
       className="max-w-3xl"
     >
       {loading ? (
@@ -110,7 +111,10 @@ export default function AdminResortViewModal({ resortId, open, onClose }: AdminR
           <section>
             <h3 className="mb-1 font-dash text-xs font-bold uppercase tracking-wide text-zinc-500">Overview</h3>
             <div className="rounded-xl border border-softBorder bg-softCard/60 px-4">
-              <DetailRow label="Name">{resort.name}</DetailRow>
+              <DetailRow label="Name">
+                <span className="block font-medium text-navy">{resort.name}</span>
+                <EntityIdHint id={resort.id} secondaryId={resort.tenant_id} className="mt-1" />
+              </DetailRow>
               <DetailRow label="Description">
                 {resort.description?.trim() ? (
                   <p className="whitespace-pre-wrap">{resort.description}</p>
