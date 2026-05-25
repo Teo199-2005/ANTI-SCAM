@@ -54,8 +54,48 @@ export async function getCroppedImageBlob(
 }
 
 export async function fetchImageAsObjectUrl(url: string): Promise<string> {
-  const res = await fetch(url, { credentials: "include", mode: "cors" });
-  if (!res.ok) throw new Error(`Failed to load image (${res.status}).`);
+  if (!url.trim()) {
+    throw new Error("Missing image URL.");
+  }
+
+  const absolute =
+    typeof window !== "undefined" && url.startsWith("/")
+      ? `${window.location.origin}${url}`
+      : url;
+
+  // Same-origin /storage/* — Next.js proxy; no CORS issues.
+  if (typeof window !== "undefined") {
+    try {
+      const parsed = new URL(absolute, window.location.origin);
+      if (parsed.origin === window.location.origin && parsed.pathname.startsWith("/storage/")) {
+        const res = await fetch(parsed.pathname + parsed.search, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`Failed to load image (${res.status}).`);
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Failed to load image")) {
+        throw e;
+      }
+      // fall through to server proxy
+    }
+  }
+
+  const proxy = `/api/media-fetch?url=${encodeURIComponent(absolute)}`;
+  const res = await fetch(proxy, { credentials: "include", cache: "no-store" });
+  if (!res.ok) {
+    let detail = `Failed to load image (${res.status}).`;
+    try {
+      const json = (await res.json()) as { message?: string };
+      if (json.message) detail = json.message;
+    } catch {
+      // not JSON
+    }
+    throw new Error(detail);
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useToast } from "@/components/shared/ToastProvider";
-import { listResorts, uploadOwnerResortLogo } from "@/lib/api/resort";
-import { uploadBgImage } from "@/lib/api/landingPage";
+import { uploadOwnerResortLogo } from "@/lib/api/resort";
+import { getOwnerLandingPage, uploadBgImage } from "@/lib/api/landingPage";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { fetchImageAsObjectUrl, getCroppedImageBlob } from "@/lib/image/getCroppedImageBlob";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -83,31 +83,48 @@ export function ProfileMediaEditorScreen() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setLogoEditUrl(null);
+      setBgEditUrl(null);
       try {
-        const { data } = await listResorts({ perPage: 5 });
-        const first = data[0];
-        if (!first) {
-          pushToast({ tone: "error", title: "No resort found", description: "Create your resort from the dashboard first." });
-          router.replace("/dashboard/resort/profile");
-          return;
-        }
-        const logo = first.logo_url?.trim() ? String(first.logo_url) : null;
-        const bg = (first as { background_image_url?: string }).background_image_url?.trim()
-          ? String((first as { background_image_url?: string }).background_image_url)
-          : null;
+        const landing = await getOwnerLandingPage();
+        const logo = landing.computed?.hero?.logoUrl?.trim() || null;
+        const bg = landing.computed?.hero?.bgImageUrl?.trim() || null;
+
+        const imageErrors: string[] = [];
 
         if (logo) {
-          const abs = laravelPublicUrl(logo);
-          const u = trackObjectUrl(await fetchImageAsObjectUrl(abs));
-          setLogoEditUrl(u);
-        } else setLogoEditUrl(null);
+          try {
+            const abs = laravelPublicUrl(logo);
+            const u = trackObjectUrl(await fetchImageAsObjectUrl(abs));
+            setLogoEditUrl(u);
+          } catch (e) {
+            imageErrors.push(`Logo: ${parseApiErrorMessage(e, "Could not load.")}`);
+          }
+        }
+
         if (bg) {
-          const abs = laravelPublicUrl(bg);
-          const u = trackObjectUrl(await fetchImageAsObjectUrl(abs));
-          setBgEditUrl(u);
-        } else setBgEditUrl(null);
+          try {
+            const abs = laravelPublicUrl(bg);
+            const u = trackObjectUrl(await fetchImageAsObjectUrl(abs));
+            setBgEditUrl(u);
+          } catch (e) {
+            imageErrors.push(`Cover: ${parseApiErrorMessage(e, "Could not load.")}`);
+          }
+        }
+
+        if (imageErrors.length > 0) {
+          pushToast({
+            tone: "error",
+            title: "Could not open image in editor",
+            description: `${imageErrors.join(" ")} Use “Replace image” below or re-upload from your profile.`,
+          });
+        }
       } catch (e) {
-        pushToast({ tone: "error", title: "Could not load profile", description: parseApiErrorMessage(e, "Try again.") });
+        pushToast({
+          tone: "error",
+          title: "Could not load profile",
+          description: parseApiErrorMessage(e, "Try again."),
+        });
         router.replace("/dashboard/resort/profile");
       } finally {
         setLoading(false);
