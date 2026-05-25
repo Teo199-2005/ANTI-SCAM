@@ -3,8 +3,7 @@
 import { useToast } from "@/components/shared/ToastProvider";
 import { uploadOwnerResortLogo } from "@/lib/api/resort";
 import { getOwnerLandingPage, uploadBgImage } from "@/lib/api/landingPage";
-import { laravelPublicUrl } from "@/lib/publicAsset";
-import { fetchImageAsObjectUrl, getCroppedImageBlob } from "@/lib/image/getCroppedImageBlob";
+import { fetchOwnerProfileMediaAsObjectUrl, getCroppedImageBlob } from "@/lib/image/getCroppedImageBlob";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ImageIcon, Loader2, RotateCcw, Sparkles, Upload, X } from "lucide-react";
@@ -87,25 +86,23 @@ export function ProfileMediaEditorScreen() {
       setBgEditUrl(null);
       try {
         const landing = await getOwnerLandingPage();
-        const logo = landing.computed?.hero?.logoUrl?.trim() || null;
-        const bg = landing.computed?.hero?.bgImageUrl?.trim() || null;
+        const hasLogo = Boolean(landing.computed?.hero?.logoUrl?.trim());
+        const hasBg = Boolean(landing.computed?.hero?.bgImageUrl?.trim());
 
         const imageErrors: string[] = [];
 
-        if (logo) {
+        if (hasLogo) {
           try {
-            const abs = laravelPublicUrl(logo);
-            const u = trackObjectUrl(await fetchImageAsObjectUrl(abs));
+            const u = trackObjectUrl(await fetchOwnerProfileMediaAsObjectUrl("logo"));
             setLogoEditUrl(u);
           } catch (e) {
             imageErrors.push(`Logo: ${parseApiErrorMessage(e, "Could not load.")}`);
           }
         }
 
-        if (bg) {
+        if (hasBg) {
           try {
-            const abs = laravelPublicUrl(bg);
-            const u = trackObjectUrl(await fetchImageAsObjectUrl(abs));
+            const u = trackObjectUrl(await fetchOwnerProfileMediaAsObjectUrl("cover"));
             setBgEditUrl(u);
           } catch (e) {
             imageErrors.push(`Cover: ${parseApiErrorMessage(e, "Could not load.")}`);

@@ -53,6 +53,27 @@ export async function getCroppedImageBlob(
   });
 }
 
+/** Load the owner's logo or cover via the authenticated BFF (works with R2 without CDN env on Next). */
+export async function fetchOwnerProfileMediaAsObjectUrl(kind: "logo" | "cover"): Promise<string> {
+  const segment = kind === "cover" ? "background" : "logo";
+  const res = await fetch(`/api/backend/resort-owner/profile-media/${segment}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let detail = `Failed to load image (${res.status}).`;
+    try {
+      const json = (await res.json()) as { message?: string };
+      if (json.message) detail = json.message;
+    } catch {
+      // binary or HTML error body
+    }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 export async function fetchImageAsObjectUrl(url: string): Promise<string> {
   if (!url.trim()) {
     throw new Error("Missing image URL.");

@@ -59,6 +59,72 @@ final class StoredMedia
     }
 
     /**
+     * Resolve disk + object key from a DB value (/storage/..., legacy full URL, or R2 CDN URL).
+     *
+     * @return array{disk: string, path: string}|null
+     */
+    public static function resolveDiskAndPathFromStored(?string $stored): ?array
+    {
+        if (! is_string($stored) || trim($stored) === '') {
+            return null;
+        }
+
+        if (str_starts_with($stored, '/storage/')) {
+            $path = substr($stored, strlen('/storage/'));
+
+            return self::isValidStorageKey($path) ? ['disk' => 'public', 'path' => $path] : null;
+        }
+
+        $trimmed = trim($stored);
+        if (! str_starts_with($trimmed, 'http://') && ! str_starts_with($trimmed, 'https://')) {
+            return null;
+        }
+
+        $parts = parse_url($trimmed);
+        $path = is_string($parts['path'] ?? null) ? $parts['path'] : '';
+
+        if ($path !== '' && str_starts_with($path, '/storage/')) {
+            $key = substr($path, strlen('/storage/'));
+
+            return self::isValidStorageKey($key) ? ['disk' => 'public', 'path' => $key] : null;
+        }
+
+        $key = ltrim($path, '/');
+        if (! self::isValidStorageKey($key)) {
+            return null;
+        }
+
+        $storedHost = isset($parts['host']) ? strtolower((string) $parts['host']) : '';
+        $publicHost = self::s3PublicUrlHost();
+        if ($publicHost !== '' && $storedHost === $publicHost) {
+            return ['disk' => 's3', 'path' => $key];
+        }
+
+        if (self::disk() === 's3') {
+            return ['disk' => 's3', 'path' => $key];
+        }
+
+        return null;
+    }
+
+    /**
+     * Stream bytes for profile editors (avoid CDN redirect + browser CORS).
+     */
+    public static function streamResponseForStoredFile(string $disk, string $path): Response
+    {
+        if (! self::isValidStorageKey($path)) {
+            abort(404, 'File not found.');
+        }
+
+        $storage = Storage::disk($disk);
+        if (! $storage->exists($path)) {
+            abort(404, 'File not found.');
+        }
+
+        return $storage->response($path);
+    }
+
+    /**
      * Store an uploaded file on the configured media disk.
      * Falls back to the public disk when S3 fails on local dev.
      *

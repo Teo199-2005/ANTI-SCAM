@@ -87,6 +87,35 @@ class ResortLandingPageController extends Controller
     }
 
     /**
+     * GET /resort-owner/profile-media/{kind}
+     * Streams logo or background bytes for the authenticated owner's resort (profile crop editor).
+     */
+    public function streamProfileMedia(Request $request, string $kind)
+    {
+        $resort = $this->resolveResort($request);
+        if (! $resort) {
+            return $this->errorResponse('No resort found for this account.', null, 404);
+        }
+
+        $stored = match ($kind) {
+            'logo' => $resort->logo_url,
+            'background', 'cover' => $resort->background_image_url,
+            default => null,
+        };
+
+        if (! is_string($stored) || trim($stored) === '') {
+            return $this->errorResponse('No image uploaded yet.', null, 404);
+        }
+
+        $resolved = StoredMedia::resolveDiskAndPathFromStored($stored);
+        if ($resolved === null) {
+            return $this->errorResponse('Image location could not be resolved.', null, 404);
+        }
+
+        return StoredMedia::streamResponseForStoredFile($resolved['disk'], $resolved['path']);
+    }
+
+    /**
      * POST /resort-owner/landing-page/upload-bg-image
      * Uploads a background image and saves it directly to the resort record.
      *

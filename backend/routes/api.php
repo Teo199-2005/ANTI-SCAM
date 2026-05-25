@@ -280,6 +280,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/resort-owner/onboard', [AdminOnboardController::class, 'ownerStore']);
             Route::post('/resort-owner/onboard/upload-logo', [AdminOnboardController::class, 'ownerUploadLogo']);
             Route::get('/resort-owner/landing-page', [ResortLandingPageController::class, 'show']);
+            Route::get('/resort-owner/profile-media/{kind}', [ResortLandingPageController::class, 'streamProfileMedia'])
+                ->where('kind', 'logo|background|cover');
             Route::patch('/resort-owner/landing-page/video', [ResortLandingPageController::class, 'updateLandingVideo']);
             Route::post('/resort-owner/landing-page/upload-bg-image', [ResortLandingPageController::class, 'uploadBgImage']);
             Route::post('/resort-owner/landing-page/upload-image', [ResortLandingPageController::class, 'uploadImage']);
