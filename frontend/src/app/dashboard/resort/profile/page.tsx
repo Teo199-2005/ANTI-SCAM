@@ -18,6 +18,7 @@ import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api/client";
 import { laravelPublicUrl } from "@/lib/publicAsset";
+import { stashPendingProfileMedia } from "@/lib/media/pendingProfileMedia";
 import { resortPublicLandingPageUrl } from "@/lib/urls/resortPublicLandingUrl";
 import {
   ACCEPT_RASTER_IMAGES,
@@ -470,6 +471,7 @@ export default function ResortProfilePage() {
       const logoUrl = await uploadOwnerResortLogo(file);
       setForm({ ...form, logo_url: logoUrl });
       await refreshOwnerLanding();
+      stashPendingProfileMedia("logo", file);
       pushToast({
         title: "Logo uploaded",
         description: "Opening the media editor to crop and position your logo.",
@@ -507,6 +509,7 @@ export default function ResortProfilePage() {
       const url = await uploadBgImage(file);
       setForm({ ...form, background_image_url: url });
       await refreshOwnerLanding();
+      stashPendingProfileMedia("cover", file);
       pushToast({
         title: "Background image uploaded",
         description: "Opening the media editor to frame your cover photo.",

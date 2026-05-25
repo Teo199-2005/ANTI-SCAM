@@ -79,9 +79,15 @@ export type LandingComputedPayload = {
   map: LandingComputedMap;
 };
 
+export type OwnerLandingProfileMedia = {
+  logo_url: string | null;
+  background_image_url: string | null;
+};
+
 export type OwnerLandingPageResponse = {
   subdomain: string | null;
   resort_id: number;
+  profile_media?: OwnerLandingProfileMedia;
   subscription_status: string | null | undefined;
   subscription_plan?: string | null;
   subscription_end_at?: string | null;

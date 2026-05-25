@@ -4,6 +4,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { uploadOwnerResortLogo } from "@/lib/api/resort";
 import { getOwnerLandingPage, uploadBgImage } from "@/lib/api/landingPage";
 import { fetchOwnerProfileMediaAsObjectUrl, getCroppedImageBlob } from "@/lib/image/getCroppedImageBlob";
+import { takePendingProfileMedia } from "@/lib/media/pendingProfileMedia";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ImageIcon, Loader2, RotateCcw, Sparkles, Upload, X } from "lucide-react";
@@ -86,12 +87,20 @@ export function ProfileMediaEditorScreen() {
       setBgEditUrl(null);
       try {
         const landing = await getOwnerLandingPage();
-        const hasLogo = Boolean(landing.computed?.hero?.logoUrl?.trim());
-        const hasBg = Boolean(landing.computed?.hero?.bgImageUrl?.trim());
+        const hasLogo = Boolean(
+          landing.computed?.hero?.logoUrl?.trim() || landing.profile_media?.logo_url?.trim(),
+        );
+        const hasBg = Boolean(
+          landing.computed?.hero?.bgImageUrl?.trim() ||
+            landing.profile_media?.background_image_url?.trim(),
+        );
 
         const imageErrors: string[] = [];
 
-        if (hasLogo) {
+        const pendingLogo = takePendingProfileMedia("logo");
+        if (pendingLogo) {
+          setLogoEditUrl(trackObjectUrl(URL.createObjectURL(pendingLogo)));
+        } else if (hasLogo) {
           try {
             const u = trackObjectUrl(await fetchOwnerProfileMediaAsObjectUrl("logo"));
             setLogoEditUrl(u);
@@ -100,7 +109,10 @@ export function ProfileMediaEditorScreen() {
           }
         }
 
-        if (hasBg) {
+        const pendingCover = takePendingProfileMedia("cover");
+        if (pendingCover) {
+          setBgEditUrl(trackObjectUrl(URL.createObjectURL(pendingCover)));
+        } else if (hasBg) {
           try {
             const u = trackObjectUrl(await fetchOwnerProfileMediaAsObjectUrl("cover"));
             setBgEditUrl(u);

@@ -73,6 +73,11 @@ class ResortLandingPageController extends Controller
         return $this->successResponse([
             'subdomain' => $resort->tenant?->subdomain,
             'resort_id' => $resort->id,
+            /** Always present so the profile media editor can load crops even when `computed` is null. */
+            'profile_media' => [
+                'logo_url' => $resort->logo_url,
+                'background_image_url' => $resort->background_image_url,
+            ],
             'subscription_status' => $resort->subscription?->status,
             'subscription_plan' => $resort->subscription?->plan,
             'subscription_end_at' => $this->subscriptionEndAtForOwner($resort),
