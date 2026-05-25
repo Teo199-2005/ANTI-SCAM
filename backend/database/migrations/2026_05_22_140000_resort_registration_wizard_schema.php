@@ -126,18 +126,24 @@ return new class extends Migration
         }
 
         if (Schema::hasColumn('resorts', 'verification_status')) {
-            DB::table('resorts')
-                ->whereIn('id', function ($q): void {
-                    $q->select('resorts.id')
-                        ->from('resorts')
-                        ->join('tenants', 'tenants.id', '=', 'resorts.tenant_id')
-                        ->join('users', 'users.tenant_id', '=', 'tenants.id')
-                        ->where('users.role', 'resort_owner')
-                        ->whereNotNull('users.registration_completed_at');
-                })
-                ->where('verification_status', 'pending')
-                ->where('is_publicly_listed', true)
-                ->update(['verification_status' => 'verified', 'verified_at' => now()]);
+            // MySQL rejects UPDATE ... WHERE id IN (SELECT id FROM resorts ...).
+            $legacyListedIds = DB::table('resorts')
+                ->join('tenants', 'tenants.id', '=', 'resorts.tenant_id')
+                ->join('users', 'users.tenant_id', '=', 'tenants.id')
+                ->where('users.role', 'resort_owner')
+                ->whereNotNull('users.registration_completed_at')
+                ->where('resorts.verification_status', 'pending')
+                ->where('resorts.is_publicly_listed', true)
+                ->pluck('resorts.id');
+
+            if ($legacyListedIds->isNotEmpty()) {
+                DB::table('resorts')
+                    ->whereIn('id', $legacyListedIds)
+                    ->update([
+                        'verification_status' => 'verified',
+                        'verified_at' => now(),
+                    ]);
+            }
         }
     }
 
