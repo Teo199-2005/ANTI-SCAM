@@ -68,6 +68,10 @@ export async function fetchOwnerProfileMediaAsObjectUrl(kind: "logo" | "cover"):
     } catch {
       // binary or HTML error body
     }
+    if (res.status === 404 && /route.*could not be found/i.test(detail)) {
+      detail =
+        "Profile media API is missing on the server. Deploy the latest backend and run: php artisan route:clear";
+    }
     throw new Error(detail);
   }
   const blob = await res.blob();

@@ -97,7 +97,7 @@ export function ProfileMediaEditorScreen() {
 
         const imageErrors: string[] = [];
 
-        const pendingLogo = takePendingProfileMedia("logo");
+        const pendingLogo = await takePendingProfileMedia("logo");
         if (pendingLogo) {
           setLogoEditUrl(trackObjectUrl(URL.createObjectURL(pendingLogo)));
         } else if (hasLogo) {
@@ -109,7 +109,7 @@ export function ProfileMediaEditorScreen() {
           }
         }
 
-        const pendingCover = takePendingProfileMedia("cover");
+        const pendingCover = await takePendingProfileMedia("cover");
         if (pendingCover) {
           setBgEditUrl(trackObjectUrl(URL.createObjectURL(pendingCover)));
         } else if (hasBg) {

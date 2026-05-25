@@ -39,3 +39,13 @@ Use this checklist when shipping the 6-step owner wizard, verification queue, an
 - [ ] Backend: `php artisan test --filter=ResortRegistrationWizardTest`
 - [ ] Backend: `php artisan test --filter=AdminResortVerificationTest`
 - [ ] Frontend E2E (optional): from `frontend/`, `npm install` then `npm run test:e2e` (Playwright)
+
+## Profile media crop editor
+
+Requires **both** frontend and backend from commit `547078c` or newer.
+
+- [ ] `git pull` includes `GET /api/v1/resort-owner/profile-media/{kind}` (logo | background | cover)
+- [ ] After backend deploy: `php artisan route:clear` then `php artisan route:cache`
+- [ ] Verify route: `php artisan route:list --path=profile-media` (must show one GET route)
+- [ ] Smoke: `curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/api/v1/resort-owner/profile-media/logo` → expect **401**, not **404**
+- [ ] Rebuild frontend (`npm run build`) and `pm2 restart anti-scam-frontend --update-env`

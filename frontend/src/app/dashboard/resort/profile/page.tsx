@@ -471,7 +471,7 @@ export default function ResortProfilePage() {
       const logoUrl = await uploadOwnerResortLogo(file);
       setForm({ ...form, logo_url: logoUrl });
       await refreshOwnerLanding();
-      stashPendingProfileMedia("logo", file);
+      await stashPendingProfileMedia("logo", file);
       pushToast({
         title: "Logo uploaded",
         description: "Opening the media editor to crop and position your logo.",
@@ -509,7 +509,7 @@ export default function ResortProfilePage() {
       const url = await uploadBgImage(file);
       setForm({ ...form, background_image_url: url });
       await refreshOwnerLanding();
-      stashPendingProfileMedia("cover", file);
+      await stashPendingProfileMedia("cover", file);
       pushToast({
         title: "Background image uploaded",
         description: "Opening the media editor to frame your cover photo.",
