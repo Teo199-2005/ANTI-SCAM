@@ -253,7 +253,7 @@ export default function AdminResortVerificationReviewModal({
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
-              <EntityIdHint id={resort?.id} secondaryId={resort?.tenant_id} />
+              {resort ? <EntityIdHint id={resort.id} secondaryId={resort.tenant_id} /> : null}
               {publicHref ? (
                 <Link
                   href={publicHref}
