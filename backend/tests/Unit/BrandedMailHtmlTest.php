@@ -23,7 +23,7 @@ class BrandedMailHtmlTest extends TestCase
         $html = app(BrandedEmailTemplateService::class)->render('Test', '<p>Body</p>');
 
         $this->assertStringContainsString(BrandedMailHtml::LOGO_MARKER, $html);
-        $this->assertStringContainsString('https://anti-scamph.com/mainlogo.png', $html);
+        $this->assertStringContainsString('https://anti-scamph.com/branding/mainlogo.png', $html);
     }
 
     public function test_resolve_logo_url_prefers_frontend_mainlogo_png(): void
@@ -35,7 +35,7 @@ class BrandedMailHtmlTest extends TestCase
         ]);
 
         $this->assertSame(
-            'https://anti-scamph.com/mainlogo.png',
+            'https://anti-scamph.com/branding/mainlogo.png',
             BrandedMailHtml::resolveLogoUrl()
         );
     }

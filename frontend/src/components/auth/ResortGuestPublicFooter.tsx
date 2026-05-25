@@ -76,7 +76,7 @@ export function ResortGuestPublicFooter({ resortSlug }: Props) {
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 p-1.5 shadow-inner">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/mainlogo.png" alt="" width={36} height={36} className="h-8 w-8 object-contain" loading="lazy" decoding="async" />
+                <img src="/branding/mainlogo.png" alt="" width={36} height={36} className="h-8 w-8 object-contain" loading="lazy" decoding="async" />
               </span>
               <BrandWordmark tone="onDark" size="sm" className="min-w-0 leading-tight" />
             </Link>

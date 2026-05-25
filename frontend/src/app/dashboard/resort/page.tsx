@@ -1,5 +1,6 @@
 "use client";
 
+import { ResortPendingVerificationBanner } from "@/components/onboarding/ResortPendingVerificationBanner";
 import DashCard from "@/components/dash/DashCard";
 import DashModal from "@/components/dash/DashModal";
 import ProgressRing from "@/components/dashboard/ProgressRing";
@@ -264,6 +265,7 @@ export default function ResortOverviewPage() {
 
   return (
     <div className="min-w-0 max-w-full space-y-6">
+      <ResortPendingVerificationBanner />
 
       {/* ── Hero banner ─────────────────────────────────────── */}
       <div className="dash-hero-banner-cta flex w-full min-w-0 max-w-full flex-col gap-5 max-md:p-5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4 md:p-6">

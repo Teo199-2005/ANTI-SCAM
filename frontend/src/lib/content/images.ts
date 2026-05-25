@@ -1,8 +1,9 @@
 /**
  * Marketing imagery paths / URLs.
  *
- * Landing hero bitmap: `public/coverphoto.png` (imported in `HeroSection` for true dimensions & mobile layout).
+ * Landing hero bitmap: `public/marketing/coverphoto.png` (imported in `HeroSection`).
  */
+import { publicAssets } from "@/lib/content/publicAssets";
 
 /** Visionaries — Charles Andrew Santiago (`CEO.png`), intrinsic **1254 × 1254** px (1∶1). */
 export const VISIONARY_CEO_INTRINSIC = { width: 1254, height: 1254 } as const;
@@ -18,18 +19,14 @@ export const VISIONARY_COO_INTRINSIC = { width: 819, height: 819 } as const;
 
 export const images = {
   /** Anti-SCAM PH homepage hero — full graphic (text and CTAs baked in) */
-  hero: "/coverphoto.png",
+  hero: publicAssets.marketing.hero,
   spa: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874",
   dining: "https://images.unsplash.com/photo-1559339352-11d035aa65de",
   pool: "https://images.unsplash.com/photo-1571896349842-33c89424de2d",
-  /** Local asset — see `VISIONARY_CEO_INTRINSIC` */
-  ceo: "/CEO.png",
-  /** Local asset — see `VISIONARY_CTO_INTRINSIC` */
-  developer: "/CTO.png",
-  /** Local asset — see `VISIONARY_CMO_INTRINSIC` */
-  cmo: "/CMO.png",
-  /** Local asset — see `VISIONARY_COO_INTRINSIC` */
-  coo: "/COO.png",
+  ceo: publicAssets.team.ceo,
+  developer: publicAssets.team.cto,
+  cmo: publicAssets.team.cmo,
+  coo: publicAssets.team.coo,
   property1: "https://images.unsplash.com/photo-1505691938895-1758d7feb511",
   property2: "https://images.unsplash.com/photo-1496417263034-38ec4f0b665a",
   property3: "https://images.unsplash.com/photo-1501117716987-c8e1ecb2101d",

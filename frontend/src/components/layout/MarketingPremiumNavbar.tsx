@@ -205,7 +205,7 @@ export function MarketingPremiumNavbar({ mode }: Props) {
           onClick={() => setMobileNav(false)}
         >
           <ImageWithFallback
-            src="/mainlogo.png"
+            src="/branding/mainlogo.png"
             alt="Anti-Scam PH Logo"
             width={112}
             height={112}

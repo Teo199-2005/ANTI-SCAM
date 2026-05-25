@@ -6,8 +6,8 @@
  */
 
 $root = dirname(__DIR__, 2);
-$source = $root.'/frontend/public/mainlogo.png';
-$outPng = $root.'/frontend/public/mainlogo-bimi.png';
+$source = $root.'/frontend/public/branding/mainlogo.png';
+$outPng = $root.'/frontend/public/branding/mainlogo-bimi.png';
 $outSvg = $root.'/frontend/public/logo.svg';
 $outBackendPng = $root.'/backend/public/brand/mainlogo.png';
 $outBackendSvg = $root.'/backend/public/logo.svg';

@@ -26,7 +26,7 @@ let logoCache: string | null | undefined;
 export async function loadBrandLogoDataUrlForPdf(): Promise<string | null> {
   if (logoCache !== undefined) return logoCache;
   try {
-    const res = await fetch("/mainlogo.png", { cache: "force-cache" });
+    const res = await fetch("/branding/mainlogo.png", { cache: "force-cache" });
     if (!res.ok) return (logoCache = null);
     const blob = await res.blob();
     logoCache = await new Promise<string>((resolve, reject) => {

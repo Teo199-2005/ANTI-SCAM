@@ -1,4 +1,4 @@
-import heroCover from "../../../public/coverphoto.png";
+import heroCover from "../../../public/marketing/coverphoto.png";
 import Image from "next/image";
 
 /**

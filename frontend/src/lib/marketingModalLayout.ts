@@ -28,6 +28,24 @@ export const MARKETING_MODAL_PANEL_MAX_H_MD = "max-h-[min(calc(100dvh-6.5rem),40
 /** Rooms preview panel. */
 export const MARKETING_MODAL_PANEL_MAX_H_LG = "max-h-[min(calc(100dvh-6.5rem),52rem)]";
 
+/** Dashboard resort registration wizard — centered, no marketing nav offset. */
+export const WIZARD_MODAL_FRAME_CLASS = cn(
+  "relative flex min-h-full w-full items-center justify-center",
+  "px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+  "pt-[max(0.75rem,env(safe-area-inset-top))]",
+  "sm:px-5 sm:py-6",
+);
+
+export const WIZARD_MODAL_MAX_W = "max-w-[min(100%,80rem)]";
+
+export const WIZARD_MODAL_MAX_H = "max-h-[min(calc(100dvh-1rem),60rem)]";
+
+/** Dashboard registration wizard overlay (below legal / nested pickers). */
+export const WIZARD_MODAL_Z = "z-[400]";
+
+/** Terms & privacy — must stack above registration wizard and AppSelect menus. */
+export const LEGAL_MODAL_Z = "z-[1100]";
+
 /** Centered overlay frame for full-screen room / availability dialogs. */
 export const MARKETING_MODAL_CENTER_FRAME_CLASS = cn(
   "relative flex min-h-full w-full items-center justify-center",

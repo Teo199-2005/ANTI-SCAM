@@ -13,9 +13,10 @@ class ResortOwnerOnboardingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_resort_owner_register_creates_workspace(): void
+    public function test_resort_owner_register_defers_workspace_until_wizard_finish(): void
     {
         Mail::fake();
+        config(['resort_registration.wizard_enabled' => true]);
 
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => 'Hayatop Paet',
@@ -31,18 +32,29 @@ class ResortOwnerOnboardingTest extends TestCase
 
         $user = User::query()->where('email', 'owner-workspace@example.com')->first();
         $this->assertNotNull($user);
+        $this->assertNull($user->tenant_id);
+        $this->assertDatabaseHas('resort_registration_drafts', ['user_id' => $user->id]);
+    }
+
+    public function test_resort_owner_register_creates_workspace_when_wizard_disabled(): void
+    {
+        Mail::fake();
+        config(['resort_registration.wizard_enabled' => false]);
+
+        $response = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Legacy Owner',
+            'email' => 'legacy-wizard-off@example.com',
+            'password' => 'Zx7!kQm9pL2wR8vN4tY1hB6cF3sA0eD5uJ',
+            'password_confirmation' => 'Zx7!kQm9pL2wR8vN4tY1hB6cF3sA0eD5uJ',
+            'role_intent' => 'resort_owner',
+            'business_name' => 'Legacy Resort',
+            'accept_terms' => true,
+        ]);
+
+        $response->assertCreated();
+        $user = User::query()->where('email', 'legacy-wizard-off@example.com')->first();
         $this->assertNotNull($user->tenant_id);
-
-        $this->assertDatabaseHas('resorts', [
-            'tenant_id' => $user->tenant_id,
-            'name' => 'Hayatop Resort',
-        ]);
-
-        $this->assertDatabaseHas('subscriptions', [
-            'tenant_id' => $user->tenant_id,
-            'plan' => 'standard',
-            'status' => 'active',
-        ]);
+        $this->assertDatabaseMissing('resort_registration_drafts', ['user_id' => $user->id]);
     }
 
     public function test_resort_owner_onboard_endpoint_succeeds_for_legacy_account(): void

@@ -65,7 +65,7 @@ export function LandingPremiumPage() {
       <section className="relative isolate min-h-[min(52svh,34rem)] overflow-hidden max-lg:min-h-[min(58svh,36rem)] lg:min-h-[min(50svh,30rem)] lg:pb-2">
         <div className="absolute inset-0">
           <ImageWithFallback
-            src="/bgresort.png"
+            src="/marketing/bgresort.png"
             alt="Luxury resort at dusk"
             fill
             priority
@@ -179,7 +179,7 @@ export function LandingPremiumPage() {
           {/* Center badge — compact for above-the-fold pricing */}
           <div className="z-10 flex justify-center max-lg:order-2 max-lg:pt-1 lg:col-span-4">
             <ImageWithFallback
-              src="/founding500.png"
+              src="/marketing/founding500.png"
               alt="Founding 500 — verified resort partners"
               width={560}
               height={620}
@@ -280,7 +280,7 @@ export function LandingPremiumPage() {
               {
                 icon: (
                   <ImageWithFallback
-                    src="/phcircle.png"
+                    src="/marketing/phcircle.png"
                     alt="Philippines"
                     width={56}
                     height={56}

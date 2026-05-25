@@ -51,6 +51,15 @@ export type AuthUser = {
   terms_accepted_at?: string | null;
   terms_version?: string | null;
   created_at: string;
+  /** Resort owner: registration wizard progress (from /auth/me). */
+  registration_status?: "incomplete" | "complete";
+  onboarding_step?: number;
+  verification_status?: string;
+  verification_rejection_reason?: string | null;
+  verification_submission_count?: number;
+  registration_completed_at?: string | null;
+  verification_submitted_at?: string | null;
+  registration_wizard_enabled?: boolean;
   /** Resort owner: signup referral trial from registration (also on /auth/me). */
   referral_trial?: {
     active: boolean;

@@ -1,5 +1,6 @@
 "use client";
 
+import { AppSelect } from "@/components/shared/form";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -42,23 +43,14 @@ export default function TablePaginationBar({
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 sm:flex-nowrap sm:justify-end sm:gap-x-3">
         <span className="hidden shrink-0 text-[13px] font-medium text-zinc-600 sm:inline">Items per page</span>
         <span className="inline shrink-0 text-[13px] font-medium text-zinc-600 sm:hidden">Per page</span>
-        <select
-          value={perPage}
+        <AppSelect
+          variant="compact"
+          value={String(perPage)}
           disabled={disabled}
           aria-label="Items per page"
           onChange={(e) => onPerPageChange(Number(e.target.value))}
-          className={cn(
-            "h-8 shrink-0 cursor-pointer rounded-lg border border-zinc-200/90 bg-white px-2 pr-7 text-[13px] font-semibold tabular-nums text-zinc-900 shadow-sm outline-none transition",
-            "hover:border-zinc-300 focus:border-skyBlue focus:ring-2 focus:ring-skyBlue/20",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-          )}
-        >
-          {perPageOptions.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+          options={perPageOptions.map((n) => ({ value: String(n), label: String(n) }))}
+        />
 
         <span
           className="hidden h-4 w-px shrink-0 bg-zinc-200 sm:block"

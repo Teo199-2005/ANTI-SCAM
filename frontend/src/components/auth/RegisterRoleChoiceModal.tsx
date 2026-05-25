@@ -297,7 +297,7 @@ export function RegisterRoleChoiceModal({
               disabled={guestPending}
               pending={guestPending}
               title="Guests"
-              imageSrc="/register-guests.png"
+              imageSrc="/register/register-guests.png"
               imageAlt="Guests enjoying a verified resort stay"
               accent="guest"
               bullets={[
@@ -312,7 +312,7 @@ export function RegisterRoleChoiceModal({
             <RegisterRoleCard
               href={ownerHref}
               title="Resort Owner"
-              imageSrc="/register-resort-owner.png"
+              imageSrc="/register/register-resort-owner.png"
               imageAlt="Resort owner welcoming verified guests"
               accent="owner"
               bullets={[

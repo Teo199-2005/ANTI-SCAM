@@ -15,6 +15,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { LEGAL_MODAL_Z } from "@/lib/marketingModalLayout";
+import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 
 type LegalDocumentsContextValue = {
@@ -87,7 +89,7 @@ function ModalFrame({
   }, [titleId, title]);
 
   return (
-    <div className="fixed inset-0 z-[800]" role="presentation">
+    <div className={cn("fixed inset-0", LEGAL_MODAL_Z)} role="presentation">
       <button
         type="button"
         className="absolute inset-0 z-0 bg-zinc-950/55 backdrop-blur-[2px]"

@@ -19,6 +19,10 @@ class Room extends Model
         'capacity',
         'units',
         'base_price',
+        'weekday_price',
+        'weekend_price',
+        'check_in_time',
+        'check_out_time',
         'amenities',
         'rules',
         'status',
@@ -28,6 +32,8 @@ class Room extends Model
     {
         return [
             'base_price' => 'decimal:2',
+            'weekday_price' => 'decimal:2',
+            'weekend_price' => 'decimal:2',
             'amenities' => 'array',
             'units' => 'integer',
         ];

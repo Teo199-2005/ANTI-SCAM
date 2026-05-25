@@ -74,7 +74,7 @@ function OperatorPoweredBy({ dark }: { dark: boolean }) {
     >
       <div className="relative flex h-20 w-20 shrink-0 items-center justify-center sm:h-24 sm:w-24 md:h-28 md:w-28">
         <Image
-          src="/rising2brothers.png"
+          src="/branding/rising2brothers.png"
           alt="The Rising 2 Brothers OPC — company logo"
           fill
           className="object-contain"
@@ -128,7 +128,7 @@ export default function VisionariesSection({ dark = false }: { dark?: boolean })
           <div className="flex flex-col items-center gap-4 sm:gap-5 md:flex-row md:items-center md:gap-5 lg:gap-6">
             <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm sm:h-24 sm:w-24 md:h-28 md:w-28">
               <Image
-                src="/the-visionaries.png"
+                src="/marketing/the-visionaries.png"
                 alt="The Visionaries — Anti-Scam PH executive leadership emblem"
                 fill
                 className="object-contain"

@@ -78,7 +78,7 @@ function PublicResortShellFooter({ resort }: Readonly<{ resort: PublicResort }>)
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 p-1.5 shadow-inner">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/mainlogo.png"
+                  src="/branding/mainlogo.png"
                   alt=""
                   width={36}
                   height={36}

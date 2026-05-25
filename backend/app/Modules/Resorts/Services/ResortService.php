@@ -109,6 +109,14 @@ class ResortService
         }
 
         if (! empty($changes)) {
+            if (
+                array_key_exists('is_publicly_listed', $changes)
+                && $changes['is_publicly_listed']
+                && ($resort->verification_status ?? 'pending') !== 'verified'
+            ) {
+                $changes['is_publicly_listed'] = false;
+            }
+
             $resort->update($changes);
             $resort->refresh();
             $this->locations->syncResortAddressLabel($resort);

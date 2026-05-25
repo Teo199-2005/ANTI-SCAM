@@ -14,10 +14,21 @@ type LegalLinkButtonProps = {
 /** Opens the terms or privacy modal; styled like an inline text link. */
 export function LegalLinkButton({ kind, children, className = "", ...rest }: LegalLinkButtonProps) {
   const { openTerms, openPrivacy } = useLegalDocuments();
+
+  const open = () => (kind === "terms" ? openTerms() : openPrivacy());
+
   return (
     <button
       type="button"
-      onClick={() => (kind === "terms" ? openTerms() : openPrivacy())}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        open();
+      }}
       className={`inline bg-transparent p-0 font-semibold text-clOcean underline decoration-clOcean/30 underline-offset-2 hover:text-clOceanHover ${className}`}
       {...rest}
     >

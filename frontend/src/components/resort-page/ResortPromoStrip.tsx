@@ -26,14 +26,14 @@ function PromoRow() {
         <div key={`${item.key}-${idx}`} className="promo-strip-chip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/mainlogo.png"
+            src="/branding/mainlogo.png"
             alt=""
             className="h-[18px] w-[18px] rounded-full border border-black/10 bg-white object-cover p-[1px]"
             loading="lazy"
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/rising2brothers.png"
+            src="/branding/rising2brothers.png"
             alt=""
             className="h-[18px] w-[18px] rounded-sm border border-black/10 bg-white object-contain p-[1px]"
             loading="lazy"

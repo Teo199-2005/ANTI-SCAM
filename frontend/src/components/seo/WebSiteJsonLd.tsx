@@ -26,7 +26,7 @@ export default function WebSiteJsonLd() {
         url: origin,
         logo: {
           "@type": "ImageObject",
-          url: `${base}/mainlogo.png`,
+          url: `${base}/branding/mainlogo.png`,
         },
       },
     ],

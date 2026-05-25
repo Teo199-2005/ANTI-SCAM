@@ -1,7 +1,11 @@
 "use client";
 
+import { AppSelect, FieldLabel, appFieldInput } from "@/components/shared/form";
+import { wizardFieldIcons } from "@/lib/onboarding/wizardIcons";
 import { normalizeProvinceCodeForDisplay } from "@/lib/locations/phLocationApiCache";
 import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
+import { cn } from "@/lib/utils";
+import { MapPin } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
 
@@ -16,10 +20,12 @@ type Props = {
   onChange: (next: PhilippineLocationValue) => void;
   disabled?: boolean;
   idPrefix?: string;
-  /** Shown when the API still has a legacy barangay PSGC code but no free-text name */
   legacyBarangayCodeHint?: boolean;
-  /** Renders in the same row as Barangay on md+ (e.g. street line on resort profile). */
   barangayRowEnd?: ReactNode;
+  /** `wizard` uses field labels with icons; `dashboard` uses standard labels. */
+  appearance?: "dashboard" | "wizard";
+  /** Select size preset */
+  selectVariant?: "default" | "filter";
 };
 
 export function PhilippineLocationPicker({
@@ -29,12 +35,12 @@ export function PhilippineLocationPicker({
   idPrefix = "ph-loc",
   legacyBarangayCodeHint,
   barangayRowEnd,
+  appearance = "dashboard",
+  selectVariant = "default",
 }: Props) {
-  /**
-   * If an existing record stored an NCR city code (e.g. 1381300000 for Quezon City)
-   * in the province slot, normalise it to the Metro Manila entry so the dropdown
-   * shows the right selection. The hook also handles this internally for city loading.
-   */
+  const isWizard = appearance === "wizard";
+  const selectVariantResolved = isWizard ? "default" : selectVariant;
+
   const displayProvinceCode = normalizeProvinceCodeForDisplay(value.provinceCode);
 
   const { provinces, cities, loadingProvinces, loadingCities, provincesError, citiesError } =
@@ -46,7 +52,6 @@ export function PhilippineLocationPicker({
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  // When province changes and the saved city is no longer in the list, clear it.
   useEffect(() => {
     const v = valueRef.current;
     if (!v.provinceCode || !v.cityCode || cities.length === 0) return;
@@ -70,52 +75,62 @@ export function PhilippineLocationPicker({
 
   const locationError = provincesError ?? citiesError;
 
+  const provinceOptions = provinces.map((p) => ({ value: p.code, label: p.name }));
+  const cityOptions = cities.map((c) => ({ value: c.code, label: c.name }));
+
+  function LocationLabel({
+    id,
+    text,
+    icon = wizardFieldIcons.location,
+  }: {
+    id: string;
+    text: string;
+    icon?: typeof wizardFieldIcons.location;
+  }) {
+    if (isWizard) {
+      return (
+        <FieldLabel icon={icon} htmlFor={id}>
+          {text}
+        </FieldLabel>
+      );
+    }
+    return (
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-zinc-600">
+        {text}
+      </label>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <label htmlFor={`${idPrefix}-prov`} className="mb-1 block text-xs font-semibold text-zinc-600">
-            Province / region
-          </label>
-          <select
+          <LocationLabel id={`${idPrefix}-prov`} text="Province / region" />
+          <AppSelect
             id={`${idPrefix}-prov`}
-            className="dash-input"
-            disabled={provinceSelectDisabled}
+            variant={selectVariantResolved}
             value={displayProvinceCode ?? ""}
+            disabled={provinceSelectDisabled}
+            loading={loadingProvinces}
+            placeholder="Select province / region"
+            options={provinceOptions}
             onChange={(e) => onProvincePick(e.target.value)}
-          >
-            <option value="">{loadingProvinces ? "Loading…" : "Select province / region"}</option>
-            {provinces.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-city`} className="mb-1 block text-xs font-semibold text-zinc-600">
-            City / municipality
-          </label>
-          <select
+          <LocationLabel id={`${idPrefix}-city`} text="City / municipality" />
+          <AppSelect
             id={`${idPrefix}-city`}
-            className="dash-input"
-            disabled={citySelectDisabled}
+            variant={selectVariantResolved}
             value={value.cityCode ?? ""}
+            disabled={citySelectDisabled}
+            loading={loadingCities}
+            placeholder={
+              !value.provinceCode ? "Select province / region first" : "Select city / municipality"
+            }
+            options={cityOptions}
             onChange={(e) => onCityPick(e.target.value)}
-          >
-            <option value="">
-              {!value.provinceCode
-                ? "Select province / region first"
-                : loadingCities
-                  ? "Loading…"
-                  : "Select city / municipality"}
-            </option>
-            {cities.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       </div>
       {locationError ? (
@@ -123,22 +138,26 @@ export function PhilippineLocationPicker({
           {locationError}
         </p>
       ) : (
-        <p className="text-[11px] leading-snug text-zinc-500">
-          For Metro Manila addresses, select <strong className="font-medium text-zinc-700">Metro Manila (NCR)</strong> as
-          province / region, then pick your city.
-          {loadingProvinces || loadingCities ? " Loading lists…" : ""}
+        <p className={cn("text-[11px] leading-snug text-zinc-500", isWizard && "inline-flex items-start gap-1.5")}>
+          {isWizard ? (
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" strokeWidth={1.75} aria-hidden />
+          ) : null}
+          <span>
+            For Metro Manila addresses, select{" "}
+            <strong className="font-medium text-zinc-700">Metro Manila (NCR)</strong> as province / region, then pick
+            your city.
+            {loadingProvinces || loadingCities ? " Loading lists…" : ""}
+          </span>
         </p>
       )}
       {barangayRowEnd ? (
         <div className="grid gap-3 md:grid-cols-2 md:items-start">
           <div className="min-w-0">
-            <label htmlFor={`${idPrefix}-brgy`} className="mb-1 block text-xs font-semibold text-zinc-600">
-              Barangay
-            </label>
+            <LocationLabel id={`${idPrefix}-brgy`} text="Barangay" icon={wizardFieldIcons.address} />
             <input
               id={`${idPrefix}-brgy`}
               type="text"
-              className="dash-input"
+              className={isWizard ? appFieldInput : "dash-input"}
               placeholder="Enter barangay…"
               maxLength={180}
               value={value.barangayName ?? ""}
@@ -159,13 +178,11 @@ export function PhilippineLocationPicker({
         </div>
       ) : (
         <div>
-          <label htmlFor={`${idPrefix}-brgy`} className="mb-1 block text-xs font-semibold text-zinc-600">
-            Barangay
-          </label>
+          <LocationLabel id={`${idPrefix}-brgy`} text="Barangay" icon={wizardFieldIcons.address} />
           <input
             id={`${idPrefix}-brgy`}
             type="text"
-            className="dash-input"
+            className={isWizard ? appFieldInput : "dash-input"}
             placeholder="Enter barangay…"
             maxLength={180}
             value={value.barangayName ?? ""}

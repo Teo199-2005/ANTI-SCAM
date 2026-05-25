@@ -21,6 +21,7 @@ import {
   Percent,
   Plus,
   Settings,
+  ShieldCheck,
   TrendingUp,
   UserRound,
   Users,
@@ -34,6 +35,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getOwnerLandingPage } from "@/lib/api/landingPage";
+import { getResortVerificationStats } from "@/lib/api/adminResortVerification";
 import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import Logo from "@/components/layout/Logo";
 import { laravelPublicUrl } from "@/lib/publicAsset";
@@ -64,6 +66,7 @@ const adminGroups: NavGroup[] = [
       { href: "/dashboard/admin/users", label: "Users", icon: Users },
       { href: "/dashboard/admin/marketing-monitor", label: "Marketing partners", icon: Activity },
       { href: "/dashboard/admin/resorts", label: "Resorts", icon: Building2 },
+      { href: "/dashboard/admin/resort-verifications", label: "Resort verification", icon: ShieldCheck },
       { href: "/dashboard/admin/clients", label: "Clients", icon: UserRound },
       { href: "/dashboard/admin/landing-embed", label: "Landing intro video", icon: Video },
       { href: "/dashboard/admin/reservations", label: "Reservations", icon: CalendarDays },
@@ -199,6 +202,7 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const [ownerPlan, setOwnerPlan] = useState<string | null>(null);
   const [ownerSubStatus, setOwnerSubStatus] = useState<string | null>(null);
+  const [verificationQueueCount, setVerificationQueueCount] = useState(0);
 
   const role = user?.role ?? "user";
 
@@ -222,6 +226,22 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
       cancelled = true;
     };
   }, [role]);
+
+  useEffect(() => {
+    if (role !== "admin") return;
+    let cancelled = false;
+    void getResortVerificationStats()
+      .then((stats) => {
+        if (!cancelled) setVerificationQueueCount(stats.awaiting_review);
+      })
+      .catch(() => {
+        if (!cancelled) setVerificationQueueCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, pathname]);
+
   const guestResortLogo =
     role === "guest" && user?.home_resort?.logo_url ? laravelPublicUrl(user.home_resort.logo_url) : "";
 
@@ -387,6 +407,17 @@ export default function DashboardSidebar({ open, onClose }: SidebarProps) {
                           <item.icon size={navIconSize} strokeWidth={active ? 2.5 : 2} />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                        {item.href === "/dashboard/admin/resort-verifications" &&
+                        verificationQueueCount > 0 ? (
+                          <span
+                            className={cn(
+                              "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
+                              active ? "bg-white/25 text-white" : "bg-rose-600 text-white",
+                            )}
+                          >
+                            {verificationQueueCount > 99 ? "99+" : verificationQueueCount}
+                          </span>
+                        ) : null}
                         {active ? (
                           // Bright dot indicator on active dark bg
                           <span className="dash-sidebar-link-dot ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white/80 ring-4 ring-white/20" />

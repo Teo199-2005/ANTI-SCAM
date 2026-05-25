@@ -304,9 +304,33 @@ body {
          disabled:cursor-not-allowed disabled:opacity-50;
 }
 .dash-filter-select {
-  @apply h-8 min-w-[7.25rem] max-w-[10.5rem] shrink-0 rounded-lg border border-softBorderStrong bg-white px-2.5
+  @apply h-8 min-w-[7.25rem] max-w-[10.5rem] shrink-0 cursor-pointer appearance-none rounded-lg border border-softBorderStrong bg-white py-0 pl-2.5 pr-9
          font-dash text-xs text-zinc-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none
          focus:border-primaryBlue focus:ring-2 focus:ring-primaryBlue/15 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Native selects using dash classes (pages not yet on AppSelect) */
+select.dash-input:not([multiple]) {
+  @apply cursor-pointer appearance-none pr-11;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+}
+
+select.dash-filter-select:not([multiple]) {
+  @apply pr-9;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 0.875rem;
+}
+
+/* Date/time fields in dashboard */
+input[type="date"].dash-input,
+input[type="time"].dash-input,
+input[type="datetime-local"].dash-input {
+  @apply [color-scheme:light];
 }
 .dash-filter-submit {
   @apply inline-flex h-8 shrink-0 items-center justify-center rounded-lg border-0 bg-primaryBlue px-3 font-dash

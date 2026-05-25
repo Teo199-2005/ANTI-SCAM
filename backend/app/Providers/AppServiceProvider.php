@@ -56,6 +56,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($request->ip());
         });
 
+        // Registration + Google signup completion (per IP; avoids hour-long lockouts from throttle:5,60).
+        RateLimiter::for('auth-register', function (Request $request) {
+            return Limit::perMinute(30)->by($request->ip());
+        });
+
         RateLimiter::for('password-reset-request', function (Request $request) {
             $email = mb_strtolower(trim((string) $request->input('email', '')));
             $key = $email !== '' ? 'email:'.hash('sha256', $email) : 'ip:'.$request->ip();

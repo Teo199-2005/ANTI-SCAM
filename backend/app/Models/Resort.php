@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,6 +39,20 @@ class Resort extends Model
         'is_vip',
         'admin_landing_embed_enabled',
         'admin_landing_youtube_url',
+        'hospitality_type',
+        'hospitality_type_other',
+        'website_url',
+        'planned_room_count',
+        'verification_status',
+        'verification_method',
+        'verification_submitted_at',
+        'verified_at',
+        'verification_rejection_reason',
+        'verification_submission_count',
+        'verification_assigned_to_user_id',
+        'verification_admin_notes',
+        'verification_scheduled_at',
+        'verification_scheduled_notes',
     ];
 
     protected function casts(): array
@@ -47,7 +62,22 @@ class Resort extends Model
             'is_vip' => 'boolean',
             'admin_landing_embed_enabled' => 'boolean',
             'amenities' => 'array',
+            'planned_room_count' => 'integer',
+            'verification_submitted_at' => 'datetime',
+            'verified_at' => 'datetime',
+            'verification_submission_count' => 'integer',
+            'verification_scheduled_at' => 'datetime',
         ];
+    }
+
+    public function businessProfile(): HasOne
+    {
+        return $this->hasOne(ResortBusinessProfile::class);
+    }
+
+    public function verificationDocuments(): HasMany
+    {
+        return $this->hasMany(ResortVerificationDocument::class);
     }
 
     public function tenant(): BelongsTo
@@ -73,5 +103,29 @@ class Resort extends Model
     public function landingPage(): HasOne
     {
         return $this->hasOne(ResortLandingPage::class);
+    }
+
+    public function verificationAssignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verification_assigned_to_user_id');
+    }
+
+    public function isDiscoverableInPublicCatalog(): bool
+    {
+        return $this->is_publicly_listed
+            && ($this->verification_status ?? 'pending') === 'verified';
+    }
+
+    /**
+     * Resorts eligible for marketing catalog, slug pages, and public booking entry.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeDiscoverableInPublicCatalog(Builder $query): Builder
+    {
+        return $query
+            ->where('is_publicly_listed', true)
+            ->where('verification_status', 'verified');
     }
 }

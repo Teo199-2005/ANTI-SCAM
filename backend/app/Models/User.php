@@ -15,8 +15,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['tenant_id', 'home_resort_id', 'name', 'email', 'avatar_url', 'phone', 'google_id', 'password', 'role', 'referral_code', 'booking_commission_php', 'referred_by_marketer_id', 'signup_referral_code', 'referral_trial_ends_at', 'referral_trial_redeemed_at', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_type', 'marketer_gov_id_number', 'marketer_gov_id_document_url', 'mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc', 'mailing_barangay_name', 'mailing_location_label', 'marketer_tin', 'marketer_bank_channel_code', 'marketer_bank_name', 'marketer_bank_branch', 'marketer_bank_account_name', 'marketer_bank_account_number', 'email_verified_at', 'terms_accepted_at', 'terms_version'])]
-#[Hidden(['password', 'remember_token', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_number', 'marketer_tin', 'marketer_bank_account_number'])]
+#[Fillable(['tenant_id', 'home_resort_id', 'name', 'email', 'avatar_url', 'phone', 'birth_date', 'personal_tin', 'owner_mailing_province_psgc', 'owner_mailing_city_municipality_psgc', 'owner_mailing_barangay_psgc', 'owner_mailing_barangay_name', 'owner_mailing_street_line', 'owner_mailing_location_label', 'information_certified_at', 'registration_completed_at', 'onboarding_step', 'google_id', 'password', 'role', 'referral_code', 'booking_commission_php', 'referred_by_marketer_id', 'signup_referral_code', 'referral_trial_ends_at', 'referral_trial_redeemed_at', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_type', 'marketer_gov_id_number', 'marketer_gov_id_document_url', 'mailing_province_psgc', 'mailing_city_municipality_psgc', 'mailing_barangay_psgc', 'mailing_barangay_name', 'mailing_location_label', 'marketer_tin', 'marketer_bank_channel_code', 'marketer_bank_name', 'marketer_bank_branch', 'marketer_bank_account_name', 'marketer_bank_account_number', 'email_verified_at', 'terms_accepted_at', 'terms_version'])]
+#[Hidden(['password', 'remember_token', 'gcash_account_number', 'gcash_account_holder_name', 'marketer_gov_id_number', 'marketer_tin', 'marketer_bank_account_number', 'personal_tin'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -37,8 +37,12 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'birth_date' => 'date',
             'email_verified_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
+            'information_certified_at' => 'datetime',
+            'registration_completed_at' => 'datetime',
+            'personal_tin' => 'encrypted',
             'referral_trial_ends_at' => 'datetime',
             'referral_trial_redeemed_at' => 'datetime',
             'password' => 'hashed',

@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandWordmark } from "@/components/branding/BrandWordmark";
+import { publicAssets } from "@/lib/content/publicAssets";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,7 +44,7 @@ export default function PoweredByMark({
     <div className={cn(layoutCls, baseText, className)}>
       {showOperatorLogo ? (
         <Image
-          src="/rising2brothers.png"
+          src={publicAssets.branding.rising2Brothers}
           alt="The Rising 2 Brothers OPC"
           width={compact ? 22 : 28}
           height={compact ? 22 : 28}

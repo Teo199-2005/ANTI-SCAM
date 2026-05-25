@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Modules\Billing\Support\XenditMode;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
+use App\Services\ResortRegistrationService;
+use App\Support\ResortRegistrationConfig;
 
 final class UserProfilePresenter
 {
@@ -27,6 +29,18 @@ final class UserProfilePresenter
 
         if ($user->role === 'resort_owner') {
             $a['referral_trial'] = app(ReferralSignupTrialService::class)->trialPayloadForUser($user);
+            $registration = app(ResortRegistrationService::class);
+            $a['registration_status'] = $registration->registrationStatus($user);
+            $a['onboarding_step'] = max(1, min(6, (int) ($user->onboarding_step ?? 1)));
+            $resort = \App\Models\Resort::withoutGlobalScopes()
+                ->where('tenant_id', $user->tenant_id)
+                ->first();
+            $a['verification_status'] = $resort?->verification_status ?? 'pending';
+            $a['verification_rejection_reason'] = $resort?->verification_rejection_reason;
+            $a['verification_submission_count'] = (int) ($resort?->verification_submission_count ?? 0);
+            $a['registration_completed_at'] = $user->registration_completed_at?->toIso8601String();
+            $a['verification_submitted_at'] = $resort?->verification_submitted_at?->toIso8601String();
+            $a['registration_wizard_enabled'] = ResortRegistrationConfig::wizardEnabled();
         }
 
         if ($user->role === 'marketing') {

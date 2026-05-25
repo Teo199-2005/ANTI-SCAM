@@ -252,7 +252,7 @@ export default function AboutPage() {
           <div className="p-5 md:p-6">
             <div className="overflow-hidden rounded-xl border border-clSeafoam/60 bg-clSand">
               <Image
-                src="/poster1.png"
+                src="/marketing/poster1.png"
                 alt="Anti-Scam PH brand poster"
                 width={1600}
                 height={900}

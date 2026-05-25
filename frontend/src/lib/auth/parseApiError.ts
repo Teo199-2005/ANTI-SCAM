@@ -218,6 +218,14 @@ export function parseApiErrorMessage(error: unknown, fallback = "Something went 
       }
     }
 
+    if (error.response?.status === 429) {
+      const retry = (data as { data?: { retry_after_seconds?: number } } | undefined)?.data?.retry_after_seconds;
+      if (typeof retry === "number" && retry > 0 && retry <= 120) {
+        return `Too many attempts. Please wait ${retry} seconds and try again.`;
+      }
+      return "Too many attempts. Please wait a minute and try again.";
+    }
+
     if (data?.message && typeof data.message === "string" && data.message !== "") {
       const m = data.message.trim();
       if (!isGenericBagMessage(m)) {
@@ -237,7 +245,6 @@ export function parseApiErrorMessage(error: unknown, fallback = "Something went 
     if (error.response?.status === 413)
       return "That file is too large for the server. Try a smaller image, or use a compressed JPEG or WebP.";
     if (error.response?.status === 422) return "Some information looks incorrect. Check the form and try again.";
-    if (error.response?.status === 429) return "Too many attempts. Please wait a moment and try again.";
     if (error.response?.status === 502) {
       const m = typeof data?.message === "string" ? data.message.trim() : "";
       if (m !== "" && !isGenericBagMessage(m)) {

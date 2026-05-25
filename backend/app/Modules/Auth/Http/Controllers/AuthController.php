@@ -11,6 +11,7 @@ use App\Services\EmailNotificationService;
 use App\Services\EmailVerificationOtpService;
 use App\Services\GooglePendingSignupService;
 use App\Services\PasswordResetOtpService;
+use App\Services\ResortRegistrationService;
 use App\Services\PhilippineLocationService;
 use App\Services\ReferralSignupTrialService;
 use App\Services\ResortOwnerOnboardingService;
@@ -19,6 +20,7 @@ use App\Modules\Billing\Services\PhilippinesPayoutBankChannelService;
 use App\Support\BankAccountNormalizer;
 use App\Support\MarketingGovIdCatalog;
 use App\Support\PlatformPasswordRules;
+use App\Support\ResortRegistrationConfig;
 use App\Support\StoredMedia;
 use App\Support\UserProfilePresenter;
 use Illuminate\Http\Request;
@@ -40,6 +42,7 @@ class AuthController extends Controller
         private readonly ResortOwnerOnboardingService $ownerOnboarding,
         private readonly PhilippinesPayoutBankChannelService $payoutBanks,
         private readonly GooglePendingSignupService $googlePendingSignup,
+        private readonly ResortRegistrationService $resortRegistration,
     ) {}
 
     public function googlePendingSignup(Request $request)
@@ -97,21 +100,8 @@ class AuthController extends Controller
         $referralCode = trim((string) ($validated['referral_code'] ?? ''));
         $businessName = isset($validated['business_name']) ? trim((string) $validated['business_name']) : null;
 
-        if ($referralCode !== '' && $roleIntent === 'resort_owner') {
-            $referralTrialPayload = $this->referralSignupTrial->redeemAtRegistration(
-                $user,
-                $referralCode,
-                $businessName !== '' ? $businessName : null,
-            );
-            $user->refresh();
-        }
-
         if ($roleIntent === 'resort_owner') {
-            $this->ownerOnboarding->onboardOwner($user, [
-                'business_name' => $businessName !== '' ? $businessName : null,
-                'is_publicly_listed' => false,
-            ]);
-            $user->refresh();
+            $this->bootstrapResortOwnerSignup($user, $referralCode, $businessName);
         }
 
         $this->emailNotifications->sendTermsAccepted($user, 'Google account registration');
@@ -167,21 +157,8 @@ class AuthController extends Controller
         $referralCode = trim((string) ($validated['referral_code'] ?? ''));
         $businessName = isset($validated['business_name']) ? trim((string) $validated['business_name']) : null;
 
-        if ($referralCode !== '' && $roleIntent === 'resort_owner') {
-            $referralTrialPayload = $this->referralSignupTrial->redeemAtRegistration(
-                $user,
-                $referralCode,
-                $businessName !== '' ? $businessName : null,
-            );
-            $user->refresh();
-        }
-
         if ($roleIntent === 'resort_owner') {
-            $this->ownerOnboarding->onboardOwner($user, [
-                'business_name' => $businessName !== '' ? $businessName : null,
-                'is_publicly_listed' => false,
-            ]);
-            $user->refresh();
+            $this->bootstrapResortOwnerSignup($user, $referralCode, $businessName);
         }
 
         $this->emailNotifications->sendTermsAccepted($user, 'account registration');
@@ -631,6 +608,38 @@ class AuthController extends Controller
         return $this->successResponse([
             'user' => UserProfilePresenter::toArray($user->fresh()),
         ], $result['message'] ?? 'Email verified successfully.');
+    }
+
+    private function bootstrapResortOwnerSignup(User $user, string $referralCode, ?string $businessName): void
+    {
+        $businessName = $businessName !== null ? trim($businessName) : '';
+
+        if (! ResortRegistrationConfig::wizardEnabled()) {
+            $this->ownerOnboarding->onboardOwner($user, [
+                'business_name' => $businessName !== '' ? $businessName : null,
+                'is_publicly_listed' => false,
+            ]);
+            $user->refresh();
+            if ($referralCode !== '') {
+                $this->referralSignupTrial->redeemAtRegistration(
+                    $user,
+                    $referralCode,
+                    $businessName !== '' ? $businessName : null,
+                );
+            }
+
+            return;
+        }
+
+        $seed = [];
+        if ($referralCode !== '') {
+            $seed['step2'] = ['referral_code' => $referralCode];
+        }
+        if ($businessName !== '') {
+            $seed['step2'] = array_merge($seed['step2'] ?? [], ['business_name' => $businessName]);
+        }
+        $this->resortRegistration->ensureDraftForOwner($user, $seed);
+        $user->forceFill(['onboarding_step' => 1])->save();
     }
 
     private function deleteStoredMarketingGovIdDocument(User $user): void

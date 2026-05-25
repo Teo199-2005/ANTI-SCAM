@@ -24,10 +24,37 @@ const nextConfig: NextConfig = {
   },
 
   async redirects() {
+    const legacyPublicImages = [
+      ["/mainlogo.png", "/branding/mainlogo.png"],
+      ["/mainlogo-bimi.png", "/branding/mainlogo-bimi.png"],
+      ["/rising2brothers.png", "/branding/rising2brothers.png"],
+      ["/verified.png", "/branding/verified.png"],
+      ["/login.png", "/auth/login.png"],
+      ["/CEO.png", "/team/CEO.png"],
+      ["/CTO.png", "/team/CTO.png"],
+      ["/CMO.png", "/team/CMO.png"],
+      ["/COO.png", "/team/COO.png"],
+      ["/coverphoto.png", "/marketing/coverphoto.png"],
+      ["/program.png", "/marketing/program.png"],
+      ["/poster1.png", "/marketing/poster1.png"],
+      ["/poster12.png", "/marketing/poster12.png"],
+      ["/founding500.png", "/marketing/founding500.png"],
+      ["/the-visionaries.png", "/marketing/the-visionaries.png"],
+      ["/bgresort.png", "/marketing/bgresort.png"],
+      ["/phcircle.png", "/marketing/phcircle.png"],
+      ["/register-guests.png", "/register/register-guests.png"],
+      ["/register-resort-owner.png", "/register/register-resort-owner.png"],
+    ] as const;
+
     return [
       { source: "/landing-preview", destination: "/", permanent: true },
       { source: "/terms", destination: "/", permanent: true },
       { source: "/privacy", destination: "/", permanent: true },
+      ...legacyPublicImages.map(([source, destination]) => ({
+        source,
+        destination,
+        permanent: true,
+      })),
     ];
   },
 

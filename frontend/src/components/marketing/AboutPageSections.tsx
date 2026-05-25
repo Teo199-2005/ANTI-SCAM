@@ -21,7 +21,7 @@ import {
 import Image from "next/image";
 import type { ReactNode } from "react";
 
-const LOGO_WATERMARK = "/mainlogo.png";
+const LOGO_WATERMARK = "/branding/mainlogo.png";
 
 type WatermarkSize = "sm" | "md" | "lg";
 type WatermarkPosition = "bottom-right" | "center-right";

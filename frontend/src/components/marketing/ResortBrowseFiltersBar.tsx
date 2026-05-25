@@ -1,6 +1,7 @@
 "use client";
 
 import type { LocationFilterValue } from "@/components/locations/LocationFilterBar";
+import { AppSelect } from "@/components/shared/form";
 import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import { cn } from "@/lib/utils";
 import { Building2, ChevronDown, Crown, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
@@ -28,8 +29,11 @@ type Props = {
 const fieldClass =
   "h-10 min-w-0 rounded-xl border-0 bg-transparent px-2 text-[13px] text-zinc-800 outline-none placeholder:text-zinc-400 focus:ring-0 sm:h-9 sm:rounded-full";
 
-const selectClass =
-  "h-10 w-full cursor-pointer appearance-none rounded-xl border border-zinc-200/90 bg-white px-3 pe-8 text-[13px] font-medium text-zinc-800 outline-none focus:border-clOcean/40 sm:h-9 sm:max-w-[9.5rem] sm:min-w-[5.5rem] sm:shrink-0 sm:rounded-full sm:border-0 sm:bg-transparent sm:pe-6 sm:ps-1";
+const PLAN_OPTIONS = [
+  { value: "", label: "All plans" },
+  { value: "business_pro", label: "Premium" },
+  { value: "standard", label: "Standard" },
+] as const;
 
 export function ResortBrowseFiltersBar({
   query,
@@ -180,60 +184,43 @@ export function ResortBrowseFiltersBar({
 
             <div className="hidden items-center gap-0.5 sm:flex">
               <MapPin size={14} className="ms-1 shrink-0 text-zinc-400" aria-hidden />
-              <select
+              <AppSelect
+                variant="marketing"
                 aria-label="Province or region"
-                className={selectClass}
                 disabled={loadingProvinces}
+                loading={loadingProvinces}
                 value={location.provincePsgc ?? ""}
+                placeholder="All provinces / regions"
+                options={provinces.map((p) => ({ value: p.code, label: p.name }))}
                 onChange={(e) => setProvince(e.target.value || null)}
-              >
-                <option value="">{loadingProvinces ? "Loading…" : "All provinces / regions"}</option>
-                {provinces.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="hidden items-center gap-0.5 sm:flex">
               <Building2 size={14} className="ms-1 shrink-0 text-zinc-400" aria-hidden />
-              <select
+              <AppSelect
+                variant="marketing"
                 aria-label="City or municipality"
-                className={selectClass}
                 value={location.cityPsgc ?? ""}
                 disabled={!location.provincePsgc || loadingProvinces || loadingCities}
+                loading={loadingCities}
+                placeholder={!location.provincePsgc ? "Province first" : "All cities"}
+                options={cities.map((c) => ({ value: c.code, label: c.name }))}
                 onChange={(e) => setCity(e.target.value || null)}
-              >
-                <option value="">
-                  {!location.provincePsgc
-                    ? "Province first"
-                    : loadingCities
-                      ? "Loading…"
-                      : "All cities"}
-                </option>
-                {cities.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <span className="hidden h-5 w-px bg-zinc-200 sm:block" aria-hidden />
 
             <div className="hidden items-center gap-0.5 sm:flex">
               <SlidersHorizontal size={14} className="ms-1 shrink-0 text-zinc-400" aria-hidden />
-              <select
+              <AppSelect
+                variant="marketing"
                 aria-label="Plan"
-                className={selectClass}
                 value={planFilter}
+                options={[...PLAN_OPTIONS]}
                 onChange={(e) => onPlanFilterChange(e.target.value as PlanFilter)}
-              >
-                <option value="">All plans</option>
-                <option value="business_pro">Premium</option>
-                <option value="standard">Standard</option>
-              </select>
+              />
             </div>
 
             <button
@@ -263,56 +250,39 @@ export function ResortBrowseFiltersBar({
           >
             <label className="col-span-2 flex flex-col gap-1">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Province / region</span>
-              <select
+              <AppSelect
+                variant="marketing"
                 aria-label="Province or region"
-                className={selectClass}
                 disabled={loadingProvinces}
+                loading={loadingProvinces}
                 value={location.provincePsgc ?? ""}
+                placeholder="All provinces / regions"
+                options={provinces.map((p) => ({ value: p.code, label: p.name }))}
                 onChange={(e) => setProvince(e.target.value || null)}
-              >
-                <option value="">{loadingProvinces ? "Loading…" : "All provinces / regions"}</option>
-                {provinces.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="col-span-2 flex flex-col gap-1">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">City / municipality</span>
-              <select
+              <AppSelect
+                variant="marketing"
                 aria-label="City or municipality"
-                className={selectClass}
                 value={location.cityPsgc ?? ""}
                 disabled={!location.provincePsgc || loadingProvinces || loadingCities}
+                loading={loadingCities}
+                placeholder={!location.provincePsgc ? "Province first" : "All cities"}
+                options={cities.map((c) => ({ value: c.code, label: c.name }))}
                 onChange={(e) => setCity(e.target.value || null)}
-              >
-                <option value="">
-                  {!location.provincePsgc
-                    ? "Province first"
-                    : loadingCities
-                      ? "Loading…"
-                      : "All cities"}
-                </option>
-                {cities.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Plan</span>
-              <select
+              <AppSelect
+                variant="marketing"
                 aria-label="Plan"
-                className={selectClass}
                 value={planFilter}
+                options={[...PLAN_OPTIONS]}
                 onChange={(e) => onPlanFilterChange(e.target.value as PlanFilter)}
-              >
-                <option value="">All plans</option>
-                <option value="business_pro">Premium</option>
-                <option value="standard">Standard</option>
-              </select>
+              />
             </label>
             <div className="flex flex-col justify-end">
               <button

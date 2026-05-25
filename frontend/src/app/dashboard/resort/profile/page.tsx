@@ -924,16 +924,29 @@ export default function ResortProfilePage() {
               placeholder="Describe your resort (shown in About section on landing page)"
             />
           </div>
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-zinc-700 md:col-span-2">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-softBorder bg-softCard text-skyBlue focus:ring-skyBlue/40"
-              checked={form.is_publicly_listed}
-              onChange={(e) => onChange("is_publicly_listed", e.target.checked)}
-            />
-            <Waves size={14} className="text-zinc-500" />
-            Publicly listed on platform
-          </label>
+          <div className="md:col-span-2 space-y-1">
+            <label
+              className={`inline-flex items-center gap-2 text-sm text-zinc-700 ${
+                user?.verification_status === "verified" ? "cursor-pointer" : "cursor-not-allowed opacity-70"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-softBorder bg-softCard text-skyBlue focus:ring-skyBlue/40"
+                checked={form.is_publicly_listed}
+                disabled={user?.verification_status !== "verified"}
+                onChange={(e) => onChange("is_publicly_listed", e.target.checked)}
+              />
+              <Waves size={14} className="text-zinc-500" />
+              Publicly listed on platform
+            </label>
+            {user?.verification_status !== "verified" ? (
+              <p className="text-xs text-amber-800">
+                Listing stays off until Anti-Scam PH verifies your property (typically 24–72 hours after document
+                submission).
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 

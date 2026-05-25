@@ -51,10 +51,10 @@ export const metadata: Metadata = {
   applicationName: "Anti-Scam PH",
   icons: {
     icon: [
-      { url: "/mainlogo.png", type: "image/png", sizes: "32x32" },
-      { url: "/mainlogo.png", type: "image/png", sizes: "192x192" }
+      { url: "/branding/mainlogo.png", type: "image/png", sizes: "32x32" },
+      { url: "/branding/mainlogo.png", type: "image/png", sizes: "192x192" }
     ],
-    apple: [{ url: "/mainlogo.png", sizes: "180x180", type: "image/png" }]
+    apple: [{ url: "/branding/mainlogo.png", sizes: "180x180", type: "image/png" }]
   },
   openGraph: {
     type: "website",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     siteName: "Anti-Scam PH",
     images: [
       {
-        url: "/coverphoto.png",
+        url: "/marketing/coverphoto.png",
         width: 1536,
         height: 1024,
         alt: "Anti-Scam PH — verified resort bookings"
@@ -71,7 +71,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/coverphoto.png"]
+    images: ["/marketing/coverphoto.png"]
   },
   robots: {
     index: true,

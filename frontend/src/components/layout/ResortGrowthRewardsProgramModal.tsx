@@ -65,7 +65,7 @@ export function ResortGrowthRewardsProgramModal({ open, onClose, eligible = true
         <div className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/80 p-2 sm:p-3">
           {eligible ? (
             <ImageWithFallback
-              src="/program.png"
+              src="/marketing/program.png"
               alt="Anti-Scam PH Resort Growth Rewards Program"
               width={1600}
               height={2200}

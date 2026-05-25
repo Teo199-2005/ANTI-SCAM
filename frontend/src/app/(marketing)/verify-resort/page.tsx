@@ -41,7 +41,11 @@ export default function VerifyResortPage() {
               </span>
             </li>
           </ul>
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <p className="mt-8 text-sm text-zinc-600">
+            After you create an owner account, sign in to your dashboard to complete the full registration wizard and
+            submit verification documents (typically reviewed within 24–72 hours).
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
               href="/resorts"
               className="glass-inline-btn justify-center px-6 py-2.5 font-semibold text-navy"

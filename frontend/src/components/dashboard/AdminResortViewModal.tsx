@@ -7,8 +7,8 @@ import { getResort, type ResortItem } from "@/lib/api/resort";
 import { formatSubscriptionStatusLabel } from "@/lib/billing/subscriptionStatus";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { formatPhp } from "@/lib/formatPhp";
+import { laravelPublicUrl } from "@/lib/publicAsset";
 import { ExternalLink, Globe, Loader2, PenLine } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -103,8 +103,13 @@ export default function AdminResortViewModal({ resortId, open, onClose }: AdminR
       ) : resort ? (
         <div className="space-y-6">
           {resort.logo_url ? (
-            <div className="relative mx-auto h-20 w-20 overflow-hidden rounded-2xl border border-softBorder bg-white shadow-soft-sm">
-              <Image src={resort.logo_url} alt="" fill className="object-cover" sizes="80px" unoptimized />
+            <div className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-softBorder bg-white p-2 shadow-soft-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={laravelPublicUrl(resort.logo_url)}
+                alt={`${resort.name} logo`}
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
           ) : null}
 
@@ -158,6 +163,12 @@ export default function AdminResortViewModal({ resortId, open, onClose }: AdminR
                 {resort.is_publicly_listed ? "Listed on platform" : "Not listed"}
               </DetailRow>
               <DetailRow label="VIP">{resort.is_vip ? "Yes" : "No"}</DetailRow>
+              {"hospitality_type" in resort && resort.hospitality_type ? (
+                <DetailRow label="Hospitality type">{String(resort.hospitality_type)}</DetailRow>
+              ) : null}
+              {"verification_status" in resort && resort.verification_status ? (
+                <DetailRow label="Verification">{String(resort.verification_status)}</DetailRow>
+              ) : null}
               {publicHref ? (
                 <DetailRow label="Public page">
                   <Link

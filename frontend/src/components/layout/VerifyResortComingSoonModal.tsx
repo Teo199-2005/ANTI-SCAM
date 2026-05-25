@@ -51,7 +51,7 @@ export function VerifyResortComingSoonModal({ open, onClose }: Props) {
           <div className="flex min-w-0 items-center gap-3">
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <ImageWithFallback
-                src="/mainlogo.png"
+                src="/branding/mainlogo.png"
                 alt="Anti-Scam PH"
                 width={56}
                 height={56}

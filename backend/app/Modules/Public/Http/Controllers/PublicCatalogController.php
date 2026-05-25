@@ -44,7 +44,7 @@ class PublicCatalogController extends Controller
                 'rooms' => fn ($q) => $q->where('status', 'active')->select('id', 'resort_id'),
             ])
             ->withCount(['rooms as active_rooms_count' => fn ($q) => $q->where('status', 'active')])
-            ->where('is_publicly_listed', true)
+            ->discoverableInPublicCatalog()
             ->leftJoin('subscriptions', 'subscriptions.resort_id', '=', 'resorts.id')
             ->orderByRaw("CASE WHEN subscriptions.plan = 'business_pro' AND subscriptions.status IN ('active','grace_period') THEN 1 ELSE 0 END DESC")
             ->orderByDesc('resorts.created_at')
@@ -110,6 +110,7 @@ class PublicCatalogController extends Controller
                     ? SubscriptionPlan::badgeLabel(SubscriptionPlan::BUSINESS_PRO)
                     : SubscriptionPlan::badgeLabel(SubscriptionPlan::STANDARD),
                 'isPremiumVerified' => $isPremium,
+                'isAntiScamVerified' => ($resort->verification_status ?? 'pending') === 'verified',
                 'isVip'            => (bool) $resort->is_vip,
                 'activeRoomsCount' => $resort->active_rooms_count,
                 'featuredRoomId'   => $resort->rooms->first()?->id,
@@ -124,7 +125,7 @@ class PublicCatalogController extends Controller
     {
         $resort = Resort::withoutGlobalScopes()->findOrFail($resort);
 
-        if (! $resort->is_publicly_listed) {
+        if (! $resort->isDiscoverableInPublicCatalog()) {
             abort(404, 'Resort is not publicly listed.');
         }
 
@@ -165,7 +166,7 @@ class PublicCatalogController extends Controller
 
         $resort = Resort::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
-            ->where('is_publicly_listed', true)
+            ->discoverableInPublicCatalog()
             ->first();
 
         if (! $resort) {
@@ -207,7 +208,7 @@ class PublicCatalogController extends Controller
         $resort = Resort::withoutGlobalScopes()
             ->with(['subscription', 'rooms.images'])
             ->where('tenant_id', $tenant->id)
-            ->where('is_publicly_listed', true)
+            ->discoverableInPublicCatalog()
             ->first();
 
         if (! $resort) {
@@ -434,7 +435,7 @@ class PublicCatalogController extends Controller
         $resort = Resort::withoutGlobalScopes()
             ->with('subscription')
             ->find($room->resort_id);
-        if (! $resort || ! $resort->is_publicly_listed) {
+        if (! $resort || ! $resort->isDiscoverableInPublicCatalog()) {
             return $this->errorResponse('Resort is not publicly listed.', ['room' => ['not_publicly_available']], 404);
         }
 

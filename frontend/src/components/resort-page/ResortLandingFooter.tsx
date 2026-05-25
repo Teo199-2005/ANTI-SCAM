@@ -28,7 +28,7 @@ export function ResortLandingFooter({ footer, resortName, isPremiumVerified = fa
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 p-1 shadow-inner">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/mainlogo.png"
+                    src="/branding/mainlogo.png"
                     alt=""
                     width={32}
                     height={32}
@@ -125,7 +125,7 @@ export function ResortLandingFooter({ footer, resortName, isPremiumVerified = fa
             <p className="inline-flex items-center gap-2 text-[10px] text-white/75">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/rising2brothers.png"
+                src="/branding/rising2brothers.png"
                 alt=""
                 width={24}
                 height={24}

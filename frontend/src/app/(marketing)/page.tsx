@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     url: "/",
     images: [
       {
-        url: "/founding500.png",
+        url: "/marketing/founding500.png",
         width: 560,
         height: 620,
         alt: "Anti-Scam PH founding resort partners",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: homeTitle,
     description: homeDescription,
-    images: ["/founding500.png"],
+    images: ["/marketing/founding500.png"],
   },
 };
 

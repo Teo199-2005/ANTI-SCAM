@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Room;
 use App\Models\Tenant;
 use Illuminate\Support\Str;
 
@@ -61,6 +62,20 @@ final class TenantPublicIdentifier
         }
 
         return substr($slug, 0, self::MAX_BASE_LEN);
+    }
+
+    public static function allocateUniqueRoomCode(int $resortId, string $roomName): string
+    {
+        $base = Str::slug($roomName) ?: 'room';
+        $base = substr($base, 0, 32);
+        $candidate = $base;
+        $n = 0;
+        while (Room::withoutGlobalScopes()->where('resort_id', $resortId)->where('code', $candidate)->exists()) {
+            $n++;
+            $candidate = $base.'-'.$n;
+        }
+
+        return substr($candidate, 0, 40);
     }
 
     private static function subdomainTaken(string $subdomain, ?int $exceptTenantId): bool

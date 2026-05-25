@@ -13,7 +13,9 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-const BRAND_HERO_SRC = "/login.png";
+import { publicAssets } from "@/lib/content/publicAssets";
+
+const BRAND_HERO_SRC = publicAssets.auth.loginHero;
 
 export const AUTH_MOBILE_FORM_CHROME =
   "lg:contents max-lg:w-full max-lg:rounded-[1.4rem] max-lg:border max-lg:border-clOcean/25 max-lg:bg-gradient-to-b max-lg:from-[#dfeaf6] max-lg:via-white max-lg:to-[#f4f7fb] max-lg:p-1 max-lg:shadow-[0_24px_60px_-34px_rgba(13,30,66,0.55),0_0_0_1px_rgba(255,255,255,0.55)_inset] max-lg:ring-1 max-lg:ring-white/60";

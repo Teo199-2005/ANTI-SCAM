@@ -40,6 +40,12 @@ class ResortResource extends JsonResource
             'amenities' => $this->amenities ?? [],
             'is_publicly_listed' => (bool) $this->is_publicly_listed,
             'is_vip' => (bool) ($this->is_vip ?? false),
+            'hospitality_type' => $this->hospitality_type,
+            'hospitality_type_other' => $this->hospitality_type_other,
+            'website_url' => $this->website_url,
+            'verification_status' => $this->verification_status,
+            'verification_method' => $this->verification_method,
+            'verification_submitted_at' => $this->verification_submitted_at?->toIso8601String(),
             'subdomain' => $this->whenLoaded('tenant', fn () => $this->tenant?->subdomain),
             'rooms_count' => $this->whenCounted('rooms'),
             'subscription' => $this->whenLoaded('subscription', function () {

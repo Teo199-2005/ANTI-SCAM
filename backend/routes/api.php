@@ -77,8 +77,8 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('throttle:10,1')->group(function (): void {
         Route::post('/auth/login', [AuthController::class, 'login']);
     });
-    // 5 new accounts per hour per IP (registration abuse protection).
-    Route::middleware('throttle:5,60')->group(function (): void {
+    // Registration abuse protection (30/min per IP; see RateLimiter::for('auth-register')).
+    Route::middleware('throttle:auth-register')->group(function (): void {
         Route::post('/auth/register', [AuthController::class, 'register']);
         Route::get('/auth/google-pending', [AuthController::class, 'googlePendingSignup']);
         Route::post('/auth/google-complete', [AuthController::class, 'completeGoogleSignup']);
@@ -181,6 +181,15 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/admin/resorts/onboard/upload-background', [AdminOnboardController::class, 'uploadBackground']);
             Route::post('/subscriptions/enforce-grace-period', [SubscriptionController::class, 'enforceGracePeriod']);
 
+            Route::get('/admin/resort-verifications/stats', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'stats']);
+            Route::get('/admin/resort-verifications', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'index']);
+            Route::get('/admin/resort-verifications/{resort}', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'show']);
+            Route::get('/admin/resort-verifications/{resort}/documents.zip', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'downloadDocuments']);
+            Route::patch('/admin/resort-verifications/{resort}/review', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'updateReview']);
+            Route::post('/admin/resort-verifications/{resort}/approve', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'approve']);
+            Route::post('/admin/resort-verifications/{resort}/reject', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'reject']);
+            Route::post('/admin/resort-verifications/{resort}/request-documents', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'requestMoreDocuments']);
+
             // VIP badge management
             Route::post('/admin/resorts/{resort}/vip', [VipController::class, 'setVip']);
 
@@ -262,6 +271,12 @@ Route::prefix('v1')->group(function (): void {
 
         // Resort-owner self-onboarding
         Route::middleware('role:resort_owner')->group(function (): void {
+            Route::get('/resort-owner/registration', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'show']);
+            Route::patch('/resort-owner/registration/step/{step}', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'updateStep'])->whereNumber('step');
+            Route::post('/resort-owner/registration/finish', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'finish']);
+            Route::post('/resort-owner/registration/upload-logo', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'uploadLogo']);
+            Route::post('/resort-owner/registration/upload-room-photo', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'uploadRoomPhoto']);
+            Route::post('/resort-owner/registration/verification/{documentType}', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'uploadVerificationDocument']);
             Route::post('/resort-owner/onboard', [AdminOnboardController::class, 'ownerStore']);
             Route::post('/resort-owner/onboard/upload-logo', [AdminOnboardController::class, 'ownerUploadLogo']);
             Route::get('/resort-owner/landing-page', [ResortLandingPageController::class, 'show']);

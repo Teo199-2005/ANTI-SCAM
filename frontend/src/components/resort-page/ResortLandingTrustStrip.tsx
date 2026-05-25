@@ -69,7 +69,7 @@ export function ResortLandingTrustStrip({ variant = "full" }: Props) {
             }
           >
             <Image
-              src="/mainlogo.png"
+              src="/branding/mainlogo.png"
               alt="Anti-Scam PH"
               width={40}
               height={40}

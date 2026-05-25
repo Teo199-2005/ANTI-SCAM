@@ -12,9 +12,9 @@ class BrandedMailHtml
     {
         foreach ([
             public_path('brand/mainlogo.png'),
-            base_path('../frontend/public/mainlogo.png'),
+            base_path('../frontend/public/branding/mainlogo.png'),
             public_path('brand/mainlogo-bimi.png'),
-            base_path('../frontend/public/mainlogo-bimi.png'),
+            base_path('../frontend/public/branding/mainlogo-bimi.png'),
         ] as $path) {
             if (is_readable($path)) {
                 return $path;
@@ -34,7 +34,7 @@ class BrandedMailHtml
 
         $frontend = rtrim((string) config('app.frontend_url', ''), '/');
         if ($frontend !== '') {
-            return "{$frontend}/mainlogo.png";
+            return "{$frontend}/branding/mainlogo.png";
         }
 
         $appUrl = rtrim((string) config('app.url', ''), '/');

@@ -1,3 +1,4 @@
+import { publicAssets } from "@/lib/content/publicAssets";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ export default function Logo({ size = "md", className, alt = "Anti-Scam PH" }: L
       )}
     >
       <Image
-        src="/mainlogo.png"
+        src={publicAssets.branding.mainlogo}
         alt={alt}
         width={80}
         height={80}

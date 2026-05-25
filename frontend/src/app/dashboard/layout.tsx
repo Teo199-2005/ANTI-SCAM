@@ -14,6 +14,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
 import { sanitizeOtpInput } from "@/lib/inputRestrictions";
 import { cn } from "@/lib/utils";
+import { ResortRegistrationWizard } from "@/components/onboarding/ResortRegistrationWizard";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
@@ -40,6 +41,18 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     if (!user) return false;
     return ["resort_owner", "marketing"].includes(user.role) && !user.email_verified_at;
   }, [user]);
+
+  const needsRegistrationWizard = useMemo(() => {
+    if (!user || user.role !== "resort_owner" || needsOtpVerification) return false;
+    if (user.registration_wizard_enabled === false) return false;
+    if (user.registration_status !== "complete") return true;
+    if (user.verification_status === "rejected" || user.verification_status === "needs_documents") {
+      return true;
+    }
+    if (user.verification_status === "pending" && !user.verification_submitted_at) return true;
+    return false;
+  }, [user, needsOtpVerification]);
+
   const displayEmail = user?.email?.toLowerCase() ?? "";
 
   const startResendCooldown = () => {
@@ -259,8 +272,26 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
   }
 
   // Let /dashboard page handle role-based redirect (and show fullscreen loader there).
+  const registrationWizardOverlay =
+    needsRegistrationWizard && user?.role === "resort_owner" ? (
+      <ResortRegistrationWizard
+        verificationOnly={
+          user.registration_status === "complete" && user.verification_status === "rejected"
+        }
+        onComplete={() => {
+          void refreshUser();
+          router.refresh();
+        }}
+      />
+    ) : null;
+
   if (pathname === "/dashboard") {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        {registrationWizardOverlay}
+      </>
+    );
   }
 
   if (needsOtpVerification) {
@@ -282,7 +313,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
               <div className="relative">
                 <div className="flex items-center gap-3">
                   <Image
-                    src="/mainlogo.png"
+                    src="/branding/mainlogo.png"
                     alt="Anti-Scam PH"
                     width={62}
                     height={62}
@@ -309,7 +340,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
                   <div className="mt-1 flex items-center gap-2">
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/30 bg-white/95 p-1">
                       <Image
-                        src="/rising2brothers.png"
+                        src="/branding/rising2brothers.png"
                         alt="The Rising 2 Brothers OPC"
                         width={30}
                         height={30}
@@ -415,18 +446,31 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     );
   }
 
+  const lockDashboardScroll = Boolean(registrationWizardOverlay);
+
   return (
-    <div className="dash-shell flex min-h-screen">
+    <div
+      className={cn(
+        "dash-shell flex min-h-screen",
+        lockDashboardScroll && "h-[100dvh] max-h-[100dvh] overflow-hidden",
+      )}
+    >
       <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div
         className={cn(
-          "flex min-h-screen min-w-0 flex-1 flex-col",
+          "flex min-h-0 min-w-0 flex-1 flex-col",
+          lockDashboardScroll ? "h-full overflow-hidden" : "min-h-screen",
           user?.role === "admin" ? "md:pl-[252px]" : "md:pl-[264px]",
         )}
       >
         <DashboardTopbar onOpenMenu={() => setSidebarOpen(true)} />
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto px-4 py-6 lg:px-8 lg:py-8">
+        <main
+          className={cn(
+            "min-h-0 min-w-0 flex-1 overflow-x-hidden px-4 py-6 lg:px-8 lg:py-8",
+            lockDashboardScroll ? "overflow-hidden" : "overflow-y-auto",
+          )}
+        >
           <div className="dash-shell-main">{children}</div>
         </main>
         <footer className="relative border-t border-white/55 bg-gradient-to-b from-white/92 via-softGray/35 to-metalFace/75 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] backdrop-blur-md lg:px-8 lg:pb-3 lg:pt-3">
@@ -443,6 +487,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
           </div>
         </footer>
       </div>
+      {registrationWizardOverlay}
     </div>
   );
 }

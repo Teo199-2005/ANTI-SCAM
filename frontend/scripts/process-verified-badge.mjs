@@ -1,6 +1,6 @@
 /**
  * Removes outer black background via edge flood-fill (keeps black checkmark on the gold disc).
- * Trims transparency and writes public/verified.png.
+ * Trims transparency and writes public/branding/verified.png.
  */
 import sharp from "sharp";
 import { existsSync } from "fs";
@@ -8,19 +8,19 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = join(__dirname, "..", "..");
+const publicDir = join(__dirname, "..", "public");
 const candidates = [
-  join(root, "verified.png"),
-  join(__dirname, "..", "public", "verified.png"),
+  join(publicDir, "branding", "verified-source.png"),
+  join(publicDir, "branding", "verified.png"),
 ];
 
 const input = candidates.find((p) => existsSync(p));
 if (!input) {
-  console.error("verified.png not found");
+  console.error("Place source art at frontend/public/branding/verified-source.png");
   process.exit(1);
 }
 
-const output = join(__dirname, "..", "public", "verified.png");
+const output = join(publicDir, "branding", "verified.png");
 
 const BLACK_THRESHOLD = 48;
 

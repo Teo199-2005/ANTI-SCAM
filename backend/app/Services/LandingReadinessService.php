@@ -41,6 +41,10 @@ class LandingReadinessService
             $missing[] = 'background_image';
         }
 
+        if (($resort->verification_status ?? 'pending') !== 'verified') {
+            $missing[] = 'verification';
+        }
+
         // Require at least one active room with at least one image so the
         // listing is genuinely bookable, not just header-complete.
         $hasActiveRoomWithImage = $resort->rooms()

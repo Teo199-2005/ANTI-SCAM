@@ -1,6 +1,7 @@
 "use client";
 
 import type { PhilippineLocationValue } from "@/components/locations/PhilippineLocationPicker";
+import { AppSelect } from "@/components/shared/form";
 import { usePhilippineLocationDropdowns } from "@/lib/locations/usePhilippineLocationDropdowns";
 import { MapPin } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -8,7 +9,6 @@ import { useEffect, useRef } from "react";
 export type LocationFilterValue = {
   provincePsgc: string | null;
   cityPsgc: string | null;
-  /** Display names from the same API list as codes (for admin stats when DB labels are incomplete). */
   provinceLabel?: string | null;
   cityLabel?: string | null;
 };
@@ -16,7 +16,6 @@ export type LocationFilterValue = {
 type Props = {
   value: LocationFilterValue;
   onChange: (next: LocationFilterValue) => void;
-  /** Accessible name for the filter group */
   label?: string;
   className?: string;
 };
@@ -39,7 +38,6 @@ export function locationFilterToParams(value: LocationFilterValue): Record<strin
   };
 }
 
-/** Same codes as {@link locationFilterToParams}, plus labels captured from the location API for admin stats. */
 export function locationFilterToParamsWithDisplayHints(value: LocationFilterValue): Record<string, string | undefined> {
   const base = locationFilterToParams(value);
   const provinceDisplay = value.provinceLabel?.trim() || undefined;
@@ -105,10 +103,14 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
         <MapPin size={13} className="text-zinc-400" aria-hidden />
         <span className="hidden sm:inline">{label}</span>
       </span>
-      <select
-        className="dash-filter-select"
+      <AppSelect
+        variant="filter"
         value={value.provincePsgc ?? ""}
         disabled={loadingProvinces}
+        loading={loadingProvinces}
+        placeholder="All provinces / regions"
+        aria-label={`${label} — province or region`}
+        options={provinces.map((p) => ({ value: p.code, label: p.name }))}
         onChange={(e) => {
           const raw = e.target.value;
           if (!raw) {
@@ -118,19 +120,15 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
           const row = provinces.find((p) => p.code === raw);
           pickProvince(raw, row?.name ?? null);
         }}
-        aria-label={`${label} — province or region`}
-      >
-        <option value="">{loadingProvinces ? "Loading…" : "All provinces / regions"}</option>
-        {provinces.map((p) => (
-          <option key={p.code} value={p.code}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <select
-        className="dash-filter-select"
+      />
+      <AppSelect
+        variant="filter"
         value={value.cityPsgc ?? ""}
         disabled={!value.provincePsgc || loadingProvinces || loadingCities}
+        loading={loadingCities}
+        placeholder={!value.provincePsgc ? "Province first" : "All cities"}
+        aria-label={`${label} — city or municipality`}
+        options={cities.map((c) => ({ value: c.code, label: c.name }))}
         onChange={(e) => {
           const raw = e.target.value;
           if (!raw) {
@@ -140,28 +138,9 @@ export default function LocationFilterBar({ value, onChange, label = "Location",
           const row = cities.find((c) => c.code === raw);
           pickCity(raw, row?.name ?? null);
         }}
-        aria-label={`${label} — city or municipality`}
-      >
-        <option value="">
-          {!value.provincePsgc
-            ? "Province first"
-            : loadingCities
-              ? "Loading…"
-              : "All cities"}
-        </option>
-        {cities.map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-      {(value.provincePsgc || value.cityPsgc) && (
-        <button type="button" className="dash-filter-clear" onClick={() => onChange(emptyLocationFilter())}>
-          Clear
-        </button>
-      )}
+      />
       {filterError ? (
-        <span className="sr-only" role="alert">
+        <span className="w-full basis-full text-[11px] text-rose-600 sm:w-auto" role="alert">
           {filterError}
         </span>
       ) : null}
