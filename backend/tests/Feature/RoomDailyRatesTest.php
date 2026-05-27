@@ -96,4 +96,49 @@ class RoomDailyRatesTest extends TestCase
                 ->value('id'),
         );
     }
+
+    public function test_weekday_weekend_default_rate_is_used_when_no_override_exists(): void
+    {
+        $room = $this->demoRoom();
+        $room->update([
+            'weekday_price' => 5100,
+            'weekend_price' => 6800,
+        ]);
+
+        $service = app(\App\Services\RoomDailyRateService::class);
+
+        $this->assertSame(5100.0, $service->resolveNightlyPrice($room->fresh(), '2026-06-19')); // Friday
+        $this->assertSame(6800.0, $service->resolveNightlyPrice($room->fresh(), '2026-06-20')); // Saturday
+    }
+
+    public function test_setting_rate_equal_to_weekend_default_removes_override(): void
+    {
+        $room = $this->demoRoom();
+        $room->update([
+            'weekday_price' => 5100,
+            'weekend_price' => 6800,
+        ]);
+        $owner = User::where('email', 'owner@resort.test')->firstOrFail();
+
+        RoomDailyRate::withoutGlobalScopes()->create([
+            'tenant_id' => $room->tenant_id,
+            'room_id' => $room->id,
+            'date' => '2026-06-20',
+            'nightly_price' => 9999,
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/v1/rooms/{$room->id}/daily-rates", [
+            'dates' => ['2026-06-20'],
+            'nightly_price' => 6800,
+        ])->assertOk();
+
+        $this->assertNull(
+            RoomDailyRate::withoutGlobalScopes()
+                ->where('room_id', $room->id)
+                ->whereDate('date', '2026-06-20')
+                ->value('id'),
+        );
+    }
 }

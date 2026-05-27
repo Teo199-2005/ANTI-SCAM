@@ -6,6 +6,7 @@ import { BrandWordmark } from "@/components/branding/BrandWordmark";
 import ChangePasswordCard from "@/components/dashboard/ChangePasswordCard";
 import { LegalLinkButton } from "@/components/legal/LegalLinkButton";
 import { useToast } from "@/components/shared/ToastProvider";
+import { sendOnboardingEmail } from "@/lib/api/resortRegistration";
 import { listResorts, getResort, ownerOnboardResort, updateResort, uploadOwnerResortLogo } from "@/lib/api/resort";
 import {
   getOwnerLandingPage,
@@ -434,14 +435,18 @@ export default function ResortProfilePage() {
         instagram_url: form.instagram_url.trim() || null,
         tiktok_url: form.tiktok_url.trim() || null,
       } as Parameters<typeof updateResort>[1]);
-      await apiClient.patch("/auth/profile", {
+      const { data: profileUpdate } = await apiClient.patch<{ message?: string }>("/auth/profile", {
         name: form.owner_name,
         email: form.representative_email,
         phone: form.owner_contact_number || null,
       });
       await refreshUser();
       await refreshOwnerLanding();
-      pushToast({ title: "Resort profile saved", description: "Your property details were updated.", tone: "success" });
+      pushToast({
+        title: "Resort profile saved",
+        description: profileUpdate?.message ?? "Your property details were updated.",
+        tone: "success",
+      });
     } catch (err) {
       pushToast({
         title: "Could not save profile",
@@ -1020,6 +1025,25 @@ export default function ResortProfilePage() {
               onChange={(e) => onChange("representative_email", e.target.value)}
               placeholder="contact@example.com"
             />
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!form || !form.id) return;
+                  try {
+                    pushToast({ title: "Sending onboarding email…", tone: "neutral" });
+                    await sendOnboardingEmail(form.id, form.representative_email);
+                    pushToast({ title: "Email sent", description: "Onboarding document sent to the representative.", tone: "success" });
+                  } catch (err) {
+                    pushToast({ title: "Send failed", description: "Could not deliver onboarding email.", tone: "error" });
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium bg-white hover:bg-zinc-50"
+              >
+                <Mail size={14} />
+                Send onboarding email
+              </button>
+            </div>
           </div>
           <div>
             <label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">

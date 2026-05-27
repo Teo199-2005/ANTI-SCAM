@@ -24,6 +24,7 @@ use App\Support\ResortRegistrationConfig;
 use App\Support\StoredMedia;
 use App\Support\UserProfilePresenter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -282,11 +283,25 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
+        if ($request->has('email')) {
+            $request->merge([
+                'email' => mb_strtolower(trim((string) $request->input('email', ''))),
+            ]);
+        }
+
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'email' => ['sometimes', 'email:rfc', 'max:190', 'unique:users,email,'.$user->id],
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
+
+        $emailChanged = array_key_exists('email', $validated)
+            && mb_strtolower((string) $validated['email']) !== mb_strtolower((string) $user->email);
+
+        if ($emailChanged) {
+            // A changed login email must be re-verified with a fresh OTP.
+            $validated['email_verified_at'] = null;
+        }
 
         if ($user->role === 'marketing' && $request->hasAny(['gcash_account_number', 'gcash_account_holder_name'])) {
             throw ValidationException::withMessages([
@@ -482,13 +497,44 @@ class AuthController extends Controller
 
         }
 
-        $user->update([...$validated, ...$bankPayoutPayload, ...$govPayload, ...$kycPayload]);
+        $responseMessage = 'Profile updated';
+        DB::transaction(function () use (
+            $user,
+            $validated,
+            $bankPayoutPayload,
+            $govPayload,
+            $kycPayload,
+            $emailChanged,
+            &$responseMessage,
+        ): void {
+            $user->update([...$validated, ...$bankPayoutPayload, ...$govPayload, ...$kycPayload]);
+
+            if (! $emailChanged || ! $this->requiresOtpEmailVerification($user)) {
+                return;
+            }
+
+            $freshUser = $user->fresh();
+            if (! $freshUser) {
+                throw ValidationException::withMessages([
+                    'email' => ['Unable to finalize your email update. Please try again.'],
+                ]);
+            }
+
+            $otpResult = $this->emailOtpService->send($freshUser);
+            if (! ($otpResult['ok'] ?? false)) {
+                throw ValidationException::withMessages([
+                    'email' => [$otpResult['message'] ?? 'We could not send the verification code to your new email.'],
+                ]);
+            }
+
+            $responseMessage = $otpResult['message'] ?? 'Profile updated. Verification code sent to your new email.';
+        });
 
         if ($user->role === 'marketing') {
             $this->locations->syncUserMailingLabel($user->fresh());
         }
 
-        return $this->successResponse(UserProfilePresenter::toArray($user->fresh()), 'Profile updated');
+        return $this->successResponse(UserProfilePresenter::toArray($user->fresh()), $responseMessage);
     }
 
     public function uploadMarketingGovIdDocument(Request $request)
@@ -645,5 +691,10 @@ class AuthController extends Controller
     private function deleteStoredMarketingGovIdDocument(User $user): void
     {
         StoredMedia::deleteIfPresent($user->marketer_gov_id_document_url);
+    }
+
+    private function requiresOtpEmailVerification(User $user): bool
+    {
+        return in_array($user->role, ['resort_owner', 'marketing'], true);
     }
 }

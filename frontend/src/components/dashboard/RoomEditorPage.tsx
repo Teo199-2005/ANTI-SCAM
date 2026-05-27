@@ -45,6 +45,8 @@ type FormState = {
   capacity: number;
   units: number;
   base_price: number;
+  weekday_price: number;
+  weekend_price: number;
   bed_count: number;
   bed_type: string;
   inclusions: string[];
@@ -61,6 +63,8 @@ const initialForm: FormState = {
   capacity: 1,
   units: 1,
   base_price: 0,
+  weekday_price: 0,
+  weekend_price: 0,
   bed_count: 1,
   bed_type: "Double",
   inclusions: [],
@@ -116,6 +120,8 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
             capacity: Number(room.capacity ?? 1),
             units: Math.max(1, Math.min(99, Number(room.units ?? 1))),
             base_price: Number(room.base_price ?? 0),
+            weekday_price: Number(room.weekday_price ?? room.base_price ?? 0),
+            weekend_price: Number(room.weekend_price ?? room.weekday_price ?? room.base_price ?? 0),
             bed_count: parsedAmenities.bedCount,
             bed_type: parsedAmenities.bedType,
             inclusions: parsedAmenities.inclusions,
@@ -159,6 +165,8 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
         capacity: form.capacity,
         units: form.units,
         base_price: form.base_price,
+        weekday_price: form.weekday_price,
+        weekend_price: form.weekend_price,
         amenities: buildStoredAmenitiesArray(form),
         rules: form.rules || null,
         status: form.status,
@@ -260,7 +268,7 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
             </p>
           </div>
           <div>
-            <p className={fieldLabelCls}>Nightly rate (₱)</p>
+            <p className={fieldLabelCls}>Base nightly rate (₱)</p>
             <label className={inputWrap}>
               <CircleDollarSign size={15} className={iconCls} />
               <input
@@ -271,6 +279,41 @@ export default function RoomEditorPage({ mode, roomId }: Props) {
                 placeholder="e.g. 3500"
                 value={form.base_price || ""}
                 onChange={(e) => update("base_price", e.target.value === "" ? 0 : Number(e.target.value))}
+                required
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <p className={fieldLabelCls}>Weekday rate (Mon-Fri) (₱)</p>
+            <label className={inputWrap}>
+              <CircleDollarSign size={15} className={iconCls} />
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="e.g. 3500"
+                value={form.weekday_price || ""}
+                onChange={(e) => update("weekday_price", e.target.value === "" ? 0 : Number(e.target.value))}
+                required
+              />
+            </label>
+          </div>
+          <div>
+            <p className={fieldLabelCls}>Weekend rate (Sat-Sun) (₱)</p>
+            <label className={inputWrap}>
+              <CircleDollarSign size={15} className={iconCls} />
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="e.g. 4200"
+                value={form.weekend_price || ""}
+                onChange={(e) => update("weekend_price", e.target.value === "" ? 0 : Number(e.target.value))}
                 required
               />
             </label>

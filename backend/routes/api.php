@@ -279,6 +279,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/resort-owner/registration/verification/{documentType}', [\App\Modules\Resorts\Http\Controllers\ResortRegistrationController::class, 'uploadVerificationDocument']);
             Route::post('/resort-owner/onboard', [AdminOnboardController::class, 'ownerStore']);
             Route::post('/resort-owner/onboard/upload-logo', [AdminOnboardController::class, 'ownerUploadLogo']);
+            // Send onboarding document via email (resort owner)
+            Route::post('/resorts/{resort}/send-onboarding-email', [\App\Http\Controllers\OnboardingMailerController::class, 'send']);
             Route::get('/resort-owner/landing-page', [ResortLandingPageController::class, 'show']);
             Route::get('/resort-owner/profile-media/{kind}', [ResortLandingPageController::class, 'streamProfileMedia'])
                 ->where('kind', 'logo|background|cover');

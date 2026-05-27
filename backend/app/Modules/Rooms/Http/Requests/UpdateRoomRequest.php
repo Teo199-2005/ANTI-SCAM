@@ -22,6 +22,8 @@ class UpdateRoomRequest extends FormRequest
             'capacity' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'units' => ['sometimes', 'integer', 'min:1', 'max:99'],
             'base_price' => ['sometimes', 'numeric', 'min:0'],
+            'weekday_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'weekend_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'amenities' => ['nullable', 'array'],
             'amenities.*' => ['string', 'max:80'],
             'rules' => ['nullable', 'string'],

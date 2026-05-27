@@ -36,6 +36,9 @@ export function WizardStep6Verification({ form, onChange, verificationMethods, f
 
   return (
     <div className="space-y-4 sm:space-y-5">
+      <div className="rounded-lg border bg-slate-50 p-3 text-sm text-slate-700">
+        <strong>Note:</strong> Anti-ScamPH is an independent verification and booking platform. Your business remains independently owned and operated; we only verify legitimacy and facilitate bookings.
+      </div>
       <WizardStepIntro step={6} description={WIZARD_STEP_DESCRIPTIONS[6]} />
 
       <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

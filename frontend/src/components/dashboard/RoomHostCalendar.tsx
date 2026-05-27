@@ -36,6 +36,8 @@ type RoomSummary = {
   id: number;
   name: string;
   base_price: string | number;
+  weekday_price?: string | number | null;
+  weekend_price?: string | number | null;
   status: string;
   /** undefined = loading thumbnail, null = no photo, string = image URL */
   thumbUrl?: string | null;
@@ -45,6 +47,8 @@ type RoomDetail = {
   id: number;
   name: string;
   base_price: string | number;
+  weekday_price?: string | number | null;
+  weekend_price?: string | number | null;
   status: string;
 };
 
@@ -94,6 +98,11 @@ function dayOverlapsRecord(ymd: string, r: AvailabilityRange) {
   return ymd >= r.start_date && ymd <= r.end_date;
 }
 
+function isWeekendYmd(ymd: string): boolean {
+  const day = new Date(`${ymd}T12:00:00`).getDay();
+  return day === 0 || day === 6;
+}
+
 type Props = {
   roomId: number;
 };
@@ -121,14 +130,22 @@ export default function RoomHostCalendar({ roomId }: Props) {
   const blockedMap = useMemo(() => rangesToBlockedMap(records), [records]);
 
   const basePriceNum = useMemo(() => Number(room?.base_price ?? 0), [room?.base_price]);
+  const weekdayPriceNum = useMemo(
+    () => Number(room?.weekday_price ?? room?.base_price ?? 0),
+    [room?.weekday_price, room?.base_price],
+  );
+  const weekendPriceNum = useMemo(
+    () => Number(room?.weekend_price ?? room?.weekday_price ?? room?.base_price ?? 0),
+    [room?.weekend_price, room?.weekday_price, room?.base_price],
+  );
 
   const getPriceForDay = useCallback(
     (ymd: string) => {
       const override = dailyRates[ymd];
       if (override !== undefined) return override;
-      return basePriceNum;
+      return isWeekendYmd(ymd) ? weekendPriceNum : weekdayPriceNum;
     },
-    [dailyRates, basePriceNum],
+    [dailyRates, weekdayPriceNum, weekendPriceNum],
   );
 
   const loadRoomList = useCallback(async () => {

@@ -37,9 +37,13 @@ export default function ClientProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await apiClient.patch("/auth/profile", { name, email });
+      const { data } = await apiClient.patch<{ message?: string }>("/auth/profile", { name, email });
       await refreshUser();
-      pushToast({ title: "Profile updated", description: "Your details were saved successfully.", tone: "success" });
+      pushToast({
+        title: "Profile updated",
+        description: data?.message ?? "Your details were saved successfully.",
+        tone: "success",
+      });
     } catch (error: unknown) {
       pushToast({
         title: "Could not save profile",

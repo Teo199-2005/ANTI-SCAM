@@ -38,7 +38,7 @@ class RoomDailyRateService
             return round((float) $override, 2);
         }
 
-        return round((float) $room->base_price, 2);
+        return $this->defaultNightlyPriceForDate($room, $ymd);
     }
 
     /**
@@ -46,12 +46,12 @@ class RoomDailyRateService
      */
     public function upsertDates(Room $room, array $dates, float $nightlyPrice): void
     {
-        $base = round((float) $room->base_price, 2);
         $price = round(max(0, $nightlyPrice), 2);
         $unique = array_values(array_unique($dates));
 
         foreach ($unique as $ymd) {
-            if ($price === $base) {
+            $default = $this->defaultNightlyPriceForDate($room, $ymd);
+            if ($price === $default) {
                 RoomDailyRate::query()
                     ->where('room_id', $room->id)
                     ->whereDate('date', $ymd)
@@ -71,6 +71,19 @@ class RoomDailyRateService
                 ],
             );
         }
+    }
+
+    public function defaultNightlyPriceForDate(Room $room, string $ymd): float
+    {
+        $date = Carbon::parse($ymd);
+        $weekday = $room->weekday_price !== null
+            ? round((float) $room->weekday_price, 2)
+            : round((float) $room->base_price, 2);
+        $weekend = $room->weekend_price !== null
+            ? round((float) $room->weekend_price, 2)
+            : $weekday;
+
+        return $date->isWeekend() ? $weekend : $weekday;
     }
 
     /**

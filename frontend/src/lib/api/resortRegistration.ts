@@ -72,3 +72,7 @@ export async function uploadVerificationDocument(
   form.append("file", file);
   await apiClient.post(`/resort-owner/registration/verification/${documentType}`, form);
 }
+
+export async function sendOnboardingEmail(resortId: number, email: string): Promise<void> {
+  await apiClient.post(`/resorts/${resortId}/send-onboarding-email`, { email });
+}

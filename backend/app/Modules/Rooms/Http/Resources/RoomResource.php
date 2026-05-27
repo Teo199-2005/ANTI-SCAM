@@ -18,6 +18,8 @@ class RoomResource extends JsonResource
             'capacity' => $this->capacity,
             'units' => (int) ($this->units ?? 1),
             'base_price' => $this->base_price,
+            'weekday_price' => $this->weekday_price,
+            'weekend_price' => $this->weekend_price,
             'amenities' => $this->amenities ?? [],
             'rules' => $this->rules,
             'status' => $this->status,

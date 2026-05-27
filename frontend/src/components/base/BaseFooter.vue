@@ -6,6 +6,10 @@
           <div class="text-subtitle-1 font-weight-bold mb-1">Anti-Scam PH</div>
           <div class="text-body-2 text-medium-emphasis">Modern reservation operations for multi-tenant resorts.</div>
         </div>
+        <!-- Recommended legal disclaimer: shown in footer and onboarding pages -->
+        <div class="text-xs text-medium-emphasis" style="line-height:1.3">
+          Anti-ScamPH is an independent verification and booking facilitation platform. All hospitality establishments remain independently owned and operated. Anti-ScamPH does not manage, control, or participate in the operations, pricing, taxes, permits, or profits of listed establishments. Verification status only confirms that the establishment underwent the platform’s verification process at the time of approval.
+        </div>
         <div class="d-flex ga-4 flex-wrap justify-end align-center">
           <router-link to="/public/resorts" class="text-body-2">Browse Resorts</router-link>
           <router-link to="/auth/login" class="text-body-2">Login</router-link>
