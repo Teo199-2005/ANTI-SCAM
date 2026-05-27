@@ -1031,7 +1031,7 @@ export default function ResortProfilePage() {
                 onClick={async () => {
                   if (!form || !form.id) return;
                   try {
-                    pushToast({ title: "Sending onboarding email…", tone: "neutral" });
+                    pushToast({ title: "Sending onboarding email…", tone: "info" });
                     await sendOnboardingEmail(form.id, form.representative_email);
                     pushToast({ title: "Email sent", description: "Onboarding document sent to the representative.", tone: "success" });
                   } catch (err) {
