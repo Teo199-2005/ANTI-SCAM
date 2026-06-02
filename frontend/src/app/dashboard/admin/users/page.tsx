@@ -28,7 +28,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { bulkDeleteToastDescription, bulkDeleteUsers } from "@/lib/api/bulkDelete";
 import { extractLaravelMeta, nextSort, type LaravelTableMeta, type SortDir } from "@/lib/tableSortPagination";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
-import { Pencil, Trash2, UserPlus, Users } from "lucide-react";
+import { Pencil, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type User = {
@@ -86,8 +86,6 @@ export default function AdminUsersPage() {
   const [perPage, setPerPage] = useState(10);
   const [sortBy, setSortBy] = useState<string>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -165,25 +163,6 @@ export default function AdminUsersPage() {
     setPerPage(pp);
     setPage(1);
     void load(appliedQuery, 1, pp, sortBy, sortDir);
-  };
-
-  const onDelete = async (id: number) => {
-    setDeleting(id);
-    try {
-      await apiClient.delete(`/users/${id}`);
-      await load(appliedQuery, page, perPage, sortBy, sortDir);
-      bulk.clear();
-      pushToast({ title: "User deleted", tone: "success" });
-    } catch (err) {
-      pushToast({
-        title: "Delete failed",
-        description: parseApiErrorMessage(err, "Unable to delete this user right now."),
-        tone: "error",
-      });
-    } finally {
-      setDeleting(null);
-      setConfirmDelete(null);
-    }
   };
 
   const onBulkDelete = async () => {
@@ -318,15 +297,6 @@ export default function AdminUsersPage() {
                       <Pencil size={14} />
                       Edit
                     </button>
-                    <button
-                      type="button"
-                      disabled={deleting === u.id}
-                      onClick={() => setConfirmDelete(u)}
-                      className="dash-btn-danger w-full justify-center"
-                    >
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
                   </div>
                 }
               />
@@ -390,10 +360,6 @@ export default function AdminUsersPage() {
                       <Pencil size={14} />
                       Edit
                     </button>
-                    <button type="button" disabled={deleting === u.id} onClick={() => setConfirmDelete(u)} className="dash-btn-danger">
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
                   </DashTableActionsInner>
                 </DashTableActionsCell>
               </tr>
@@ -424,21 +390,6 @@ export default function AdminUsersPage() {
         loading={bulkDeleting}
         onCancel={() => setConfirmBulkDelete(false)}
         onConfirm={() => void onBulkDelete()}
-      />
-
-      <ConfirmDialog
-        open={Boolean(confirmDelete)}
-        title="Delete user?"
-        description={
-          confirmDelete ? `Delete ${confirmDelete.name}. This action cannot be undone.` : "This action cannot be undone."
-        }
-        confirmLabel="Delete"
-        tone="danger"
-        loading={deleting !== null}
-        onCancel={() => setConfirmDelete(null)}
-        onConfirm={() => {
-          if (confirmDelete) void onDelete(confirmDelete.id);
-        }}
       />
     </div>
   );
