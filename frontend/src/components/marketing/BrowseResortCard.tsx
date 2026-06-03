@@ -10,7 +10,7 @@ import { formatPhp } from "@/lib/formatPhp";
 import { guestDisplayPriceFrom } from "@/lib/guestRoomPricing";
 import { laravelPublicUrl } from "@/lib/publicAsset";
 import { cn } from "@/lib/utils";
-import { BedDouble, Building2, ExternalLink, MapPin } from "lucide-react";
+import { BedDouble, Building2, ExternalLink, MapPin, Star } from "lucide-react";
 import Image from "next/image";
 
 const NAVY = "#0d1f3c";
@@ -152,6 +152,25 @@ export function BrowseResortCard({ resort, onViewRooms, onViewWebsite, className
               <MapPin size={10} className="mt-0.5 shrink-0 text-amber-600/90" aria-hidden />
               <span className="line-clamp-2">{resort.address}</span>
             </p>
+          ) : null}
+          {resort.averageRating != null && resort.averageRating > 0 ? (
+            <div className="mb-1 flex items-center gap-1">
+              <div className="flex items-center gap-px">
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const filled = star <= Math.round(resort.averageRating!);
+                  return (
+                    <Star
+                      key={star}
+                      size={10}
+                      className={filled ? "fill-amber-400 text-amber-400" : "fill-zinc-300 text-zinc-300"}
+                      aria-hidden
+                    />
+                  );
+                })}
+              </div>
+              <span className="text-[9px] font-semibold text-zinc-700">{resort.averageRating.toFixed(1)}</span>
+              <span className="text-[9px] text-zinc-400">({resort.totalReviews ?? 0})</span>
+            </div>
           ) : null}
           {resort.description ? (
             <p

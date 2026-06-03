@@ -16,6 +16,7 @@ use App\Support\SubscriptionPlan;
 use App\Support\YoutubeVideoId;
 use App\Services\ReservationCheckoutExpiryService;
 use App\Services\RoomOccupancyService;
+use App\Services\ResortReviewService;
 use App\Shared\Traits\ApiResponseTrait;
 
 class PublicCatalogController extends Controller
@@ -26,6 +27,7 @@ class PublicCatalogController extends Controller
         private readonly LandingReadinessService $readiness,
         private readonly PhilippineLocationService $locations,
         private readonly ReservationCheckoutExpiryService $checkoutExpiry,
+        private readonly ResortReviewService $reviewService,
     ) {}
 
     public function resorts()
@@ -84,7 +86,10 @@ class PublicCatalogController extends Controller
             ->get()
             ->mapWithKeys(fn ($row): array => [(int) $row->resort_id => (float) $row->min_price]);
 
-        $resorts->setCollection($resorts->getCollection()->map(function (Resort $resort) use ($minPrices): array {
+        // Batch-compute review summaries for the page of resorts
+        $ratingSummaries = $this->reviewService->batchRatingSummaries($pageResortIds->all());
+
+        $resorts->setCollection($resorts->getCollection()->map(function (Resort $resort) use ($minPrices, $ratingSummaries): array {
             $plan = SubscriptionPlan::normalize($resort->subscription?->plan);
             $isPremium = $plan === SubscriptionPlan::BUSINESS_PRO
                 && in_array((string) ($resort->subscription?->status), ['active', 'grace_period'], true);
@@ -92,6 +97,8 @@ class PublicCatalogController extends Controller
             $slug = $resort->tenant?->subdomain;
             $slug = is_string($slug) ? trim($slug) : '';
             $slug = $slug !== '' ? $slug : null;
+
+            $summary = $ratingSummaries[$resort->id] ?? null;
 
             return [
                 'id'               => $resort->id,
@@ -111,10 +118,13 @@ class PublicCatalogController extends Controller
                     : SubscriptionPlan::badgeLabel(SubscriptionPlan::STANDARD),
                 'isPremiumVerified' => $isPremium,
                 'isAntiScamVerified' => ($resort->verification_status ?? 'pending') === 'verified',
+                'verificationStatus'  => $resort->verification_status ?? 'not_verified',
                 'isVip'            => (bool) $resort->is_vip,
                 'activeRoomsCount' => $resort->active_rooms_count,
                 'featuredRoomId'   => $resort->rooms->first()?->id,
                 'priceFrom'        => $minPrices->get($resort->id),
+                'averageRating'    => $summary['average_rating'] ?? null,
+                'totalReviews'     => $summary['total_reviews'] ?? 0,
             ];
         }));
 
@@ -135,6 +145,8 @@ class PublicCatalogController extends Controller
         $slug = is_string($slug) ? trim($slug) : '';
         $slug = $slug !== '' ? $slug : null;
 
+        $reviewSummary = $this->reviewService->getResortRatingSummary($resort);
+
         return $this->successResponse([
             'id'            => $resort->id,
             'slug'          => $slug,
@@ -150,6 +162,8 @@ class PublicCatalogController extends Controller
             'isVip'         => (bool) $resort->is_vip,
             'map'           => $this->readiness->mapPayloadForResort($resort),
             'rooms'         => $rooms,
+            'averageRating' => $reviewSummary['average_rating'],
+            'totalReviews'  => $reviewSummary['total_reviews'],
         ], 'Resort detail fetched');
     }
 
@@ -174,6 +188,7 @@ class PublicCatalogController extends Controller
         }
 
         $rooms = $this->roomsForResort($resort);
+        $reviewSummary = $this->reviewService->getResortRatingSummary($resort);
 
         return $this->successResponse([
             'id'            => $resort->id,
@@ -191,6 +206,8 @@ class PublicCatalogController extends Controller
             'isVip'         => (bool) $resort->is_vip,
             'map'           => $this->readiness->mapPayloadForResort($resort),
             'rooms'         => $rooms,
+            'averageRating' => $reviewSummary['average_rating'],
+            'totalReviews'  => $reviewSummary['total_reviews'],
         ], 'Resort detail by slug fetched');
     }
 
@@ -243,6 +260,8 @@ class PublicCatalogController extends Controller
             $embedVideoId = YoutubeVideoId::parse($resort->admin_landing_youtube_url);
         }
 
+        $reviewSummary = $this->reviewService->getResortRatingSummary($resort);
+
         return $this->successResponse([
             'id'                   => $resort->id,
             'slug'                 => $slug,
@@ -260,6 +279,7 @@ class PublicCatalogController extends Controller
                 ? SubscriptionPlan::badgeLabel(SubscriptionPlan::BUSINESS_PRO)
                 : SubscriptionPlan::badgeLabel(SubscriptionPlan::STANDARD),
             'isPremiumVerified'    => $isPremium,
+            'verificationStatus'    => $resort->verification_status ?? 'not_verified',
             'isVip'                => $isPremium,
             'amenities'            => $resortAmenities,
             'cancellationPolicy'   => $resort->cancellation_policy,
@@ -273,6 +293,8 @@ class PublicCatalogController extends Controller
                 'enabled' => (bool) $resort->admin_landing_embed_enabled && $embedVideoId !== null,
                 'youtubeVideoId' => $embedVideoId,
             ],
+            'averageRating'        => $reviewSummary['average_rating'],
+            'totalReviews'         => $reviewSummary['total_reviews'],
         ], 'Resort landing page fetched');
     }
 

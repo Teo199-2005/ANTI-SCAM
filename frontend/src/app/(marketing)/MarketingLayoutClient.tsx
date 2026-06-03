@@ -14,6 +14,7 @@ import {
 import { ResortGuestBookingFlowLayout } from "@/components/layout/ResortGuestBookingFlowLayout";
 import { ResortGuestSlugChromeLayout } from "@/components/layout/ResortGuestSlugChromeLayout";
 import { cn } from "@/lib/utils";
+import { recordVisitorVisit } from "@/lib/visitorTracking";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
@@ -54,6 +55,13 @@ export default function MarketingLayoutClient({ children }: Readonly<{ children:
       router.replace("/dashboard");
     }
   }, [allowMarketingWhileSignedIn, loading, router, user]);
+
+  // Visitor tracking — record a visit on each marketing page load
+  useEffect(() => {
+    if (!loading && !user) {
+      recordVisitorVisit();
+    }
+  }, [pathname, loading, user]);
 
   if (loading) {
     return (

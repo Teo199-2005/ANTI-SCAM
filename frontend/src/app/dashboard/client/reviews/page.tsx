@@ -2,12 +2,7 @@
 
 import { useToast } from "@/components/shared/ToastProvider";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  getStoredReviews,
-  hasReviewForReservation,
-  saveReview,
-  StoredClientReview,
-} from "@/lib/client/reviews";
+import { submitResortReview } from "@/lib/api/reviews";
 import { apiClient } from "@/lib/api/client";
 import { sanitizeLongText } from "@/lib/inputRestrictions";
 import { Loader2, Star } from "lucide-react";
@@ -26,6 +21,14 @@ type ReservationRow = {
   room?: { id: number; name: string };
 };
 
+type SubmittedReview = {
+  id: number;
+  resort_id: number;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
 type Paginated = {
   success: boolean;
   data: { data: ReservationRow[] };
@@ -37,7 +40,7 @@ export default function ClientReviewsPage() {
   const userId = user?.id ?? 0;
 
   const [eligible, setEligible] = useState<ReservationRow[]>([]);
-  const [past, setPast] = useState<StoredClientReview[]>([]);
+  const [past, setPast] = useState<SubmittedReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,24 +50,17 @@ export default function ClientReviewsPage() {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<ReviewTab>("write");
 
-  const refreshLocal = () => {
-    if (userId) setPast(getStoredReviews(userId));
-  };
-
-  useEffect(() => {
-    refreshLocal();
-  }, [userId]);
-
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
+        // Load completed reservations that are eligible for review
         const { data } = await apiClient.get<Paginated>("/reservations", {
           params: { status: "completed", perPage: 50 },
         });
         const rows = (data.data?.data ?? []) as ReservationRow[];
-        setEligible(rows.filter((r) => !hasReviewForReservation(userId, r.id)));
+        setEligible(rows);
       } catch (err) {
         setError("Could not load completed stays.");
         setEligible([]);
@@ -76,33 +72,65 @@ export default function ClientReviewsPage() {
     else setLoading(false);
   }, [userId]);
 
+  // Load past reviews from localStorage temporarily until we have a user-reviews endpoint
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      const stored = localStorage.getItem(`rs_client_submitted_reviews_${userId}`);
+      if (stored) {
+        setPast(JSON.parse(stored) as SubmittedReview[]);
+      }
+    } catch {
+      // ignore
+    }
+  }, [userId]);
+
   const startReview = (r: ReservationRow) => {
     setEditingRow(r);
     setRating(5);
     setComment("");
   };
 
-  const submitReview = () => {
+  const submitReview = async () => {
     if (!editingRow || !userId) return;
+    const resortId = editingRow.resort?.id;
+    if (!resortId) {
+      pushToast({ title: "Cannot submit review", description: "Resort information missing.", tone: "error" });
+      return;
+    }
     setSaving(true);
     try {
-      saveReview(userId, {
-        reservationId: editingRow.id,
-        resortId: editingRow.resort?.id ?? 0,
-        resortName: editingRow.resort?.name ?? "Resort",
-        roomName: editingRow.room?.name ?? "Room",
+      const result = await submitResortReview(resortId, {
+        reservation_id: editingRow.id,
         rating,
-        comment: comment.trim() || "Great stay!",
+        comment: comment.trim() || undefined,
       });
       setEligible((prev) => prev.filter((x) => x.id !== editingRow.id));
-      refreshLocal();
+      // Save to local past reviews
+      const newPast: SubmittedReview = {
+        id: result.id,
+        resort_id: result.resort_id,
+        rating: result.rating,
+        comment: result.comment,
+        created_at: result.created_at,
+      };
+      setPast((prev) => {
+        const updated = [newPast, ...prev];
+        try {
+          localStorage.setItem(`rs_client_submitted_reviews_${userId}`, JSON.stringify(updated));
+        } catch { /* ignore */ }
+        return updated;
+      });
       setEditingRow(null);
       setTab("past");
       pushToast({
-        title: "Review saved",
-        description: "Stored on this device — sync to the server when your API supports it.",
+        title: "Review submitted",
+        description: "Thank you for sharing your experience!",
         tone: "success",
       });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not submit review.";
+      pushToast({ title: "Review failed", description: msg, tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -125,7 +153,7 @@ export default function ClientReviewsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="dash-page-title">My reviews</h1>
-        <p className="dash-page-sub">Share feedback after completed stays. Reviews are saved on this device.</p>
+        <p className="dash-page-sub">Share feedback after completed stays.</p>
       </div>
 
       {loading ? (
@@ -196,8 +224,8 @@ export default function ClientReviewsPage() {
                             onChange={(e) => setComment(sanitizeLongText(e.target.value))}
                           />
                           <div className="flex gap-2">
-                            <button type="button" disabled={saving} onClick={submitReview} className="dash-btn-primary">
-                              {saving ? "Saving…" : "Submit review"}
+                            <button type="button" disabled={saving} onClick={() => void submitReview()} className="dash-btn-primary">
+                              {saving ? "Submitting…" : "Submit review"}
                             </button>
                             <button type="button" onClick={() => setEditingRow(null)} className="dash-btn-sm">
                               Cancel
@@ -224,18 +252,16 @@ export default function ClientReviewsPage() {
               )}
             </>
           ) : past.length === 0 ? (
-            <p className="text-sm text-zinc-500">You haven’t submitted any reviews yet.</p>
+            <p className="text-sm text-zinc-500">You haven&apos;t submitted any reviews yet.</p>
           ) : (
             <ul className="space-y-4">
               {past.map((rv) => (
                 <li key={rv.id} className="border-b border-softBorder pb-4 last:border-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-navy">{rv.resortName}</span>
                     <span className="text-amber-600">{"★".repeat(rv.rating)}{"☆".repeat(5 - rv.rating)}</span>
                   </div>
-                  <p className="text-sm text-zinc-600">{rv.roomName}</p>
-                  <p className="mt-2 text-sm text-zinc-700">{rv.comment}</p>
-                  <p className="mt-1 text-xs text-zinc-400">{new Date(rv.createdAt).toLocaleString()}</p>
+                  <p className="mt-2 text-sm text-zinc-700">{rv.comment ?? "Great stay!"}</p>
+                  <p className="mt-1 text-xs text-zinc-400">{new Date(rv.created_at).toLocaleString()}</p>
                 </li>
               ))}
             </ul>
@@ -245,4 +271,3 @@ export default function ClientReviewsPage() {
     </div>
   );
 }
-

@@ -10,6 +10,7 @@ import {
   rejectResortVerification,
   requestMoreVerificationDocuments,
   updateResortVerificationReview,
+  updateResortVerificationStatus,
   type VerificationAssignee,
   type VerificationDetail,
   type VerificationDocument,
@@ -78,6 +79,15 @@ export default function AdminResortVerificationReviewModal({
   const [adminNotes, setAdminNotes] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [scheduledNotes, setScheduledNotes] = useState("");
+  const [statusChangeReason, setStatusChangeReason] = useState("");
+
+  const VERIFICATION_STATUSES = [
+    { value: "not_verified", label: "Not Yet Verified" },
+    { value: "pending", label: "Pending" },
+    { value: "verified", label: "Verified" },
+    { value: "rejected", label: "Rejected" },
+    { value: "needs_documents", label: "Needs Documents" },
+  ];
 
   useEffect(() => {
     if (!open || resortId == null) {
@@ -204,6 +214,24 @@ export default function AdminResortVerificationReviewModal({
       await downloadVerificationDocumentsZip(resortId);
     } catch (err) {
       setError(parseApiErrorMessage(err, "Could not download documents."));
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (resortId == null || newStatus === resort?.verification_status) return;
+    setAction("save_review");
+    setError(null);
+    try {
+      await updateResortVerificationStatus(resortId, {
+        verification_status: newStatus,
+        reason: statusChangeReason.trim() || undefined,
+      });
+      onResolved();
+      onClose();
+    } catch (err) {
+      setError(parseApiErrorMessage(err, "Could not update verification status."));
     } finally {
       setAction(null);
     }
@@ -415,6 +443,47 @@ export default function AdminResortVerificationReviewModal({
                   Download ZIP
                 </button>
               </div>
+            </div>
+          </InfoPanel>
+
+          <InfoPanel title="Change verification status">
+            <div className="space-y-3 py-2">
+              <p className="text-xs text-zinc-500">
+                Directly change the verification status. This bypasses the normal review workflow.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {VERIFICATION_STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    disabled={action !== null || s.value === resort?.verification_status}
+                    onClick={() => void handleStatusChange(s.value)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition",
+                      s.value === resort?.verification_status
+                        ? "border-zinc-300 bg-zinc-100 text-zinc-400 cursor-not-allowed"
+                        : s.value === "verified"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                          : s.value === "rejected"
+                            ? "border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100"
+                            : s.value === "not_verified"
+                              ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                              : "border-softBorder bg-white text-zinc-700 hover:bg-zinc-50",
+                    )}
+                  >
+                    {s.value === resort?.verification_status && <Check size={12} aria-hidden />}
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <label className="block text-xs font-semibold text-zinc-600">Reason for status change (optional)</label>
+              <textarea
+                value={statusChangeReason}
+                onChange={(e) => setStatusChangeReason(e.target.value)}
+                rows={2}
+                className="w-full rounded-xl border border-softBorder px-3 py-2 text-sm"
+                placeholder="Explain why you are changing the status…"
+              />
             </div>
           </InfoPanel>
 

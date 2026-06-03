@@ -134,68 +134,148 @@ export default function AdminOverviewPage() {
       </div>
 
       {/* ── KPI split: booking/resort ratios left, resort footprint right ─────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-        <DashCard className="flex h-full min-h-0 flex-col overflow-hidden p-0">
-          <div className="grid grid-cols-1 divide-y divide-softBorder">
-            {[
-              {
-                label: "Confirmed bookings",
-                pct: confirmedPct,
-                count: stats.confirmedReservations,
-                accent: color.semantic.success,
-                icon: CheckCircle2,
-              },
-              {
-                label: "Pending payment",
-                pct: pendingPct,
-                count: stats.pendingPayment,
-                accent: color.semantic.warning,
-                icon: Clock3,
-              },
-              {
-                label: "Public resorts",
-                pct: publicPct,
-                count: stats.publicResorts,
-                accent: color.data.skyBright,
-                icon: Globe2,
-              },
-              {
-                label: "Suspended resorts",
-                pct: suspendedPct,
-                count: stats.suspendedResorts,
-                accent: color.semantic.error,
-                icon: AlertTriangle,
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="space-y-2 p-4 motion-safe:animate-dash-fade-in md:p-5"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="inline-flex items-center gap-1.5 font-dash text-[12px] font-semibold leading-tight text-zinc-700 md:text-dash-sm">
-                      <item.icon size={14} style={{ color: item.accent }} />
-                      {item.label}
-                    </p>
-                    <p className="mt-0.5 font-dash text-[10px] text-zinc-500">Share of total · raw count on right</p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="flex flex-col gap-4">
+          <DashCard className="overflow-hidden p-0">
+            <div className="grid grid-cols-2 divide-x divide-y divide-softBorder">
+              {[
+                {
+                  label: "Confirmed bookings",
+                  pct: confirmedPct,
+                  count: stats.confirmedReservations,
+                  accent: color.semantic.success,
+                  icon: CheckCircle2,
+                },
+                {
+                  label: "Pending payment",
+                  pct: pendingPct,
+                  count: stats.pendingPayment,
+                  accent: color.semantic.warning,
+                  icon: Clock3,
+                },
+                {
+                  label: "Public resorts",
+                  pct: publicPct,
+                  count: stats.publicResorts,
+                  accent: color.data.skyBright,
+                  icon: Globe2,
+                },
+                {
+                  label: "Suspended resorts",
+                  pct: suspendedPct,
+                  count: stats.suspendedResorts,
+                  accent: color.semantic.error,
+                  icon: AlertTriangle,
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="space-y-2 p-4 motion-safe:animate-dash-fade-in md:p-5"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="inline-flex items-center gap-1.5 font-dash text-[12px] font-semibold leading-tight text-zinc-700 md:text-dash-sm">
+                        <item.icon size={14} style={{ color: item.accent }} />
+                        {item.label}
+                      </p>
+                      <p className="mt-0.5 font-dash text-[10px] text-zinc-500">Share of total · raw count on right</p>
+                    </div>
+                    <div className="flex shrink-0 items-baseline gap-3">
+                      <p className="font-dash text-sm font-semibold tabular-nums text-zinc-600 md:text-base">{item.pct}%</p>
+                      <p className="min-w-[2.25rem] text-right font-dash text-2xl font-bold tabular-nums text-navy">{item.count}</p>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-baseline gap-3">
-                    <p className="font-dash text-sm font-semibold tabular-nums text-zinc-600 md:text-base">{item.pct}%</p>
-                    <p className="min-w-[2.25rem] text-right font-dash text-2xl font-bold tabular-nums text-navy">{item.count}</p>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-softGray">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500"
+                      style={{ width: `${item.pct}%`, background: item.accent }}
+                    />
                   </div>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-softGray">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-500"
-                    style={{ width: `${item.pct}%`, background: item.accent }}
-                  />
+              ))}
+            </div>
+          </DashCard>
+
+          <DashCard className="overflow-hidden p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="inline-flex rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
+                  <CalendarDays size={16} className="text-clOcean" />
+                </div>
+                <div>
+                  <h2 className="font-dash text-base font-semibold text-navy">Recent reservations</h2>
+                  <p className="text-xs text-zinc-500">Latest across all resorts</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </DashCard>
+              <Link href="/dashboard/admin/reservations" className="dash-btn-sm">
+                View all
+              </Link>
+            </div>
 
-        <DashCard className="flex h-full min-h-[20rem] flex-col overflow-hidden p-0 lg:min-h-0">
+            {stats.recentReservations.length === 0 ? (
+              <p className="px-6 py-8 text-sm text-zinc-500">No reservations yet.</p>
+            ) : (
+              <>
+                <div className="md:hidden space-y-3 p-4">
+                  {stats.recentReservations.map((r) => (
+                    <DashMobileTableCard
+                      key={r.id}
+                      title={<span className="font-mono text-sm">{r.reference_no}</span>}
+                      fields={[
+                        { label: "Check-in", value: r.check_in_date },
+                        { label: "Check-out", value: r.check_out_date },
+                        { label: "Fee", value: formatPhp(Number(r.reservation_fee)) },
+                        {
+                          label: "Status",
+                          value: (
+                            <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
+                              {r.status.replaceAll("_", " ")}
+                            </span>
+                          ),
+                        },
+                      ]}
+                      actions={
+                        <Link href="/dashboard/admin/reservations" className="dash-btn-sm w-full justify-center">
+                          View all reservations
+                        </Link>
+                      }
+                    />
+                  ))}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="dash-table">
+                    <thead>
+                      <tr>
+                        <th>Reference</th>
+                        <th>Check-in</th>
+                        <th>Check-out</th>
+                        <th>Fee</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.recentReservations.map((r) => (
+                        <tr key={r.id}>
+                          <td className="font-mono text-xs font-semibold text-navy">{r.reference_no}</td>
+                          <td className="text-zinc-600">{r.check_in_date}</td>
+                          <td className="text-zinc-600">{r.check_out_date}</td>
+                          <td className="font-semibold text-zinc-800">{formatPhp(Number(r.reservation_fee))}</td>
+                          <td>
+                            <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
+                              {r.status.replaceAll("_", " ")}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </DashCard>
+        </div>
+
+        <DashCard className="overflow-hidden p-0">
           <div className="shrink-0 border-b border-softBorder px-4 py-4 md:px-6">
             <div className="flex items-start gap-2.5">
               <div className="inline-flex shrink-0 rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
@@ -218,84 +298,6 @@ export default function AdminOverviewPage() {
           </div>
         </DashCard>
       </div>
-
-      <DashCard className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-softBorder px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="inline-flex rounded-lg bg-clOcean/10 p-2 ring-1 ring-clOcean/10">
-              <CalendarDays size={16} className="text-clOcean" />
-            </div>
-            <div>
-              <h2 className="font-dash text-base font-semibold text-navy">Recent reservations</h2>
-              <p className="text-xs text-zinc-500">Latest across all resorts</p>
-            </div>
-          </div>
-          <Link href="/dashboard/admin/reservations" className="dash-btn-sm">
-            View all
-          </Link>
-        </div>
-
-        {stats.recentReservations.length === 0 ? (
-          <p className="px-6 py-8 text-sm text-zinc-500">No reservations yet.</p>
-        ) : (
-          <>
-            <div className="md:hidden space-y-3 p-4">
-              {stats.recentReservations.map((r) => (
-                <DashMobileTableCard
-                  key={r.id}
-                  title={<span className="font-mono text-sm">{r.reference_no}</span>}
-                  fields={[
-                    { label: "Check-in", value: r.check_in_date },
-                    { label: "Check-out", value: r.check_out_date },
-                    { label: "Fee", value: formatPhp(Number(r.reservation_fee)) },
-                    {
-                      label: "Status",
-                      value: (
-                        <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
-                          {r.status.replaceAll("_", " ")}
-                        </span>
-                      ),
-                    },
-                  ]}
-                  actions={
-                    <Link href="/dashboard/admin/reservations" className="dash-btn-sm w-full justify-center">
-                      View all reservations
-                    </Link>
-                  }
-                />
-              ))}
-            </div>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="dash-table">
-                <thead>
-                  <tr>
-                    <th>Reference</th>
-                    <th>Check-in</th>
-                    <th>Check-out</th>
-                    <th>Fee</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.recentReservations.map((r) => (
-                    <tr key={r.id}>
-                      <td className="font-mono text-xs font-semibold text-navy">{r.reference_no}</td>
-                      <td className="text-zinc-600">{r.check_in_date}</td>
-                      <td className="text-zinc-600">{r.check_out_date}</td>
-                      <td className="font-semibold text-zinc-800">{formatPhp(Number(r.reservation_fee))}</td>
-                      <td>
-                        <span className={statusBadge[r.status] ?? "dash-badge-slate"}>
-                          {r.status.replaceAll("_", " ")}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </DashCard>
 
     </div>
   );

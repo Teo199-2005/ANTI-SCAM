@@ -2,6 +2,7 @@ import { ResortLandingAboutMapBand } from "@/components/resort-page/ResortLandin
 import { ResortLandingFooter } from "@/components/resort-page/ResortLandingFooter";
 import { ResortLandingHero } from "@/components/resort-page/ResortLandingHero";
 import { ResortPublicNavbar } from "@/components/resort-page/ResortPublicNavbar";
+import { ResortReviewsSection } from "@/components/resort-page/ResortReviewsSection";
 import {
   resortLandingSectionChain,
   resortLandingSurfaceFor,
@@ -27,10 +28,16 @@ export function ResortPublicLandingTemplate({ data }: Props) {
   const hasAbout = Boolean(data.about.body?.trim()) || resortAmenities.length > 0;
   const hasRooms = data.rooms.length > 0;
   const hasMap = Boolean(data.map.embedUrl);
-  const sectionChain = resortLandingSectionChain({ hasAbout: true, hasRooms, hasMap: false });
+  const sectionChain = resortLandingSectionChain({ hasAbout: true, hasRooms, hasMap: false, hasReviews: true });
 
   return (
     <main className="resort-landing-shell scroll-pt-[4.75rem] pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-0">
+      {/* Expose resort ID for visitor tracking (fire-and-forget analytics) */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.__ASP_RESORT_ID__=${data.id};`,
+        }}
+      />
       <ResortPublicNavbar
         resortName={data.name}
         logoUrl={data.logoUrl ?? data.hero.logoUrl}
@@ -47,6 +54,9 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         contactNumber={data.contactNumber}
         isVip={data.isVip}
         isPremiumVerified={data.isPremiumVerified ?? false}
+        verificationStatus={data.verificationStatus}
+        averageRating={data.averageRating}
+        totalReviews={data.totalReviews}
         badgeLabel={data.badgeLabel}
         facebookUrl={data.hero.facebookUrl ?? null}
         instagramUrl={data.hero.instagramUrl ?? null}
@@ -58,6 +68,11 @@ export function ResortPublicLandingTemplate({ data }: Props) {
         rooms={data.rooms}
         resortId={data.id}
         surface={resortLandingSurfaceFor(sectionChain, "rooms")}
+      />
+
+      <ResortReviewsSection
+        resortId={data.id}
+        surface={resortLandingSurfaceFor(sectionChain, "reviews")}
       />
 
       <ResortLandingAboutMapBand

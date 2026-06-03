@@ -53,7 +53,7 @@ final class AdminResortVerificationService
     public function list(Request $request): LengthAwarePaginator
     {
         $validated = validator($request->all(), [
-            'filter' => ['sometimes', 'string', Rule::in(['awaiting_review', 'verified', 'rejected', 'needs_documents', 'all'])],
+            'filter' => ['sometimes', 'string', Rule::in(['awaiting_review', 'verified', 'rejected', 'needs_documents', 'not_verified', 'all'])],
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
             'perPage' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -76,6 +76,7 @@ final class AdminResortVerificationService
             'verified' => $query->where('verification_status', 'verified'),
             'rejected' => $query->where('verification_status', 'rejected'),
             'needs_documents' => $query->where('verification_status', 'needs_documents'),
+            'not_verified' => $query->where('verification_status', 'not_verified'),
             default => null,
         };
 
@@ -302,6 +303,74 @@ final class AdminResortVerificationService
         ]);
 
         return $resort->fresh(['tenant', 'verificationAssignee', 'verificationDocuments'])->loadCount('rooms');
+    }
+
+    /**
+     * Allow admin to directly set the verification status of a resort.
+     */
+    public function updateStatus(User $admin, Resort $resort, array $data): Resort
+    {
+        $allowedStatuses = ['not_verified', 'pending', 'verified', 'rejected', 'needs_documents'];
+
+        $validated = validator($data, [
+            'verification_status' => ['required', 'string', Rule::in($allowedStatuses)],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ])->validate();
+
+        $newStatus = $validated['verification_status'];
+        $oldStatus = $resort->verification_status ?? 'not_verified';
+
+        if ($oldStatus === $newStatus) {
+            throw ValidationException::withMessages([
+                'verification_status' => ['Resort already has this status.'],
+            ]);
+        }
+
+        $old = [
+            'verification_status' => $oldStatus,
+            'verified_at' => $resort->verified_at?->toIso8601String(),
+            'is_publicly_listed' => $resort->is_publicly_listed,
+        ];
+
+        $updateData = [
+            'verification_status' => $newStatus,
+        ];
+
+        // When setting to verified, set verified_at
+        if ($newStatus === 'verified') {
+            $updateData['verified_at'] = now();
+            $updateData['verification_rejection_reason'] = null;
+        } else {
+            $updateData['verified_at'] = null;
+        }
+
+        // When rejecting or needing documents, unlist the resort
+        if (in_array($newStatus, ['rejected', 'needs_documents', 'not_verified'], true)) {
+            $updateData['is_publicly_listed'] = false;
+        }
+
+        if ($validated['reason'] ?? null) {
+            $updateData['verification_rejection_reason'] = $validated['reason'];
+        }
+
+        $resort->update($updateData);
+        $resort = $resort->fresh();
+
+        $this->audits->log(
+            'resort_verification_status_changed',
+            'resort',
+            $resort->id,
+            $old,
+            [
+                'verification_status' => $newStatus,
+                'verified_at' => $resort->verified_at?->toIso8601String(),
+                'is_publicly_listed' => $resort->is_publicly_listed,
+            ],
+            ['actor_user_id' => $admin->id],
+            $validated['reason'] ?? "Status changed from {$oldStatus} to {$newStatus}",
+        );
+
+        return $resort->fresh(['tenant', 'verificationDocuments'])->loadCount('rooms');
     }
 
     public function downloadDocumentsZip(Resort $resort): BinaryFileResponse

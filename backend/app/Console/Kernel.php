@@ -8,6 +8,7 @@ use App\Console\Commands\ExpireBookingLocks;
 use App\Console\Commands\GenerateMonthlyInvoices;
 use App\Console\Commands\ClearMarketerGcashPayoutDetails;
 use App\Console\Commands\ProcessMarketerCommissionPayouts;
+use App\Console\Commands\PurgeOldSiteVisitors;
 use App\Console\Commands\ReconcileMarketerPayoutBatches;
 use App\Console\Commands\ReportStaleMarketerPayoutBatches;
 use App\Console\Commands\SendSubscriptionExpiryReminders;
@@ -28,6 +29,7 @@ class Kernel extends ConsoleKernel
         ProcessMarketerCommissionPayouts::class,
         ReconcileMarketerPayoutBatches::class,
         ReportStaleMarketerPayoutBatches::class,
+        PurgeOldSiteVisitors::class,
     ];
 
     protected function schedule(Schedule $schedule): void
@@ -45,6 +47,7 @@ class Kernel extends ConsoleKernel
             ->dailyAt('07:30')
             ->timezone('Asia/Manila');
         $schedule->command('marketing:reconcile-payout-batches')->hourly();
+        $schedule->command('visitors:purge')->weekly()->sundays()->at('03:00');
     }
 
     protected function commands(): void

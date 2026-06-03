@@ -6,6 +6,7 @@ export type VerificationQueueFilter =
   | "verified"
   | "rejected"
   | "needs_documents"
+  | "not_verified"
   | "all";
 
 export type VerificationQueueItem = {
@@ -193,4 +194,22 @@ export async function downloadVerificationDocumentsZip(resortId: number): Promis
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+export type VerificationStatusUpdateResponse = {
+  id: number;
+  verification_status: string;
+  verified_at: string | null;
+  is_publicly_listed: boolean;
+};
+
+export async function updateResortVerificationStatus(
+  resortId: number,
+  body: { verification_status: string; reason?: string },
+): Promise<VerificationStatusUpdateResponse> {
+  const { data } = await apiClient.patch<ApiEnvelope<VerificationStatusUpdateResponse>>(
+    `/admin/resort-verifications/${resortId}/status`,
+    body,
+  );
+  return data.data;
 }

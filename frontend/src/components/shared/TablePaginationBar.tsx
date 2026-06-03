@@ -14,6 +14,8 @@ type TablePaginationBarProps = {
   onPageChange: (nextPage: number) => void;
   disabled?: boolean;
   className?: string;
+  /** When true, hides the per-page selector and label */
+  hidePerPage?: boolean;
 };
 
 export default function TablePaginationBar({
@@ -26,6 +28,7 @@ export default function TablePaginationBar({
   onPageChange,
   disabled,
   className,
+  hidePerPage = false,
 }: TablePaginationBarProps) {
   const from = total === 0 ? 0 : (page - 1) * perPage + 1;
   const to = Math.min(page * perPage, total);
@@ -41,19 +44,23 @@ export default function TablePaginationBar({
       )}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 sm:flex-nowrap sm:justify-end sm:gap-x-3">
-        <span className="hidden shrink-0 text-[13px] font-medium text-zinc-600 sm:inline">Items per page</span>
-        <span className="inline shrink-0 text-[13px] font-medium text-zinc-600 sm:hidden">Per page</span>
-        <AppSelect
-          variant="compact"
-          value={String(perPage)}
-          disabled={disabled}
-          aria-label="Items per page"
-          onChange={(e) => onPerPageChange(Number(e.target.value))}
-          options={perPageOptions.map((n) => ({ value: String(n), label: String(n) }))}
-        />
+        {!hidePerPage && (
+          <>
+            <span className="hidden shrink-0 text-[13px] font-medium text-zinc-600 sm:inline">Items per page</span>
+            <span className="inline shrink-0 text-[13px] font-medium text-zinc-600 sm:hidden">Per page</span>
+            <AppSelect
+              variant="compact"
+              value={String(perPage)}
+              disabled={disabled}
+              aria-label="Items per page"
+              onChange={(e) => onPerPageChange(Number(e.target.value))}
+              options={perPageOptions.map((n) => ({ value: String(n), label: String(n) }))}
+            />
+          </>
+        )}
 
         <span
-          className="hidden h-4 w-px shrink-0 bg-zinc-200 sm:block"
+          className={cn("h-4 w-px shrink-0 bg-zinc-200 sm:block", hidePerPage ? "hidden" : "hidden sm:block")}
           aria-hidden
         />
 

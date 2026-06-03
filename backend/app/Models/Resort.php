@@ -105,6 +105,11 @@ class Resort extends Model
         return $this->hasOne(ResortLandingPage::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ResortReview::class);
+    }
+
     public function verificationAssignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verification_assigned_to_user_id');

@@ -87,9 +87,9 @@ function RoomDetailInner() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-5">
-          <div className="soft-panel p-7">
+          <div className="soft-panel p-5 sm:p-7">
             <div className="flex flex-wrap items-start gap-3">
-              <h1 className="flex-1 font-heading text-4xl text-zinc-900">{room.name}</h1>
+              <h1 className="flex-1 font-heading text-2xl font-bold text-zinc-900 sm:text-4xl">{room.name}</h1>
               <span className="glass-tag text-sm">{room.code}</span>
             </div>
 
@@ -106,7 +106,7 @@ function RoomDetailInner() {
 
             <div className="mt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Price per night</p>
-              <p className="font-heading text-4xl text-zinc-900">
+              <p className="font-heading text-2xl font-bold text-zinc-900 sm:text-4xl">
                 {formatGuestDisplayPhp(room.basePrice, reservationFeePhp)}
               </p>
               <p className="text-xs text-zinc-500">

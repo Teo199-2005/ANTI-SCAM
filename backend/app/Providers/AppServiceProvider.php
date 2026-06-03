@@ -80,5 +80,10 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perHour(30)->by('ip:'.$request->ip()),
             ];
         });
+
+        // Review submission: 5 per minute per authenticated user (spam protection)
+        RateLimiter::for('review-submission', function (Request $request) {
+            return Limit::perMinute(5)->by($request->user()?->getAuthIdentifier() ?? $request->ip());
+        });
     }
 }

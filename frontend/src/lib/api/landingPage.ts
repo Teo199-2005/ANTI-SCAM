@@ -120,6 +120,12 @@ export type PublicResortLandingPayload = {
   plan?: string;
   badgeLabel?: string;
   isPremiumVerified?: boolean;
+  /** Verification status: not_verified | pending | verified | rejected | needs_documents */
+  verificationStatus?: string;
+  /** Average rating from visible reviews (null if no reviews). */
+  averageRating?: number | null;
+  /** Total count of visible reviews. */
+  totalReviews?: number;
   /** Resort-level amenities from the owner profile (display chips on the public landing page). */
   amenities?: string[];
   cancellationPolicy?: string | null;

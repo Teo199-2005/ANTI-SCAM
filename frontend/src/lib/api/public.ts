@@ -39,6 +39,11 @@ export type PublicResort = {
   /** Public resort detail (by id or slug) — resort logo path when set. */
   logoUrl?: string | null;
   isPremiumVerified?: boolean;
+  verificationStatus?: string;
+  /** Average rating from visible reviews (null if no reviews). */
+  averageRating?: number | null;
+  /** Total count of visible reviews. */
+  totalReviews?: number;
   map?: PublicResortMap | null;
   images?: { id: number; url: string; caption?: string | null }[];
   rooms: PublicRoom[];
@@ -56,10 +61,15 @@ export type PublicResortListItem = {
   plan?: string;
   badgeLabel?: string;
   isPremiumVerified?: boolean;
+  verificationStatus?: string;
   isVip?: boolean;
   activeRoomsCount: number;
   featuredRoomId: number | null;
   priceFrom?: number | null;
+  /** Average rating from visible reviews (null if no reviews). */
+  averageRating?: number | null;
+  /** Total count of visible reviews. */
+  totalReviews?: number;
 };
 
 export type AvailabilityResult = {

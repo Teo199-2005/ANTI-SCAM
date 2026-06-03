@@ -15,7 +15,6 @@ use App\Modules\Admin\Http\Controllers\AdminSubscriptionOverviewController;
 use App\Modules\Admin\Http\Controllers\AdminUserSubscriptionController;
 use App\Modules\Admin\Http\Controllers\MarketingController;
 use App\Modules\Admin\Http\Controllers\SuspensionController;
-use App\Modules\Admin\Http\Controllers\SystemSettingController;
 use App\Modules\Admin\Http\Controllers\VipController;
 use App\Modules\Admin\Http\Controllers\XenditLogController;
 use App\Modules\Audit\Http\Controllers\AuditLogController;
@@ -35,12 +34,14 @@ use App\Modules\Guests\Http\Controllers\GuestPortalController;
 use App\Modules\Public\Http\Controllers\PublicCatalogController;
 use App\Modules\Public\Http\Controllers\PublicLocationController;
 use App\Modules\Public\Http\Controllers\ReferralValidationController;
+use App\Modules\Public\Http\Controllers\SiteVisitorController;
 use App\Modules\Reservations\Http\Controllers\BookingLockController;
 use App\Modules\Reservations\Http\Controllers\ReservationController;
 use App\Modules\Reservations\Http\Controllers\StaffNoteController;
 use App\Modules\Resorts\Http\Controllers\DiscountCodeController;
 use App\Modules\Resorts\Http\Controllers\ResortController;
 use App\Modules\Resorts\Http\Controllers\ResortGuestController;
+use App\Modules\Resorts\Http\Controllers\ResortReviewController;
 use App\Modules\Resorts\Http\Controllers\ResortLandingPageController;
 use App\Modules\Rooms\Http\Controllers\RoomController;
 use App\Modules\Rooms\Http\Controllers\RoomImageController;
@@ -102,6 +103,15 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/public/rooms/{room}/images/{image}/file', [PublicCatalogController::class, 'roomImageFile']);
     Route::get('/public/rooms/{room}/availability', [PublicCatalogController::class, 'checkAvailability']);
     Route::get('/public/rooms/{room}/availability-calendar', [PublicCatalogController::class, 'availabilityCalendar']);
+
+    // Public resort reviews
+    Route::get('/public/resorts/{resort}/reviews', [\App\Modules\Public\Http\Controllers\PublicResortReviewController::class, 'index']);
+    Route::get('/public/resorts/{resort}/reviews/summary', [\App\Modules\Public\Http\Controllers\PublicResortReviewController::class, 'summary']);
+
+    // Public visitor tracking
+    Route::middleware('throttle:30,1')->group(function (): void {
+        Route::post('/public/visitors/record', [SiteVisitorController::class, 'record']);
+    });
 
     // Discount code validation (public, called from checkout)
     Route::middleware('throttle:public-forms')->group(function (): void {
@@ -186,6 +196,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/admin/resort-verifications/{resort}', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'show']);
             Route::get('/admin/resort-verifications/{resort}/documents.zip', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'downloadDocuments']);
             Route::patch('/admin/resort-verifications/{resort}/review', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'updateReview']);
+            Route::patch('/admin/resort-verifications/{resort}/status', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'updateStatus']);
             Route::post('/admin/resort-verifications/{resort}/approve', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'approve']);
             Route::post('/admin/resort-verifications/{resort}/reject', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'reject']);
             Route::post('/admin/resort-verifications/{resort}/request-documents', [\App\Modules\Admin\Http\Controllers\AdminResortVerificationController::class, 'requestMoreDocuments']);
@@ -204,12 +215,21 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/admin/resorts/{resort}/subscriptions/trigger-invoice', [SubscriptionInvoiceController::class, 'create']);
             Route::post('/admin/mail/test', [AdminMailHealthController::class, 'send']);
 
-            // System settings
-            Route::get('/admin/settings', [SystemSettingController::class, 'index']);
-            Route::put('/admin/settings', [SystemSettingController::class, 'update']);
+            // System settings (removed)
 
             // Marketing management
             Route::get('/admin/marketers', [MarketingController::class, 'marketers']);
+
+            // Admin review management
+            Route::get('/admin/reviews', [\App\Modules\Admin\Http\Controllers\AdminReviewController::class, 'index']);
+            Route::patch('/admin/reviews/{review}/visibility', [\App\Modules\Admin\Http\Controllers\AdminReviewController::class, 'toggleVisibility']);
+
+            // Admin visitor stats
+            Route::get('/admin/visitors/stats', [\App\Modules\Admin\Http\Controllers\AdminVisitorController::class, 'stats']);
+            Route::get('/admin/visitors/daily', [\App\Modules\Admin\Http\Controllers\AdminVisitorController::class, 'daily']);
+            Route::get('/admin/visitors/top-pages', [\App\Modules\Admin\Http\Controllers\AdminVisitorController::class, 'topPages']);
+            Route::get('/admin/visitors/top-resorts', [\App\Modules\Admin\Http\Controllers\AdminVisitorController::class, 'topResorts']);
+            Route::get('/admin/visitors/recent', [\App\Modules\Admin\Http\Controllers\AdminVisitorController::class, 'recent']);
             Route::get('/admin/marketers/monitoring', [MarketingController::class, 'marketersMonitoring']);
             Route::get('/admin/marketing/booking-commissions/analytics', [MarketingController::class, 'bookingCommissionAnalytics']);
             Route::get('/admin/marketers/{marketer}/detail', [MarketingController::class, 'marketerDetail']);
@@ -239,6 +259,13 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/favorites', [GuestPortalController::class, 'favoritesStore']);
             Route::delete('/favorites/{roomId}', [GuestPortalController::class, 'favoritesDestroy'])
                 ->whereNumber('roomId');
+        });
+
+        // Client review submission
+        Route::middleware('role:client,user')->group(function (): void {
+            Route::middleware('throttle:review-submission')->group(function (): void {
+                Route::post('/resorts/{resort}/reviews', [ResortReviewController::class, 'store']);
+            });
         });
         Route::middleware('throttle:booking-actions')->group(function (): void {
             Route::post('/booking-locks', [BookingLockController::class, 'store']);

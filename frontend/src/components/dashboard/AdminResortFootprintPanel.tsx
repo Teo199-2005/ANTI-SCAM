@@ -2,7 +2,6 @@
 
 import { SubscriptionPlanLabel } from "@/components/badges/SubscriptionPlanLabel";
 import { EntityIdHint } from "@/components/shared/EntityIdHint";
-import TablePaginationBar from "@/components/shared/TablePaginationBar";
 import { TableEntityThumb } from "@/components/shared/TableEntityThumb";
 import { listResorts, type ResortItem } from "@/lib/api/resort";
 import { parseApiErrorMessage } from "@/lib/auth/parseApiError";
@@ -29,7 +28,7 @@ export default function AdminResortFootprintPanel({
   totalResorts,
   publicResorts,
   suspendedResorts,
-  defaultPerPage = 8,
+  defaultPerPage = 3,
 }: AdminResortFootprintPanelProps) {
   const [resorts, setResorts] = useState<ResortItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,26 +149,10 @@ export default function AdminResortFootprintPanel({
               </li>
             ))}
           </ul>
-          {listTotal > 0 ? (
-            <TablePaginationBar
-              page={page}
-              lastPage={lastPage}
-              total={listTotal}
-              perPage={perPage}
-              perPageOptions={[5, 8, 10, 15]}
-              onPerPageChange={onPerPageChange}
-              onPageChange={onPageChange}
-              disabled={loading}
-              className="rounded-none border-x-0 border-b-0"
-            />
-          ) : null}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-softBorder pt-3">
-        <p className="text-xs text-zinc-500">
-          Sorted A–Z by resort name. Use pagination to browse all properties, or open Resorts for search and filters.
-        </p>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-softBorder pt-3">
         <Link href="/dashboard/admin/resorts" className="dash-btn-sm inline-flex shrink-0 items-center gap-1">
           <Building2 size={14} aria-hidden />
           Manage resorts

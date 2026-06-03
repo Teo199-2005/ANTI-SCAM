@@ -9,6 +9,7 @@ import {
   Building2,
   CalendarDays,
   CreditCard,
+  Eye,
   FileText,
   LayoutDashboard,
   Link2,
@@ -73,6 +74,8 @@ const adminGroups: NavGroup[] = [
       { href: "/dashboard/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
       { href: "/dashboard/admin/finance", label: "Finance & payouts", icon: Landmark },
       { href: "/dashboard/admin/suspensions", label: "Suspensions", icon: AlertTriangle },
+      { href: "/dashboard/admin/reviews", label: "Reviews", icon: MessageSquare },
+      { href: "/dashboard/admin/visitors", label: "Visitors", icon: Eye },
     ],
   },
   {
@@ -81,7 +84,6 @@ const adminGroups: NavGroup[] = [
       { href: "/dashboard/admin/onboard",     label: "Onboard Resort",   icon: Plus },
       { href: "/dashboard/admin/xendit-logs", label: "Payment Logs",     icon: Webhook },
       { href: "/dashboard/admin/audit-logs",  label: "Audit Logs",       icon: FileText },
-      { href: "/dashboard/admin/settings",    label: "System Settings",  icon: Settings },
     ],
   },
 ];

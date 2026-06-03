@@ -55,7 +55,7 @@ function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPre
         }}
       >
         {primaryImage ? (
-          <div className="relative flex aspect-[2/1] w-full items-center justify-center overflow-hidden bg-zinc-100">
+          <div className="relative flex aspect-[3/2] w-full items-center justify-center overflow-hidden bg-zinc-100 sm:aspect-[2/1]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={roomImageDisplaySrc(room.id, primaryImage, "public")}
@@ -64,33 +64,33 @@ function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPre
             />
           </div>
         ) : (
-          <div className="flex aspect-[2/1] w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-zinc-100 to-zinc-200 text-[11px] text-zinc-500">
+          <div className="flex aspect-[3/2] w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-zinc-100 to-zinc-200 text-[11px] text-zinc-500 sm:aspect-[2/1]">
             <ImageOff size={14} />
             <span>No photo yet</span>
           </div>
         )}
 
-        <div className="flex flex-1 flex-col p-3">
-          <h3 className="min-h-0 text-left font-heading text-sm font-semibold leading-tight text-navy line-clamp-2">
+        <div className="flex flex-1 flex-col p-3 sm:p-3">
+          <h3 className="min-h-0 text-left font-heading text-sm font-semibold leading-tight text-navy line-clamp-2 sm:text-sm">
             {room.name}
           </h3>
 
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">
+          <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-1.5">
+            <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-0.5 text-[11px] font-medium text-zinc-800 sm:text-[10px] sm:py-px">
               <Users size={10} className="shrink-0 text-zinc-500" aria-hidden />
               {room.capacity} {room.capacity === 1 ? "guest" : "guests"}
             </span>
-            <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2 py-px text-[10px] font-semibold text-zinc-800">
+            <span className="inline-flex items-center rounded-full border border-zinc-300/80 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-800 sm:text-[10px] sm:py-px">
               {formatGuestDisplayPerNight(room.basePrice, room.reservationFee)}
             </span>
             {bedCount ? (
-              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-px text-[10px] font-medium text-zinc-800">
+              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-zinc-50/90 px-2 py-0.5 text-[11px] font-medium text-zinc-800 sm:text-[10px] sm:py-px">
                 <BedDouble size={10} className="shrink-0 text-zinc-500" aria-hidden />
                 {bedCount} {bedCount === 1 ? "bed" : "beds"}
               </span>
             ) : null}
             {bedType ? (
-              <span className="inline-flex items-center rounded-full border border-zinc-200/90 bg-white px-2 py-px text-[10px] font-medium text-zinc-700">
+              <span className="inline-flex items-center rounded-full border border-zinc-200/90 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 sm:text-[10px] sm:py-px">
                 {bedType}
               </span>
             ) : null}
@@ -104,7 +104,7 @@ function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPre
                 return (
                   <span
                     key={a}
-                    className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-white/90 px-1.5 py-px text-[9px] font-medium text-zinc-700"
+                    className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 sm:text-[9px] sm:py-px"
                   >
                     <Icon size={9} className={`shrink-0 ${isCustomInclusionToken(a) ? "text-amber-500" : "text-zinc-500"}`} aria-hidden />
                     {displayInclusionLabel(a)}
@@ -119,12 +119,12 @@ function RoomPreviewTile({ room, onSelect, revealDelay = 0, className }: RoomPre
             </div>
           )}
 
-          <p className="mt-2 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+          <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-zinc-500 sm:text-[10px]">
             {room.rules?.trim() || "Comfortable stay with guest-first amenities."}
           </p>
 
-          <div className="mt-2 border-t border-zinc-200/90 pt-2">
-            <span className="inline-flex w-full items-center justify-center rounded-lg bg-navy px-3 py-1.5 text-[11px] font-semibold text-white transition group-hover:bg-navy/90">
+          <div className="mt-2 border-t border-zinc-200/90 pt-2 sm:pt-2">
+            <span className="inline-flex w-full items-center justify-center rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white transition group-hover:bg-navy/90 sm:py-1.5 sm:text-[11px]">
               View room details
             </span>
           </div>
@@ -156,7 +156,7 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
         </p>
         <div className="mt-2 h-px max-w-sm bg-gradient-to-r from-zinc-400/70 via-zinc-200/80 to-transparent" />
 
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rooms.slice(0, 3).map((room, i) => (
             <RoomPreviewTile
               key={room.id}
@@ -165,22 +165,13 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
               revealDelay={Math.min(220, (room.id % 4) * 70 + i * 24)}
             />
           ))}
-          {rooms[3] ? (
-            <RoomPreviewTile
-              key={rooms[3].id}
-              room={rooms[3]}
-              onSelect={setSelectedRoom}
-              revealDelay={Math.min(220, (rooms[3].id % 4) * 70)}
-              className="lg:hidden"
-            />
-          ) : null}
         </div>
 
         {rooms.length > 3 ? (
           <details
             className={cn(
               "group mt-3 w-full border-0 bg-transparent p-0",
-              rooms.length === 4 && "hidden lg:block",
+              rooms.length <= 2 && "hidden",
             )}
           >
             <summary className="mx-auto flex w-full max-w-md cursor-pointer list-none items-center justify-center gap-1.5 rounded-full border border-zinc-200/60 bg-zinc-50/40 py-2 text-[11px] font-medium text-zinc-500 shadow-none transition hover:border-zinc-300/80 hover:bg-zinc-100/60 hover:text-zinc-700 marker:content-none [&::-webkit-details-marker]:hidden">
@@ -191,12 +182,13 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
               />
               <span>View more rooms</span>
               <span className="tabular-nums text-zinc-400">
-                <span className="lg:hidden">({rooms.length - 4})</span>
+                <span className="sm:hidden">({rooms.length - 3})</span>
+                <span className="hidden sm:inline lg:hidden">({rooms.length - 4})</span>
                 <span className="hidden lg:inline">({rooms.length - 3})</span>
               </span>
             </summary>
             <div className="mt-3 border-t border-zinc-200/60 pt-3">
-              <div className="hidden grid-cols-3 gap-3 lg:grid">
+              <div className="hidden grid-cols-3 gap-3 sm:hidden lg:grid">
                 {rooms.slice(3).map((room, i) => (
                   <RoomPreviewTile
                     key={room.id}
@@ -206,13 +198,15 @@ export function ResortRoomsSection({ rooms, resortId, surface }: Props) {
                   />
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-3 lg:hidden">
-                {rooms.slice(4).map((room, i) => (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:hidden">
+                {rooms.slice(2).map((room, i) => (
+                  // On mobile (< sm), show from index 2; on sm-lg, show from index 4
                   <RoomPreviewTile
                     key={room.id}
                     room={room}
                     onSelect={setSelectedRoom}
                     revealDelay={80 + i * 40}
+                    className=""
                   />
                 ))}
               </div>

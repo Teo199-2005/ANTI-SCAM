@@ -109,6 +109,18 @@ class AdminResortVerificationController extends Controller
         );
     }
 
+    public function updateStatus(Request $request, Resort $resort)
+    {
+        $updated = $this->verification->updateStatus($request->user(), $resort, $request->all());
+
+        return $this->successResponse([
+            'id' => $updated->id,
+            'verification_status' => $updated->verification_status,
+            'verified_at' => $updated->verified_at?->toIso8601String(),
+            'is_publicly_listed' => $updated->is_publicly_listed,
+        ], 'Verification status updated');
+    }
+
     public function downloadDocuments(Resort $resort)
     {
         return $this->verification->downloadDocumentsZip($resort);

@@ -5,7 +5,7 @@ import { laravelPublicUrl } from "@/lib/publicAsset";
 import type { PublicAdminLandingEmbed } from "@/lib/api/landingPage";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/badges/VerifiedBadge";
-import { Facebook, Instagram, MapPin, Phone } from "lucide-react";
+import { Facebook, Instagram, MapPin, Phone, Star } from "lucide-react";
 
 /**
  * Public resort hero — full-bleed photo + glass panel.
@@ -52,6 +52,12 @@ type Props = {
   isVip: boolean;
   /** Business Pro / premium verified — gold verified.png badge. */
   isPremiumVerified?: boolean;
+  /** Verification status: not_verified | pending | verified | rejected | needs_documents */
+  verificationStatus?: string;
+  /** Average rating from visible reviews (null if no reviews). */
+  averageRating?: number | null;
+  /** Total count of visible reviews. */
+  totalReviews?: number;
   badgeLabel?: string;
   facebookUrl?: string | null;
   instagramUrl?: string | null;
@@ -70,6 +76,9 @@ export function ResortLandingHero({
   secondaryCta,
   isVip,
   isPremiumVerified = false,
+  verificationStatus,
+  averageRating,
+  totalReviews,
   badgeLabel,
   facebookUrl,
   instagramUrl,
@@ -154,6 +163,73 @@ export function ResortLandingHero({
                   </span>
                 </div>
               </div>
+
+              {/* Verification status warning for non-verified resorts */}
+              {verificationStatus && verificationStatus !== 'verified' ? (
+                <div className={cn(
+                  "mt-2 w-full rounded-lg border px-3 py-2 text-center text-[11px] font-medium leading-snug sm:text-xs",
+                  verificationStatus === 'not_verified'
+                    ? "border-amber-400/50 bg-amber-900/30 text-amber-200/90"
+                    : verificationStatus === 'pending' || verificationStatus === 'needs_documents'
+                      ? "border-sky-400/40 bg-sky-900/25 text-sky-200/90"
+                      : "border-rose-400/50 bg-rose-900/30 text-rose-200/90",
+                )}>
+                  {verificationStatus === 'not_verified' && (
+                    <>
+                      <span className="font-bold uppercase tracking-wide">Not Yet Verified by Anti-ScamPH</span>
+                      <span className="block mt-0.5 text-[10px] opacity-80 sm:text-[11px]">
+                        This resort has not completed Anti-ScamPH verification through site visitation or live video verification.
+                      </span>
+                    </>
+                  )}
+                  {(verificationStatus === 'pending' || verificationStatus === 'needs_documents') && (
+                    <>
+                      <span className="font-bold uppercase tracking-wide">Verification In Progress</span>
+                      <span className="block mt-0.5 text-[10px] opacity-80 sm:text-[11px]">
+                        This resort is currently undergoing Anti-ScamPH verification review.
+                      </span>
+                    </>
+                  )}
+                  {verificationStatus === 'rejected' && (
+                    <>
+                      <span className="font-bold uppercase tracking-wide">Verification Not Approved</span>
+                      <span className="block mt-0.5 text-[10px] opacity-80 sm:text-[11px]">
+                        This resort did not meet Anti-ScamPH verification requirements.
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Star rating display */}
+              {averageRating != null && averageRating > 0 ? (
+                <div className="mt-2 flex w-full items-center justify-center gap-1.5">
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const filled = star <= Math.round(averageRating);
+                      return (
+                        <Star
+                          key={star}
+                          size={14}
+                          className={cn(
+                            "sm:h-4 sm:w-4",
+                            filled
+                              ? "fill-amber-400 text-amber-400"
+                              : "fill-zinc-600/50 text-zinc-600/50",
+                          )}
+                          aria-hidden
+                        />
+                      );
+                    })}
+                  </div>
+                  <span className="text-[11px] font-semibold text-zinc-200/90 sm:text-xs">
+                    {averageRating.toFixed(1)}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 sm:text-[11px]">
+                    ({totalReviews ?? 0} review{totalReviews !== 1 ? "s" : ""})
+                  </span>
+                </div>
+              ) : null}
 
               <p
                 className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-300/95 sm:text-xs"

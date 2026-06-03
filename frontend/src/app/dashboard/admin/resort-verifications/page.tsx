@@ -20,17 +20,19 @@ import { Eye, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 const FILTERS: { key: VerificationQueueFilter; label: string }[] = [
+  { key: "all", label: "All" },
   { key: "awaiting_review", label: "Awaiting review" },
   { key: "needs_documents", label: "Needs documents" },
+  { key: "not_verified", label: "Not verified" },
   { key: "verified", label: "Verified" },
   { key: "rejected", label: "Rejected" },
-  { key: "all", label: "All" },
 ];
 
 function statusBadge(status: string) {
   if (status === "verified") return "dash-badge-emerald";
   if (status === "rejected") return "dash-badge-rose";
   if (status === "needs_documents") return "dash-badge-amber";
+  if (status === "not_verified") return "dash-badge-slate";
   return "dash-badge-amber";
 }
 
@@ -53,7 +55,7 @@ export default function AdminResortVerificationsPage() {
   const [items, setItems] = useState<VerificationQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<VerificationQueueFilter>("awaiting_review");
+  const [filter, setFilter] = useState<VerificationQueueFilter>("all");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);

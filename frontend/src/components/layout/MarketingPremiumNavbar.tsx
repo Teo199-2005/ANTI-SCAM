@@ -39,6 +39,7 @@ const registerGoldButtonStyle = {
 const LINK_HREF = {
   home: "/",
   about: "/about",
+  plans: "/plans",
   blogs: "/blogs",
   contact: "/contact",
 } as const;
@@ -256,6 +257,13 @@ export function MarketingPremiumNavbar({ mode }: Props) {
             About
           </Link>
           <Link
+            href={LINK_HREF.plans}
+            className={desktopLinkClass(LINK_HREF.plans, false)}
+            style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+          >
+            Plans
+          </Link>
+          <Link
             href={LINK_HREF.blogs}
             className={desktopLinkClass(LINK_HREF.blogs, false)}
             style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
@@ -381,6 +389,14 @@ export function MarketingPremiumNavbar({ mode }: Props) {
             onClick={() => setMobileNav(false)}
           >
             About
+          </Link>
+          <Link
+            href={LINK_HREF.plans}
+            className={mobileRowClass(false)}
+            style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+            onClick={() => setMobileNav(false)}
+          >
+            Plans
           </Link>
           <Link
             href={LINK_HREF.blogs}
