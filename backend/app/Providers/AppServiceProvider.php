@@ -85,5 +85,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('review-submission', function (Request $request) {
             return Limit::perMinute(5)->by($request->user()?->getAuthIdentifier() ?? $request->ip());
         });
+
+        // Public resort link verification: 10 per minute per IP (anti-scraping)
+        RateLimiter::for('verify-resort-link', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
     }
 }

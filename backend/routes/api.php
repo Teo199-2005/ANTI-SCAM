@@ -34,6 +34,7 @@ use App\Modules\Guests\Http\Controllers\GuestPortalController;
 use App\Modules\Public\Http\Controllers\PublicCatalogController;
 use App\Modules\Public\Http\Controllers\PublicLocationController;
 use App\Modules\Public\Http\Controllers\ReferralValidationController;
+use App\Modules\Public\Http\Controllers\PublicResortVerificationController;
 use App\Modules\Public\Http\Controllers\SiteVisitorController;
 use App\Modules\Reservations\Http\Controllers\BookingLockController;
 use App\Modules\Reservations\Http\Controllers\ReservationController;
@@ -111,6 +112,11 @@ Route::prefix('v1')->group(function (): void {
     // Public visitor tracking
     Route::middleware('throttle:30,1')->group(function (): void {
         Route::post('/public/visitors/record', [SiteVisitorController::class, 'record']);
+    });
+
+    // Public resort link verification (guest anti-scam tool)
+    Route::middleware('throttle:verify-resort-link')->group(function (): void {
+        Route::post('/public/verify-resort-link', [PublicResortVerificationController::class, 'verify']);
     });
 
     // Discount code validation (public, called from checkout)

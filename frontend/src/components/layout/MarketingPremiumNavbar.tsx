@@ -17,7 +17,7 @@ import { getOwnerLandingPage } from "@/lib/api/landingPage";
 import { isBusinessProPlan } from "@/lib/subscriptionPlans";
 import { cn } from "@/lib/utils";
 import { ResortGrowthRewardsProgramModal } from "@/components/layout/ResortGrowthRewardsProgramModal";
-import { VerifyResortComingSoonModal } from "@/components/layout/VerifyResortComingSoonModal";
+import { VerifyResortModal } from "@/components/layout/VerifyResortModal";
 import { useRegisterModal } from "@/contexts/RegisterModalContext";
 
 const GOLD = "#f5a623";
@@ -477,7 +477,7 @@ export function MarketingPremiumNavbar({ mode }: Props) {
   return (
     <>
       <header className={headerShell}>{inner}</header>
-      <VerifyResortComingSoonModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
+      <VerifyResortModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
       <ResortGrowthRewardsProgramModal
         open={programOpen}
         onClose={() => setProgramOpen(false)}
