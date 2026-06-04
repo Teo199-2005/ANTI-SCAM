@@ -129,6 +129,7 @@ export function BrowseResortCard({ resort, onViewRooms, onViewWebsite, className
             badgeLabel={resort.badgeLabel}
             isPremiumVerified={resort.isPremiumVerified}
             isVip={resort.isVip}
+            verificationStatus={resort.verificationStatus}
             className="mt-1.5 max-sm:hidden sm:mt-2"
           />
         </div>
@@ -145,6 +146,7 @@ export function BrowseResortCard({ resort, onViewRooms, onViewWebsite, className
             badgeLabel={resort.badgeLabel}
             isPremiumVerified={resort.isPremiumVerified}
             isVip={resort.isVip}
+            verificationStatus={resort.verificationStatus}
             className="mb-1.5 sm:hidden"
           />
           {resort.address ? (
@@ -183,7 +185,7 @@ export function BrowseResortCard({ resort, onViewRooms, onViewWebsite, className
             </p>
           ) : (
             <p className={cn("flex-1 text-zinc-500 max-sm:hidden", compact ? "text-[10px]" : "text-xs")}>
-              Verified on Anti-Scam PH
+              {resort.verificationStatus === 'verified' ? "Verified on Anti-Scam PH" : "Listed on Anti-Scam PH"}
             </p>
           )}
           {resort.priceFrom != null && resort.priceFrom > 0 ? (

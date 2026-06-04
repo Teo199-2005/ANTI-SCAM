@@ -104,7 +104,7 @@ export default function BrowseResortsPage() {
 
   const resultLabel = loading
     ? "Loading resorts…"
-    : `${meta.total} verified resort${meta.total === 1 ? "" : "s"}`;
+    : `${meta.total} resort${meta.total === 1 ? "" : "s"}`;
 
   return (
     <div className="min-w-0 bg-white font-body text-[#111] antialiased">

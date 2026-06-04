@@ -279,6 +279,10 @@ class PhilippineLocationService
 
         $city = $this->findCityRow($cityCode);
         if ($city === null) {
+            if (filled($barangayName) && $this->isValidProvinceCityPair($provinceCode, $cityCode)) {
+                return trim((string) $barangayName);
+            }
+
             return null;
         }
 

@@ -117,8 +117,7 @@ class Resort extends Model
 
     public function isDiscoverableInPublicCatalog(): bool
     {
-        return $this->is_publicly_listed
-            && ($this->verification_status ?? 'pending') === 'verified';
+        return (bool) $this->is_publicly_listed;
     }
 
     /**
@@ -129,8 +128,6 @@ class Resort extends Model
      */
     public function scopeDiscoverableInPublicCatalog(Builder $query): Builder
     {
-        return $query
-            ->where('is_publicly_listed', true)
-            ->where('verification_status', 'verified');
+        return $query->where('is_publicly_listed', true);
     }
 }
