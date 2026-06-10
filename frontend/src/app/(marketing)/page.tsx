@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { LandingPremiumPage } from "@/components/landing-preview/LandingPremiumPage";
+import { siteUrl } from "@/lib/site";
 
+const base = siteUrl().replace(/\/+$/, "");
 const homeTitle = "Anti-Scam PH — Verified resort bookings in the Philippines";
 const homeDescription =
-  "Anti-Scam PH helps Philippine resorts prevent fake bookings, avoid double reservations, and build guest trust through verified booking technology. Plan your staycation with confidence.";
+  "Book verified resorts with transparent pricing and scam-aware protections. Compare listings, secure your stay, and pay with confidence on the Philippines’ resort booking platform.";
 
 export const metadata: Metadata = {
   title: homeTitle,
@@ -15,10 +17,10 @@ export const metadata: Metadata = {
     url: "/",
     images: [
       {
-        url: "/marketing/founding500.png",
-        width: 560,
-        height: 620,
-        alt: "Anti-Scam PH founding resort partners",
+        url: `${base}/branding/mainlogo.png`,
+        width: 1200,
+        height: 630,
+        alt: "Anti-Scam PH — verified resort bookings",
       },
     ],
   },
@@ -26,7 +28,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: homeTitle,
     description: homeDescription,
-    images: ["/marketing/founding500.png"],
+    images: [`${base}/branding/mainlogo.png`],
   },
 };
 
