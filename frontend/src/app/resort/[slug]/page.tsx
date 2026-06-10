@@ -1,17 +1,85 @@
 import { ResortPublicLandingTemplate } from "@/components/resort-page/ResortPublicLandingTemplate";
 import { getPublicResortBySubdomain } from "@/lib/api/landingPage";
+import { siteUrl } from "@/lib/site";
 import Link from "next/link";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ slug: string }> };
 
+/**
+ * Resolve a resort image path (which may be a relative `/storage/…` path or a full
+ * HTTPS URL) into an **absolute** URL suitable for Open Graph `<meta>` tags.
+ */
+function resolveOgImageUrl(
+  path: string | null | undefined,
+  base: string,
+): string | null {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  const rel = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${rel}`;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const base = siteUrl();
+  const fallbackOgImage = `${base}/branding/mainlogo.png`;
+
   const result = await getPublicResortBySubdomain(slug);
   if (!result.ok) {
-    return { title: "Resort | Anti-Scam PH" };
+    return {
+      title: "Resort | Anti-Scam PH",
+      openGraph: {
+        title: "Resort | Anti-Scam PH",
+        description:
+          "Book verified resorts with transparent pricing on Anti-Scam PH.",
+        images: [{ url: fallbackOgImage, width: 1200, height: 630, alt: "Anti-Scam PH" }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        images: [fallbackOgImage],
+      },
+    };
   }
-  return { title: `${result.data.name} | Anti-Scam PH` };
+
+  const resort = result.data;
+  const description =
+    resort.description?.slice(0, 200) ||
+    `Book your stay at ${resort.name} — verified on Anti-Scam PH.`;
+
+  // Prefer the resort's background image, then logo, then platform fallback
+  const ogImage =
+    resolveOgImageUrl(resort.hero.bgImageUrl, base) ||
+    resolveOgImageUrl(resort.hero.logoUrl, base) ||
+    resolveOgImageUrl(resort.logoUrl, base) ||
+    fallbackOgImage;
+
+  return {
+    title: `${resort.name} | Anti-Scam PH`,
+    description,
+    openGraph: {
+      type: "website",
+      locale: "en_PH",
+      siteName: "Anti-Scam PH",
+      title: `${resort.name} | Anti-Scam PH`,
+      description,
+      url: `${base}/resort/${slug}`,
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: `${resort.name} — Anti-Scam PH`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${resort.name} | Anti-Scam PH`,
+      description,
+      images: [ogImage],
+    },
+  };
 }
 
 export default async function PublicResortLandingPage({ params }: Props) {

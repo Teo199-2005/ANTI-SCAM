@@ -62,16 +62,16 @@ export const metadata: Metadata = {
     siteName: "Anti-Scam PH",
     images: [
       {
-        url: "/marketing/coverphoto.png",
-        width: 1536,
-        height: 1024,
+        url: "/branding/mainlogo.png",
+        width: 1200,
+        height: 630,
         alt: "Anti-Scam PH — verified resort bookings"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/marketing/coverphoto.png"]
+    images: ["/branding/mainlogo.png"]
   },
   robots: {
     index: true,
