@@ -7,16 +7,21 @@ import type { Metadata } from "next";
 type Props = { params: Promise<{ slug: string }> };
 
 /**
- * Resolve a resort image path (which may be a relative `/storage/…` path or a full
- * HTTPS URL) into an **absolute** URL suitable for Open Graph `<meta>` tags.
+ * Resolve a resort image path into an **absolute** URL suitable for Open Graph `<meta>` tags.
+ *
+ * Handles:
+ * - Absolute HTTPS URLs (Cloudflare R2, S3, etc.) → returned as-is
+ * - Relative `/storage/…` paths → prepended with the site base URL
+ * - Empty strings, null, undefined → fall-through to the next candidate
  */
 function resolveOgImageUrl(
   path: string | null | undefined,
   base: string,
 ): string | null {
-  if (!path) return null;
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  const rel = path.startsWith("/") ? path : `/${path}`;
+  if (!path || (typeof path === "string" && path.trim() === "")) return null;
+  const trimmed = path.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const rel = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   return `${base}${rel}`;
 }
 
@@ -47,11 +52,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     resort.description?.slice(0, 200) ||
     `Book your stay at ${resort.name} — verified on Anti-Scam PH.`;
 
-  // Prefer the resort's background image, then logo, then platform fallback
+  // Prefer (in order):
+  //   1. hero background image   (landing page cover)
+  //   2. hero logo               (landing page brand mark)
+  //   3. top-level logoUrl       (resort logo from owner profile)
+  //   4. Anti-Scam PH logo       (platform fallback)
   const ogImage =
-    resolveOgImageUrl(resort.hero.bgImageUrl, base) ||
-    resolveOgImageUrl(resort.hero.logoUrl, base) ||
-    resolveOgImageUrl(resort.logoUrl, base) ||
+    resolveOgImageUrl(resort.hero?.bgImageUrl, base) ??
+    resolveOgImageUrl(resort.hero?.logoUrl, base) ??
+    resolveOgImageUrl(resort.logoUrl, base) ??
     fallbackOgImage;
 
   return {
