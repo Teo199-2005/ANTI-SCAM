@@ -28,7 +28,7 @@ const poppins = Poppins({
   weight: ["600", "700", "800"]
 });
 
-const site = siteUrl();
+const site = siteUrl().replace(/\/+$/, "");
 const defaultTitle = "Anti-Scam PH — Verified resort bookings in the Philippines";
 const defaultDescription =
   "Book verified resorts with transparent pricing and scam-aware protections. Compare listings, secure your stay, and pay with confidence on the Philippines’ resort booking platform.";
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     siteName: "Anti-Scam PH",
     images: [
       {
-        url: "/branding/mainlogo.png",
+        url: `${site}/branding/mainlogo.png`,
         width: 1200,
         height: 630,
         alt: "Anti-Scam PH — verified resort bookings"
@@ -71,7 +71,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/branding/mainlogo.png"]
+    images: [`${site}/branding/mainlogo.png`]
   },
   robots: {
     index: true,
